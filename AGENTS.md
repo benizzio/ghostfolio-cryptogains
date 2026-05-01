@@ -102,4 +102,16 @@ TO BE DEFINED
 
 </CustomCodeDocs>
 
+- when declaring a variable, give preference to `var` over `:=` as it is more explicit and more similar to other
+  languages
+    - **exception**: multiple variable declarations with reusage, e.g.:
+        ```go
+        err := doSomething()
+        <...>
+        result, err := doSomethingElse()
+        ```
+- do not follow Godoc convention of adding a comment for every function, type, variable, etc. Clean code has priority
+    - exception: AI generated code according to general instructions
+
+
 </CodingStandards>

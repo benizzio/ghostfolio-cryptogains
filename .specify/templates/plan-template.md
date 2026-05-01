@@ -19,7 +19,7 @@
 
 **Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
 **Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
+**Storage**: [if applicable, local-only encrypted files, local-only encrypted database, or N/A]  
 **Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
 **Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
 **Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app or NEEDS CLARIFICATION]  
@@ -31,7 +31,22 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- [ ] Security: no Ghostfolio token persistence or output, justified local-only
+      persistence, token-derived encryption approach, and OWASP Top 10:2025
+      review scope are defined.
+- [ ] Precision: all financial calculations use fixed-point decimals or integer
+      minor units, never floating point in domain logic.
+- [ ] Testing: integration-first automated tests, mocked or stubbed outside
+      services, unit tests only for justified complex units, and 100% coverage
+      for project-owned code are planned.
+- [ ] Dependencies: every new third-party library is justified against a core
+      implementation and includes research on maintenance, community acceptance,
+      security posture, release freshness, and recent activity.
+- [ ] External APIs: each integration is necessary, and the latest supported API
+      version, authentication model, failure modes, and security implications are
+      documented.
+- [ ] Architecture: the design keeps clear domain boundaries, descriptive names,
+      cohesive modules, and minimal duplication.
 
 ## Project Structure
 

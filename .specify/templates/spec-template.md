@@ -77,6 +77,10 @@
 
 ## Requirements *(mandatory)*
 
+Each feature specification MUST capture security, persistence, precision,
+testing, dependency, and external integration impacts when the feature touches
+those areas.
+
 <!--
   ACTION REQUIRED: The content in this section represents placeholders.
   Fill them out with the right functional requirements.
@@ -87,13 +91,26 @@
 - **FR-001**: System MUST [specific capability, e.g., "allow users to create accounts"]
 - **FR-002**: System MUST [specific capability, e.g., "validate email addresses"]  
 - **FR-003**: Users MUST be able to [key interaction, e.g., "reset their password"]
-- **FR-004**: System MUST [data requirement, e.g., "persist user preferences"]
+- **FR-004**: System MUST [data requirement, e.g., "persist locally encrypted user preferences with documented justification"]
 - **FR-005**: System MUST [behavior, e.g., "log all security events"]
 
 *Example of marking unclear requirements:*
 
 - **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
 - **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
+
+### Security, Precision, and Integration Constraints
+
+- **SEC-001**: [Describe how secrets are supplied, kept in memory only, and kept
+  out of logs, output, and persisted artifacts]
+- **SEC-002**: [State whether any data is persisted. If yes, justify it, keep it
+  local only, and describe encryption tied to the active Ghostfolio token]
+- **FIN-001**: [Define the numeric representation, scale, and rounding rules for
+  every financial value involved]
+- **QUAL-001**: [Describe the automated integration tests, mocked or stubbed
+  outside services, and how 100% coverage will be enforced]
+- **INT-001**: [List any new dependencies or external APIs and the research or
+  justification required before implementation]
 
 ### Key Entities *(include if feature involves data)*
 
