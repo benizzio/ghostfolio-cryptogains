@@ -133,9 +133,11 @@ The client must reject sync when any activity required for holdings reconstructi
 
 Optional fields used when available:
 
-- account scope data used as wallet-equivalent input for wallet-scoped matching
+- account scope data used as one available source grouping for deriving `applicable_scope` during scope-local matching
 - asset name and display metadata
 - opaque data-source metadata
+
+An upstream `account` value is treated only as source grouping data for deriving `applicable_scope`; it is not assumed to be semantically identical to a wallet.
 
 ### Pagination Rules
 
@@ -156,7 +158,9 @@ Optional fields used when available:
 - Remove exact duplicates after canonical normalization.
 - Reject the sync if unsupported event types that affect holdings are present.
 - Reject the sync if remaining gaps or contradictions make basis calculation non-defensible.
-- If account-derived wallet scope is missing or unreliable, downgrade wallet-scoped unit matching to asset-level FIFO exactly as defined in the feature specification.
+- Reliable source scope data may narrow scope-local matching to the current `(asset, applicable_scope)` partition.
+- Unreliable or missing source scope data causes the same scope-local hybrid method to use asset-level scope for that asset.
+- This scope change is not a FIFO downgrade.
 
 ## Security Rules
 

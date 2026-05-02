@@ -193,7 +193,7 @@ Fields:
 | `activity_count` | integer | Count after normalization and deduplication |
 | `activities` | `ActivityRecord[]` | Chronological normalized records |
 | `available_years` | integer array | Distinct years present in the normalized timeline |
-| `scope_reliability` | enum | `reliable`, `partial`, `unavailable` |
+| `scope_reliability` | enum | `reliable`, `partial`, `unavailable`; determines whether source scope can narrow `applicable_scope` or must broaden it to the asset level |
 
 Relationships:
 
@@ -226,7 +226,7 @@ Fields:
 | `fee_amount` | decimal string | Fee in the report currency or source base currency |
 | `comment` | string nullable | Required for interpreting zero-priced movements safely |
 | `data_source` | string nullable | Preserve source system identity as opaque data |
-| `source_scope` | `SourceHoldingScope` nullable | Optional account-derived wallet-equivalent scope |
+| `source_scope` | `SourceHoldingScope` nullable | Optional source grouping used to derive `applicable_scope` when reliable and defensible |
 | `raw_hash` | string | Hash of normalized source fields used for exact-duplicate detection |
 
 Relationships:
@@ -240,10 +240,11 @@ Validation rules:
 - Monetary inputs are consumed as provided and are not cross-currency converted in this feature slice.
 - Exact duplicates are removed by `raw_hash` after canonical normalization.
 - Unsupported holding-affecting event types fail the sync instead of being skipped.
+- Self-transfers between user-owned scopes must preserve carried-forward basis, acquisition timestamp, and provenance instead of realizing gain or loss.
 
 ## SourceHoldingScope
 
-Purpose: Ghostfolio account, or equivalent future source grouping, normalized as the application's wallet concept when wallet-scoped cost-basis matching is selected.
+Purpose: Ghostfolio account, or equivalent future source grouping, normalized as one available source scope the application can use to derive `applicable_scope` for scope-local cost-basis calculations.
 
 Fields:
 
@@ -260,7 +261,16 @@ Relationships:
 
 Validation rules:
 
-- `reliability != reliable` for the relevant asset timeline forces fallback from account-derived wallet matching to asset-level FIFO.
+- `reliability != reliable` for the relevant asset timeline prevents narrowing `applicable_scope` to this source scope; the scope-local hybrid method continues by using the asset as the `applicable_scope`.
+
+## Derived Runtime Concepts
+
+These runtime concepts are derived from normalized activity history when the scope-local hybrid method is active. They do not require new persisted entities.
+
+- `ApplicableScope`: Resolved per disposal as the reliable `SourceHoldingScope` for that asset when available and defensible, otherwise the asset as a whole.
+- `HybridPartitionState`: Runtime state maintained per `(asset_symbol, applicable_scope)` with minimum derived fields `valuation_pool_quantity`, `valuation_pool_basis`, `provenance_queue`, `exact_lots`, and `pooled_until_zero`.
+- `pooled_until_zero`: Boolean flag set after the first scope-local average-cost fallback in an open partition; while true, later disposals in that partition continue using pooled valuation until the partition quantity reaches zero.
+- `TransferCarryForward`: Runtime transfer result that moves quantity, basis, acquisition timestamp, and exact-unit or deemed-disposal provenance between user-owned scopes without realizing gain or loss.
 
 ## ReportRequest
 
@@ -271,7 +281,7 @@ Fields:
 | Field | Type | Notes |
 |-------|------|-------|
 | `tax_year` | integer | Must exist in `available_years` |
-| `cost_basis_method` | enum | `fifo`, `lifo`, `hifo`, `average_cost`, `unit_by_unit_wallet_scoped` |
+| `cost_basis_method` | enum | `fifo`, `lifo`, `hifo`, `average_cost`, `scope_local_hybrid`; `scope_local_hybrid` maps to the user-facing label `Scope-Local Exact Unit Matching, otherwise Scope-Local Average Cost with Oldest-Acquired Deemed-Disposal Order` |
 | `output_format` | enum | Baseline always `pdf` |
 
 Relationships:
@@ -282,7 +292,7 @@ Relationships:
 Validation rules:
 
 - Report generation is blocked until setup is complete and a successful sync exists.
-- The TUI must show a jurisdiction-neutral informational message whenever the cost basis method changes.
+- The TUI must show an informational message whenever the cost basis method changes and explain the matching rule in neutral mathematical and data-model terms.
 
 State transitions:
 

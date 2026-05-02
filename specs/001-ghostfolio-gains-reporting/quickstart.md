@@ -34,6 +34,12 @@ gocoverageplus -i coverage.cov -o coverage.xml
 - unsupported-event rejection
 - non-defensible-history rejection
 - all five cost basis methods
+- exact-unit identification possible within a reliable scope
+- exact-unit identification impossible within a reliable scope, triggering scope-local average fallback
+- unreliable scope, triggering asset-level scope under the same method
+- self-transfer carry-forward of basis and provenance
+- same-timestamp ordering resolved by `source_id`
+- pooled-until-zero behavior after average fallback has occurred in an open partition
 - yearly report generation ordering and inclusion rules
 
 ## Manual TUI Verification Flow
@@ -89,6 +95,11 @@ The implementation should provide deterministic fixtures under `tests/fixtures/`
 - unsupported event types
 - gaps or inconsistencies that make basis calculation non-defensible
 - zero-priced `BUY` and `SELL` activity with explanatory comments
-- reliable and unreliable account-scope cases used as wallet-equivalent matching input
+- exact-unit identification possible within a reliable scope
+- exact-unit identification impossible within a reliable scope, triggering scope-local average fallback
+- unreliable scope, triggering asset-level scope under the same method
+- self-transfer between user-owned scopes carrying forward basis and provenance
+- same-timestamp ordering resolved by `source_id`
+- pooled-until-zero behavior after average fallback has occurred in an open partition
 
 These fixtures must allow the full sync and reporting suite to run without requiring a live Ghostfolio server.

@@ -31,5 +31,5 @@
 
 ## Notes
 
-- Revalidated after user feedback; report inclusion scenarios now sit under report generation, post-year position states are excluded from detailed sections, and local user data is defined as token-unlocked protected data.
-- Baseline scope is intentionally limited to generic capital gains methods and excludes jurisdiction-specific tax rules that would require a separate specification.
+- Revalidated after user feedback; report inclusion scenarios now sit under report generation, post-year position states are excluded from detailed sections, local user data is defined as token-unlocked protected data, and the scope-local hybrid method is defined as a scope-local exact-match or average-cost method rather than a FIFO degradation path.
+- Baseline scope is intentionally limited to the documented cost basis methods and excludes additional disposal-matching rules that would require a separate specification.

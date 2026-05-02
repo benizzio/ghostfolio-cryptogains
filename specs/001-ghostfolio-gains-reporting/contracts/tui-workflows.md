@@ -134,7 +134,7 @@ Rules:
 
 - Report generation controls are disabled when no successful sync exists.
 - The selected year list contains only years present in cached activity history.
-- Changing the cost basis method updates an informational message that explains the matching rule and fallback behavior in jurisdiction-neutral language.
+- Changing the cost basis method updates an informational message that explains the matching rule and any scope-local or fallback behavior in neutral mathematical and data-model language.
 
 Success transition:
 

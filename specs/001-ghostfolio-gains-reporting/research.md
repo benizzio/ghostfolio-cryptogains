@@ -22,6 +22,12 @@ Rationale: The constitution prohibits floating-point domain logic. `apd` has a c
 
 Alternatives considered: `shopspring/decimal` is simpler but less strict and less attractive for accounting-grade controls. `math/big.Rat` is exact but awkward for decimal presentation and rounding policy. `govalues/decimal` has a fixed precision ceiling that is harder to justify for crypto ledgers.
 
+## Cost Basis Method Set
+
+Decision: The baseline product supports FIFO, LIFO, HIFO, Average Cost Basis, and Scope-Local Exact Unit Matching, otherwise Scope-Local Average Cost with Oldest-Acquired Deemed-Disposal Order.
+
+Rationale: The scope-local hybrid method uses exact unit matching when it is defensible within the current `(asset, applicable_scope)` partition and otherwise uses scope-local average-cost valuation with oldest-acquired deemed-disposal ordering inside that same partition. Reliable wallet or account scope narrows `applicable_scope` to that source scope. Missing or unreliable scope broadens `applicable_scope` to the asset as a whole.
+
 ## Persistence Strategy
 
 Decision: Store each registered local user in one encrypted snapshot file located under the OS application data directory. Each file uses an opaque random filename, a small authenticated cleartext header, and a versioned JSON payload encrypted with AES-256-GCM. The encryption key is derived only at runtime from the user-entered Ghostfolio token via Argon2id.
@@ -63,7 +69,7 @@ Rationale: `net/http`, `context`, and `encoding/json` are sufficient and keep th
 - Authenticated activity endpoints use bearer JWT auth.
 - `GET /api/v1/activities` returns `{ activities, count }` and supports `skip` and `take` pagination.
 - `GET /api/v1/health` exists for optional preflight checks.
-- The `Activity` interface exposes optional `account` data but no dedicated wallet field, so account scope is the only upstream grouping available for wallet-scoped matching in this baseline.
+- The `Activity` interface exposes optional `account` data but no dedicated wallet field, so account scope is the only upstream grouping available to help derive `applicable_scope` in this baseline.
 
 Integration decisions:
 
@@ -71,7 +77,7 @@ Integration decisions:
 - Reject non-HTTPS production origins with a blocking configuration error. Only explicitly permitted local-development origins such as `http://localhost` may use HTTP.
 - Canonicalize and pin the selected Ghostfolio origin in the encrypted setup profile.
 - Probe `GET /api/v1/health` or `POST /api/v1/auth/anonymous` early to surface connectivity and version problems before a long sync.
-- Normalize Ghostfolio account scope as the application's wallet-equivalent source scope when the selected cost basis method requires wallet scoping.
+- Use Ghostfolio account scope only as available source grouping data when the selected cost basis method derives `applicable_scope` from reliable scope.
 - Treat missing, redacted, unsupported, or internally inconsistent activity payload fields as hard sync failures.
 
 Cloud default verification:
