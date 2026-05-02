@@ -104,7 +104,8 @@ those areas.
 - **SEC-001**: [Describe how secrets are supplied, kept in memory only, and kept
   out of logs, output, and persisted artifacts]
 - **SEC-002**: [State whether any data is persisted. If yes, justify it, keep it
-  local only, and describe encryption tied to the active Ghostfolio token]
+  local only, and describe encryption tied to the active Ghostfolio token in
+  alignment with the OWASP Cryptographic Storage Cheat Sheet]
 - **FIN-001**: [Define the numeric representation, scale, and rounding rules for
   every financial value involved]
 - **QUAL-001**: [Describe the automated integration tests, mocked or stubbed

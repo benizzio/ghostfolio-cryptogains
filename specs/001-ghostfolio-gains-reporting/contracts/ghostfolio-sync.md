@@ -11,10 +11,10 @@ Observed upstream reference:
 
 ## Compatibility Rules
 
-- The configured Ghostfolio base origin is user-selected and stored in encrypted local setup data.
+- The configured Ghostfolio base origin defaults to `https://ghostfol.io`, is stored in encrypted local setup data, and may be replaced by the user with a self-hosted origin.
 - The client targets the observed `api/v1` base path.
 - The client must validate connectivity and endpoint compatibility at runtime instead of assuming a permanent public contract.
-- HTTPS is required by default unless the user explicitly allows an insecure local-development origin.
+- HTTPS is required for all production-like origins. Only explicitly permitted local-development origins may use HTTP, and production-like HTTP attempts must fail with a blocking error.
 
 ## Authentication Contract
 
@@ -133,7 +133,7 @@ The client must reject sync when any activity required for holdings reconstructi
 
 Optional fields used when available:
 
-- account or wallet scope data for wallet-scoped matching
+- account scope data used as wallet-equivalent input for wallet-scoped matching
 - asset name and display metadata
 - opaque data-source metadata
 
@@ -156,7 +156,7 @@ Optional fields used when available:
 - Remove exact duplicates after canonical normalization.
 - Reject the sync if unsupported event types that affect holdings are present.
 - Reject the sync if remaining gaps or contradictions make basis calculation non-defensible.
-- If wallet or account scope is missing or unreliable, downgrade wallet-scoped unit matching to asset-level FIFO exactly as defined in the feature specification.
+- If account-derived wallet scope is missing or unreliable, downgrade wallet-scoped unit matching to asset-level FIFO exactly as defined in the feature specification.
 
 ## Security Rules
 

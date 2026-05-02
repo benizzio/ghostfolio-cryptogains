@@ -4,8 +4,8 @@ This document defines the verification flow that the implementation for this fea
 
 ## Prerequisites
 
-- Go 1.24 installed.
-- A Ghostfolio server reachable over HTTPS, or a fixture server used by integration tests.
+- Go 1.26.2 installed.
+- The default Ghostfolio cloud server `https://ghostfol.io`, a self-hosted Ghostfolio server reachable over HTTPS, or a local fixture server used by integration tests.
 - A valid Ghostfolio security token for manual end-to-end verification.
 - A writable local filesystem location for encrypted snapshots and generated PDFs.
 
@@ -44,7 +44,7 @@ gocoverageplus -i coverage.cov -o coverage.xml
 go run ./cmd/ghostfolio-cryptogains
 ```
 
-2. On first run, complete setup by selecting either the default Ghostfolio cloud server or a custom server origin.
+2. On first run, complete setup by keeping the default Ghostfolio cloud server `https://ghostfol.io` or by entering a custom self-hosted server origin. Any non-HTTPS production-like origin must be rejected with a blocking error.
 
 3. Start a sync session for the selected registered local user and enter the Ghostfolio security token.
 
@@ -89,6 +89,6 @@ The implementation should provide deterministic fixtures under `tests/fixtures/`
 - unsupported event types
 - gaps or inconsistencies that make basis calculation non-defensible
 - zero-priced `BUY` and `SELL` activity with explanatory comments
-- reliable and unreliable wallet/account scope cases
+- reliable and unreliable account-scope cases used as wallet-equivalent matching input
 
 These fixtures must allow the full sync and reporting suite to run without requiring a live Ghostfolio server.

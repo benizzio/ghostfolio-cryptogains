@@ -96,9 +96,9 @@ Fields:
 | Field | Type | Notes |
 |-------|------|-------|
 | `setup_complete` | boolean | Gates report workflows |
-| `server_mode` | enum | `ghostfolio_cloud` or `custom_origin` |
-| `server_origin` | string | Canonical scheme, host, and optional port only |
-| `allow_insecure_http` | boolean | Default false; intended only for local development or explicit override |
+| `server_mode` | enum | `ghostfolio_cloud` or `custom_origin`; first-run default is `ghostfolio_cloud` |
+| `server_origin` | string | Canonical scheme, host, and optional port only; defaults to `https://ghostfol.io` |
+| `allow_insecure_http` | boolean | Default false; true only for explicitly permitted local-development origins |
 | `last_validated_at` | timestamp nullable | Updated after a successful connectivity/auth check |
 
 Relationships:
@@ -108,7 +108,7 @@ Relationships:
 Validation rules:
 
 - `server_origin` must be an absolute origin without path, query, or fragment.
-- HTTPS is required unless the origin is an explicitly permitted local-development address or the user confirms an insecure override.
+- HTTPS is required unless the origin is an explicitly permitted local-development address. Production-like HTTP origins are rejected with a blocking error.
 - Changing `server_origin` after a cache exists requires a server-mismatch confirmation flow.
 
 State transitions:
@@ -219,14 +219,14 @@ Fields:
 | `activity_type` | enum | Supported Ghostfolio event type |
 | `asset_symbol` | string | Asset identifier used in reporting |
 | `asset_name` | string nullable | Human-readable symbol profile name |
-| `base_currency` | string nullable | Report currency when provided by source data |
+| `base_currency` | string nullable | Report currency label when provided by source data; not converted in this feature slice |
 | `quantity` | decimal string | Exact asset quantity |
 | `unit_price` | decimal string | Exact unit price, may be zero for non-fiat movement semantics |
 | `gross_value` | decimal string | Source value before fee treatment as used by the domain |
 | `fee_amount` | decimal string | Fee in the report currency or source base currency |
 | `comment` | string nullable | Required for interpreting zero-priced movements safely |
 | `data_source` | string nullable | Preserve source system identity as opaque data |
-| `source_scope` | `SourceHoldingScope` nullable | Optional wallet/account scope |
+| `source_scope` | `SourceHoldingScope` nullable | Optional account-derived wallet-equivalent scope |
 | `raw_hash` | string | Hash of normalized source fields used for exact-duplicate detection |
 
 Relationships:
@@ -237,18 +237,19 @@ Validation rules:
 
 - `occurred_at`, `activity_type`, `asset_symbol`, and `quantity` are mandatory.
 - Unit price `0` is valid only when the business rules can interpret the movement from direction and explanatory context.
+- Monetary inputs are consumed as provided and are not cross-currency converted in this feature slice.
 - Exact duplicates are removed by `raw_hash` after canonical normalization.
 - Unsupported holding-affecting event types fail the sync instead of being skipped.
 
 ## SourceHoldingScope
 
-Purpose: Wallet, account, or equivalent source grouping used by wallet-scoped cost-basis matching.
+Purpose: Ghostfolio account, or equivalent future source grouping, normalized as the application's wallet concept when wallet-scoped cost-basis matching is selected.
 
 Fields:
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `scope_id` | string | Stable account or wallet identifier when provided |
+| `scope_id` | string | Stable account identifier, or wallet identifier if future upstream data adds it |
 | `scope_name` | string nullable | Optional human-readable label |
 | `scope_kind` | enum | `account`, `wallet`, `unknown` |
 | `reliability` | enum | `reliable`, `partial`, `unavailable` |
@@ -259,7 +260,7 @@ Relationships:
 
 Validation rules:
 
-- `reliability != reliable` for the relevant asset timeline forces fallback from wallet-scoped unit matching to asset-level FIFO.
+- `reliability != reliable` for the relevant asset timeline forces fallback from account-derived wallet matching to asset-level FIFO.
 
 ## ReportRequest
 

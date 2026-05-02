@@ -1,15 +1,12 @@
 <!--
 Sync Impact Report
-Version change: N/A -> 1.0.0
+Version change: 1.0.0 -> 1.1.0
 Modified principles:
-- Template Principle 1 -> I. Security-First Financial Data Handling
-- Template Principle 2 -> II. Deterministic Financial Precision
-- Template Principle 3 -> III. Testability with Full Coverage
-- Template Principle 4 -> IV. Minimal Dependencies and External Integrations
-- Template Principle 5 -> V. Clean Architecture and Domain Clarity
-Added sections:
-- Operational Constraints
+- I. Security-First Financial Data Handling
+Modified sections:
 - Delivery Workflow & Quality Gates
+Added sections:
+- None
 Removed sections:
 - None
 Templates requiring updates:
@@ -34,6 +31,12 @@ Follow-up TODOs:
 - Persisted data MUST be encrypted at rest with key material derived from the
   active Ghostfolio security token so that the stored data is unreadable without
   re-supplying a valid token in a later session.
+- Cryptographic storage design MUST follow the [OWASP Cryptographic Storage
+  Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html),
+  including minimizing stored sensitive data, using established algorithms,
+  providing integrity protection, generating salts/nonces/IVs from a
+  cryptographically secure random source, and separating persisted ciphertext
+  from keying material where feasible.
 - The Ghostfolio security token MUST be requested for every usage session,
   cached only in memory for the minimum required duration, and MUST NEVER be
   persisted.
@@ -42,6 +45,8 @@ Follow-up TODOs:
   authenticated request path to the Ghostfolio API.
 - Every feature MUST document an OWASP Top 10:2025 review of the relevant attack
   surface before merge.
+- Every feature that persists protected data MUST document how its storage
+  design follows the OWASP Cryptographic Storage Cheat Sheet before merge.
 Rationale: Financial data and authentication secrets create direct privacy,
 fraud, and account access risk.
 
@@ -125,6 +130,9 @@ the codebase maintainable.
 - Every feature specification MUST capture the feature's impacts on persistence,
   token handling, financial precision, testing strategy, dependency choices, and
   external integrations when applicable.
+- Every feature or change that persists protected data MUST record its OWASP
+  Cryptographic Storage Cheat Sheet compliance evidence in `spec.md`, `plan.md`,
+  `tasks.md`, or equivalent review notes.
 - Every implementation plan MUST pass a constitution check before research and
   again before implementation.
 - Every task list MUST include work for automated integration testing, coverage
@@ -156,4 +164,4 @@ the codebase maintainable.
   review notes, or equivalent artifacts. Missing evidence counts as
   non-compliance.
 
-**Version**: 1.0.0 | **Ratified**: 2026-05-01 | **Last Amended**: 2026-05-01
+**Version**: 1.1.0 | **Ratified**: 2026-05-01 | **Last Amended**: 2026-05-02

@@ -2,21 +2,22 @@
 
 ## Go And TUI Stack
 
-Decision: Implement the baseline as a single-module Go 1.24 application with `github.com/charmbracelet/bubbletea/v2` as the TUI runtime and only the `github.com/charmbracelet/bubbles` components that are actually needed for token entry, selections, progress, and confirmations.
+Decision: Implement the baseline as a single-module Go 1.26.2 application with `charm.land/bubbletea/v2` as the TUI runtime and only the `charm.land/bubbles/v2` components that are actually needed for token entry, selections, progress, and confirmations.
 
-Rationale: The user explicitly required Go and a TUI. `bubbletea` has a current `v2.0.6` release dated 2026-04-16 and commits on 2026-04-23. `bubbles` has a current `v2.1.0` release dated 2026-03-26 and commits on 2026-04-22. This stack is active, pure Go, and its event-loop model is easy to drive in automated tests. It also keeps the presentation layer separate from the tax domain and storage code.
+Rationale: The user explicitly required Go and a TUI. The current Go release reported by `go.dev` is `1.26.2` dated 2026-03-27. `bubbletea` has a current `v2.0.6` release dated 2026-04-16 and commits on 2026-04-23. `bubbles` has a current `v2.1.0` release dated 2026-03-26 and commits on 2026-04-22. The published `go.mod` files for `bubbletea`, `bubbles`, and `golang.org/x/crypto` all require Go `1.25.0`, while `apd/v3` and `gopdf` declare lower minimums. Using Go `1.26.2` keeps the implementation on the latest stable toolchain while satisfying the highest dependency minimum without needing any compatibility exception. This stack is active, pure Go, and its event-loop model is easy to drive in automated tests. It also keeps the presentation layer separate from the tax domain and storage code.
 
-Alternatives considered: `tview` would reduce custom component work for form-heavy screens but gives a less explicit state model for deterministic workflow tests. `gocui` is too low-level for the number of flow states in this product. Desktop GUI frameworks were rejected because the requirement is specifically a TUI.
+Alternatives considered: Go `1.24` was rejected because it is below the minimum Go version declared by `bubbletea`, `bubbles`, and `golang.org/x/crypto`. Go `1.25.x` would satisfy dependencies but is not the latest stable toolchain. `tview` would reduce custom component work for form-heavy screens but gives a less explicit state model for deterministic workflow tests. `gocui` is too low-level for the number of flow states in this product. Desktop GUI frameworks were rejected because the requirement is specifically a TUI.
 
 ## Financial Arithmetic And Rounding
 
-Decision: Use `github.com/cockroachdb/apd/v3` for all quantities, prices, fees, proceeds, basis values, and gains or losses. Parse Ghostfolio JSON numbers with `encoding/json.Decoder.UseNumber`, convert them immediately into canonical decimal strings and `apd.Decimal` values, persist canonical decimal strings, and round only at report-output boundaries.
+Decision: Use `github.com/cockroachdb/apd/v3` for all quantities, prices, fees, proceeds, basis values, and gains or losses. Parse Ghostfolio JSON numbers with `encoding/json.Decoder.UseNumber`, convert them immediately into canonical decimal strings and `apd.Decimal` values, persist canonical decimal strings, and round only at report-output boundaries. This feature slice does not perform cross-currency conversion and instead treats source base-currency amounts as numerically equivalent inputs until a later specification defines real conversion rules.
 
 Rationale: The constitution prohibits floating-point domain logic. `apd` has a current `v3.2.3` release dated 2026-03-23 with commits on 2026-03-23 and 2026-03-13. It is maintained by CockroachDB, supports arbitrary precision, and exposes explicit error-returning arithmetic contexts that fit audit-sensitive financial calculations better than more convenience-oriented decimal libraries. The baseline report policy is:
 
 - Internal calculations retain full source precision.
 - Persisted numeric values keep their canonical decimal string form.
-- Monetary values rendered in the PDF round to the report currency minor unit using round half up; if minor-unit metadata is unavailable, the fallback is 2 decimal places.
+- The baseline performs no cross-currency conversion. If activities carry differing base-currency labels, the client treats their source base-currency amounts as price-equivalent instead of applying exchange rates.
+- Monetary values rendered in the PDF round to the selected display currency minor unit using round half up; if minor-unit metadata is unavailable, the fallback is 2 decimal places.
 - Quantities render with preserved source scale after trimming insignificant trailing zeros.
 
 Alternatives considered: `shopspring/decimal` is simpler but less strict and less attractive for accounting-grade controls. `math/big.Rat` is exact but awkward for decimal presentation and rounding policy. `govalues/decimal` has a fixed precision ceiling that is harder to justify for crypto ledgers.
@@ -32,6 +33,8 @@ Rationale: This is the best fit for a security-first local TUI with modest datas
 - Payload fields: schema version, registered-user metadata, setup profile, sync metadata, normalized activity cache, and available report years.
 - File permissions: create with `0600` where the platform supports POSIX-style modes.
 - Update strategy: write a temp file, `fsync`, then atomic rename over the old snapshot only after a successful sync and validation.
+
+The envelope choices follow the OWASP Cryptographic Storage Cheat Sheet by minimizing persisted sensitive data, using established algorithms with integrity protection, generating salts and nonces from a cryptographically secure random source, and keeping key material runtime-derived instead of persisting it beside the ciphertext.
 
 Selected crypto details:
 
@@ -51,7 +54,7 @@ Alternatives considered: SQLite with app-layer encryption adds WAL and temp-file
 
 ## Ghostfolio HTTP Integration
 
-Decision: Use Go's standard library HTTP client against Ghostfolio's currently observed `api/v1` endpoints, authenticate by posting the user-entered Ghostfolio security token for the selected registered local user to `POST /api/v1/auth/anonymous`, and use the returned bearer JWT only for the active sync session. Retrieve activity history via paged `GET /api/v1/activities` requests.
+Decision: Use Go's standard library HTTP client against Ghostfolio's currently observed `api/v1` endpoints, default first-run setup to the hosted Ghostfolio cloud origin `https://ghostfol.io`, allow the user to replace it with a self-hosted origin, authenticate by posting the user-entered Ghostfolio security token for the selected registered local user to `POST /api/v1/auth/anonymous`, and use the returned bearer JWT only for the active sync session. Retrieve activity history via paged `GET /api/v1/activities` requests.
 
 Rationale: `net/http`, `context`, and `encoding/json` are sufficient and keep the dependency surface small. Ghostfolio has a current `3.1.0` release dated 2026-04-29 and commits on 2026-05-01, so the upstream is active. Current upstream source shows:
 
@@ -60,17 +63,26 @@ Rationale: `net/http`, `context`, and `encoding/json` are sufficient and keep th
 - Authenticated activity endpoints use bearer JWT auth.
 - `GET /api/v1/activities` returns `{ activities, count }` and supports `skip` and `take` pagination.
 - `GET /api/v1/health` exists for optional preflight checks.
+- The `Activity` interface exposes optional `account` data but no dedicated wallet field, so account scope is the only upstream grouping available for wallet-scoped matching in this baseline.
 
 Integration decisions:
 
-- Require HTTPS by default except explicitly allowed local-development origins such as `localhost`.
+- Default the configured origin to `https://ghostfol.io`; let the user replace it with a self-hosted origin.
+- Reject non-HTTPS production origins with a blocking configuration error. Only explicitly permitted local-development origins such as `http://localhost` may use HTTP.
 - Canonicalize and pin the selected Ghostfolio origin in the encrypted setup profile.
 - Probe `GET /api/v1/health` or `POST /api/v1/auth/anonymous` early to surface connectivity and version problems before a long sync.
+- Normalize Ghostfolio account scope as the application's wallet-equivalent source scope when the selected cost basis method requires wallet scoping.
 - Treat missing, redacted, unsupported, or internally inconsistent activity payload fields as hard sync failures.
 
-Alternatives considered: `resty` or other HTTP wrappers were rejected because the stdlib already covers the required features. Ghostfolio API keys were rejected for the baseline because the observed history endpoints are JWT-guarded and the specification is written around the Ghostfolio security token. The public portfolio endpoint was rejected because it is not sufficient for defensible activity reconstruction.
+Cloud default verification:
 
-⚠️ [UNCERTAINTY] Ghostfolio's authenticated activity endpoints are visible in current source but are not fully documented as a stable public contract. The client must validate compatibility at runtime and fail safely when required fields are missing or the server behavior changes.
+- `https://ghostfol.io/api/v1/health` returned `OK` on 2026-05-02.
+- `POST https://ghostfol.io/api/v1/auth/anonymous` with an invalid token returned `403 Forbidden` on 2026-05-02.
+- These live responses match the observed upstream source contract closely enough to treat the hosted cloud as the baseline default origin for this feature.
+
+Alternatives considered: `resty` or other HTTP wrappers were rejected because the stdlib already covers the required features. Ghostfolio API keys were rejected for the baseline because the observed history endpoints are JWT-guarded and the specification is written around the Ghostfolio security token. Generic insecure HTTP overrides were rejected for production because the feature now blocks non-HTTPS production origins instead of allowing them by confirmation. The public portfolio endpoint was rejected because it is not sufficient for defensible activity reconstruction.
+
+⚠️ [UNCERTAINTY] Ghostfolio's authenticated activity endpoints and account-scoped payload details are visible in current source and match the hosted cloud at the time of research, but they are not fully documented as a stable public contract. The client must validate compatibility at runtime and fail safely when required fields are missing or the server behavior changes.
 
 ## PDF Generation
 
