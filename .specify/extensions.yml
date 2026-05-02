@@ -99,13 +99,6 @@ hooks:
     description: Auto-commit after spec clarification
     condition: null
   after_plan:
-  - extension: data-model-diagram
-    command: speckit.data-model-diagram.generate
-    enabled: true
-    optional: false
-    prompt: Execute speckit.data-model-diagram.generate?
-    description: Generate a Mermaid ER diagram from the active feature data model
-    condition: null
   - extension: git
     command: speckit.git.commit
     enabled: true
