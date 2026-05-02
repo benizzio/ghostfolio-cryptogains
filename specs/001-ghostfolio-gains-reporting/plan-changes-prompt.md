@@ -7,3 +7,5 @@ Adaptations to the plan for the gains reporting feature needed:
 - chriptographic storage is a key concern for security, so let's add a reference to it in an amendment to the constitution, making sure we reference OWASPs directive that must be followed from (https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html).
 - for the selection of ghostfolio server to get activity data, default must be cloud currently available at https://ghostfol.io, self-hosted server can be entered to replace it.
   - make sure to that the plan research guarantees that the cloud server of ghostfolio has the public API available and functional according to ghostfolio source.
+
+Remove this file after the plan and constitution updates.
