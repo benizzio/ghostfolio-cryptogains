@@ -6,8 +6,8 @@ extension:
   version: "0.1.0"
   description: "Generate Mermaid ER diagrams from Spec Kit data models after planning"
   author: OpenCode
-  repository: https://github.com/benizzio/ghostfolio-cryptogains
-  license: GPL-3.0-only
+  repository: TODO
+  license: MIT
 
 requires:
   speckit_version: ">=0.2.0"
@@ -15,8 +15,8 @@ requires:
 provides:
   commands:
     - name: speckit.data-model-diagram.generate
-      file: commands/generate.md
-      description: "Generate data-model-diagram.mmd from data-model.md"
+      file: commands/speckit.data-model-diagram.generate.md
+      description: "Generate data-model-diagram.mmd from data-model.md via agent inference"
 
 hooks:
   after_plan:

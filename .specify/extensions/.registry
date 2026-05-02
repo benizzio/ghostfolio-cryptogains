@@ -22,7 +22,7 @@
     "data-model-diagram": {
       "version": "0.1.0",
       "source": "local",
-      "manifest_hash": "sha256:32551a699b79920d60c4f114da6718bb31652d57a34e557ee228ae6219cfb004",
+      "manifest_hash": "sha256:1e3225136ffc533278aa894275c770a74089e413842e89c3250a6515891bd2e0",
       "enabled": true,
       "priority": 5,
       "registered_commands": {

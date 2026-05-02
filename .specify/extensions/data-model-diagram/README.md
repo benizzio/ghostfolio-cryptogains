@@ -6,8 +6,8 @@ Generate a raw Mermaid `erDiagram` file from the active Spec Kit `data-model.md`
 
 - Provides the `speckit.data-model-diagram.generate` command
 - Registers a mandatory `after_plan` hook
-- Resolves the active feature directory with Spec Kit's shared shell helpers
-- Reads `data-model.md` and overwrites `data-model-diagram.mmd` deterministically
+- Reads the active feature `data-model.md`
+- Asks the agent to infer and overwrite `data-model-diagram.mmd`
 
 ## Development Install
 
