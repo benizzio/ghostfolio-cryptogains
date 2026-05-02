@@ -1,0 +1,7 @@
+- entity diagram: maybe add to constitution
+- currency conversion: establish rules
+- concept of account in ghostfolio: is it a wallet?
+- attemps to not use HTTPS in production should be blocked with an error
+- why go version behind. Let's use the latest possible versions
+- chriptographic storage, point to owasp in constitution
+- selection of ghostfolio, default is cloud, self-hosted server can be entered

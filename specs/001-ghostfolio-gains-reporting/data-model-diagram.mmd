@@ -1,0 +1,148 @@
+erDiagram
+    EncryptedSnapshotEnvelope {
+        UUID_string file_id
+        integer format_version
+        enum kdf_name
+        integer kdf_memory_kib
+        integer kdf_iterations
+        integer kdf_parallelism
+        bytes salt
+        bytes nonce
+        bytes ciphertext
+    }
+
+    SnapshotPayload {
+        integer schema_version
+        RegisteredLocalUser registered_local_user
+        SetupProfile setup_profile
+        ProtectedActivityCache_nullable protected_activity_cache
+        integer_array available_report_years
+    }
+
+    RegisteredLocalUser {
+        UUID_string profile_id
+        timestamp created_at
+        timestamp updated_at
+        timestamp_nullable last_successful_sync_at
+        string_nullable report_base_currency
+    }
+
+    SetupProfile {
+        boolean setup_complete
+        enum server_mode
+        string server_origin
+        boolean allow_insecure_http
+        timestamp_nullable last_validated_at
+    }
+
+    GhostfolioSession {
+        UUID_string registered_local_user_profile_id
+        string server_origin
+        secret_string security_token
+        secret_string bearer_jwt
+        timestamp started_at
+        timestamp_nullable authenticated_at
+        SyncAttempt sync_attempt
+    }
+
+    SyncAttempt {
+        UUID_string attempt_id
+        string server_origin
+        timestamp started_at
+        timestamp_nullable completed_at
+        enum status
+        enum_nullable failure_reason
+        GhostfolioSession ghostfolio_session
+        ProtectedActivityCache_nullable protected_activity_cache
+    }
+
+    ProtectedActivityCache {
+        timestamp synced_at
+        string source_api_base_path
+        integer activity_count
+        ActivityRecord_array activities
+        integer_array available_years
+        enum scope_reliability
+    }
+
+    ActivityRecord {
+        string source_id
+        timestamp occurred_at
+        enum activity_type
+        string asset_symbol
+        string_nullable asset_name
+        string_nullable base_currency
+        decimal_string quantity
+        decimal_string unit_price
+        decimal_string gross_value
+        decimal_string fee_amount
+        string_nullable comment
+        string_nullable data_source
+        SourceHoldingScope_nullable source_scope
+        string raw_hash
+    }
+
+    SourceHoldingScope {
+        string scope_id
+        string_nullable scope_name
+        enum scope_kind
+        enum reliability
+    }
+
+    ReportRequest {
+        integer tax_year
+        enum cost_basis_method
+        enum output_format
+        ProtectedActivityCache protected_activity_cache
+        CapitalGainsReport capital_gains_report
+    }
+
+    AssetPositionTimeline {
+        string asset_symbol
+        decimal_string opening_position_before_year
+        ActivityRecord_array in_year_events
+        decimal_string closing_position_end_of_year
+        boolean liquidated_before_year
+        boolean liquidated_during_year
+    }
+
+    AssetReportEntry {
+        string asset_symbol
+        string_nullable asset_name
+        decimal_string net_gain_loss_amount
+        enum result_kind
+    }
+
+    CapitalGainsReport {
+        integer tax_year
+        enum cost_basis_method
+        timestamp generated_at
+        AssetReportEntry_array summary_entries
+        string_array previously_liquidated_assets
+        AssetPositionTimeline_array detail_sections
+        string pdf_output_path
+    }
+
+    EncryptedSnapshotEnvelope ||--|| SnapshotPayload : wraps
+    SnapshotPayload ||--|| RegisteredLocalUser : contains
+    SnapshotPayload ||--|| SetupProfile : contains
+    SnapshotPayload ||--o| ProtectedActivityCache : contains
+
+    RegisteredLocalUser ||--|| SetupProfile : owns
+    RegisteredLocalUser ||--o| ProtectedActivityCache : owns
+    RegisteredLocalUser ||--o{ GhostfolioSession : runs_with
+
+    GhostfolioSession ||--|| SyncAttempt : used_by
+    SyncAttempt ||--o| ProtectedActivityCache : produces
+
+    ProtectedActivityCache ||--|{ ActivityRecord : contains
+    ActivityRecord }o--|| SourceHoldingScope : references
+
+    ReportRequest }o--|| ProtectedActivityCache : consumes
+    ReportRequest ||--|| CapitalGainsReport : produces
+
+    AssetPositionTimeline }o--|{ ActivityRecord : derived_from
+    CapitalGainsReport }o--|| ReportRequest : derived_from
+    CapitalGainsReport }o--|| ProtectedActivityCache : derived_from
+    CapitalGainsReport ||--|{ AssetReportEntry : contains
+    CapitalGainsReport ||--|{ AssetPositionTimeline : includes

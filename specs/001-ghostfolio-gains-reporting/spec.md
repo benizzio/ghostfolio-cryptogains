@@ -29,7 +29,7 @@ After installing the application, the user can complete mandatory setup, choose 
 
 1. **Given** the application is opened for the first time, **When** no setup exists, **Then** the application requires setup before allowing access to reporting features.
 2. **Given** setup is incomplete, **When** the user tries to start reporting, **Then** the application blocks the action and sends the user to complete setup.
-3. **Given** setup exists, **When** the user starts a Ghostfolio interaction session and provides a valid token, **Then** the application gathers activity data, stores it in protected local storage, confirms the data is ready, and offers report generation.
+3. **Given** setup exists for a registered local user, **When** the user starts a Ghostfolio interaction session for that local user and provides a valid token, **Then** the application gathers activity data, stores it in protected local storage, confirms the data is ready, and offers report generation.
 4. **Given** setup exists, **When** the user updates the selected Ghostfolio server, **Then** the new setup is securely persisted for later sessions.
 5. **Given** setup, authentication, connectivity, or protected-storage handling fails during setup or sync, **When** the application informs the user, **Then** the message appears during that workflow, explains the problem and next step, does not reveal the token or unprotected activity data, and is not persisted for later display.
 6. **Given** Ghostfolio access or activity retrieval fails for a token, **When** the failed workflow ends, **Then** the application does not create or retain a local registered user entry or protected local data for that failed attempt.
@@ -92,7 +92,7 @@ those areas.
 - **FR-002**: The system MUST require setup on first interaction before allowing any reporting workflow.
 - **FR-003**: The system MUST allow the user to choose the default Ghostfolio cloud server or provide a self-hosted Ghostfolio server address during setup.
 - **FR-004**: The system MUST persist each registered user's setup data between sessions in cryptographically protected local storage and MUST allow that user to update the setup after unlocking with the informed Ghostfolio security token.
-- **FR-005**: The system MUST require the user to start a Ghostfolio interaction session and provide a Ghostfolio security token before each data-gathering workflow.
+- **FR-005**: The system MUST require the user to start a Ghostfolio interaction session for a specific registered local user and provide a Ghostfolio security token before each data-gathering workflow.
 - **FR-006**: The system MUST use the Ghostfolio security token only for the active session and MUST not leave a recoverable token trace after the application interaction or process ends.
 - **FR-007**: The system MUST gather asset activity history needed for capital gains and losses reporting from the selected Ghostfolio server after a valid session begins.
 - **FR-008**: The system MUST maintain an updatable local cache of gathered activity history for each successfully registered user for reuse across sessions.
@@ -126,7 +126,7 @@ those areas.
 
 ### Security, Precision, and Integration Constraints
 
-- **SEC-001**: Secret input MUST be entered explicitly by the user for each Ghostfolio interaction session, kept only for the duration of the active session, excluded from logs and report output, and cleared when the session ends or fails.
+- **SEC-001**: Secret input MUST be entered explicitly by the user for each Ghostfolio interaction session for a specific registered local user, kept only for the duration of the active session, excluded from logs and report output, and cleared when the session ends or fails.
 - **SEC-002**: Persisted user-related data MUST remain local to the user's computer and MUST be protected in accordance with the OWASP Cryptographic Storage Cheat Sheet best practices, including minimising stored sensitive data, using established cryptography with integrity protection, secure random generation, and separation of protected data from keying material where feasible. All locally persisted user-related data MUST be unlockable only with the informed Ghostfolio security token.
 - **FIN-001**: Every quantity, price, fee, proceeds value, and gain or loss calculation MUST use exact decimal arithmetic, preserve source precision, include transaction fees in basis or disposal proceeds when present in source data, interpret `BUY` and `SELL` records with unit price `0` and explanatory comments according to their non-fiat economic effect, and apply a single documented rounding policy only at user-visible output boundaries.
 - **QUAL-001**: Automated validation MUST cover installation gating, setup persistence, successful and failed local-user registration behavior, session-token non-persistence, cache unreadability without the token, yearly boundary handling, each supported cost basis method, zero-priced non-fiat movement handling, unsupported-event rejection during sync, server-mismatch warning and confirmed replacement behavior, chronological normalization and exact-duplicate removal during sync, rejection of non-defensible normalized histories, wallet-scope-unavailable fallback to asset-level FIFO, asset inclusion and exclusion rules, and final report section ordering by using deterministic sample ledgers and controlled source-system responses.
@@ -136,7 +136,7 @@ those areas.
 
 - **Registered Local User**: A local user record created only after successful Ghostfolio access and successful activity retrieval, bound to one Ghostfolio security token, owning the protected setup and cache for that user, and storing the Ghostfolio server reference associated with that protected data.
 - **Setup Profile**: The protected per-registered-user configuration that identifies which Ghostfolio server the user has chosen and whether setup is complete.
-- **Ghostfolio Session**: The temporary authenticated interaction context created when the user provides a Ghostfolio token for the current application run.
+- **Ghostfolio Session**: The temporary authenticated interaction context created when the user provides a Ghostfolio token for the current application run for a specific registered local user.
 - **Activity Record**: A timestamped asset acquisition or disposal event, including the data needed to determine holdings, basis, proceeds, fees, and any available source holding scope used by methods that evaluate disposals within that scope.
 - **Source Holding Scope**: The wallet, account, or equivalent source grouping associated with activity records when a selected cost basis method requires disposal matching to be evaluated within that scope.
 - **Protected Activity Cache**: The local persisted collection of activity records for one registered user that can be refreshed from the selected Ghostfolio server and can only be read after token-based unlock.
