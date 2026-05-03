@@ -31,13 +31,14 @@ gocoverageplus -i coverage.cov -o coverage.xml
 - encrypted snapshot unreadable with the wrong token
 - server-mismatch warning and confirmed replacement
 - chronological normalization and exact-duplicate removal
-- unsupported-event rejection
+- rejection of activity types other than `BUY` or `SELL`
 - non-defensible-history rejection
+- zero-priced `BUY` rejection
 - all five cost basis methods
 - exact-unit identification possible within a reliable scope
 - exact-unit identification impossible within a reliable scope, triggering scope-local average fallback
 - unreliable scope, triggering asset-level scope under the same method
-- self-transfer carry-forward of basis and provenance
+- zero-priced `SELL` reducing holdings without realizing gain or loss
 - same-timestamp ordering resolved by `source_id`
 - pooled-until-zero behavior after average fallback has occurred in an open partition
 - yearly report generation ordering and inclusion rules
@@ -92,13 +93,14 @@ The implementation should provide deterministic fixtures under `tests/fixtures/`
 
 - valid multi-year activity history
 - out-of-order and duplicate activities that normalize successfully
-- unsupported event types
+- activity types other than `BUY` or `SELL`
 - gaps or inconsistencies that make basis calculation non-defensible
-- zero-priced `BUY` and `SELL` activity with explanatory comments
+- zero-priced `SELL` activity with explanatory comments
+- zero-priced `BUY` activity rejected during sync
 - exact-unit identification possible within a reliable scope
 - exact-unit identification impossible within a reliable scope, triggering scope-local average fallback
 - unreliable scope, triggering asset-level scope under the same method
-- self-transfer between user-owned scopes carrying forward basis and provenance
+- transfer-in `BUY` activity with explicit non-zero basis pricing
 - same-timestamp ordering resolved by `source_id`
 - pooled-until-zero behavior after average fallback has occurred in an open partition
 

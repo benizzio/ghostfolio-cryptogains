@@ -203,12 +203,12 @@ Relationships:
 Validation rules:
 
 - Persist only after chronological sorting, exact duplicate removal, and defensibility validation complete.
-- Unsupported event types that affect holdings cause the whole sync to fail.
+- Any normalized activity type other than `BUY` or `SELL` causes the whole sync to fail.
 - Missing or contradictory data that prevents defensible basis calculation causes the whole sync to fail.
 
 ## ActivityRecord
 
-Purpose: One normalized acquisition, disposal, or movement event derived from Ghostfolio activity history.
+Purpose: One normalized Ghostfolio `BUY` or `SELL` event derived from Ghostfolio activity history.
 
 Fields:
 
@@ -216,15 +216,15 @@ Fields:
 |-------|------|-------|
 | `source_id` | string | Ghostfolio activity identifier |
 | `occurred_at` | timestamp | Normalized event time |
-| `activity_type` | enum | Supported Ghostfolio event type |
+| `activity_type` | enum | Supported Ghostfolio event type; only `BUY` and `SELL` are valid |
 | `asset_symbol` | string | Asset identifier used in reporting |
 | `asset_name` | string nullable | Human-readable symbol profile name |
 | `base_currency` | string nullable | Report currency label when provided by source data; not converted in this feature slice |
 | `quantity` | decimal string | Exact asset quantity |
-| `unit_price` | decimal string | Exact unit price, may be zero for non-fiat movement semantics |
+| `unit_price` | decimal string | Exact unit price; `BUY` must be non-zero and `SELL` may be zero only for non-taxable holding reductions |
 | `gross_value` | decimal string | Source value before fee treatment as used by the domain |
 | `fee_amount` | decimal string | Fee in the report currency or source base currency |
-| `comment` | string nullable | Required for interpreting zero-priced movements safely |
+| `comment` | string nullable | Required for zero-priced `SELL` explanations; explanatory only for basis interpretation |
 | `data_source` | string nullable | Preserve source system identity as opaque data |
 | `source_scope` | `SourceHoldingScope` nullable | Optional source grouping used to derive `applicable_scope` when reliable and defensible |
 | `raw_hash` | string | Hash of normalized source fields used for exact-duplicate detection |
@@ -236,11 +236,13 @@ Relationships:
 Validation rules:
 
 - `occurred_at`, `activity_type`, `asset_symbol`, and `quantity` are mandatory.
-- Unit price `0` is valid only when the business rules can interpret the movement from direction and explanatory context.
+- `activity_type` must be `BUY` or `SELL`.
+- `BUY` requires `unit_price > 0`.
+- `SELL` with `unit_price = 0` is valid only as a non-taxable holding reduction and requires an explanatory comment.
 - Monetary inputs are consumed as provided and are not cross-currency converted in this feature slice.
 - Exact duplicates are removed by `raw_hash` after canonical normalization.
-- Unsupported holding-affecting event types fail the sync instead of being skipped.
-- Self-transfers between user-owned scopes must preserve carried-forward basis, acquisition timestamp, and provenance instead of realizing gain or loss.
+- Unsupported activity types fail the sync instead of being skipped.
+- Free-text comments must not be used as authoritative basis-linkage data between separate activities.
 
 ## SourceHoldingScope
 
@@ -270,7 +272,6 @@ These runtime concepts are derived from normalized activity history when the sco
 - `ApplicableScope`: Resolved per disposal as the reliable `SourceHoldingScope` for that asset when available and defensible, otherwise the asset as a whole.
 - `HybridPartitionState`: Runtime state maintained per `(asset_symbol, applicable_scope)` with minimum derived fields `valuation_pool_quantity`, `valuation_pool_basis`, `provenance_queue`, `exact_lots`, and `pooled_until_zero`.
 - `pooled_until_zero`: Boolean flag set after the first scope-local average-cost fallback in an open partition; while true, later disposals in that partition continue using pooled valuation until the partition quantity reaches zero.
-- `TransferCarryForward`: Runtime transfer result that moves quantity, basis, acquisition timestamp, and exact-unit or deemed-disposal provenance between user-owned scopes without realizing gain or loss.
 
 ## ReportRequest
 

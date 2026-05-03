@@ -7,7 +7,7 @@
 
 ## Summary
 
-Build an installed cross-platform Go terminal application that defaults setup to the Ghostfolio cloud origin `https://ghostfol.io`, allows a self-hosted origin override, opens a short-lived authenticated Ghostfolio sync session for a specific registered local user, stores successful per-user setup and activity history only in local token-derived encrypted storage, and generates yearly PDF capital gains and losses reports from normalized activity history. The baseline architecture uses a Bubble Tea TUI, exact decimal domain math with no cross-currency conversion in this feature slice, stdlib HTTP integration against Ghostfolio's observed `api/v1` endpoints, and source-scope normalization that derives `applicable_scope` from reliable wallet or account data when available, while keeping the report pipeline separate from storage, transport, and presentation concerns.
+Build an installed cross-platform Go terminal application that defaults setup to the Ghostfolio cloud origin `https://ghostfol.io`, allows a self-hosted origin override, opens a short-lived authenticated Ghostfolio sync session for a specific registered local user, stores successful per-user setup and activity history only in local token-derived encrypted storage, and generates yearly PDF capital gains and losses reports from normalized activity history. The baseline architecture uses a Bubble Tea TUI, exact decimal domain math with no cross-currency conversion in this feature slice, stdlib HTTP integration against Ghostfolio's observed `api/v1` endpoints, support for only `BUY` and `SELL` source activities, zero-priced `SELL` handling as a non-taxable holding reduction, mandatory non-zero pricing for all `BUY` records, and source-scope normalization that derives `applicable_scope` from reliable wallet or account data when available, while keeping the report pipeline separate from storage, transport, and presentation concerns.
 
 ## Technical Context
 
@@ -18,7 +18,7 @@ Build an installed cross-platform Go terminal application that defaults setup to
 **Target Platform**: Installed terminal application for Linux, macOS, and Windows terminals with local filesystem access and PDF file output  
 **Project Type**: Single-module Go TUI application  
 **Performance Goals**: Unlock cached data in under 2 seconds on supported hardware; complete sync normalization and persistence for 10,000 activities without freezing the UI; generate a yearly PDF report for 10,000 activities spanning 5 years in under 2 minutes  
-**Constraints**: Ghostfolio token and JWT are runtime-only; no recoverable token trace on disk; non-HTTPS production origins are rejected with a blocking error and only explicitly permitted local-development origins may use HTTP; financial domain logic uses arbitrary-precision decimals only and baseline calculations intentionally skip currency conversion by treating source base-currency amounts as price-equivalent; persisted data stays local and is replaced atomically after confirmed server mismatch; no CGO-required runtime dependency in the baseline distribution
+**Constraints**: Ghostfolio token and JWT are runtime-only; no recoverable token trace on disk; non-HTTPS production origins are rejected with a blocking error and only explicitly permitted local-development origins may use HTTP; financial domain logic uses arbitrary-precision decimals only and baseline calculations intentionally skip currency conversion by treating source base-currency amounts as price-equivalent; Ghostfolio source activity support is limited to `BUY` and `SELL`; normalized `BUY` records must have non-zero unit price; zero-priced `SELL` records are treated as non-taxable holding reductions and require explanatory comments; persisted data stays local and is replaced atomically after confirmed server mismatch; no CGO-required runtime dependency in the baseline distribution
 **Scale/Scope**: Multiple encrypted local profiles per machine, each unlocked by its own Ghostfolio token; up to 10,000 stored activities per profile; one report type; five supported cost basis methods with the scope-local hybrid method narrowing to reliable source scope when available and broadening to asset-level scope when it is not; default sync target is the Ghostfolio cloud origin with optional self-hosted replacement; Ghostfolio `api/v1` integration treated as runtime-validated rather than fully stable
 
 ## Constitution Check
@@ -95,6 +95,33 @@ tests/
 ```
 
 **Structure Decision**: Use a single Go module rooted at the repository root. Bubble Tea screens live under `internal/tui`, Ghostfolio HTTP and encrypted persistence remain in infrastructure packages, and all financial rules live under `internal/domain` so calculation logic is testable without filesystem or terminal dependencies.
+
+## Source Activity Interpretation Rules
+
+### Supported Source Activity Types
+
+Only these normalized Ghostfolio activity types are valid input for this feature slice:
+
+```text
+BUY
+SELL
+```
+
+Any other source activity type makes the ledger unsupported and sync must fail before persistence.
+
+### BUY Rules
+
+- A `BUY` record is always treated as an acquisition.
+- A normalized `BUY` record must have `unit_price > 0`.
+- If Ghostfolio models the receiving side of a blockchain transfer as a `BUY`, that record must already contain the intended non-zero acquisition price used for basis.
+- Free-text comments on `BUY` records are explanatory only and must not be used to infer basis linkage to any other activity.
+
+### SELL Rules
+
+- A `SELL` record with `unit_price > 0` is treated as a disposal under the selected cost basis method.
+- A `SELL` record with `unit_price = 0` is treated as a non-taxable holding reduction representing a blockchain fee or transfer-out movement.
+- A zero-priced `SELL` must include an explanatory comment in the normalized record.
+- Free-text comments on `SELL` records are explanatory only and must not be used to infer basis linkage to any receiving acquisition.
 
 ## Cost Basis Calculation Rules
 
@@ -235,7 +262,6 @@ Exact unit identification is possible only when the normalized ledger can unambi
 Valid sources of exact identification are limited to:
 
 - explicit disposal-to-acquisition linkage in normalized data
-- preserved unit provenance from earlier self-transfers
 - other normalized source evidence that identifies the exact outgoing units without ambiguity
 
 For each disposal:
@@ -296,35 +322,50 @@ Normative behavior:
 - During `pooled_until_zero == true`, provenance removal still follows oldest-acquired deemed-disposal order.
 - When partition quantity reaches zero, clear all partition state. Later acquisitions start a new clean partition state.
 
-### Self-Transfer Carry-Forward Rule
+### Zero-Priced SELL Holding-Reduction Rule
 
-A transfer between user-owned scopes must not realize gain or loss:
+A `SELL` record with unit price `0` is not a capital gain or loss realization event. It still reduces holdings under the currently selected cost basis method.
+
+Method-specific basis removal:
 
 ```text
-gain_or_loss = 0
+allocated_basis = method_specific_basis_for_removed_quantity
+remaining_quantity' = remaining_quantity - reduced_quantity
+remaining_basis' = remaining_basis - allocated_basis
+realized_gain_or_loss = 0
 ```
 
-The transferred quantity must carry forward:
+Normative behavior:
 
-- basis
-- acquisition timestamp
-- exact-unit provenance when available
-- deemed-disposal provenance when exact-unit provenance is not available
+- The quantity reduction follows the same ordering, partitioning, and basis-allocation rules that the active cost basis method would use for a taxable disposal.
+- The removed basis leaves the remaining holdings.
+- The event does not create taxable proceeds.
+- The event does not create a gain or loss line item in the report output.
 
-If the transferred units are not exactly identifiable at transfer time, the outgoing side of the transfer must use the currently active method rules of the source partition to determine the carried-forward basis and provenance.
+### Priced BUY Acquisition Rule
 
-For the hybrid method:
+A `BUY` record always affects cost basis directly using its explicit non-zero unit price.
 
-- if the source partition is still in exact-lot mode, transfer exact identified lots when possible
-- if the source partition is in pooled mode, transfer value from the partition-local average cost and reduce provenance using oldest-acquired deemed-disposal order
+```text
+acquisition_basis = gross_value + acquisition_fee
+unit_cost = acquisition_basis / acquired_quantity
+```
+
+Normative behavior:
+
+- A transfer-in or similar receiving movement must arrive as a priced `BUY` if it is intended to adjust holdings and basis.
+- The acquisition basis for that `BUY` comes from the priced activity data itself.
+- Comments may explain why the acquisition occurred, but comments do not participate in basis linkage or matching.
 
 ### Invalid History Conditions
 
 Reject the normalized ledger as non-defensible if any of the following occurs:
 
+- any normalized activity type is not `BUY` or `SELL`
+- a `BUY` record has unit price `0`
+- a zero-priced `SELL` lacks an explanatory comment
 - disposed quantity exceeds currently available quantity in the relevant partition
 - required ordering is ambiguous after deterministic tie-breaking
-- a required self-transfer cannot carry forward defensible basis or provenance
 - exact unit identification is claimed but cannot be substantiated by normalized data
 
 ## Complexity Tracking

@@ -60,7 +60,7 @@ Alternatives considered: SQLite with app-layer encryption adds WAL and temp-file
 
 ## Ghostfolio HTTP Integration
 
-Decision: Use Go's standard library HTTP client against Ghostfolio's currently observed `api/v1` endpoints, default first-run setup to the hosted Ghostfolio cloud origin `https://ghostfol.io`, allow the user to replace it with a self-hosted origin, authenticate by posting the user-entered Ghostfolio security token for the selected registered local user to `POST /api/v1/auth/anonymous`, and use the returned bearer JWT only for the active sync session. Retrieve activity history via paged `GET /api/v1/activities` requests.
+Decision: Use Go's standard library HTTP client against Ghostfolio's currently observed `api/v1` endpoints, default first-run setup to the hosted Ghostfolio cloud origin `https://ghostfol.io`, allow the user to replace it with a self-hosted origin, authenticate by posting the user-entered Ghostfolio security token for the selected registered local user to `POST /api/v1/auth/anonymous`, and use the returned bearer JWT only for the active sync session. Retrieve activity history via paged `GET /api/v1/activities` requests, but accept only normalized `BUY` and `SELL` records in this feature slice.
 
 Rationale: `net/http`, `context`, and `encoding/json` are sufficient and keep the dependency surface small. Ghostfolio has a current `3.1.0` release dated 2026-04-29 and commits on 2026-05-01, so the upstream is active. Current upstream source shows:
 
@@ -78,7 +78,7 @@ Integration decisions:
 - Canonicalize and pin the selected Ghostfolio origin in the encrypted setup profile.
 - Probe `GET /api/v1/health` or `POST /api/v1/auth/anonymous` early to surface connectivity and version problems before a long sync.
 - Use Ghostfolio account scope only as available source grouping data when the selected cost basis method derives `applicable_scope` from reliable scope.
-- Treat missing, redacted, unsupported, or internally inconsistent activity payload fields as hard sync failures.
+- Treat any activity type other than `BUY` or `SELL`, any normalized `BUY` with unit price `0`, any zero-priced `SELL` without an explanatory comment, and other missing, redacted, unsupported, or internally inconsistent activity payload fields as hard sync failures.
 
 Cloud default verification:
 

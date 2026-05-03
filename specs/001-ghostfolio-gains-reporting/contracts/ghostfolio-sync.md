@@ -118,6 +118,13 @@ HTTP `200 OK`
 
 The full upstream activity schema is larger than this example. The baseline client depends only on the minimum fields required for defensible holdings and basis reconstruction.
 
+Supported normalized source activity types:
+
+- `BUY`
+- `SELL`
+
+Any other activity type is unsupported for this feature slice and must fail the sync.
+
 ### Minimum Required Fields Per Activity
 
 The client must reject sync when any activity required for holdings reconstruction is missing these normalized inputs:
@@ -129,7 +136,7 @@ The client must reject sync when any activity required for holdings reconstructi
 - quantity
 - gross value or unit price information sufficient to derive basis and proceeds
 - fee information when present in source data
-- explanatory comment when zero-priced movement semantics depend on it
+- explanatory comment for any zero-priced `SELL`
 
 Optional fields used when available:
 
@@ -150,13 +157,16 @@ An upstream `account` value is treated only as source grouping data for deriving
 - HTTP `401 Unauthorized`: treat as invalid or expired session JWT, end the sync, and clear in-memory credentials.
 - HTTP `403 Forbidden`: treat as permission or feature-gating failure and end the sync without persisting any new profile data.
 - HTTP `400 Bad Request`: treat as client/server contract mismatch and surface a non-secret actionable error.
-- Malformed JSON, redacted numeric values, unsupported holding-affecting event types, or missing required fields: reject the entire sync.
+- Malformed JSON, redacted numeric values, an activity type other than `BUY` or `SELL`, a `BUY` with unit price `0`, a zero-priced `SELL` without an explanatory comment, or missing required fields: reject the entire sync.
 
 ## Normalization And Validation Rules
 
 - Sort the complete retrieved activity history chronologically before persistence.
 - Remove exact duplicates after canonical normalization.
-- Reject the sync if unsupported event types that affect holdings are present.
+- Reject the sync if any normalized activity type is not `BUY` or `SELL`.
+- Reject the sync if any normalized `BUY` record has unit price `0`.
+- Treat a normalized `SELL` with unit price `0` and an explanatory comment as a non-taxable holding reduction.
+- Reject the sync if a normalized zero-priced `SELL` lacks an explanatory comment.
 - Reject the sync if remaining gaps or contradictions make basis calculation non-defensible.
 - Reliable source scope data may narrow scope-local matching to the current `(asset, applicable_scope)` partition.
 - Unreliable or missing source scope data causes the same scope-local hybrid method to use asset-level scope for that asset.

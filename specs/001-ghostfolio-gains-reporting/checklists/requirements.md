@@ -31,5 +31,5 @@
 
 ## Notes
 
-- Revalidated after user feedback; report inclusion scenarios now sit under report generation, post-year position states are excluded from detailed sections, local user data is defined as token-unlocked protected data, and the scope-local hybrid method is defined as a scope-local exact-match or average-cost method rather than a FIFO degradation path.
+- Revalidated after user feedback; report inclusion scenarios now sit under report generation, post-year position states are excluded from detailed sections, local user data is defined as token-unlocked protected data, the scope-local hybrid method is defined as a scope-local exact-match or average-cost method rather than a FIFO degradation path, and Ghostfolio ingestion is now limited to `BUY` and `SELL` with zero-priced handling restricted to explanatory `SELL` records only.
 - Baseline scope is intentionally limited to the documented cost basis methods and excludes additional disposal-matching rules that would require a separate specification.
