@@ -35,6 +35,7 @@ erDiagram
         timestamp_nullable last_validated_at
     }
 
+    %% GhostfolioSession and SyncAttempt are runtime-ephemeral and never persisted.
     GhostfolioSession {
         UUID_string registered_local_user_profile_id
         string server_origin
@@ -42,7 +43,6 @@ erDiagram
         secret_string bearer_jwt
         timestamp started_at
         timestamp_nullable authenticated_at
-        SyncAttempt sync_attempt
     }
 
     SyncAttempt {
@@ -52,7 +52,6 @@ erDiagram
         timestamp_nullable completed_at
         enum status
         enum_nullable failure_reason
-        GhostfolioSession ghostfolio_session
         ProtectedActivityCache_nullable protected_activity_cache
     }
 
@@ -142,7 +141,6 @@ erDiagram
     ReportRequest ||--|| CapitalGainsReport : produces
 
     AssetPositionTimeline }o--|{ ActivityRecord : derived_from
-    CapitalGainsReport }o--|| ReportRequest : derived_from
     CapitalGainsReport }o--|| ProtectedActivityCache : derived_from
     CapitalGainsReport ||--|{ AssetReportEntry : contains
     CapitalGainsReport ||--|{ AssetPositionTimeline : includes

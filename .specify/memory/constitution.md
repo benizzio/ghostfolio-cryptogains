@@ -1,17 +1,20 @@
 <!--
 Sync Impact Report
-Version change: 1.0.0 -> 1.1.0
+Version change: 1.1.0 -> 1.1.1
 Modified principles:
 - I. Security-First Financial Data Handling
-Modified sections:
 - Delivery Workflow & Quality Gates
+- Governance
+Modified sections:
+- I. Security-First Financial Data Handling
+- Delivery Workflow & Quality Gates
+- Governance
 Added sections:
 - None
 Removed sections:
 - None
 Templates requiring updates:
 - ✅ .specify/templates/plan-template.md
-- ✅ .specify/templates/spec-template.md
 - ✅ .specify/templates/tasks-template.md
 Follow-up TODOs:
 - None
@@ -43,8 +46,8 @@ Follow-up TODOs:
 - The Ghostfolio security token MUST NEVER be output, logged, embedded in test
   fixtures, written to files, or otherwise exposed in any channel other than the
   authenticated request path to the Ghostfolio API.
-- Every feature MUST document an OWASP Top 10:2025 review of the relevant attack
-  surface before merge.
+- Every feature MUST document a review of the most recent published OWASP Top 10
+  relevant to the attack surface before merge.
 - Every feature that persists protected data MUST document how its storage
   design follows the OWASP Cryptographic Storage Cheat Sheet before merge.
 Rationale: Financial data and authentication secrets create direct privacy,
@@ -164,4 +167,4 @@ the codebase maintainable.
   review notes, or equivalent artifacts. Missing evidence counts as
   non-compliance.
 
-**Version**: 1.1.0 | **Ratified**: 2026-05-01 | **Last Amended**: 2026-05-02
+**Version**: 1.1.1 | **Ratified**: 2026-05-01 | **Last Amended**: 2026-05-06

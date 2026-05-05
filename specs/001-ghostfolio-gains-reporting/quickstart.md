@@ -8,6 +8,7 @@ This document defines the verification flow that the implementation for this fea
 - The default Ghostfolio cloud server `https://ghostfol.io`, a self-hosted Ghostfolio server reachable over HTTPS, or a local fixture server used by integration tests.
 - A valid Ghostfolio security token for manual end-to-end verification.
 - A writable local filesystem location for encrypted snapshots and generated PDFs.
+- `gocoverageplus` installed for branch and file coverage export: `go install github.com/Fabianexe/gocoverageplus/cmd/gocoverageplus@v1.2.0`
 
 ## Automated Verification Flow
 
