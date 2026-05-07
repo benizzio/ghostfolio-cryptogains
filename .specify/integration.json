@@ -1,4 +1,15 @@
 {
+  "version": "0.8.7",
+  "integration_state_schema": 1,
+  "installed_integrations": [
+    "opencode"
+  ],
+  "integration_settings": {
+    "opencode": {
+      "script": "sh",
+      "invoke_separator": "."
+    }
+  },
   "integration": "opencode",
-  "version": "0.8.4"
+  "default_integration": "opencode"
 }
