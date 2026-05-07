@@ -32,7 +32,8 @@
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
 - [ ] Security: no Ghostfolio token persistence or output, justified local-only
-      persistence, token-derived encryption approach, and OWASP Top 10:2025
+      persistence, token-derived encryption approach, OWASP Cryptographic
+      Storage Cheat Sheet alignment, and most recent published OWASP Top 10
       review scope are defined.
 - [ ] Precision: all financial calculations use fixed-point decimals or integer
       minor units, never floating point in domain logic.

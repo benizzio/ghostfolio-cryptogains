@@ -169,7 +169,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX Performance optimization across all stories
 - [ ] TXXX [P] Additional unit tests for justified complex logic in language default location
 - [ ] TXXX [P] Verify 100% coverage for project-owned code
-- [ ] TXXX OWASP Top 10:2025 review and security hardening
+- [ ] TXXX Most recent published OWASP Top 10 and OWASP Cryptographic Storage Cheat Sheet review and security hardening
 - [ ] TXXX Run quickstart.md validation
 
 ---
