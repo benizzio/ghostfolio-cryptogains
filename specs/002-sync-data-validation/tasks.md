@@ -8,7 +8,7 @@ description: "Task list for Sync Data Validation implementation"
 **Input**: Design documents from `/specs/002-sync-data-validation/`
 **Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`
 
-**Tests**: Automated tests are mandatory for this feature. Write the story tests first, make them fail for the targeted behavior, and keep 100% coverage for project-owned code with `go test` plus the `gocoverageplus` gate.
+**Tests**: Automated tests are mandatory for this feature. Write the story tests first, make them fail for the targeted behavior, and keep 100% statement coverage from `go test` plus 100% branch and file coverage for project-owned code with the `gocoverageplus` gate.
 
 **Organization**: Tasks are grouped by user story so each story can be implemented and verified independently.
 
@@ -57,8 +57,8 @@ description: "Task list for Sync Data Validation implementation"
 
 ### Tests for User Story 1
 
-- [ ] T010 [P] [US1] Add first-run, remembered-setup, and no-pre-sync-network integration coverage in `tests/integration/setup_flow_test.go`
-- [ ] T011 [P] [US1] Add bootstrap config store, setup-file protection, and origin validation unit coverage in `tests/unit/config_store_test.go`, `tests/unit/config_permissions_test.go`, and `tests/unit/origin_validator_test.go`
+- [ ] T010 [P] [US1] Add first-run setup completion, remembered-setup startup, and no-pre-sync-network integration coverage for both clean and remembered bootstrap states in `tests/integration/setup_flow_test.go`
+- [ ] T011 [P] [US1] Add bootstrap config store, setup-file protection, and origin validation unit coverage, including restrictive-permission checks where supported and protected config-directory placement expectations otherwise, in `tests/unit/config_store_test.go`, `tests/unit/config_permissions_test.go`, and `tests/unit/origin_validator_test.go`
 
 ### Implementation for User Story 1
 
@@ -109,7 +109,7 @@ description: "Task list for Sync Data Validation implementation"
 - [ ] T024 [P] [US3] Implement Ghostfolio auth and activities probe DTOs in `internal/ghostfolio/dto/auth_response.go` and `internal/ghostfolio/dto/activities_probe_response.go`
 - [ ] T025 [P] [US3] Implement Ghostfolio response validation rules for auth and activities probes in `internal/ghostfolio/validator/response_validator.go`
 - [ ] T026 [US3] Implement the Ghostfolio client for anonymous auth and one-page activities probes in `internal/ghostfolio/client/client.go`
-- [ ] T027 [US3] Implement sync validation attempt orchestration and secret clearing in `internal/app/runtime/sync_service.go`
+- [ ] T027 [US3] Implement `GhostfolioSession`, `SyncValidationAttempt`, and `ValidationOutcome` orchestration with secret clearing in `internal/app/runtime/sync_service.go`
 - [ ] T028 [US3] Implement async busy-state transitions, in-flight resize handling, and retryable sync workflow behavior in `internal/tui/flow/sync_flow.go`
 - [ ] T029 [US3] Implement success and failure result screens with no-persistence messaging in `internal/tui/screen/validation_result_screen.go`
 
@@ -123,8 +123,8 @@ description: "Task list for Sync Data Validation implementation"
 
 - [ ] T030 [P] Update the `README.md` sections `Local Setup Storage`, `Removing Local Setup`, `Development Mode`, and `Current Slice Scope`
 - [ ] T031 [P] Reconcile the `Launch The Application`, `Remembered Setup Path`, `Sync Validation Failure Paths`, and `Negative Check: No Persistence Beyond Setup` sections in `specs/002-sync-data-validation/quickstart.md`
-- [ ] T032 Run `go test ./...`, generate the coverage profile in `dist/coverage/coverage.out`, and verify the `gocoverageplus` gate against `dist/coverage/coverage.out`
-- [ ] T033 [P] Document the OWASP Top 10 review for setup persistence, Ghostfolio token handling, and Ghostfolio API calls in `specs/002-sync-data-validation/plan.md`
+- [ ] T032 Run `mkdir -p dist/coverage && go test ./... -covermode=atomic -coverprofile=dist/coverage/coverage.out && gocoverageplus -i dist/coverage/coverage.out -o dist/coverage/coverage.xml`, then verify the generated artifacts report 100% statement coverage and 100% branch and file coverage for project-owned code
+- [ ] T033 [P] Document the OWASP Top 10 review for setup persistence, Ghostfolio token handling, and Ghostfolio API calls in `specs/002-sync-data-validation/plan.md`, and record any required mitigations in this feature before marking it complete
 
 ---
 

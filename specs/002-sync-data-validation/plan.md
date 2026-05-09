@@ -14,7 +14,7 @@ Build the first runnable Go terminal application slice for this repository. The 
 **Language/Version**: Go 1.26.2  
 **Primary Dependencies**: `charm.land/bubbletea/v2`, selected `charm.land/bubbles/v2` components (`list`, `textinput`, `help`, `key`, `spinner`), Go standard library (`net/http`, `encoding/json`, `context`, `net/url`, `os`, `path/filepath`)  
 **Storage**: Local-only machine-scoped JSON setup file in the OS config or app-data directory, written atomically with restrictive filesystem permissions; no Ghostfolio token, JWT, or activity payload persistence in this slice  
-**Testing**: `go test` with `httptest.Server` integration suites for first-run setup, no-pre-sync-network startup, delayed-request busy states, terminal resize responsiveness, and Ghostfolio validation flows; table-driven unit tests for validators, setup-file protection, and focus routing; `go test -coverprofile`, branch and file coverage gate via `github.com/Fabianexe/gocoverageplus`  
+**Testing**: `go test` with `httptest.Server` integration suites for first-run setup completion, remembered-setup startup without pre-sync network requests, delayed-request busy states, terminal resize responsiveness, and Ghostfolio validation flows; table-driven unit tests for validators, setup-file protection, protected config placement or restrictive permission behavior, and focus routing; `go test -coverprofile`, branch and file coverage gate via `github.com/Fabianexe/gocoverageplus`  
 **Target Platform**: Installed terminal application for Linux, macOS, and Windows terminals with local filesystem access  
 **Project Type**: Single-module Go TUI application  
 **Performance Goals**: Render the first actionable setup or main-menu screen using only local bootstrap state before any Ghostfolio network request can occur, continue to process busy-state updates and terminal resize messages while auth or activities requests are in flight, and complete the one-page communication probe without blocking the Bubble Tea event loop  
@@ -106,7 +106,7 @@ tests/
 - Use restrictive local permissions where the operating system supports them.
 - Canonicalize and validate the stored origin on every read. Reject malformed or now-disallowed origins before any network request.
 - Never persist the Ghostfolio security token, Ghostfolio JWT, raw response payloads, retry diagnostics, or any report-related data in this slice.
-- Document the resolved bootstrap file path and the user-reset procedure: deleting the bootstrap setup file forces the application back to first-run setup on the next launch.
+- Document, in `README.md` and `quickstart.md`, where the bootstrap setup file is stored on supported platforms and the user-reset procedure: deleting the bootstrap setup file forces the application back to first-run setup on the next launch. The runtime workflow does not need to display that path.
 
 ## Ghostfolio Communication Validation Rules
 
@@ -122,7 +122,7 @@ tests/
 ## Slice Evolution Rules
 
 - `ActivitiesProbeResponse` and `ActivityProbeEntry` are validation-only probe models for this slice and must be removed once later specs introduce full-history Ghostfolio retrieval and normalized `ActivityRecord` modeling.
-- `SyncValidationAttempt` and `ValidationOutcome` are temporary workflow abstractions and must be evolved or merged into the broader real-sync lifecycle when later specs add retrieval, normalization, persistence, and report readiness states.
+- `SyncValidationAttempt` and `ValidationOutcome` are temporary workflow abstractions and may be implemented as cohesive runtime or flow-local types in this slice rather than as standalone packages. They must still be evolved or merged into the broader real-sync lifecycle when later specs add retrieval, normalization, persistence, and report readiness states.
 - `GhostfolioSession` is expected to remain, but later specs must expand it from a validation-only session into the authenticated runtime context for full sync execution.
 - `AppSetupConfig` may remain as bootstrap-only machine-local configuration, but later specs must keep it free of financial data and person-linked identifiers or move such fields into the future token-protected user and setup models.
 

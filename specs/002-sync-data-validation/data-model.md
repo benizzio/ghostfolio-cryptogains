@@ -8,6 +8,8 @@ The persisted setup model below is intentionally narrow. It is sufficient to gat
 
 This data model also contains validation-only runtime entities that exist only because this slice stops at communication verification. Later slices that implement real Ghostfolio retrieval, normalization, and protected persistence must not keep those probe entities permanently if equivalent real-sync models replace them.
 
+These transient runtime entities may be implemented as cohesive types inside the runtime or TUI flow packages in this slice. They do not require a standalone model package as long as the names, fields, and rules below remain traceable in the implementation.
+
 ## Forward Slice Evolution
 
 | Entity | Transitional Status | Next-slice expectation |
