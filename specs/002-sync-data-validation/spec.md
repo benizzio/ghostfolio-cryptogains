@@ -2,7 +2,7 @@
 
 **Feature Branch**: `[002-sync-data-validation]`  
 **Created**: 2026-05-09  
-**Status**: Draft  
+**Status**: Ready  
 **Input**: User description: "We created before the specs on @specs/001-ghostfolio-gains-reporting/ but their scope is too big. They will now become only source of knowledge and we will create smaller specs to tackle the features with higher granularity. Let's create the first one that will tackle base boilerplate creation of the application and setup, including the selection of the sync data feature and a validation that it works, and ONLY THAT. In this initial spec, when sync data is selected by the user to be executed, the only thing the application will do is receive the result of the call to obtain data from ghostfolio, validate that the received data and request result is ok and give a message to the user that communication is ok, and the actual persistence and report generation will be available in future versions (will be added in future specs)"
 
 ## Clarifications
