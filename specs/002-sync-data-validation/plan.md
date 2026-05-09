@@ -13,12 +13,12 @@ Build the first runnable Go terminal application slice for this repository. The 
 
 **Language/Version**: Go 1.26.2  
 **Primary Dependencies**: `charm.land/bubbletea/v2`, selected `charm.land/bubbles/v2` components (`list`, `textinput`, `help`, `key`, `spinner`), Go standard library (`net/http`, `encoding/json`, `context`, `net/url`, `os`, `path/filepath`)  
-**Storage**: Local-only machine-scoped JSON setup file in the OS config or app-data directory, written atomically with restrictive filesystem permissions; no Ghostfolio token, JWT, or activity payload persistence in this slice  
-**Testing**: `go test` with `httptest.Server` integration suites for first-run setup completion, remembered-setup startup without pre-sync network requests, delayed-request busy states, terminal resize responsiveness, and Ghostfolio validation flows; table-driven unit tests for validators, setup-file protection, protected config placement or restrictive permission behavior, and focus routing; `go test -coverprofile`, branch and file coverage gate via `github.com/Fabianexe/gocoverageplus`  
+**Storage**: Local-only machine-scoped JSON setup file in the OS config or app-data directory, scoped to the current OS user profile and containing only `schema_version`, `setup_complete`, `server_mode`, `server_origin`, `allow_dev_http`, and `updated_at`; written atomically with restrictive filesystem permissions where supported; no Ghostfolio token, JWT, or activity payload persistence in this slice  
+**Testing**: `go test` with `httptest.Server` integration suites for first-run setup completion, remembered-setup startup without pre-sync network requests, invalid-remembered-setup startup fallback, repeated validation after both success and failure, setup-file removal after startup load, delayed-request busy states, terminal resize responsiveness, and Ghostfolio validation flows across rejected-token, timeout, connectivity, unsuccessful-response, and incompatible-server categories; table-driven unit tests for validators, setup-file protection, protected config placement or restrictive permission behavior, and focus routing; `go test -coverprofile`, branch and file coverage gate via `github.com/Fabianexe/gocoverageplus`  
 **Target Platform**: Installed terminal application for Linux, macOS, and Windows terminals with local filesystem access  
 **Project Type**: Single-module Go TUI application  
 **Performance Goals**: Render the first actionable setup or main-menu screen using only local bootstrap state before any Ghostfolio network request can occur, continue to process busy-state updates and terminal resize messages while auth or activities requests are in flight, and complete the one-page communication probe without blocking the Bubble Tea event loop  
-**Constraints**: Ghostfolio token is runtime-only and cleared after each attempt; no Ghostfolio payload persistence; production-like custom origins require HTTPS and only explicit development mode may allow HTTP; development mode is entered only through an explicit startup flag; the TUI always owns the full terminal screen; primary next-step actions are presented as arrow-key menus; optional side actions are exposed only as clearly labeled hotkeys; labeled text inputs suppress conflicting hotkeys while they are focused; report generation, PDF output, financial calculations, and multi-user token-derived storage are out of scope  
+**Constraints**: Ghostfolio token is runtime-only and cleared after each attempt; no Ghostfolio payload persistence; production-like custom origins require HTTPS and only explicit development mode may allow HTTP; development mode is entered only through an explicit startup flag and must not be inferred from remembered setup or remote behavior; the TUI always owns the full terminal screen; primary next-step actions are presented as arrow-key menus; optional side actions are exposed only as clearly labeled hotkeys; labeled text inputs suppress conflicting hotkeys while they are focused; report generation, PDF output, financial calculations, and multi-user token-derived storage are out of scope  
 **Scale/Scope**: One application-level setup profile per local OS user profile, one selected Ghostfolio origin, one executable business workflow (`Sync Data`), one anonymous-auth request plus one `take=1` activities probe per validation attempt, and successful empty activity lists are accepted when the response contract is otherwise valid
 
 ## Constitution Check
@@ -90,6 +90,7 @@ tests/
 - Every screen uses a stable full-screen layout with clearly delimited regions for title and explanation, main workflow content, transient status, and visible hotkeys.
 - Use Ghostfolio's general visual identity as the TUI design reference: Inter-style clean sans typography, primary teal accents around `#36cfcc`, secondary blue accents around `#3686cf`, warning and error red around `#dc3545`, and restrained light or dark neutral surfaces rather than saturated backgrounds.
 - Adapt that palette to terminal capabilities by using truecolor when available and the nearest readable ANSI fallbacks when it is not. Preserve the palette hierarchy even when exact hex values are unavailable.
+- If terminal capabilities are effectively monochrome, add visible non-color cues so selection state, primary-action emphasis, and failure state remain distinguishable.
 - The next main workflow steps are always shown as a vertical arrow-key menu. `Up` and `Down` move selection, and `Enter` activates the selected primary action.
 - Optional side steps remain available through visible hotkeys shown in the footer or help region. Prefer modifier-based hotkeys such as `Ctrl+` combinations so they do not collide with text entry.
 - Labeled text inputs are rendered outside placeholder text and must take focus explicitly. While an input is focused, plain-character hotkeys are disabled so typing never triggers application actions.
@@ -100,11 +101,17 @@ tests/
 
 ## Setup Persistence Rules
 
-- Persist only the bootstrap setup data needed before token entry: setup completion state, selected server mode, canonical Ghostfolio origin, development-mode HTTP allowance, and last-updated timestamp.
+- Persist only the bootstrap setup data needed before token entry: `schema_version`, setup completion state, selected server mode, canonical Ghostfolio origin, development-mode HTTP allowance, and last-updated timestamp.
 - Store the setup file under `os.UserConfigDir()` or the platform-equivalent application data directory in a `ghostfolio-cryptogains` folder.
+- Platform expectation for setup-file placement:
+  - Linux: user config directory such as `$XDG_CONFIG_HOME` or `~/.config`
+  - macOS: per-user application support or config directory under the current user's home directory
+  - Windows: per-user roaming or local application data directory under the current OS user profile
 - Write updates by serializing the full document to a temporary file, syncing it, and renaming it atomically over the previous file.
 - Use restrictive local permissions where the operating system supports them.
+- On platforms that do not expose Unix-style permission bits in the same way, rely on correct per-user application-data placement and any platform-native user scoping available to the process.
 - Canonicalize and validate the stored origin on every read. Reject malformed or now-disallowed origins before any network request.
+- If remembered setup becomes invalid on read, keep no partially accepted startup state from disk, make no Ghostfolio network request, and return the user to setup with an explanation.
 - Never persist the Ghostfolio security token, Ghostfolio JWT, raw response payloads, retry diagnostics, or any report-related data in this slice.
 - Document, in `README.md` and `quickstart.md`, where the bootstrap setup file is stored on supported platforms and the user-reset procedure: deleting the bootstrap setup file forces the application back to first-run setup on the next launch. The runtime workflow does not need to display that path.
 
@@ -116,7 +123,9 @@ tests/
 - After successful auth, request exactly one activities page with `GET /api/v1/activities?skip=0&take=1&sortColumn=date&sortDirection=asc`.
 - Treat communication as successful only when the activities probe returns HTTP `200 OK`, a JSON object with an `activities` array and non-negative integer `count`, and the first returned item contains non-empty `id`, `date`, and `type` fields when `count > 0`.
 - Treat `{ "activities": [], "count": 0 }` as success because an empty history is still a valid communication result.
-- Any transport error, non-2xx response, malformed JSON, missing `authToken`, missing `activities`, invalid `count`, or missing minimal activity fields ends the workflow with a user-facing failure result.
+- Treat `count > 0` with no returned first activity, `count == 0` with returned activities, or more than one returned activity for the one-page probe as incompatible-server failures.
+- Map validation failures into exactly one user-visible category: rejected token, timeout, connectivity problem, unsuccessful server response, or incompatible server contract.
+- Any transport error, non-2xx response, malformed JSON, unsupported JSON content type for a response expected to be JSON, missing `authToken`, missing `activities`, invalid `count`, contradictory one-page probe semantics, unreadable first-activity timestamp, or missing minimal activity fields ends the workflow with a user-facing failure result in the appropriate category.
 - A successful validation attempt must explicitly tell the user that communication works, but that no data was stored and no report flow is available yet.
 
 ## Slice Evolution Rules

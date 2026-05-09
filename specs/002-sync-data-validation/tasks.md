@@ -12,6 +12,13 @@ description: "Task list for Sync Data Validation implementation"
 
 **Organization**: Tasks are grouped by user story so each story can be implemented and verified independently.
 
+## Requirement Traceability
+
+- `FR-001` to `FR-005`, `FR-017` to `FR-021`, `SEC-005`, `QUAL-001`, and `SC-001` trace primarily to `T010` to `T016`, `T033`, and `T034`.
+- `FR-006` to `FR-007`, `FR-014`, `QUAL-002`, `QUAL-004`, and `SC-005` trace primarily to `T017` to `T022`.
+- `FR-008` to `FR-016`, `FR-022`, `SEC-001` to `SEC-004`, `QUAL-001`, `QUAL-003`, `INT-001`, and `SC-002` to `SC-006` trace primarily to `T023` to `T032`.
+- Release-level evidence for coverage and security review traces to `T035` and `T036`.
+
 ## Path Conventions
 
 - Executable entrypoint: `cmd/ghostfolio-cryptogains/`
@@ -59,8 +66,8 @@ description: "Task list for Sync Data Validation implementation"
 ### Tests for User Story 1
 
 - [ ] T010 [P] [US1] Add setup-screen contract coverage from `specs/002-sync-data-validation/contracts/tui-workflows.md` in `tests/contract/setup_workflow_contract_test.go`
-- [ ] T011 [P] [US1] Add first-run setup completion, remembered-setup startup, and no-pre-sync-network integration coverage for clean and remembered bootstrap states in `tests/integration/setup_flow_test.go`
-- [ ] T012 [P] [US1] Add bootstrap config store, setup-file protection, and origin validation unit coverage in `tests/unit/config_store_test.go`, `tests/unit/config_permissions_test.go`, and `tests/unit/origin_validator_test.go`
+- [ ] T011 [P] [US1] Add first-run setup completion, remembered-setup startup, invalid-remembered-setup startup fallback, setup-file removal-after-load behavior, and no-pre-sync-network integration coverage for clean and remembered bootstrap states in `tests/integration/setup_flow_test.go`
+- [ ] T012 [P] [US1] Add bootstrap config store, setup-file protection, startup-readable field validation, and origin validation unit coverage in `tests/unit/config_store_test.go`, `tests/unit/config_permissions_test.go`, and `tests/unit/origin_validator_test.go`
 
 ### Implementation for User Story 1
 
@@ -82,7 +89,7 @@ description: "Task list for Sync Data Validation implementation"
 ### Tests for User Story 2
 
 - [ ] T017 [P] [US2] Add main-menu and sync-entry screen contract coverage from `specs/002-sync-data-validation/contracts/tui-workflows.md` in `tests/contract/main_menu_workflow_contract_test.go` and `tests/contract/sync_entry_workflow_contract_test.go`
-- [ ] T018 [P] [US2] Add main-menu and workflow-selection integration coverage in `tests/integration/main_menu_flow_test.go`
+- [ ] T018 [P] [US2] Add main-menu, workflow-selection, and non-reporting-outcome integration coverage in `tests/integration/main_menu_flow_test.go`
 - [ ] T019 [P] [US2] Add focus-aware key routing unit coverage in `tests/unit/key_routing_test.go`
 
 ### Implementation for User Story 2
@@ -105,8 +112,8 @@ description: "Task list for Sync Data Validation implementation"
 
 - [ ] T023 [P] [US3] Add Ghostfolio auth and activities contract coverage from `specs/002-sync-data-validation/contracts/ghostfolio-sync-validation.md` in `tests/contract/ghostfolio_sync_validation_contract_test.go`
 - [ ] T024 [P] [US3] Add validation-result and busy-state screen contract coverage from `specs/002-sync-data-validation/contracts/tui-workflows.md` in `tests/contract/validation_result_workflow_contract_test.go`
-- [ ] T025 [P] [US3] Add sync validation success, failure, retry, no-persistence, and in-flight resize responsiveness integration coverage in `tests/integration/sync_validation_flow_test.go`
-- [ ] T026 [P] [US3] Add payload validation, token-redaction, and failure-diagnostic coverage in `tests/unit/response_validator_test.go`, `tests/unit/redact_test.go`, and `tests/integration/diagnostic_redaction_test.go`
+- [ ] T025 [P] [US3] Add sync validation success, categorized failure outcomes, retry after success and failure, no-persistence, abandoned-attempt, and in-flight resize responsiveness integration coverage in `tests/integration/sync_validation_flow_test.go`
+- [ ] T026 [P] [US3] Add payload validation, contradictory one-page probe validation, token-redaction, and failure-diagnostic coverage in `tests/unit/response_validator_test.go`, `tests/unit/redact_test.go`, and `tests/integration/diagnostic_redaction_test.go`
 
 ### Implementation for User Story 3
 
@@ -125,8 +132,8 @@ description: "Task list for Sync Data Validation implementation"
 
 **Purpose**: Finish documentation, verification, and release-level checks across all stories.
 
-- [ ] T033 [P] Update the `README.md` sections `Local Setup Storage`, `Removing Local Setup`, `Development Mode`, and `Current Slice Scope`
-- [ ] T034 [P] Reconcile the `Launch The Application`, `Remembered Setup Path`, `Sync Validation Failure Paths`, and `Negative Check: No Persistence Beyond Setup` sections in `specs/002-sync-data-validation/quickstart.md`
+- [ ] T033 [P] Update the `README.md` sections `Local Setup Storage`, `Removing Local Setup`, `Development Mode`, and `Current Slice Scope`, including Linux, macOS, and Windows setup-file location expectations and protection notes
+- [ ] T034 [P] Reconcile the `Launch The Application`, `Remembered Setup Path`, `Sync Validation Failure Paths`, and `Negative Check: No Persistence Beyond Setup` sections in `specs/002-sync-data-validation/quickstart.md`, including the supported failure categories and invalid-remembered-setup behavior
 - [ ] T035 Run `mkdir -p dist/coverage && go test ./... -covermode=atomic -coverprofile=dist/coverage/coverage.out && gocoverageplus -i dist/coverage/coverage.out -o dist/coverage/coverage.xml`, then verify the generated artifacts in `dist/coverage/coverage.out` and `dist/coverage/coverage.xml` report 100% statement coverage plus 100% branch and file coverage for project-owned code
 - [ ] T036 [P] Document the OWASP Top 10 review for setup persistence, Ghostfolio token handling, and Ghostfolio API calls in `specs/002-sync-data-validation/plan.md`
 
