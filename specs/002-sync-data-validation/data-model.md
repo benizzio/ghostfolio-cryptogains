@@ -6,6 +6,19 @@ This slice persists only the bootstrap setup state needed before Ghostfolio toke
 
 The persisted setup model below is intentionally narrow. It is sufficient to gate first-run setup and reuse the selected Ghostfolio origin between runs, but it does not create any local user profile, encrypted activity cache, or report-ready ledger.
 
+This data model also contains validation-only runtime entities that exist only because this slice stops at communication verification. Later slices that implement real Ghostfolio retrieval, normalization, and protected persistence must not keep those probe entities permanently if equivalent real-sync models replace them.
+
+## Forward Slice Evolution
+
+| Entity | Transitional Status | Next-slice expectation |
+|--------|---------------------|------------------------|
+| `AppSetupConfig` | Keep, but narrow | Retain only as bootstrap configuration readable before token entry. If later setup fields become person-linked or financial, move them into future token-protected setup or profile models instead of expanding this entity unsafely |
+| `GhostfolioSession` | Keep and expand | Reuse as the authenticated runtime context for real sync and persistence workflows |
+| `SyncValidationAttempt` | Update or rename | Align with a broader future `SyncAttempt` model that covers retrieval, normalization, validation, and persistence states |
+| `ActivitiesProbeResponse` | Remove | Replace with the real Ghostfolio retrieval DTOs and pagination inputs used by full sync |
+| `ActivityProbeEntry` | Remove | Replace with normalized `ActivityRecord`-style models and related source-scope data once real sync exists |
+| `ValidationOutcome` | Update or merge | Replace with the broader sync-result and UI-status model used once successful communication can also produce persisted data and later report readiness |
+
 ## AppSetupConfig
 
 Purpose: Machine-local bootstrap configuration loaded before any Ghostfolio token prompt.
@@ -40,6 +53,10 @@ State transitions:
 - `complete -> updated` when the user changes the selected server origin.
 - `complete -> deleted` when the user removes local bootstrap state.
 
+Future slice note:
+
+- This entity is expected to remain as bootstrap-only configuration, but later slices must not turn it into a container for user-linked or financial data. Those fields belong in the future protected user and setup models.
+
 ## GhostfolioSession
 
 Purpose: Ephemeral authenticated runtime state for one communication-validation run.
@@ -69,6 +86,10 @@ State transitions:
 
 - `prompted -> authenticated -> cleared`
 - `prompted -> failed -> cleared`
+
+Future slice note:
+
+- This entity is expected to remain, but later slices must expand it beyond the validation probe so it can support full sync execution and later protected-data workflows.
 
 ## SyncValidationAttempt
 
@@ -103,6 +124,10 @@ State transitions:
 - `idle -> requesting_activities -> failure`
 - `idle -> validating_payload -> failure`
 
+Future slice note:
+
+- This entity is transitional. Later slices should evolve or replace it with the broader real-sync lifecycle model instead of preserving a separate validation-only attempt abstraction indefinitely.
+
 ## ActivitiesProbeResponse
 
 Purpose: Minimal validated representation of the first page returned by `GET /api/v1/activities` for this slice.
@@ -128,6 +153,10 @@ Validation rules:
 - If `count > 0`, the response must contain one `ActivityProbeEntry` on the first page.
 - Unknown extra fields are ignored.
 
+Future slice note:
+
+- This entity is validation-only and must be removed when later slices introduce full-history retrieval and pagination models for real sync.
+
 ## ActivityProbeEntry
 
 Purpose: Minimal activity item shape required to treat Ghostfolio communication as structurally compatible in this slice.
@@ -151,6 +180,10 @@ Validation rules:
 - `type` must be a non-empty string.
 - This slice does not yet enforce full domain support such as `BUY` or `SELL`-only normalization across the retrieved history.
 
+Future slice note:
+
+- This entity is validation-only and must be replaced by the normalized activity models used for real sync, persistence, and later reporting.
+
 ## ValidationOutcome
 
 Purpose: User-visible result produced after a sync validation attempt finishes.
@@ -173,3 +206,7 @@ Validation rules:
 - Success messages must explicitly state that no Ghostfolio data was stored and no reporting flow is available yet.
 - Failure messages must explain the failure category without exposing the Ghostfolio token, JWT, or raw unprotected payload details.
 - Outcomes are transient and are not shown again after restart unless the workflow fails again.
+
+Future slice note:
+
+- This entity should not remain as a standalone long-term domain model once later slices add real sync completion, cache update, and report-readiness states. It should evolve into or merge with the broader workflow-status model.

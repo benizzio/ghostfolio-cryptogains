@@ -16,6 +16,14 @@ Rationale: This directly implements the user guidance for a pleasant, clear, and
 
 Alternatives considered: Global single-letter hotkeys on every screen were rejected because they conflict with text entry and make state reasoning harder. Placeholder-only inputs were rejected because labels disappear while the user is typing. A table-first interaction model was rejected because this slice is about action selection rather than row comparison.
 
+## Ghostfolio Visual Identity Alignment
+
+Decision: Style the TUI with the same general visual identity cues observable on Ghostfolio's live website: an Inter-style sans-serif typography stack, a teal primary accent, a blue secondary accent, a red warning or error color, and restrained light or dark neutral surfaces.
+
+Rationale: The live `https://ghostfol.io` HTML exposes theme variables that are concrete enough for planning: primary teal `#36cfcc`, accent blue `#3686cf`, warning red `#dc3545`, light neutral surfaces near `#fafafa` and white, darker panels around `rgb(25, 25, 25)` and `rgb(66, 66, 66)`, and `Inter` as the primary typeface. A terminal UI cannot reproduce the web interface exactly, but it can follow the same palette hierarchy and clean, data-oriented tone by using teal for primary actions and active selection, blue for secondary emphasis, red for destructive or failure states, and quiet neutral surfaces for panels and separators.
+
+Alternatives considered: Inventing a separate palette for the TUI was rejected because it would weaken visual continuity with Ghostfolio. Copying the website literally was rejected because terminal rendering constraints require a simpler adaptation and fallback behavior when truecolor is unavailable.
+
 ## Setup Persistence Strategy
 
 Decision: Persist only the bootstrap setup state as a small machine-local JSON document under the operating system's config or app-data directory, with atomic rewrites and restrictive local permissions.

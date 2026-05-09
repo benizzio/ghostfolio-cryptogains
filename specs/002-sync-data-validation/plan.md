@@ -7,7 +7,7 @@
 
 ## Summary
 
-Build the first runnable Go terminal application slice for this repository. The application launches into a full-screen Bubble Tea interface, guides first-run setup for Ghostfolio server selection, persists only startup-readable machine-local setup state, presents `Sync Data` as the only business workflow, prompts for a Ghostfolio security token only when that workflow starts, validates Ghostfolio communication through the minimal authenticated activities contract, and reports success or failure without persisting returned Ghostfolio data or exposing any reporting features.
+Build the first runnable Go terminal application slice for this repository. The application launches into a full-screen Bubble Tea interface, guides first-run setup for Ghostfolio server selection, persists only startup-readable machine-local setup state, presents `Sync Data` as the only business workflow, prompts for a Ghostfolio security token only when that workflow starts, validates Ghostfolio communication through the minimal authenticated activities contract, and reports success or failure without persisting returned Ghostfolio data or exposing any reporting features. The slice also treats its probe-specific validation models as transitional scaffolding that must be removed or evolved when later specs introduce real sync normalization and protected persistence.
 
 ## Technical Context
 
@@ -88,11 +88,14 @@ tests/
 
 - Launch the root Bubble Tea program with `tea.WithAltScreen()` so the application owns the entire terminal immediately.
 - Every screen uses a stable full-screen layout with clearly delimited regions for title and explanation, main workflow content, transient status, and visible hotkeys.
+- Use Ghostfolio's general visual identity as the TUI design reference: Inter-style clean sans typography, primary teal accents around `#36cfcc`, secondary blue accents around `#3686cf`, warning and error red around `#dc3545`, and restrained light or dark neutral surfaces rather than saturated backgrounds.
+- Adapt that palette to terminal capabilities by using truecolor when available and the nearest readable ANSI fallbacks when it is not. Preserve the palette hierarchy even when exact hex values are unavailable.
 - The next main workflow steps are always shown as a vertical arrow-key menu. `Up` and `Down` move selection, and `Enter` activates the selected primary action.
 - Optional side steps remain available through visible hotkeys shown in the footer or help region. Prefer modifier-based hotkeys such as `Ctrl+` combinations so they do not collide with text entry.
 - Labeled text inputs are rendered outside placeholder text and must take focus explicitly. While an input is focused, plain-character hotkeys are disabled so typing never triggers application actions.
 - Token entry is always masked. Origin entry remains unmasked but uses the same focus rules.
 - Busy states replace the primary menu with a progress view and non-secret status text. Navigation is limited to actions that are actually safe during the active request.
+- Panels, menus, and help regions should follow Ghostfolio's clean product tone: subtle separators, compact spacing, high-contrast headings, and minimal ornamentation so workflow guidance stays dominant.
 
 ## Setup Persistence Rules
 
@@ -113,6 +116,13 @@ tests/
 - Treat `{ "activities": [], "count": 0 }` as success because an empty history is still a valid communication result.
 - Any transport error, non-2xx response, malformed JSON, missing `authToken`, missing `activities`, invalid `count`, or missing minimal activity fields ends the workflow with a user-facing failure result.
 - A successful validation attempt must explicitly tell the user that communication works, but that no data was stored and no report flow is available yet.
+
+## Slice Evolution Rules
+
+- `ActivitiesProbeResponse` and `ActivityProbeEntry` are validation-only probe models for this slice and must be removed once later specs introduce full-history Ghostfolio retrieval and normalized `ActivityRecord` modeling.
+- `SyncValidationAttempt` and `ValidationOutcome` are temporary workflow abstractions and must be evolved or merged into the broader real-sync lifecycle when later specs add retrieval, normalization, persistence, and report readiness states.
+- `GhostfolioSession` is expected to remain, but later specs must expand it from a validation-only session into the authenticated runtime context for full sync execution.
+- `AppSetupConfig` may remain as bootstrap-only machine-local configuration, but later specs must keep it free of financial data and person-linked identifiers or move such fields into the future token-protected user and setup models.
 
 ## Complexity Tracking
 

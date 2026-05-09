@@ -7,6 +7,8 @@ This contract defines the user-visible workflow states and keyboard interaction 
 ## Global UX Rules
 
 - The application always launches into the terminal alternate screen and occupies the full visible terminal.
+- The TUI visual identity follows Ghostfolio's general product style: clean sans-serif typography, teal primary emphasis, blue secondary emphasis, red warning or failure states, and restrained neutral backgrounds and panels.
+- When the terminal supports truecolor, the UI should approximate Ghostfolio's live palette with teal near `#36cfcc`, blue near `#3686cf`, and red near `#dc3545`. When truecolor is unavailable, the nearest readable ANSI equivalents should be used.
 - Every screen must clearly delimit these regions:
   - header with title and one-line workflow explanation
   - main content region with the current primary menu or input form
@@ -19,6 +21,7 @@ This contract defines the user-visible workflow states and keyboard interaction 
 - When a text input is focused, plain-character hotkeys are disabled so typing never triggers application actions.
 - Ghostfolio token input is always masked.
 - Transient failure or success messages are shown only in the active workflow and are not persisted for later display.
+- Panels and menus should favor subtle separators, compact spacing, and high-contrast headings over decorative borders so the workflow reads like a focused Ghostfolio product surface rather than a generic terminal form.
 
 ## Screen Contract
 
