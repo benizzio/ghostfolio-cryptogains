@@ -24,13 +24,13 @@ Rationale: The persisted data in this slice is limited to setup completion state
 
 Alternatives considered: OS keychain or keyring storage was rejected because it adds runtime variability, desktop-service assumptions, and little practical security value for this non-secret bootstrap data. SQLite was rejected because a single small setup document does not justify a database. A Ghostfolio-token-derived encrypted file was rejected because it conflicts with the slice requirement that setup be readable before token entry.
 
-## Constitution Compatibility For Bootstrap Persistence
+## Constitution Alignment For Bootstrap Persistence
 
-Decision: Record startup-readable setup persistence as a planning blocker against the current constitution instead of masking the conflict.
+Decision: Treat the bootstrap setup file as less-sensitive machine-local configuration that still requires explicit justification, local-only storage, and proportionate protection, but not Ghostfolio-token-derived encryption.
 
-Rationale: Constitution I currently requires persisted data to be encrypted at rest with key material derived from the active Ghostfolio security token. This feature slice intentionally persists bootstrap state that must be readable before token entry and therefore cannot satisfy that rule as written. The plan must show a security gate error until either the constitution is amended for non-secret bootstrap configuration or the spec is revised.
+Rationale: The amended constitution now reserves the strict token-derived encryption and OWASP Cryptographic Storage Cheat Sheet requirements for persisted data that contains financial information or can be connected to a specific person or user. This slice persists only setup completion state and the selected Ghostfolio origin, stores no Ghostfolio token, JWT, financial payload, or user identity, and therefore fits the narrower bootstrap-configuration case. The plan must still document why the file is persisted, what fields it contains, and what local protection controls apply.
 
-Alternatives considered: Treating the bootstrap file as exempt without documenting the conflict was rejected because the constitution explicitly requires traceable compliance evidence. Persisting the Ghostfolio token or a token verifier to unlock setup at startup was rejected because token persistence is prohibited.
+Alternatives considered: Treating the bootstrap file as exempt without documentation was rejected because the constitution still requires traceable persistence justification. Persisting the Ghostfolio token or a token verifier to unlock setup at startup was rejected because token persistence remains prohibited.
 
 ## Ghostfolio Communication Validation Contract
 

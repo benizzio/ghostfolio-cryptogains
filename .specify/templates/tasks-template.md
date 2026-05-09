@@ -72,7 +72,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T007 Create base models/entities and financial precision primitives that
       all stories depend on
 - [ ] T008 Configure error handling and security logging infrastructure
-- [ ] T009 Setup justified local-only persistence and encryption approach
+- [ ] T009 Setup justified local-only persistence and protection approach, using token-derived encryption when persisted data includes financial or person-linked information
 - [ ] T010 Setup environment configuration management
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
@@ -169,7 +169,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX Performance optimization across all stories
 - [ ] TXXX [P] Additional unit tests for justified complex logic in language default location
 - [ ] TXXX [P] Verify 100% coverage for project-owned code
-- [ ] TXXX Most recent published OWASP Top 10 and OWASP Cryptographic Storage Cheat Sheet review and security hardening
+- [ ] TXXX Most recent published OWASP Top 10 review and, when persisted data includes financial or person-linked information, OWASP Cryptographic Storage Cheat Sheet review and security hardening
 - [ ] TXXX Run quickstart.md validation
 
 ---

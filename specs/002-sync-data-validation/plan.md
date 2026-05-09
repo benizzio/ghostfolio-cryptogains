@@ -25,10 +25,10 @@ Build the first runnable Go terminal application slice for this repository. The 
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-Pre-research gate status: ERROR  
-Post-design gate status: ERROR
+Pre-research gate status: PASS  
+Post-design gate status: PASS
 
-- [ ] Security: This slice requires persisted setup state to be readable before Ghostfolio token entry and therefore cannot use Ghostfolio-token-derived encryption as required by Constitution I. The proposed design still keeps setup local-only, stores no Ghostfolio token or payload, revalidates the configured origin on every read, and scopes the OWASP Top 10 review to cryptographic failures, identification and authentication failures, security misconfiguration, software and data integrity failures, and logging leakage. Even with those controls, implementation is blocked until the constitution is amended for non-secret bootstrap configuration or the spec is changed to avoid startup-readable persistence.
+- [x] Security: This slice persists only startup-readable bootstrap configuration that contains neither financial information nor person- or user-linkable data. It remains local-only, stores no Ghostfolio token, JWT, activity payload, or user identity, revalidates the configured origin on every read, and documents proportionate machine-local protection instead of Ghostfolio-token-derived encryption. The OWASP Top 10 review scope covers identification and authentication failures, security misconfiguration, software and data integrity failures, and logging leakage. Token-derived encryption and OWASP Cryptographic Storage Cheat Sheet evidence remain deferred until the product starts persisting financial or person-linked data.
 - [x] Precision: Financial calculations are out of scope in this slice. Numeric values received from Ghostfolio are used only to validate JSON structure and are not used to derive balances, gains, losses, or reports.
 - [x] Testing: Integration-first automated tests cover first-run setup gating, setup persistence, origin validation, full-screen workflow transitions, successful and failed communication validation, retry-after-failure behavior, token non-persistence, token non-exposure, and confirmation that no data persistence or report flow occurs. Unit tests isolate origin canonicalization, response-shape validation, and focus-aware key routing. Statement and branch or file coverage remain explicit release gates.
 - [x] Dependencies: Only Bubble Tea, selected Bubbles widgets, and the existing development-time coverage helper are planned. `research.md` records the due diligence and keeps cryptographic storage, decimal math, and PDF dependencies out of this slice.
@@ -116,6 +116,4 @@ tests/
 
 ## Complexity Tracking
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| Startup-readable persisted setup state | Required by `FR-005` and `SEC-003` so the application can determine setup completion before prompting for the Ghostfolio security token | Ghostfolio-token-derived encryption would force token entry at startup and break the slice scope. This is not a valid waiver under the current constitution and needs a constitution amendment or a spec change before implementation |
+No constitution violations require justification for this plan.
