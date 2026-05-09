@@ -14,10 +14,10 @@ Build the first runnable Go terminal application slice for this repository. The 
 **Language/Version**: Go 1.26.2  
 **Primary Dependencies**: `charm.land/bubbletea/v2`, selected `charm.land/bubbles/v2` components (`list`, `textinput`, `help`, `key`, `spinner`), Go standard library (`net/http`, `encoding/json`, `context`, `net/url`, `os`, `path/filepath`)  
 **Storage**: Local-only machine-scoped JSON setup file in the OS config or app-data directory, written atomically with restrictive filesystem permissions; no Ghostfolio token, JWT, or activity payload persistence in this slice  
-**Testing**: `go test` with `httptest.Server` integration suites, table-driven unit tests for validators and focus routing, `go test -coverprofile`, branch and file coverage gate via `github.com/Fabianexe/gocoverageplus`  
+**Testing**: `go test` with `httptest.Server` integration suites for first-run setup, no-pre-sync-network startup, delayed-request busy states, terminal resize responsiveness, and Ghostfolio validation flows; table-driven unit tests for validators, setup-file protection, and focus routing; `go test -coverprofile`, branch and file coverage gate via `github.com/Fabianexe/gocoverageplus`  
 **Target Platform**: Installed terminal application for Linux, macOS, and Windows terminals with local filesystem access  
 **Project Type**: Single-module Go TUI application  
-**Performance Goals**: Load remembered setup before the first actionable screen, keep the full-screen UI responsive during resize and network waits, and complete the one-page communication probe without freezing the Bubble Tea event loop  
+**Performance Goals**: Render the first actionable setup or main-menu screen using only local bootstrap state before any Ghostfolio network request can occur, continue to process busy-state updates and terminal resize messages while auth or activities requests are in flight, and complete the one-page communication probe without blocking the Bubble Tea event loop  
 **Constraints**: Ghostfolio token is runtime-only and cleared after each attempt; no Ghostfolio payload persistence; production-like custom origins require HTTPS and only explicit development mode may allow HTTP; development mode is entered only through an explicit startup flag; the TUI always owns the full terminal screen; primary next-step actions are presented as arrow-key menus; optional side actions are exposed only as clearly labeled hotkeys; labeled text inputs suppress conflicting hotkeys while they are focused; report generation, PDF output, financial calculations, and multi-user token-derived storage are out of scope  
 **Scale/Scope**: One application-level setup profile per local OS user profile, one selected Ghostfolio origin, one executable business workflow (`Sync Data`), one anonymous-auth request plus one `take=1` activities probe per validation attempt, and successful empty activity lists are accepted when the response contract is otherwise valid
 
@@ -95,6 +95,7 @@ tests/
 - Labeled text inputs are rendered outside placeholder text and must take focus explicitly. While an input is focused, plain-character hotkeys are disabled so typing never triggers application actions.
 - Token entry is always masked. Origin entry remains unmasked but uses the same focus rules.
 - Busy states replace the primary menu with a progress view and non-secret status text. Navigation is limited to actions that are actually safe during the active request.
+- Busy states must be driven by asynchronous Bubble Tea commands so spinner ticks, safe status updates, and terminal resize messages continue while Ghostfolio requests are in flight.
 - Panels, menus, and help regions should follow Ghostfolio's clean product tone: subtle separators, compact spacing, high-contrast headings, and minimal ornamentation so workflow guidance stays dominant.
 
 ## Setup Persistence Rules
@@ -105,6 +106,7 @@ tests/
 - Use restrictive local permissions where the operating system supports them.
 - Canonicalize and validate the stored origin on every read. Reject malformed or now-disallowed origins before any network request.
 - Never persist the Ghostfolio security token, Ghostfolio JWT, raw response payloads, retry diagnostics, or any report-related data in this slice.
+- Document the resolved bootstrap file path and the user-reset procedure: deleting the bootstrap setup file forces the application back to first-run setup on the next launch.
 
 ## Ghostfolio Communication Validation Rules
 

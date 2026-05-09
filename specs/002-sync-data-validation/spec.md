@@ -91,19 +91,20 @@ those areas.
 - **FR-001**: The system MUST provide a runnable base application that guides the user through first-run setup before any business workflow can be executed.
 - **FR-002**: The system MUST allow the user during setup to choose either the hosted Ghostfolio service or a self-hosted Ghostfolio server origin.
 - **FR-003**: The system MUST accept a self-hosted server origin only when it uses `https`, except that `http` origins MAY be accepted when the application is explicitly running in development mode.
-- **FR-004**: The system MUST prevent feature execution until setup has been completed.
-- **FR-005**: The system MUST persist the completed setup state and selected Ghostfolio server between application runs using protected local setup storage on the user's machine that remains readable without prompting for the Ghostfolio security token at startup.
+- **FR-004**: The system MUST prevent entry into any business workflow until a valid `AppSetupConfig` has been loaded or created through setup.
+- **FR-005**: The system MUST persist only the completed `AppSetupConfig` fields required at startup and the selected Ghostfolio server between application runs using protected local setup storage on the user's machine that remains readable without prompting for the Ghostfolio security token at startup.
 - **FR-006**: The system MUST present sync data as the executable feature in this release after setup is complete.
 - **FR-007**: The system MUST require only the Ghostfolio security token from the user to validate communication with the selected Ghostfolio server when the user chooses sync data.
 - **FR-008**: The system MUST use the user-supplied Ghostfolio security token for that active validation attempt to authenticate with the selected Ghostfolio server and request activity data through the validated Ghostfolio sync contract.
 - **FR-009**: The system MUST validate both the request result and the returned payload before declaring communication successful.
 - **FR-010**: The system MUST treat communication validation as successful only when the selected Ghostfolio server accepts the request, returns a successful activity-retrieval response, and includes the minimal payload shape required by the validated Ghostfolio sync contract, even if the returned activity list is empty.
-- **FR-011**: The system MUST show a success message to the user when communication validation succeeds.
-- **FR-012**: The system MUST show a user-facing failure message when communication validation fails because of a rejected Ghostfolio security token, connectivity problems, unsuccessful responses, or an invalid retrieval result.
+- **FR-011**: The system MUST map a successful communication-validation outcome to a user-visible success result.
+- **FR-012**: The system MUST map a failed communication-validation outcome to a user-visible failure result when the failure is caused by a rejected Ghostfolio security token, connectivity problems, unsuccessful responses, or an invalid retrieval result.
 - **FR-013**: The system MUST end the workflow after showing the communication-validation result without persisting the retrieved data.
 - **FR-014**: The system MUST not generate reports, prepare report output, or present report-generation as part of this release.
-- **FR-015**: The system MUST inform the user in the sync data workflow that successful communication validation does not yet mean data has been stored or prepared for reporting.
+- **FR-015**: The success result in the sync data workflow MUST inform the user that successful communication validation does not yet mean data has been stored or prepared for reporting.
 - **FR-016**: The system MUST allow the user to re-run sync data after a failed validation attempt.
+- **FR-017**: The system MUST document the local bootstrap setup file location and a safe removal procedure that resets setup on the next launch.
 
 ### Security, Precision, and Integration Constraints
 
@@ -114,31 +115,35 @@ those areas.
 - **SEC-005**: Production usage MUST reject self-hosted `http` server origins and allow only `https` origins; `http` is permitted only when the application is explicitly running in development mode.
 - **FIN-001**: Financial calculation rules are out of scope for this slice; any numeric values received during validation are used only to confirm that the minimal expected response structure was returned and not to derive balances, gains, losses, or reports.
 - **QUAL-001**: Automated validation MUST cover first-run setup gating, setup completion, setup persistence between runs, local device protection of persisted setup state, self-hosted origin acceptance rules for development and production modes, sync data selection, Ghostfolio security token-only input, successful communication validation, rejected-token handling, connectivity failure, unsuccessful response handling, invalid response payload handling, token non-persistence, token non-exposure in application-produced diagnostics, retry after failure, and confirmation that no data persistence or report flow occurs.
+- **QUAL-002**: Automated validation MUST cover startup rendering of the first actionable setup or main-menu screen using only local bootstrap state, without Ghostfolio network requests or token entry before the user starts sync data.
+- **QUAL-003**: Automated validation MUST cover Bubble Tea busy-state progress updates and terminal resize handling while Ghostfolio authentication and activities requests are in flight so the event loop remains responsive during communication validation.
 - **INT-001**: The feature depends on a Ghostfolio server that can accept a Ghostfolio security token through the validated Ghostfolio authentication contract and return activity data that satisfies the minimal payload shape required by the validated Ghostfolio sync contract; the integration must validate compatibility at runtime rather than assume a permanently stable remote contract.
 
 ### Key Entities *(include if feature involves data)*
 
 This slice reuses the validated reference model from `specs/001-ghostfolio-gains-reporting/` and includes only the subset needed for setup and communication validation.
 
-- **SetupProfile**: The protected local configuration on the user's machine that identifies the selected Ghostfolio server and whether setup is complete. In this slice, it is limited to the server-selection and setup-completion concerns needed before feature execution and remains readable before Ghostfolio token entry.
+- **AppSetupConfig**: The protected local bootstrap configuration on the user's machine that identifies the selected Ghostfolio server and whether setup is complete. In this slice, it is limited to the server-selection and setup-completion concerns needed before feature execution and remains readable before Ghostfolio token entry.
 - **GhostfolioSession**: The ephemeral authenticated runtime state for one application run. In this slice, it includes the active server origin, the in-memory Ghostfolio security token supplied by the user, and any temporary session credential returned by Ghostfolio during the active validation flow only.
-- **SyncAttempt**: The ephemeral workflow state for one sync execution. In this slice, it covers starting the validation request, receiving the result, validating structural success or failure, and ending with a user-visible success or failure outcome.
+- **SyncValidationAttempt**: The ephemeral workflow state for one sync execution. In this slice, it covers starting the validation request, receiving the result, validating structural success or failure, and ending with a user-visible success or failure outcome.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: 95% of first-time users can complete setup and reach the feature-selection step in under 3 minutes using only in-application prompts.
+- **SC-001**: In automated validation runs from both a clean config directory and a remembered setup directory, 100% of launches reach an actionable setup or main-menu screen before any Ghostfolio network request can occur and without prompting for the Ghostfolio security token at startup.
 - **SC-002**: In controlled validation runs with a reachable and compatible Ghostfolio server, 100% of valid communication attempts end with a success message confirming communication is working.
 - **SC-003**: In controlled validation runs with a rejected Ghostfolio security token, unreachable server, unsuccessful responses, or invalid response payloads, 100% of attempts end with a failure message and do not proceed to any later-stage workflow.
 - **SC-004**: 100% of successful communication-validation runs end without storing returned Ghostfolio data locally.
 - **SC-005**: 100% of user-visible outcomes in this slice are limited to setup completion, sync data selection, and communication-validation messaging, with no report-generation outcome exposed.
+- **SC-006**: In controlled validation runs with delayed Ghostfolio responses, 100% of sync-validation attempts continue to render busy-state updates and process terminal resize events until the request finishes.
 
 ## Assumptions
 
 - This slice intentionally narrows a previously broader feature definition into a first step focused only on setup, sync data selection, and communication validation.
 - The first release slice needs only enough response validation to confirm communication is functioning, limited to successful authentication, a successful activity-retrieval response, and the minimal payload shape required by the validated Ghostfolio sync contract; domain-level activity normalization, persistence of retrieved sync data, and reporting are deferred to later specs.
 - This slice does not require keeping any Ghostfolio-returned data after the communication result is shown. Setup state is remembered between runs and stored using local device protection so the application can determine setup completion before Ghostfolio token entry; token-protected persisted user data remains deferred to later specs.
+- The machine-local bootstrap setup file remains user-removable, and deleting it resets the application to the first-run setup flow on the next launch.
 - The Ghostfolio security token is the only user-entered secret required to exercise the successful communication path.
 - Hosted Ghostfolio and self-hosted Ghostfolio are both in scope for setup, but only one selected server is validated per sync attempt.
 - This slice reuses the validated Ghostfolio sync contract from the reference feature to define the supported authentication and activity-retrieval boundary.

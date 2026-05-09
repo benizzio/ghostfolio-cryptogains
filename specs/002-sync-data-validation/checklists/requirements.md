@@ -37,4 +37,4 @@
 - Security wording now states that the Ghostfolio security token is the only user-entered secret, remains memory-only, must not appear in logs, dumps, traces, diagnostics, or persisted artifacts, and that remembered setup uses local device protection instead of token-derived protection in this slice.
 - Transport rules now state that self-hosted origins require `https` in production usage, with `http` allowed only in explicit development mode.
 - Integration wording now references the validated Ghostfolio sync contract instead of embedding raw API details in the feature spec.
-- Key entities now reuse the validated subset of the reference model: `SetupProfile`, `GhostfolioSession`, and `SyncAttempt`.
+- Key entities now reuse the validated subset of the reference model: `AppSetupConfig`, `GhostfolioSession`, and `SyncValidationAttempt`.

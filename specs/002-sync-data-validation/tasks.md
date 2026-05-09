@@ -57,8 +57,8 @@ description: "Task list for Sync Data Validation implementation"
 
 ### Tests for User Story 1
 
-- [ ] T010 [P] [US1] Add first-run and remembered-setup integration coverage in `tests/integration/setup_flow_test.go`
-- [ ] T011 [P] [US1] Add bootstrap config store and origin validation unit coverage in `tests/unit/config_store_test.go` and `tests/unit/origin_validator_test.go`
+- [ ] T010 [P] [US1] Add first-run, remembered-setup, and no-pre-sync-network integration coverage in `tests/integration/setup_flow_test.go`
+- [ ] T011 [P] [US1] Add bootstrap config store, setup-file protection, and origin validation unit coverage in `tests/unit/config_store_test.go`, `tests/unit/config_permissions_test.go`, and `tests/unit/origin_validator_test.go`
 
 ### Implementation for User Story 1
 
@@ -101,8 +101,8 @@ description: "Task list for Sync Data Validation implementation"
 ### Tests for User Story 3
 
 - [ ] T021 [P] [US3] Add Ghostfolio auth and activities contract coverage in `tests/contract/ghostfolio_sync_validation_contract_test.go`
-- [ ] T022 [P] [US3] Add sync validation success, failure, and retry integration coverage in `tests/integration/sync_validation_flow_test.go`
-- [ ] T023 [P] [US3] Add payload validation and secret-redaction unit coverage in `tests/unit/response_validator_test.go` and `tests/unit/redact_test.go`
+- [ ] T022 [P] [US3] Add sync validation success, failure, retry, and in-flight resize responsiveness integration coverage in `tests/integration/sync_validation_flow_test.go`
+- [ ] T023 [P] [US3] Add payload validation, token-redaction unit coverage, and failure-diagnostic redaction integration coverage in `tests/unit/response_validator_test.go`, `tests/unit/redact_test.go`, and `tests/integration/diagnostic_redaction_test.go`
 
 ### Implementation for User Story 3
 
@@ -110,7 +110,7 @@ description: "Task list for Sync Data Validation implementation"
 - [ ] T025 [P] [US3] Implement Ghostfolio response validation rules for auth and activities probes in `internal/ghostfolio/validator/response_validator.go`
 - [ ] T026 [US3] Implement the Ghostfolio client for anonymous auth and one-page activities probes in `internal/ghostfolio/client/client.go`
 - [ ] T027 [US3] Implement sync validation attempt orchestration and secret clearing in `internal/app/runtime/sync_service.go`
-- [ ] T028 [US3] Implement busy-state transitions and retryable sync workflow behavior in `internal/tui/flow/sync_flow.go`
+- [ ] T028 [US3] Implement async busy-state transitions, in-flight resize handling, and retryable sync workflow behavior in `internal/tui/flow/sync_flow.go`
 - [ ] T029 [US3] Implement success and failure result screens with no-persistence messaging in `internal/tui/screen/validation_result_screen.go`
 
 **Checkpoint**: Ghostfolio communication validation works end to end and does not persist tokens, JWTs, or payloads.
@@ -121,9 +121,10 @@ description: "Task list for Sync Data Validation implementation"
 
 **Purpose**: Finish documentation, verification, and release-level checks across all stories.
 
-- [ ] T030 [P] Update the operator and contributor guidance for local setup storage, development mode, and sync-only scope in `README.md`
-- [ ] T031 [P] Reconcile manual verification steps with the implemented screens and commands in `specs/002-sync-data-validation/quickstart.md`
+- [ ] T030 [P] Update the `README.md` sections `Local Setup Storage`, `Removing Local Setup`, `Development Mode`, and `Current Slice Scope`
+- [ ] T031 [P] Reconcile the `Launch The Application`, `Remembered Setup Path`, `Sync Validation Failure Paths`, and `Negative Check: No Persistence Beyond Setup` sections in `specs/002-sync-data-validation/quickstart.md`
 - [ ] T032 Run `go test ./...`, generate the coverage profile in `dist/coverage/coverage.out`, and verify the `gocoverageplus` gate against `dist/coverage/coverage.out`
+- [ ] T033 [P] Document the OWASP Top 10 review for setup persistence, Ghostfolio token handling, and Ghostfolio API calls in `specs/002-sync-data-validation/plan.md`
 
 ---
 
@@ -159,7 +160,7 @@ description: "Task list for Sync Data Validation implementation"
 - T010 and T011 can run in parallel for US1, then T012 and T014 can run in parallel before T013 and T015.
 - T016 and T017 can run in parallel for US2, then T018 and T019 can run in parallel before T020.
 - T021, T022, and T023 can run in parallel for US3, then T024 and T025 can run in parallel before T026 through T029.
-- T030 and T031 can run in parallel once the released story set is stable.
+- T030, T031, and T033 can run in parallel once the released story set is stable.
 
 ---
 
