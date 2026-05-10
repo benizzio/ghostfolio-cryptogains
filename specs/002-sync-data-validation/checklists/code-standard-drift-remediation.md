@@ -23,6 +23,6 @@
 
 ## Closure Criteria
 
-- [ ] Re-run the coding-standards review after remediation and confirm that every drift item in `../code-standard-drift-report.md` is either resolved or intentionally reclassified.
+- [x] Re-run the coding-standards review after remediation and confirm that every drift item in `../code-standard-drift-report.md` is either resolved or intentionally reclassified.
 - [x] Confirm the remediation changes preserve project-owned automated coverage expectations.
 - [x] Confirm any updated public API comments remain accurate after the code changes.
