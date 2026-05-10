@@ -8,6 +8,8 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 )
 
+const minimumPanelWidth = 1
+
 // ApplicationIdentityName is the persistent project name shown in every
 // full-screen view.
 // Authored by: OpenCode
@@ -109,11 +111,23 @@ func RenderScreen(
 		height = 32
 	}
 
-	var header = theme.Panel.Width(width - 4).Render(strings.TrimSpace(renderApplicationIdentity(theme) + "\n" + theme.Title.Render(title) + "\n" + theme.Subtitle.Render(subtitle)))
-	var bodyPanel = theme.SummaryPanel.Width(width - 4).Render(body)
-	var statusPanel = theme.Panel.Width(width - 4).Render(status)
-	var footerPanel = theme.Panel.Width(width - 4).Render(footer)
+	var panelWidth = contentPanelWidth(width)
+	var header = theme.Panel.Width(panelWidth).Render(strings.TrimSpace(renderApplicationIdentity(theme) + "\n" + theme.Title.Render(title) + "\n" + theme.Subtitle.Render(subtitle)))
+	var bodyPanel = theme.SummaryPanel.Width(panelWidth).Render(body)
+	var statusPanel = theme.Panel.Width(panelWidth).Render(status)
+	var footerPanel = theme.Panel.Width(panelWidth).Render(footer)
 
 	var content = lipgloss.JoinVertical(lipgloss.Left, header, bodyPanel, statusPanel, footerPanel)
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Top, content)
+}
+
+// contentPanelWidth clamps the interior panel width so very narrow terminals do
+// not produce negative or zero-width panels after shared padding is applied.
+// Authored by: OpenCode
+func contentPanelWidth(width int) int {
+	if width <= 4 {
+		return minimumPanelWidth
+	}
+
+	return width - 4
 }

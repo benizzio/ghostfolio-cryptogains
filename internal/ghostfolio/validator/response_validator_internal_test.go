@@ -34,6 +34,7 @@ func TestValidateActivitiesProbeResponseCoversBranches(t *testing.T) {
 		{name: "missing type", response: dto.ActivitiesProbeResponse{Count: 1, Activities: []dto.ActivityProbeEntry{{ID: "1", Date: "2026-01-31T10:00:00Z"}}}, wantErr: true},
 		{name: "missing date", response: dto.ActivitiesProbeResponse{Count: 1, Activities: []dto.ActivityProbeEntry{{ID: "1", Type: "BUY"}}}, wantErr: true},
 		{name: "invalid date", response: dto.ActivitiesProbeResponse{Count: 1, Activities: []dto.ActivityProbeEntry{{ID: "1", Date: "bad", Type: "BUY"}}}, wantErr: true},
+		{name: "valid activity with fractional seconds", response: dto.ActivitiesProbeResponse{Count: 1, Activities: []dto.ActivityProbeEntry{{ID: "1", Date: "2026-01-31T10:00:00.000Z", Type: "BUY"}}}, wantErr: false},
 		{name: "valid activity", response: dto.ActivitiesProbeResponse{Count: 1, Activities: []dto.ActivityProbeEntry{{ID: "1", Date: "2026-01-31T10:00:00Z", Type: "BUY"}}}, wantErr: false},
 	}
 

@@ -72,6 +72,13 @@ var renamePath = os.Rename
 // Authored by: OpenCode
 var removePath = os.Remove
 
+// Test seams wrap platform checks so unit tests can exercise platform-specific
+// save behavior safely.
+// Authored by: OpenCode
+var isWindowsPlatform = func() bool {
+	return runtime.GOOS == "windows"
+}
+
 // JSONStore persists the setup file as a JSON document under the user config
 // directory.
 //
@@ -278,9 +285,54 @@ func applyTemporaryFileMode(file temporaryFile) error {
 // replaceSetupFile atomically swaps the saved setup document and reapplies restrictive permissions.
 // Authored by: OpenCode
 func (s *JSONStore) replaceSetupFile(tempPath string) error {
+	if isWindowsPlatform() {
+		return s.replaceSetupFileWindows(tempPath)
+	}
+
 	var err = renamePath(tempPath, s.path)
 	if err != nil {
 		return fmt.Errorf("replace setup file atomically: %w", err)
+	}
+
+	err = applyPathMode(s.path, setupFileMode, "chmod setup file")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// replaceSetupFileWindows swaps the saved setup document using a backup path so
+// repeated saves can replace an existing file on Windows.
+// Authored by: OpenCode
+func (s *JSONStore) replaceSetupFileWindows(tempPath string) error {
+	var backupPath = s.path + ".bak"
+
+	cleanupTempFile(backupPath)
+
+	var existingFilePresent = false
+	if _, err := os.Stat(s.path); err == nil {
+		existingFilePresent = true
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("inspect existing setup file: %w", err)
+	}
+
+	if existingFilePresent {
+		if err := renamePath(s.path, backupPath); err != nil {
+			return fmt.Errorf("move existing setup file aside: %w", err)
+		}
+	}
+
+	var err = renamePath(tempPath, s.path)
+	if err != nil {
+		if existingFilePresent {
+			_ = renamePath(backupPath, s.path)
+		}
+		return fmt.Errorf("replace setup file atomically: %w", err)
+	}
+
+	if existingFilePresent {
+		cleanupTempFile(backupPath)
 	}
 
 	err = applyPathMode(s.path, setupFileMode, "chmod setup file")
@@ -311,5 +363,5 @@ func cleanupTempFile(path string) {
 // Unix-style permission bits in a meaningful way for these checks.
 // Authored by: OpenCode
 func ignoresPermissionBits() bool {
-	return runtime.GOOS == "windows"
+	return isWindowsPlatform()
 }

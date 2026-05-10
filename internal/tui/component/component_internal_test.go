@@ -45,6 +45,18 @@ func TestRenderScreenUsesDefaultDimensions(t *testing.T) {
 	}
 }
 
+func TestRenderScreenClampsNarrowPositiveWidth(t *testing.T) {
+	t.Parallel()
+
+	var got = RenderScreen(DefaultTheme(), 3, 10, "Title", "Subtitle", "Body", "Status", "Footer")
+	if got == "" {
+		t.Fatalf("expected rendered screen")
+	}
+	if !strings.Contains(got, ApplicationIdentityName) {
+		t.Fatalf("expected persistent application identity header, got %q", got)
+	}
+}
+
 func quitBindingForTest() key.Binding {
 	return key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit"))
 }

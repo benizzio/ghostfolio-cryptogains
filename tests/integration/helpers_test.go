@@ -1,11 +1,10 @@
 package integration
 
-import "strings"
-
-import tea "charm.land/bubbletea/v2"
-
 import (
+	"strings"
 	"testing"
+
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"

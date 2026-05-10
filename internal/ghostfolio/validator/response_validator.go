@@ -68,7 +68,7 @@ func ValidateActivitiesProbeResponse(response dto.ActivitiesProbeResponse) error
 	if strings.TrimSpace(entry.Date) == "" {
 		return fmt.Errorf("activity date is required")
 	}
-	if _, err := time.Parse(time.RFC3339, entry.Date); err != nil {
+	if _, err := time.Parse(time.RFC3339Nano, entry.Date); err != nil {
 		return fmt.Errorf("activity date must be a readable timestamp: %w", err)
 	}
 
