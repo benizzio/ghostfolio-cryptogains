@@ -263,6 +263,52 @@ func TestReplaceSetupFileWindowsReplacesExistingDestination(t *testing.T) {
 	}
 }
 
+func TestReplaceSetupFileNonWindowsRenamesDirectly(t *testing.T) {
+	var previousRename = renamePath
+	var previousPlatform = isWindowsPlatform
+	defer func() {
+		renamePath = previousRename
+		isWindowsPlatform = previousPlatform
+	}()
+
+	var renameCalls = 0
+	isWindowsPlatform = func() bool { return false }
+	renamePath = func(source string, destination string) error {
+		renameCalls++
+		return os.Rename(source, destination)
+	}
+
+	var store = NewJSONStore(t.TempDir())
+	if err := store.ensureParentDirectory(); err != nil {
+		t.Fatalf("ensure parent directory: %v", err)
+	}
+
+	if err := os.WriteFile(store.Path(), []byte("old"), 0o600); err != nil {
+		t.Fatalf("write existing setup file: %v", err)
+	}
+
+	var tempPath = filepath.Join(filepath.Dir(store.Path()), "temp-setup.json")
+	if err := os.WriteFile(tempPath, []byte("new"), 0o600); err != nil {
+		t.Fatalf("write temporary setup file: %v", err)
+	}
+
+	if err := store.replaceSetupFile(tempPath); err != nil {
+		t.Fatalf("replace setup file: %v", err)
+	}
+
+	if renameCalls != 1 {
+		t.Fatalf("expected one rename call, got %d", renameCalls)
+	}
+
+	var content, err = os.ReadFile(store.Path())
+	if err != nil {
+		t.Fatalf("read replaced setup file: %v", err)
+	}
+	if string(content) != "new" {
+		t.Fatalf("expected replaced content, got %q", string(content))
+	}
+}
+
 func TestEnsureParentDirectoryHandlesChmodFailure(t *testing.T) {
 	if ignoresPermissionBits() {
 		t.Skip("permission-bit path error is ignored on this platform")

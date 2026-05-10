@@ -57,6 +57,14 @@ func TestRenderScreenClampsNarrowPositiveWidth(t *testing.T) {
 	}
 }
 
+func TestContentWidthForScreenClampsPaddingBoundary(t *testing.T) {
+	t.Parallel()
+
+	if got := ContentWidthForScreen(4); got != 1 {
+		t.Fatalf("expected padding boundary to clamp to one column, got %d", got)
+	}
+}
+
 func quitBindingForTest() key.Binding {
 	return key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit"))
 }
