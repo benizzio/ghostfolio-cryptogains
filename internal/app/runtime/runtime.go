@@ -22,11 +22,15 @@ import (
 //	}
 //	_ = app.ConfigStore
 //
+// App keeps the bootstrap store available for startup loading and exposes the
+// application services that the TUI uses for setup persistence and sync
+// validation.
 // Authored by: OpenCode
 type App struct {
-	Options     bootstrap.Options
-	ConfigStore configstore.Store
-	SyncService SyncService
+	Options      bootstrap.Options
+	ConfigStore  configstore.Store
+	SetupService SetupService
+	SyncService  SyncService
 }
 
 // New assembles the runtime dependencies required by the application.
@@ -39,6 +43,8 @@ type App struct {
 //	}
 //	_ = app.SyncService
 //
+// New resolves the config directory, constructs the bootstrap store, and wires
+// the setup and sync application services used by the terminal workflow.
 // Authored by: OpenCode
 func New(options bootstrap.Options) (*App, error) {
 	var baseConfigDir = options.ConfigDir
@@ -51,11 +57,13 @@ func New(options bootstrap.Options) (*App, error) {
 	}
 
 	var bootstrapStore = configstore.NewJSONStore(baseConfigDir)
+	var setupService = NewSetupService(bootstrapStore, options.AllowDevHTTP)
 	var syncService = NewSyncService(ghostfolioclient.New(&http.Client{}), options.RequestTimeout)
 
 	return &App{
-		Options:     options,
-		ConfigStore: bootstrapStore,
-		SyncService: syncService,
+		Options:      options,
+		ConfigStore:  bootstrapStore,
+		SetupService: setupService,
+		SyncService:  syncService,
 	}, nil
 }

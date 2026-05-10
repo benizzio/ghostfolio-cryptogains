@@ -70,7 +70,7 @@ func TestLoadStartupStateReturnsInvalidRememberedSetupMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load startup state: %v", err)
 	}
-	if !state.NeedsSetup || state.InvalidSetupMessage == "" {
+	if !state.NeedsSetup || state.SetupRequirementReason != SetupRequirementInvalidRememberedSetup {
 		t.Fatalf("expected invalid remembered setup fallback: %#v", state)
 	}
 }
@@ -92,7 +92,7 @@ func TestLoadStartupStateHandlesNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load startup state: %v", err)
 	}
-	if !state.NeedsSetup {
+	if !state.NeedsSetup || state.SetupRequirementReason != SetupRequirementMissing {
 		t.Fatalf("expected setup to be required")
 	}
 }

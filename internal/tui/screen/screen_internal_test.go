@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
-	ghostfolioclient "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/client"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/component"
 )
 
@@ -107,7 +106,7 @@ func TestSyncValidationScreenViewUsesValidationMessageOverride(t *testing.T) {
 func TestValidationResultScreenViewCoversFailureBranch(t *testing.T) {
 	t.Parallel()
 
-	var content = ValidationResultScreenView(ValidationResultScreenParams{Theme: component.DefaultTheme(), Width: 80, Height: 24, Outcome: runtime.ValidationOutcome{Success: false, FailureCategory: ghostfolioclient.FailureTimeout}, MenuItems: []component.MenuItem{{Label: "Back", Enabled: true}}})
+	var content = ValidationResultScreenView(ValidationResultScreenParams{Theme: component.DefaultTheme(), Width: 80, Height: 24, Outcome: runtime.ValidationOutcome{Success: false, FailureReason: runtime.ValidationFailureTimeout}, MenuItems: []component.MenuItem{{Label: "Back", Enabled: true}}})
 	if content == "" {
 		t.Fatalf("expected rendered content")
 	}

@@ -29,6 +29,13 @@ type temporaryFile interface {
 	Close() error
 }
 
+// temporarySetupFile wraps the transient file path used during an atomic save.
+// Authored by: OpenCode
+type temporarySetupFile struct {
+	file temporaryFile
+	path string
+}
+
 var readFile = os.ReadFile
 
 var marshalIndent = json.MarshalIndent
@@ -125,44 +132,32 @@ func (s *JSONStore) Load(_ context.Context) (configmodel.AppSetupConfig, error) 
 //
 // Authored by: OpenCode
 func (s *JSONStore) Save(_ context.Context, config configmodel.AppSetupConfig) error {
-	if err := s.ensureParentDirectory(); err != nil {
+	var err = s.ensureParentDirectory()
+	if err != nil {
 		return err
 	}
 
-	var encoded, err = marshalIndent(config, "", "  ")
+	var encoded []byte
+	encoded, err = encodeSetupConfig(config)
 	if err != nil {
-		return fmt.Errorf("encode setup file: %w", err)
+		return err
 	}
 
-	var parentDir = filepath.Dir(s.path)
-	var tempFile temporaryFile
-	tempFile, err = createTempFile(parentDir, ".setup-*.json")
+	var tempFile *temporarySetupFile
+	tempFile, err = s.createTemporarySetupFile()
 	if err != nil {
-		return fmt.Errorf("create temporary setup file: %w", err)
+		return err
 	}
-	defer cleanupTempFile(tempFile.Name())
+	defer cleanupTempFile(tempFile.path)
 
-	if err := tempFile.Chmod(setupFileMode); err != nil && !ignoresPermissionBits() {
-		_ = tempFile.Close()
-		return fmt.Errorf("chmod temporary setup file: %w", err)
-	}
-	if _, err := tempFile.Write(encoded); err != nil {
-		_ = tempFile.Close()
-		return fmt.Errorf("write temporary setup file: %w", err)
-	}
-	if err := tempFile.Sync(); err != nil {
-		_ = tempFile.Close()
-		return fmt.Errorf("sync temporary setup file: %w", err)
-	}
-	if err := tempFile.Close(); err != nil {
-		return fmt.Errorf("close temporary setup file: %w", err)
+	err = writeTemporarySetupFile(tempFile.file, encoded)
+	if err != nil {
+		return err
 	}
 
-	if err := renamePath(tempFile.Name(), s.path); err != nil {
-		return fmt.Errorf("replace setup file atomically: %w", err)
-	}
-	if err := chmodPath(s.path, setupFileMode); err != nil && !ignoresPermissionBits() {
-		return fmt.Errorf("chmod setup file: %w", err)
+	err = s.replaceSetupFile(tempFile.path)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -188,11 +183,99 @@ func (s *JSONStore) Delete(_ context.Context) error {
 // ensureParentDirectory creates the application config directory when needed.
 func (s *JSONStore) ensureParentDirectory() error {
 	var parentDir = filepath.Dir(s.path)
-	if err := mkdirAll(parentDir, directoryFileMode); err != nil {
+	var err = mkdirAll(parentDir, directoryFileMode)
+	if err != nil {
 		return fmt.Errorf("create config directory: %w", err)
 	}
-	if err := chmodPath(parentDir, directoryFileMode); err != nil && !ignoresPermissionBits() {
+	err = applyPathMode(parentDir, directoryFileMode, "chmod config directory")
+	if err != nil {
 		return fmt.Errorf("chmod config directory: %w", err)
+	}
+	return nil
+}
+
+// encodeSetupConfig serializes one bootstrap setup document for atomic persistence.
+// Authored by: OpenCode
+func encodeSetupConfig(config configmodel.AppSetupConfig) ([]byte, error) {
+	var encoded, err = marshalIndent(config, "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("encode setup file: %w", err)
+	}
+	return encoded, nil
+}
+
+// createTemporarySetupFile allocates the transient file used by atomic save.
+// Authored by: OpenCode
+func (s *JSONStore) createTemporarySetupFile() (*temporarySetupFile, error) {
+	var parentDir = filepath.Dir(s.path)
+	var file, err = createTempFile(parentDir, ".setup-*.json")
+	if err != nil {
+		return nil, fmt.Errorf("create temporary setup file: %w", err)
+	}
+	return &temporarySetupFile{file: file, path: file.Name()}, nil
+}
+
+// writeTemporarySetupFile writes and closes the transient atomic-save file.
+// Authored by: OpenCode
+func writeTemporarySetupFile(file temporaryFile, encoded []byte) error {
+	var err = applyTemporaryFileMode(file)
+	if err != nil {
+		_ = file.Close()
+		return err
+	}
+
+	_, err = file.Write(encoded)
+	if err != nil {
+		_ = file.Close()
+		return fmt.Errorf("write temporary setup file: %w", err)
+	}
+
+	err = file.Sync()
+	if err != nil {
+		_ = file.Close()
+		return fmt.Errorf("sync temporary setup file: %w", err)
+	}
+
+	err = file.Close()
+	if err != nil {
+		return fmt.Errorf("close temporary setup file: %w", err)
+	}
+
+	return nil
+}
+
+// applyTemporaryFileMode sets restrictive permissions on the transient atomic-save file.
+// Authored by: OpenCode
+func applyTemporaryFileMode(file temporaryFile) error {
+	var err = file.Chmod(setupFileMode)
+	if err != nil && !ignoresPermissionBits() {
+		return fmt.Errorf("chmod temporary setup file: %w", err)
+	}
+	return nil
+}
+
+// replaceSetupFile atomically swaps the saved setup document and reapplies restrictive permissions.
+// Authored by: OpenCode
+func (s *JSONStore) replaceSetupFile(tempPath string) error {
+	var err = renamePath(tempPath, s.path)
+	if err != nil {
+		return fmt.Errorf("replace setup file atomically: %w", err)
+	}
+
+	err = applyPathMode(s.path, setupFileMode, "chmod setup file")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// applyPathMode reapplies a restrictive file mode when the platform honors permission bits.
+// Authored by: OpenCode
+func applyPathMode(path string, mode os.FileMode, operation string) error {
+	var err = chmodPath(path, mode)
+	if err != nil && !ignoresPermissionBits() {
+		return fmt.Errorf("%s: %w", operation, err)
 	}
 	return nil
 }

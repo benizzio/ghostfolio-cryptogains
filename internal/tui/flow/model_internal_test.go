@@ -18,7 +18,7 @@ type testSyncService struct {
 	outcome runtime.ValidationOutcome
 }
 
-func (s testSyncService) Validate(context.Context, configmodel.AppSetupConfig, string) runtime.ValidationOutcome {
+func (s testSyncService) Validate(context.Context, runtime.ValidateRequest) runtime.ValidationOutcome {
 	return s.outcome
 }
 
@@ -27,11 +27,11 @@ type cancellingSyncService struct {
 	ctxErr error
 }
 
-func (s *cancellingSyncService) Validate(ctx context.Context, _ configmodel.AppSetupConfig, _ string) runtime.ValidationOutcome {
+func (s *cancellingSyncService) Validate(ctx context.Context, _ runtime.ValidateRequest) runtime.ValidationOutcome {
 	s.called = true
 	<-ctx.Done()
 	s.ctxErr = ctx.Err()
-	return runtime.ValidationOutcome{Success: false, SummaryMessage: "cancelled", FollowUpNote: "note"}
+	return runtime.ValidationOutcome{Success: false, DetailReason: string(runtime.ValidationFailureTimeout), FailureReason: runtime.ValidationFailureTimeout}
 }
 
 func TestModelInitAndHelpers(t *testing.T) {
@@ -43,6 +43,9 @@ func TestModelInitAndHelpers(t *testing.T) {
 	}
 	if model.ActiveScreen() != "setup" {
 		t.Fatalf("expected setup screen")
+	}
+	if model.setup.StartupReason != bootstrap.SetupRequirementMissing {
+		t.Fatalf("expected missing-setup startup reason")
 	}
 	if model.currentServerOrigin() != configmodel.GhostfolioCloudOrigin {
 		t.Fatalf("unexpected default origin")
@@ -93,7 +96,10 @@ func TestModelInitAndHelpers(t *testing.T) {
 		t.Fatalf("expected success result to default to main menu option")
 	}
 	model.enterMainMenu()
-	_ = model.enterSetup("invalid")
+	if model.setup.StartupReason != bootstrap.SetupRequirementNone {
+		t.Fatalf("expected setup reason to clear on main menu entry")
+	}
+	_ = model.enterSetup("invalid", bootstrap.SetupRequirementNone)
 	_ = model.enterSyncValidation()
 	_ = model.selectedSetupOrigin()
 	_ = model.setupCanSave()
@@ -135,7 +141,7 @@ func TestUpdateSetupCoversSaveSuccessAndError(t *testing.T) {
 	}
 
 	var config = mustSetupConfig(t)
-	updated, _ = model.Update(setupSavedMsg{Config: config})
+	updated, _ = model.Update(setupSavedMsg{Result: runtime.SaveSetupResult{Config: config}})
 	model = updated.(*Model)
 	if model.active != mainMenuScreenKey || model.currentConfig == nil {
 		t.Fatalf("expected main menu after save")
@@ -200,6 +206,7 @@ func TestUpdateSetupCoversNavigationAndInput(t *testing.T) {
 	}
 
 	model.deps.Options.AllowDevHTTP = true
+	model.deps.SetupService = runtime.NewSetupService(configstore.NewJSONStore(t.TempDir()), true)
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	msg := runCmdFlow(cmd)
 	updated, _ = model.Update(msg)
@@ -437,11 +444,12 @@ func TestCancelActiveValidationCancelsContextAndValidationCmdRuns(t *testing.T) 
 
 	var config = mustSetupConfig(t)
 	var service = &cancellingSyncService{}
+	var store = configstore.NewJSONStore(t.TempDir())
 	var model = NewModel(Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     bootstrap.StartupState{ActiveConfig: &config},
-		ConfigStore: configstore.NewJSONStore(t.TempDir()),
-		SyncService: service,
+		Options:      bootstrap.DefaultOptions(),
+		Startup:      bootstrap.StartupState{ActiveConfig: &config},
+		SetupService: runtime.NewSetupService(store, false),
+		SyncService:  service,
 	})
 
 	model.active = syncValidationScreenKey
@@ -555,12 +563,16 @@ func newTestModel(t *testing.T, config *configmodel.AppSetupConfig) *Model {
 	var startup = bootstrap.StartupState{}
 	if config != nil {
 		startup.ActiveConfig = config
+	} else {
+		startup.NeedsSetup = true
+		startup.SetupRequirementReason = bootstrap.SetupRequirementMissing
 	}
+	var store = configstore.NewJSONStore(t.TempDir())
 	return NewModel(Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     startup,
-		ConfigStore: configstore.NewJSONStore(t.TempDir()),
-		SyncService: testSyncService{outcome: runtime.ValidationOutcome{Success: true, SummaryMessage: "ok", FollowUpNote: "note"}},
+		Options:      bootstrap.DefaultOptions(),
+		Startup:      startup,
+		SetupService: runtime.NewSetupService(store, false),
+		SyncService:  testSyncService{outcome: runtime.ValidationOutcome{Success: true, DetailReason: "communication_ok"}},
 	})
 }
 

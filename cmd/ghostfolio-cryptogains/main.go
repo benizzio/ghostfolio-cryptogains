@@ -16,6 +16,9 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 )
 
+// programRunner abstracts Bubble Tea program execution so tests can replace the
+// real program runner without starting an interactive terminal session.
+// Authored by: OpenCode
 type programRunner interface {
 	Run() (tea.Model, error)
 }
@@ -30,14 +33,17 @@ var exitFunc = os.Exit
 
 // main parses options, assembles the runtime, and starts the Bubble Tea
 // program.
+// Authored by: OpenCode
 func main() {
-	if err := run(); err != nil {
+	var err = run()
+	if err != nil {
 		fmt.Fprintln(stderrWriter, err)
 		exitFunc(1)
 	}
 }
 
 // run starts the application runtime and returns startup errors to the caller.
+// Authored by: OpenCode
 func run() error {
 	var options, err = bootstrap.ParseOptions(os.Args[1:])
 	if err != nil {
@@ -58,10 +64,10 @@ func run() error {
 
 	var program = newProgram(
 		flow.NewModel(flow.Dependencies{
-			Options:     app.Options,
-			Startup:     startupState,
-			ConfigStore: app.ConfigStore,
-			SyncService: app.SyncService,
+			Options:      app.Options,
+			Startup:      startupState,
+			SetupService: app.SetupService,
+			SyncService:  app.SyncService,
 		}),
 		tea.WithWindowSize(options.InitialWindowWidth, options.InitialWindowHeight),
 	)

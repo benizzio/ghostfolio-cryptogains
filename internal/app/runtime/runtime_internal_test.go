@@ -24,6 +24,9 @@ func TestNewUsesExplicitConfigDirectory(t *testing.T) {
 	if app.ConfigStore.Path() == "" {
 		t.Fatalf("expected config store path")
 	}
+	if app.SetupService == nil {
+		t.Fatalf("expected setup service")
+	}
 }
 
 func TestNewUsesUserConfigDirWhenUnset(t *testing.T) {
@@ -65,8 +68,8 @@ func TestValidateCoversInvalidAuthPayload(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var outcome = service.Validate(context.Background(), config, "token")
-	if outcome.FailureCategory != ghostfolioclient.FailureIncompatibleServerContract {
+	var outcome = service.Validate(context.Background(), ValidateRequest{Config: config, SecurityToken: "token"})
+	if outcome.FailureReason != ValidationFailureIncompatibleServerContract {
 		t.Fatalf("expected incompatible-server outcome, got %#v", outcome)
 	}
 }
@@ -75,7 +78,7 @@ func TestFinalizeFailureFallsBackToConnectivityCategory(t *testing.T) {
 	t.Parallel()
 
 	var outcome = finalizeFailure(&GhostfolioSession{}, &SyncValidationAttempt{}, errors.New("boom"))
-	if outcome.FailureCategory != ghostfolioclient.FailureConnectivityProblem {
+	if outcome.FailureReason != ValidationFailureConnectivityProblem {
 		t.Fatalf("expected connectivity fallback, got %#v", outcome)
 	}
 }
@@ -102,8 +105,8 @@ func TestValidateHandlesActivitiesTransportFailure(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var outcome = service.Validate(context.Background(), config, "token")
-	if outcome.FailureCategory != ghostfolioclient.FailureUnsuccessfulServerResponse {
+	var outcome = service.Validate(context.Background(), ValidateRequest{Config: config, SecurityToken: "token"})
+	if outcome.FailureReason != ValidationFailureUnsuccessfulServerResponse {
 		t.Fatalf("expected unsuccessful-response outcome, got %#v", outcome)
 	}
 }
@@ -130,8 +133,8 @@ func TestValidateHandlesActivitiesPayloadValidationFailure(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var outcome = service.Validate(context.Background(), config, "token")
-	if outcome.FailureCategory != ghostfolioclient.FailureIncompatibleServerContract {
+	var outcome = service.Validate(context.Background(), ValidateRequest{Config: config, SecurityToken: "token"})
+	if outcome.FailureReason != ValidationFailureIncompatibleServerContract {
 		t.Fatalf("expected incompatible-contract outcome, got %#v", outcome)
 	}
 }
@@ -158,8 +161,8 @@ func TestValidateSuccessOutcomeIncludesAttemptAndMessages(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var outcome = service.Validate(context.Background(), config, "token")
-	if !outcome.Success || outcome.Attempt.Status != AttemptStatusSuccess || outcome.Attempt.AttemptID == "" || outcome.DetailReason != "communication_ok" || outcome.FollowUpNote == "" {
+	var outcome = service.Validate(context.Background(), ValidateRequest{Config: config, SecurityToken: "token"})
+	if !outcome.Success || outcome.Attempt.Status != AttemptStatusSuccess || outcome.Attempt.AttemptID == "" || outcome.DetailReason != "communication_ok" || outcome.FailureReason != ValidationFailureNone {
 		t.Fatalf("unexpected success outcome: %#v", outcome)
 	}
 }
@@ -176,8 +179,8 @@ func TestValidateHandlesAuthTransportFailure(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var outcome = service.Validate(context.Background(), config, "token")
-	if outcome.FailureCategory != ghostfolioclient.FailureTimeout || outcome.Attempt.Status != AttemptStatusFailure {
+	var outcome = service.Validate(context.Background(), ValidateRequest{Config: config, SecurityToken: "token"})
+	if outcome.FailureReason != ValidationFailureTimeout || outcome.Attempt.Status != AttemptStatusFailure {
 		t.Fatalf("unexpected auth failure outcome: %#v", outcome)
 	}
 }
@@ -190,7 +193,7 @@ func TestFinalizeFailureUsesCategorizedRequestFailure(t *testing.T) {
 		&SyncValidationAttempt{},
 		&ghostfolioclient.RequestFailure{Category: ghostfolioclient.FailureTimeout, Message: "timeout"},
 	)
-	if outcome.FailureCategory != ghostfolioclient.FailureTimeout {
+	if outcome.FailureReason != ValidationFailureTimeout {
 		t.Fatalf("expected timeout category, got %#v", outcome)
 	}
 }

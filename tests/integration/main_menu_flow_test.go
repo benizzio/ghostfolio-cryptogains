@@ -8,7 +8,6 @@ import (
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
-	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 )
 
@@ -20,12 +19,7 @@ func TestMainMenuOnlyExposesSyncDataWorkflow(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var model = flow.NewModel(flow.Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     bootstrap.StartupState{ActiveConfig: &config},
-		ConfigStore: configstore.NewJSONStore(t.TempDir()),
-		SyncService: integrationSyncService{},
-	})
+	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &config}, false, integrationSyncService{}))
 
 	var content = model.View().Content
 	if !contains(content, "Sync Data") {
@@ -44,12 +38,7 @@ func TestMainMenuEnterNavigatesToSyncValidation(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var model = flow.NewModel(flow.Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     bootstrap.StartupState{ActiveConfig: &config},
-		ConfigStore: configstore.NewJSONStore(t.TempDir()),
-		SyncService: integrationSyncService{},
-	})
+	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &config}, false, integrationSyncService{}))
 
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	_ = runCmd(cmd)
@@ -68,12 +57,7 @@ func TestFocusedTokenInputEnterReturnsToValidationMenuPath(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var model = flow.NewModel(flow.Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     bootstrap.StartupState{ActiveConfig: &config},
-		ConfigStore: configstore.NewJSONStore(t.TempDir()),
-		SyncService: integrationSyncService{},
-	})
+	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &config}, false, integrationSyncService{}))
 
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	_ = runCmd(cmd)
@@ -104,12 +88,7 @@ func TestFocusedTokenInputPasteDoesNotTriggerWorkflowNavigation(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var model = flow.NewModel(flow.Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     bootstrap.StartupState{ActiveConfig: &config},
-		ConfigStore: configstore.NewJSONStore(t.TempDir()),
-		SyncService: integrationSyncService{},
-	})
+	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &config}, false, integrationSyncService{}))
 
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	_ = runCmd(cmd)

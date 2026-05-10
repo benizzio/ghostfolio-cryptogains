@@ -17,12 +17,14 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
-	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/component"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/screen"
 )
 
 type activeScreen string
+
+// activeScreen identifies the currently rendered workflow screen.
+// Authored by: OpenCode
 
 const (
 	setupScreenKey            activeScreen = "setup"
@@ -31,11 +33,15 @@ const (
 	validationResultScreenKey activeScreen = "validation_result"
 )
 
+// setupSavedMsg reports the result of an application-layer setup save request.
+// Authored by: OpenCode
 type setupSavedMsg struct {
-	Config configmodel.AppSetupConfig
+	Result runtime.SaveSetupResult
 	Err    error
 }
 
+// validationFinishedMsg reports the result of an asynchronous validation run.
+// Authored by: OpenCode
 type validationFinishedMsg struct {
 	Outcome runtime.ValidationOutcome
 	Attempt string
@@ -51,21 +57,25 @@ type validationFinishedMsg struct {
 //
 // Authored by: OpenCode
 type Dependencies struct {
-	Options     bootstrap.Options
-	Startup     bootstrap.StartupState
-	ConfigStore configstore.Store
-	SyncService runtime.SyncService
+	Options      bootstrap.Options
+	Startup      bootstrap.StartupState
+	SetupService runtime.SetupService
+	SyncService  runtime.SyncService
 }
 
+// setupState holds transient UI state for the setup workflow.
+// Authored by: OpenCode
 type setupState struct {
-	SelectedMode        string
-	MenuIndex           int
-	InputFocused        bool
-	OriginInput         textinput.Model
-	ValidationMessage   string
-	InvalidSetupMessage string
+	SelectedMode      string
+	MenuIndex         int
+	InputFocused      bool
+	OriginInput       textinput.Model
+	ValidationMessage string
+	StartupReason     bootstrap.SetupRequirementReason
 }
 
+// syncState holds transient UI state for the sync-entry workflow.
+// Authored by: OpenCode
 type syncState struct {
 	MenuIndex         int
 	InputFocused      bool
@@ -77,6 +87,8 @@ type syncState struct {
 	Cancel            context.CancelFunc
 }
 
+// resultState holds transient UI state for the validation-result screen.
+// Authored by: OpenCode
 type resultState struct {
 	MenuIndex int
 	Outcome   runtime.ValidationOutcome
@@ -119,7 +131,7 @@ func NewModel(deps Dependencies) *Model {
 		theme:   component.DefaultTheme(),
 		spinner: spinner.New(spinner.WithSpinner(spinner.Line)),
 	}
-	model.setup = newSetupState(nil, deps.Startup.InvalidSetupMessage)
+	model.setup = newSetupState(nil, deps.Startup.SetupRequirementReason)
 	model.sync = newSyncState()
 
 	if deps.Startup.ActiveConfig != nil {
@@ -128,6 +140,9 @@ func NewModel(deps Dependencies) *Model {
 		model.active = mainMenuScreenKey
 	} else {
 		model.active = setupScreenKey
+	}
+	if model.setup.StartupReason == bootstrap.SetupRequirementNone && model.currentConfig == nil {
+		model.setup.StartupReason = deps.Startup.SetupRequirementReason
 	}
 
 	return model
@@ -201,7 +216,7 @@ func (m *Model) View() tea.View {
 			SelectedIndex:       m.setup.MenuIndex,
 			ShowOriginInput:     m.setup.SelectedMode == configmodel.ServerModeCustomOrigin,
 			OriginInput:         m.setup.OriginInput.View(),
-			InvalidSetupMessage: m.setup.InvalidSetupMessage,
+			InvalidSetupMessage: setupInvalidMessage(m.setup.StartupReason),
 			ValidationMessage:   m.setup.ValidationMessage,
 			HelpText:            m.setupHelpText(),
 			CanSave:             m.setupCanSave(),
@@ -269,6 +284,15 @@ func (m *Model) currentServerOrigin() string {
 		return configmodel.GhostfolioCloudOrigin
 	}
 	return m.currentConfig.ServerOrigin
+}
+
+// setupInvalidMessage maps structured startup state into setup-screen wording.
+// Authored by: OpenCode
+func setupInvalidMessage(reason bootstrap.SetupRequirementReason) string {
+	if reason == bootstrap.SetupRequirementInvalidRememberedSetup {
+		return "The saved server selection is no longer valid. Complete setup again before sync validation can run."
+	}
+	return ""
 }
 
 // setupMenuItems builds the primary setup actions for the current render.
@@ -347,16 +371,16 @@ func (m *Model) cancelActiveValidation() {
 
 // newSetupState creates the initial setup workflow state.
 // Authored by: OpenCode
-func newSetupState(config *configmodel.AppSetupConfig, invalidSetupMessage string) setupState {
+func newSetupState(config *configmodel.AppSetupConfig, startupReason bootstrap.SetupRequirementReason) setupState {
 	var input = textinput.New()
 	input.SetWidth(48)
 	input.Prompt = ""
 	input.Placeholder = "https://your-ghostfolio.example"
 
 	var state = setupState{
-		SelectedMode:        configmodel.ServerModeGhostfolioCloud,
-		OriginInput:         input,
-		InvalidSetupMessage: invalidSetupMessage,
+		SelectedMode:  configmodel.ServerModeGhostfolioCloud,
+		OriginInput:   input,
+		StartupReason: startupReason,
 	}
 	state.OriginInput.SetValue(configmodel.GhostfolioCloudOrigin)
 
@@ -385,9 +409,10 @@ func newSyncState() syncState {
 
 // enterSetup routes the application to the setup workflow.
 // Authored by: OpenCode
-func (m *Model) enterSetup(message string) tea.Cmd {
+func (m *Model) enterSetup(message string, startupReason bootstrap.SetupRequirementReason) tea.Cmd {
 	m.active = setupScreenKey
-	m.setup = newSetupState(m.currentConfig, message)
+	m.setup = newSetupState(m.currentConfig, startupReason)
+	m.setup.ValidationMessage = message
 	return nil
 }
 
@@ -399,7 +424,7 @@ func (m *Model) enterMainMenu() {
 	m.sync = newSyncState()
 	m.sync.InputFocused = false
 	m.setup.ValidationMessage = ""
-	m.setup.InvalidSetupMessage = ""
+	m.setup.StartupReason = bootstrap.SetupRequirementNone
 }
 
 // enterSyncValidation routes the application to the sync-validation entry screen.
@@ -426,21 +451,21 @@ func quitCmd() tea.Msg {
 	return tea.Quit()
 }
 
-// saveSetupCmd writes the selected setup to the bootstrap store.
+// saveSetupCmd delegates setup validation and persistence to the application service.
 // Authored by: OpenCode
-func (m *Model) saveSetupCmd(config configmodel.AppSetupConfig) tea.Cmd {
+func (m *Model) saveSetupCmd(request runtime.SaveSetupRequest) tea.Cmd {
 	return func() tea.Msg {
-		var err = m.deps.ConfigStore.Save(context.Background(), config)
-		return setupSavedMsg{Config: config, Err: err}
+		var result, err = m.deps.SetupService.Save(context.Background(), request)
+		return setupSavedMsg{Result: result, Err: err}
 	}
 }
 
-// validationCmd runs a single sync-validation attempt against the current setup.
+// validationCmd delegates a single sync-validation attempt to the application service.
 // Authored by: OpenCode
-func (m *Model) validationCmd(ctx context.Context, attemptID string, config configmodel.AppSetupConfig, token string) tea.Cmd {
+func (m *Model) validationCmd(ctx context.Context, attemptID string, request runtime.ValidateRequest) tea.Cmd {
 	return func() tea.Msg {
 		return validationFinishedMsg{
-			Outcome: m.deps.SyncService.Validate(ctx, config, token),
+			Outcome: m.deps.SyncService.Validate(ctx, request),
 			Attempt: attemptID,
 		}
 	}

@@ -35,7 +35,7 @@ func TestSyncServiceSuccess(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var outcome = service.Validate(context.Background(), config, "token")
+	var outcome = service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token"})
 	if !outcome.Success {
 		t.Fatalf("expected success outcome: %#v", outcome)
 	}
@@ -56,8 +56,8 @@ func TestSyncServiceFailureCategoryPassThrough(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var outcome = service.Validate(context.Background(), config, "token")
-	if outcome.FailureCategory != ghostfolioclient.FailureRejectedToken {
+	var outcome = service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token"})
+	if outcome.FailureReason != runtime.ValidationFailureRejectedToken {
 		t.Fatalf("expected rejected token category, got %#v", outcome)
 	}
 }

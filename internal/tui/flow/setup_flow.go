@@ -9,6 +9,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 )
 
@@ -35,7 +36,7 @@ func (m *Model) handleSetupSaved(message setupSavedMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	var config = message.Config
+	var config = message.Result.Config
 	m.currentConfig = &config
 	m.enterMainMenu()
 	return m, nil
@@ -190,17 +191,10 @@ func (m *Model) saveSetupSelection() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	var config, err = configmodel.NewSetupConfig(
-		m.setup.SelectedMode,
-		m.selectedSetupOrigin(),
-		m.deps.Options.AllowDevHTTP,
-		time.Now(),
-	)
-	if err != nil {
-		m.setup.ValidationMessage = err.Error()
-		return m, nil
-	}
-
 	m.setup.ValidationMessage = "Saving setup..."
-	return m, m.saveSetupCmd(config)
+	return m, m.saveSetupCmd(runtime.SaveSetupRequest{
+		ServerMode:   m.setup.SelectedMode,
+		ServerOrigin: m.selectedSetupOrigin(),
+		SavedAt:      time.Now(),
+	})
 }

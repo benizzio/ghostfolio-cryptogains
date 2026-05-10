@@ -62,6 +62,12 @@ func DefaultOptions() Options {
 //	}
 //	_ = opts.ConfigDir
 //
+// ParseOptions supports `--config-dir`, `--dev-mode`, `--request-timeout`,
+// `--window-width`, and `--window-height`. The returned `Options` start from
+// `DefaultOptions`, then apply any supplied overrides. Unknown flags, malformed
+// durations, and non-positive request timeouts return an error without starting
+// runtime assembly. `--dev-mode` only allows custom `http` origins for the
+// current process and does not change any persisted setup on its own.
 // Authored by: OpenCode
 func ParseOptions(args []string) (Options, error) {
 	var opts = DefaultOptions()
@@ -74,11 +80,13 @@ func ParseOptions(args []string) (Options, error) {
 	flags.IntVar(&opts.InitialWindowWidth, "window-width", opts.InitialWindowWidth, "initial test-friendly window width")
 	flags.IntVar(&opts.InitialWindowHeight, "window-height", opts.InitialWindowHeight, "initial test-friendly window height")
 
-	if err := flags.Parse(args); err != nil {
+	var err = flags.Parse(args)
+	if err != nil {
 		return Options{}, err
 	}
 
-	var parsedTimeout, err = time.ParseDuration(requestTimeout)
+	var parsedTimeout time.Duration
+	parsedTimeout, err = time.ParseDuration(requestTimeout)
 	if err != nil {
 		return Options{}, fmt.Errorf("parse request timeout: %w", err)
 	}

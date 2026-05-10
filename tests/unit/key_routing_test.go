@@ -10,14 +10,13 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
-	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 )
 
 type fakeSyncService struct{}
 
-func (fakeSyncService) Validate(context.Context, configmodel.AppSetupConfig, string) runtime.ValidationOutcome {
-	return runtime.ValidationOutcome{Success: true, SummaryMessage: "ok", DetailReason: "communication_ok", FollowUpNote: "No Ghostfolio data was stored locally."}
+func (fakeSyncService) Validate(context.Context, runtime.ValidateRequest) runtime.ValidationOutcome {
+	return runtime.ValidationOutcome{Success: true, DetailReason: "communication_ok"}
 }
 
 func TestTokenInputConsumesPlainCharactersWithoutTriggeringActions(t *testing.T) {
@@ -28,12 +27,7 @@ func TestTokenInputConsumesPlainCharactersWithoutTriggeringActions(t *testing.T)
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var model = flow.NewModel(flow.Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     bootstrap.StartupState{ActiveConfig: &config},
-		ConfigStore: configstore.NewJSONStore(t.TempDir()),
-		SyncService: fakeSyncService{},
-	})
+	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &config}, false, fakeSyncService{}))
 
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	_ = runCmd(cmd)
@@ -58,12 +52,7 @@ func TestFocusedInputsEnterReleaseToPrimaryMenusAndPasteSafely(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var setupModel = flow.NewModel(flow.Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     bootstrap.StartupState{NeedsSetup: true},
-		ConfigStore: configstore.NewJSONStore(t.TempDir()),
-		SyncService: fakeSyncService{},
-	})
+	var setupModel = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementMissing}, false, fakeSyncService{}))
 
 	updated, _ := setupModel.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 	setupModel = updated.(*flow.Model)
@@ -77,12 +66,7 @@ func TestFocusedInputsEnterReleaseToPrimaryMenusAndPasteSafely(t *testing.T) {
 		t.Fatalf("expected setup enter to return to save menu path, got %q", got)
 	}
 
-	var setupPasteModel = flow.NewModel(flow.Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     bootstrap.StartupState{NeedsSetup: true},
-		ConfigStore: configstore.NewJSONStore(t.TempDir()),
-		SyncService: fakeSyncService{},
-	})
+	var setupPasteModel = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementMissing}, false, fakeSyncService{}))
 
 	updated, _ = setupPasteModel.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 	setupPasteModel = updated.(*flow.Model)
@@ -98,12 +82,7 @@ func TestFocusedInputsEnterReleaseToPrimaryMenusAndPasteSafely(t *testing.T) {
 		t.Fatalf("expected pasted setup origin to remain in the input, got %q", got)
 	}
 
-	var syncModel = flow.NewModel(flow.Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     bootstrap.StartupState{ActiveConfig: &config},
-		ConfigStore: configstore.NewJSONStore(t.TempDir()),
-		SyncService: fakeSyncService{},
-	})
+	var syncModel = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &config}, false, fakeSyncService{}))
 
 	updated, cmd = syncModel.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	_ = runCmd(cmd)

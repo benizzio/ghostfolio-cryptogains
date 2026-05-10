@@ -16,20 +16,15 @@ import (
 
 type integrationSyncService struct{}
 
-func (integrationSyncService) Validate(context.Context, configmodel.AppSetupConfig, string) runtime.ValidationOutcome {
-	return runtime.ValidationOutcome{Success: true, SummaryMessage: "Communication with the selected Ghostfolio server is working.", DetailReason: "communication_ok", FollowUpNote: "No Ghostfolio data was stored locally, and reporting is not available in this slice."}
+func (integrationSyncService) Validate(context.Context, runtime.ValidateRequest) runtime.ValidationOutcome {
+	return runtime.ValidationOutcome{Success: true, DetailReason: "communication_ok"}
 }
 
 func TestFreshRunCompletesSetupAndReachesMainMenu(t *testing.T) {
 	t.Parallel()
 
 	var store = configstore.NewJSONStore(t.TempDir())
-	var model = flow.NewModel(flow.Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     bootstrap.StartupState{NeedsSetup: true},
-		ConfigStore: store,
-		SyncService: integrationSyncService{},
-	})
+	var model = flow.NewModel(newFlowDependenciesWithStore(t, bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementMissing}, false, integrationSyncService{}, store))
 
 	updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 	model = updated.(*flow.Model)
@@ -68,12 +63,7 @@ func TestStartupSkipsSetupWhenRememberedConfigExists(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var model = flow.NewModel(flow.Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     bootstrap.StartupState{ActiveConfig: &config},
-		ConfigStore: configstore.NewJSONStore(t.TempDir()),
-		SyncService: integrationSyncService{},
-	})
+	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &config}, false, integrationSyncService{}))
 
 	if model.ActiveScreen() != "main_menu" {
 		t.Fatalf("expected main menu startup, got %s", model.ActiveScreen())
@@ -83,12 +73,7 @@ func TestStartupSkipsSetupWhenRememberedConfigExists(t *testing.T) {
 func TestInvalidRememberedSetupFallsBackToSetup(t *testing.T) {
 	t.Parallel()
 
-	var model = flow.NewModel(flow.Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     bootstrap.StartupState{NeedsSetup: true, InvalidSetupMessage: "The saved server selection is no longer valid. Complete setup again before sync validation can run."},
-		ConfigStore: configstore.NewJSONStore(t.TempDir()),
-		SyncService: integrationSyncService{},
-	})
+	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementInvalidRememberedSetup}, false, integrationSyncService{}))
 
 	if model.ActiveScreen() != "setup" {
 		t.Fatalf("expected setup screen, got %s", model.ActiveScreen())
@@ -110,12 +95,7 @@ func TestSetupFileRemovalAfterStartupDoesNotBreakCurrentRun(t *testing.T) {
 		t.Fatalf("save config: %v", err)
 	}
 
-	var model = flow.NewModel(flow.Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     bootstrap.StartupState{ActiveConfig: &config},
-		ConfigStore: store,
-		SyncService: integrationSyncService{},
-	})
+	var model = flow.NewModel(newFlowDependenciesWithStore(t, bootstrap.StartupState{ActiveConfig: &config}, false, integrationSyncService{}, store))
 
 	if err := store.Delete(context.Background()); err != nil {
 		t.Fatalf("delete setup file: %v", err)
@@ -133,12 +113,7 @@ func TestSetupFileRemovalAfterStartupDoesNotBreakCurrentRun(t *testing.T) {
 func TestFocusedCustomOriginInputEnterReturnsToSavePath(t *testing.T) {
 	t.Parallel()
 
-	var model = flow.NewModel(flow.Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     bootstrap.StartupState{NeedsSetup: true},
-		ConfigStore: configstore.NewJSONStore(t.TempDir()),
-		SyncService: integrationSyncService{},
-	})
+	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementMissing}, false, integrationSyncService{}))
 
 	updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 	model = updated.(*flow.Model)
@@ -169,12 +144,7 @@ func TestFocusedCustomOriginInputEnterReturnsToSavePath(t *testing.T) {
 func TestFocusedCustomOriginInputPasteDoesNotTriggerWorkflowNavigation(t *testing.T) {
 	t.Parallel()
 
-	var model = flow.NewModel(flow.Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     bootstrap.StartupState{NeedsSetup: true},
-		ConfigStore: configstore.NewJSONStore(t.TempDir()),
-		SyncService: integrationSyncService{},
-	})
+	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementMissing}, false, integrationSyncService{}))
 
 	updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 	model = updated.(*flow.Model)

@@ -13,6 +13,42 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/validator"
 )
 
+// ValidationFailureReason identifies the supported structured failure outcome
+// for a communication-validation attempt.
+//
+// Example:
+//
+//	var reason runtime.ValidationFailureReason = runtime.ValidationFailureTimeout
+//	_ = reason
+//
+// Authored by: OpenCode
+type ValidationFailureReason string
+
+const (
+	// ValidationFailureNone indicates that validation completed successfully.
+	ValidationFailureNone ValidationFailureReason = ""
+
+	// ValidationFailureRejectedToken indicates that Ghostfolio rejected the
+	// supplied access token.
+	ValidationFailureRejectedToken ValidationFailureReason = "rejected token"
+
+	// ValidationFailureTimeout indicates that the validation request exceeded the
+	// allowed runtime deadline.
+	ValidationFailureTimeout ValidationFailureReason = "timeout"
+
+	// ValidationFailureConnectivityProblem indicates a transport-level reachability
+	// problem before a supported success response could be confirmed.
+	ValidationFailureConnectivityProblem ValidationFailureReason = "connectivity problem"
+
+	// ValidationFailureUnsuccessfulServerResponse indicates that the server was
+	// reachable but returned an unsuccessful HTTP response.
+	ValidationFailureUnsuccessfulServerResponse ValidationFailureReason = "unsuccessful server response"
+
+	// ValidationFailureIncompatibleServerContract indicates that the server
+	// response shape or behavior does not satisfy this slice's supported contract.
+	ValidationFailureIncompatibleServerContract ValidationFailureReason = "incompatible server contract"
+)
+
 // AttemptStatus identifies the current phase of a validation attempt.
 //
 // Example:
@@ -72,12 +108,12 @@ type GhostfolioSession struct {
 type SyncValidationAttempt struct {
 	AttemptID     string
 	Status        AttemptStatus
-	FailureReason ghostfolioclient.FailureCategory
+	FailureReason ValidationFailureReason
 	StartedAt     time.Time
 	CompletedAt   time.Time
 }
 
-// ValidationOutcome is the user-visible result of a completed validation
+// ValidationOutcome is the structured result of a completed validation
 // attempt.
 //
 // Example:
@@ -85,14 +121,28 @@ type SyncValidationAttempt struct {
 //	outcome := runtime.ValidationOutcome{Success: true, DetailReason: "communication_ok"}
 //	_ = outcome.Success
 //
+// The application layer returns outcome semantics only. Presentation layers are
+// expected to convert the result into final user-facing wording.
 // Authored by: OpenCode
 type ValidationOutcome struct {
-	Success         bool
-	SummaryMessage  string
-	DetailReason    string
-	FollowUpNote    string
-	FailureCategory ghostfolioclient.FailureCategory
-	Attempt         SyncValidationAttempt
+	Success       bool
+	DetailReason  string
+	FailureReason ValidationFailureReason
+	Attempt       SyncValidationAttempt
+}
+
+// ValidateRequest contains the bootstrap configuration and runtime-only token
+// needed for a single Ghostfolio communication check.
+//
+// Example:
+//
+//	request := runtime.ValidateRequest{Config: config, SecurityToken: "token"}
+//	_ = request.SecurityToken
+//
+// Authored by: OpenCode
+type ValidateRequest struct {
+	Config        configmodel.AppSetupConfig
+	SecurityToken string
 }
 
 // SyncService validates Ghostfolio communication for the currently selected
@@ -100,12 +150,17 @@ type ValidationOutcome struct {
 //
 // Example:
 //
-//	var service runtime.SyncService
-//	_ = service
+//	outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token"})
+//	_ = outcome.DetailReason
 //
+// Validate runs the anonymous-auth and one-page activities probe for the given
+// setup and returns a structured semantic result. Successful outcomes never
+// persist tokens or Ghostfolio payload data. Failed outcomes classify the
+// attempt into one supported failure reason without exposing transport-layer
+// implementation types to callers.
 // Authored by: OpenCode
 type SyncService interface {
-	Validate(context.Context, configmodel.AppSetupConfig, string) ValidationOutcome
+	Validate(context.Context, ValidateRequest) ValidationOutcome
 }
 
 type syncService struct {
@@ -120,6 +175,8 @@ type syncService struct {
 //	service := runtime.NewSyncService(ghostfolioclient.New(nil), 30*time.Second)
 //	_ = service
 //
+// The returned service depends on the Ghostfolio HTTP client boundary and
+// enforces a per-attempt timeout for the full validation workflow.
 // Authored by: OpenCode
 func NewSyncService(client *ghostfolioclient.Client, requestTimeout time.Duration) SyncService {
 	return &syncService{client: client, requestTimeout: requestTimeout}
@@ -129,18 +186,21 @@ func NewSyncService(client *ghostfolioclient.Client, requestTimeout time.Duratio
 //
 // Example:
 //
-//	outcome := service.Validate(context.Background(), config, "token")
+//	outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token"})
 //	_ = outcome.Success
 //
+// Validate authenticates anonymously against the configured origin, performs
+// the one-page activities probe, validates both response contracts, and maps
+// any failure into a structured application-facing result.
 // Authored by: OpenCode
-func (s *syncService) Validate(ctx context.Context, config configmodel.AppSetupConfig, securityToken string) ValidationOutcome {
+func (s *syncService) Validate(ctx context.Context, request ValidateRequest) ValidationOutcome {
 	var timedContext, cancel = context.WithTimeout(ctx, s.requestTimeout)
 	defer cancel()
 
 	var now = time.Now().UTC()
 	var session = GhostfolioSession{
-		ServerOrigin:  config.ServerOrigin,
-		SecurityToken: securityToken,
+		ServerOrigin:  request.Config.ServerOrigin,
+		SecurityToken: request.SecurityToken,
 		StartedAt:     now,
 	}
 	var attempt = SyncValidationAttempt{
@@ -176,11 +236,9 @@ func (s *syncService) Validate(ctx context.Context, config configmodel.AppSetupC
 	clearSessionSecrets(&session)
 
 	return ValidationOutcome{
-		Success:        true,
-		SummaryMessage: "Communication with the selected Ghostfolio server is working.",
-		DetailReason:   "communication_ok",
-		FollowUpNote:   "No Ghostfolio data was stored locally, and reporting is not available in this slice.",
-		Attempt:        attempt,
+		Success:      true,
+		DetailReason: "communication_ok",
+		Attempt:      attempt,
 	}
 }
 
@@ -190,21 +248,19 @@ func finalizeFailure(session *GhostfolioSession, attempt *SyncValidationAttempt,
 	attempt.Status = AttemptStatusFailure
 	attempt.CompletedAt = time.Now().UTC()
 
-	var category = ghostfolioclient.FailureConnectivityProblem
+	var category = ValidationFailureConnectivityProblem
 	var requestFailure *ghostfolioclient.RequestFailure
 	if errors.As(err, &requestFailure) {
-		category = requestFailure.Category
+		category = validationFailureReasonFromBoundary(requestFailure.Category)
 	}
 	attempt.FailureReason = category
 	clearSessionSecrets(session)
 
 	return ValidationOutcome{
-		Success:         false,
-		SummaryMessage:  "Communication validation did not succeed.",
-		DetailReason:    string(category),
-		FollowUpNote:    "Validate again or return to the main menu. No Ghostfolio data was stored locally.",
-		FailureCategory: category,
-		Attempt:         *attempt,
+		Success:       false,
+		DetailReason:  string(category),
+		FailureReason: category,
+		Attempt:       *attempt,
 	}
 }
 
@@ -214,16 +270,34 @@ func finalizeValidationFailure(session *GhostfolioSession, attempt *SyncValidati
 	_ = err
 	attempt.Status = AttemptStatusFailure
 	attempt.CompletedAt = time.Now().UTC()
-	attempt.FailureReason = ghostfolioclient.FailureIncompatibleServerContract
+	attempt.FailureReason = ValidationFailureIncompatibleServerContract
 	clearSessionSecrets(session)
 
 	return ValidationOutcome{
-		Success:         false,
-		SummaryMessage:  "Communication validation did not succeed.",
-		DetailReason:    string(ghostfolioclient.FailureIncompatibleServerContract),
-		FollowUpNote:    "The selected server responded, but it did not satisfy the supported contract for this slice.",
-		FailureCategory: ghostfolioclient.FailureIncompatibleServerContract,
-		Attempt:         *attempt,
+		Success:       false,
+		DetailReason:  string(ValidationFailureIncompatibleServerContract),
+		FailureReason: ValidationFailureIncompatibleServerContract,
+		Attempt:       *attempt,
+	}
+}
+
+// validationFailureReasonFromBoundary maps transport-boundary failures into the
+// application-facing validation failure taxonomy.
+// Authored by: OpenCode
+func validationFailureReasonFromBoundary(category ghostfolioclient.FailureCategory) ValidationFailureReason {
+	switch category {
+	case ghostfolioclient.FailureRejectedToken:
+		return ValidationFailureRejectedToken
+	case ghostfolioclient.FailureTimeout:
+		return ValidationFailureTimeout
+	case ghostfolioclient.FailureConnectivityProblem:
+		return ValidationFailureConnectivityProblem
+	case ghostfolioclient.FailureUnsuccessfulServerResponse:
+		return ValidationFailureUnsuccessfulServerResponse
+	case ghostfolioclient.FailureIncompatibleServerContract:
+		return ValidationFailureIncompatibleServerContract
+	default:
+		return ValidationFailureConnectivityProblem
 	}
 }
 

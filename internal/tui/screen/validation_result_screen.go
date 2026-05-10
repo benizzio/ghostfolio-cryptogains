@@ -41,14 +41,14 @@ type ValidationResultScreenParams struct {
 func ValidationResultScreenView(params ValidationResultScreenParams) string {
 	var resultLine = params.Theme.SuccessStatus.Render("Success")
 	if !params.Outcome.Success {
-		resultLine = params.Theme.FailureStatus.Render(fmt.Sprintf("Failure Category: %s", params.Outcome.FailureCategory))
+		resultLine = params.Theme.FailureStatus.Render(fmt.Sprintf("Failure Category: %s", params.Outcome.FailureReason))
 	}
 
 	var body = fmt.Sprintf(
 		"%s\n\n%s\n\n%s\n\n%s",
 		resultLine,
-		params.Outcome.SummaryMessage,
-		params.Outcome.FollowUpNote,
+		validationSummaryText(params.Outcome),
+		validationFollowUpText(params.Outcome),
 		component.RenderMenu(params.Theme, params.MenuItems, params.SelectedIndex),
 	)
 
@@ -62,4 +62,30 @@ func ValidationResultScreenView(params ValidationResultScreenParams) string {
 		"Results are transient and are not shown again after restart.",
 		params.HelpText,
 	)
+}
+
+// validationSummaryText converts the structured validation outcome into the
+// primary result text shown on the TUI result screen.
+// Authored by: OpenCode
+func validationSummaryText(outcome runtime.ValidationOutcome) string {
+	if outcome.Success {
+		return "Communication with the selected Ghostfolio server is working."
+	}
+	return "Communication validation did not succeed."
+}
+
+// validationFollowUpText converts the structured validation outcome into the
+// secondary guidance shown on the TUI result screen.
+// Authored by: OpenCode
+func validationFollowUpText(outcome runtime.ValidationOutcome) string {
+	if outcome.Success {
+		return "No Ghostfolio data was stored locally, and reporting is not available in this slice."
+	}
+
+	switch outcome.FailureReason {
+	case runtime.ValidationFailureIncompatibleServerContract:
+		return "The selected server responded, but it did not satisfy the supported contract for this slice."
+	default:
+		return "Validate again or return to the main menu. No Ghostfolio data was stored locally."
+	}
 }

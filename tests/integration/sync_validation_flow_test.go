@@ -21,7 +21,7 @@ type scriptedSyncService struct {
 	index    int
 }
 
-func (s *scriptedSyncService) Validate(context.Context, configmodel.AppSetupConfig, string) runtime.ValidationOutcome {
+func (s *scriptedSyncService) Validate(context.Context, runtime.ValidateRequest) runtime.ValidationOutcome {
 	var outcome = s.outcomes[s.index]
 	if s.index < len(s.outcomes)-1 {
 		s.index++
@@ -38,18 +38,11 @@ func TestSyncValidationSuccessShowsTransientSuccessResult(t *testing.T) {
 	}
 
 	var service = &scriptedSyncService{outcomes: []runtime.ValidationOutcome{{
-		Success:        true,
-		SummaryMessage: "Communication with the selected Ghostfolio server is working.",
-		DetailReason:   "communication_ok",
-		FollowUpNote:   "No Ghostfolio data was stored locally, and reporting is not available in this slice.",
+		Success:      true,
+		DetailReason: "communication_ok",
 	}}}
 
-	var model = flow.NewModel(flow.Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     bootstrap.StartupState{ActiveConfig: &config},
-		ConfigStore: configstore.NewJSONStore(t.TempDir()),
-		SyncService: service,
-	})
+	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &config}, false, service))
 
 	model = openSyncValidation(t, model)
 	model = typeToken(t, model, "abc123")
@@ -77,12 +70,7 @@ func TestSyncValidationRetryUsesResultMenuPath(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var model = flow.NewModel(flow.Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     bootstrap.StartupState{ActiveConfig: &config},
-		ConfigStore: configstore.NewJSONStore(t.TempDir()),
-		SyncService: &scriptedSyncService{outcomes: []runtime.ValidationOutcome{{Success: true, SummaryMessage: "Communication with the selected Ghostfolio server is working.", DetailReason: "communication_ok", FollowUpNote: "No Ghostfolio data was stored locally."}}},
-	})
+	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &config}, false, &scriptedSyncService{outcomes: []runtime.ValidationOutcome{{Success: true, DetailReason: "communication_ok"}}}))
 
 	model = openSyncValidation(t, model)
 	model = typeToken(t, model, "abc123")
@@ -111,12 +99,7 @@ func TestSyncValidationNoPersistenceBeyondSetup(t *testing.T) {
 		t.Fatalf("save config: %v", err)
 	}
 
-	var model = flow.NewModel(flow.Dependencies{
-		Options:     bootstrap.DefaultOptions(),
-		Startup:     bootstrap.StartupState{ActiveConfig: &config},
-		ConfigStore: store,
-		SyncService: &scriptedSyncService{outcomes: []runtime.ValidationOutcome{{Success: true, SummaryMessage: "Communication with the selected Ghostfolio server is working.", DetailReason: "communication_ok", FollowUpNote: "No Ghostfolio data was stored locally."}}},
-	})
+	var model = flow.NewModel(newFlowDependenciesWithStore(t, bootstrap.StartupState{ActiveConfig: &config}, false, &scriptedSyncService{outcomes: []runtime.ValidationOutcome{{Success: true, DetailReason: "communication_ok"}}}, store))
 
 	model = openSyncValidation(t, model)
 	model = typeToken(t, model, "abc123")

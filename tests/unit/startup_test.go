@@ -17,7 +17,7 @@ func TestLoadStartupStateWithoutRememberedSetup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load startup state: %v", err)
 	}
-	if !state.NeedsSetup {
+	if !state.NeedsSetup || state.SetupRequirementReason != bootstrap.SetupRequirementMissing {
 		t.Fatalf("expected setup to be required")
 	}
 }

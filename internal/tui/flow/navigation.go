@@ -6,6 +6,8 @@ package flow
 import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 )
 
 // upBinding returns the shared upward menu navigation binding.
@@ -60,7 +62,7 @@ func (m *Model) updateMainMenu(message tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch {
 	case key.Matches(keyMessage, editSetupBinding()):
-		return m, m.enterSetup("")
+		return m, m.enterSetup("", bootstrap.SetupRequirementNone)
 	case key.Matches(keyMessage, enterBinding()):
 		return m, m.enterSyncValidation()
 	default:

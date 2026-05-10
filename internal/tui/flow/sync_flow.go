@@ -10,6 +10,9 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 )
 
 const busyStatusText = "Validating Ghostfolio communication..."
@@ -187,7 +190,7 @@ func (m *Model) activateSyncSelection() (tea.Model, tea.Cmd) {
 // Authored by: OpenCode
 func (m *Model) startSyncValidation() (tea.Model, tea.Cmd) {
 	if m.currentConfig == nil {
-		return m, m.enterSetup("Complete setup before Sync Data can run.")
+		return m, m.enterSetup("Complete setup before Sync Data can run.", bootstrap.SetupRequirementNone)
 	}
 
 	var token = strings.TrimSpace(m.sync.TokenInput.Value())
@@ -204,7 +207,7 @@ func (m *Model) startSyncValidation() (tea.Model, tea.Cmd) {
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.Line))
 
 	var config = *m.currentConfig
-	return m, tea.Batch(m.spinner.Tick, m.validationCmd(validationContext, m.sync.AttemptID, config, token))
+	return m, tea.Batch(m.spinner.Tick, m.validationCmd(validationContext, m.sync.AttemptID, runtime.ValidateRequest{Config: config, SecurityToken: token}))
 }
 
 // leaveSyncValidation clears transient token state and returns to the main
