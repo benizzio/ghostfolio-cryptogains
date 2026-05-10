@@ -129,6 +129,13 @@ hooks:
     prompt: Commit implementation changes?
     description: Auto-commit after implementation
     condition: null
+  - extension: bugfix
+    command: speckit.bugfix.verify
+    enabled: true
+    optional: true
+    prompt: Run bugfix consistency check after implementation?
+    description: Verify spec artifact consistency after implementation completes
+    condition: null
   after_checklist:
   - extension: git
     command: speckit.git.commit
