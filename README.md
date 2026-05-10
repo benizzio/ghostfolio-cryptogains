@@ -5,14 +5,25 @@ Terminal UI for the first runnable Ghostfolio integration slice. The current rel
 ## Running
 
 ```bash
-go run ./cmd/ghostfolio-cryptogains
+make run
 ```
+
+Use `make run ARGS="--dev-mode"` only when intentionally testing a custom `http://` origin.
 
 Supported runtime flags:
 
 - `--config-dir <path>` overrides the base config directory used for the bootstrap setup file.
 - `--dev-mode` allows custom `http://` origins for local development only.
 - `--request-timeout <duration>` sets the validation timeout. The default is `30s`.
+
+## Verification
+
+```bash
+make test
+make coverage
+```
+
+`make coverage` writes `dist/coverage/coverage.out` and `dist/coverage/coverage.xml` using the maintained coverage gate configuration in `.cov.json`.
 
 ## Local Setup Storage
 

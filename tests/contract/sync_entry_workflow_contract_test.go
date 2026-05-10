@@ -22,4 +22,6 @@ func TestSyncEntryWorkflowContract(t *testing.T) {
 	assertContains(t, content, "Validate Communication")
 	assertContains(t, content, "Back")
 	assertContains(t, content, "communication only")
+	assertContains(t, content, "ghostfolio-cryptogains")
+	assertContains(t, content, "[Ghostfolio]")
 }

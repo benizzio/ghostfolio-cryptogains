@@ -1,6 +1,7 @@
 package component
 
 import (
+	"strings"
 	"testing"
 
 	"charm.land/bubbles/v2/key"
@@ -35,8 +36,12 @@ func TestRenderMenuCoversSelectedDisabledAndDescriptions(t *testing.T) {
 func TestRenderScreenUsesDefaultDimensions(t *testing.T) {
 	t.Parallel()
 
-	if got := RenderScreen(DefaultTheme(), 0, 0, "Title", "Subtitle", "Body", "Status", "Footer"); got == "" {
+	var got = RenderScreen(DefaultTheme(), 0, 0, "Title", "Subtitle", "Body", "Status", "Footer")
+	if got == "" {
 		t.Fatalf("expected rendered screen")
+	}
+	if !strings.Contains(got, ApplicationIdentityName) || !strings.Contains(got, ApplicationIdentityCue) {
+		t.Fatalf("expected persistent application identity header, got %q", got)
 	}
 }
 

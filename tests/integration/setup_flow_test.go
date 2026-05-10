@@ -129,3 +129,73 @@ func TestSetupFileRemovalAfterStartupDoesNotBreakCurrentRun(t *testing.T) {
 		t.Fatalf("expected current run to keep working after setup file removal")
 	}
 }
+
+func TestFocusedCustomOriginInputEnterReturnsToSavePath(t *testing.T) {
+	t.Parallel()
+
+	var model = flow.NewModel(flow.Dependencies{
+		Options:     bootstrap.DefaultOptions(),
+		Startup:     bootstrap.StartupState{NeedsSetup: true},
+		ConfigStore: configstore.NewJSONStore(t.TempDir()),
+		SyncService: integrationSyncService{},
+	})
+
+	updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	model = updated.(*flow.Model)
+	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	_ = runCmd(cmd)
+	model = updated.(*flow.Model)
+
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = updated.(*flow.Model)
+
+	if got := model.View().Content; !contains(got, "> Save And Continue") {
+		t.Fatalf("expected setup menu focus to return to Save And Continue, got %q", got)
+	}
+
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	result := runCmd(cmd)
+	updated, _ = model.Update(result)
+	model = updated.(*flow.Model)
+
+	if model.ActiveScreen() != "main_menu" {
+		t.Fatalf("expected save path to remain reachable, got %s", model.ActiveScreen())
+	}
+	if got := model.View().Content; !contains(got, "ghostfolio-cryptogains") {
+		t.Fatalf("expected persistent header on main menu, got %q", got)
+	}
+}
+
+func TestFocusedCustomOriginInputPasteDoesNotTriggerWorkflowNavigation(t *testing.T) {
+	t.Parallel()
+
+	var model = flow.NewModel(flow.Dependencies{
+		Options:     bootstrap.DefaultOptions(),
+		Startup:     bootstrap.StartupState{NeedsSetup: true},
+		ConfigStore: configstore.NewJSONStore(t.TempDir()),
+		SyncService: integrationSyncService{},
+	})
+
+	updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	model = updated.(*flow.Model)
+	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	_ = runCmd(cmd)
+	model = updated.(*flow.Model)
+
+	updated, _ = model.Update(tea.PasteStartMsg{})
+	model = updated.(*flow.Model)
+	updated, _ = model.Update(tea.PasteMsg{Content: "https://localhost:8080"})
+	model = updated.(*flow.Model)
+	updated, _ = model.Update(tea.PasteEndMsg{})
+	model = updated.(*flow.Model)
+
+	if model.ActiveScreen() != "setup" {
+		t.Fatalf("expected setup screen to remain active during paste, got %s", model.ActiveScreen())
+	}
+	if got := model.View().Content; !contains(got, "https://localhost:8080") {
+		t.Fatalf("expected pasted origin in setup input, got %q", got)
+	}
+	if got := model.View().Content; !contains(got, "Use Custom Server") {
+		t.Fatalf("expected setup workflow to remain active after paste, got %q", got)
+	}
+}

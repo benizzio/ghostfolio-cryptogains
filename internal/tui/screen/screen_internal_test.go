@@ -1,6 +1,7 @@
 package screen
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
@@ -14,6 +15,9 @@ func TestSyncValidationScreenViewCoversBusyBranch(t *testing.T) {
 	var content = SyncValidationScreenView(SyncValidationScreenParams{Theme: component.DefaultTheme(), Width: 80, Height: 24, Busy: true, BusyText: "Working", SpinnerFrame: "*", TokenInput: "***"})
 	if content == "" {
 		t.Fatalf("expected rendered content")
+	}
+	if !strings.Contains(content, "ghostfolio-cryptogains") || !strings.Contains(content, "[Ghostfolio]") {
+		t.Fatalf("expected persistent application identity header, got %q", content)
 	}
 }
 
@@ -36,6 +40,9 @@ func TestSetupScreenViewCoversVisibleBranches(t *testing.T) {
 	if content == "" {
 		t.Fatalf("expected rendered content")
 	}
+	if !strings.Contains(content, "ghostfolio-cryptogains") || !strings.Contains(content, "[Ghostfolio]") {
+		t.Fatalf("expected persistent application identity header, got %q", content)
+	}
 }
 
 func TestMainMenuScreenViewCoversRenderPath(t *testing.T) {
@@ -52,6 +59,9 @@ func TestMainMenuScreenViewCoversRenderPath(t *testing.T) {
 	})
 	if content == "" {
 		t.Fatalf("expected rendered content")
+	}
+	if !strings.Contains(content, "ghostfolio-cryptogains") || !strings.Contains(content, "[Ghostfolio]") {
+		t.Fatalf("expected persistent application identity header, got %q", content)
 	}
 }
 
@@ -70,6 +80,9 @@ func TestSyncValidationScreenViewCoversIdleBranch(t *testing.T) {
 	if content == "" {
 		t.Fatalf("expected rendered content")
 	}
+	if !strings.Contains(content, "ghostfolio-cryptogains") || !strings.Contains(content, "[Ghostfolio]") {
+		t.Fatalf("expected persistent application identity header, got %q", content)
+	}
 }
 
 func TestSyncValidationScreenViewUsesValidationMessageOverride(t *testing.T) {
@@ -85,6 +98,9 @@ func TestSyncValidationScreenViewUsesValidationMessageOverride(t *testing.T) {
 	})
 	if content == "" {
 		t.Fatalf("expected rendered content")
+	}
+	if !strings.Contains(content, "ghostfolio-cryptogains") || !strings.Contains(content, "[Ghostfolio]") {
+		t.Fatalf("expected persistent application identity header, got %q", content)
 	}
 }
 

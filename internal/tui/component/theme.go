@@ -13,19 +13,21 @@ import lipgloss "charm.land/lipgloss/v2"
 //
 // Authored by: OpenCode
 type Theme struct {
-	Title         lipgloss.Style
-	Subtitle      lipgloss.Style
-	Panel         lipgloss.Style
-	SelectedItem  lipgloss.Style
-	DisabledItem  lipgloss.Style
-	BodyText      lipgloss.Style
-	MutedText     lipgloss.Style
-	InputLabel    lipgloss.Style
-	SuccessStatus lipgloss.Style
-	FailureStatus lipgloss.Style
-	NeutralStatus lipgloss.Style
-	HelpText      lipgloss.Style
-	SummaryPanel  lipgloss.Style
+	AppIdentity    lipgloss.Style
+	AppIdentityCue lipgloss.Style
+	Title          lipgloss.Style
+	Subtitle       lipgloss.Style
+	Panel          lipgloss.Style
+	SelectedItem   lipgloss.Style
+	DisabledItem   lipgloss.Style
+	BodyText       lipgloss.Style
+	MutedText      lipgloss.Style
+	InputLabel     lipgloss.Style
+	SuccessStatus  lipgloss.Style
+	FailureStatus  lipgloss.Style
+	NeutralStatus  lipgloss.Style
+	HelpText       lipgloss.Style
+	SummaryPanel   lipgloss.Style
 }
 
 // DefaultTheme returns the Ghostfolio-inspired TUI theme used by this slice.
@@ -43,6 +45,12 @@ func DefaultTheme() Theme {
 		Padding(1, 2)
 
 	return Theme{
+		AppIdentity: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#36cfcc")),
+		AppIdentityCue: lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#3686cf")),
 		Title:        lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#36cfcc")),
 		Subtitle:     lipgloss.NewStyle().Foreground(lipgloss.Color("#3686cf")),
 		Panel:        panel,

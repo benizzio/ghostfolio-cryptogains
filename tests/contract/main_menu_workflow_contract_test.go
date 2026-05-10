@@ -20,5 +20,7 @@ func TestMainMenuWorkflowContract(t *testing.T) {
 
 	assertContains(t, content, "Sync Data")
 	assertContains(t, content, "Selected Server")
+	assertContains(t, content, "ghostfolio-cryptogains")
+	assertContains(t, content, "[Ghostfolio]")
 	assertNotContains(t, content, "Report")
 }

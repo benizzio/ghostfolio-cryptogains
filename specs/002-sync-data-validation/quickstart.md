@@ -25,10 +25,17 @@ Validate the first runnable application slice that covers:
 Run:
 
 ```bash
-go run ./cmd/ghostfolio-cryptogains
+make run
 ```
 
-Use `go run ./cmd/ghostfolio-cryptogains --dev-mode` only when intentionally testing a custom `http://` origin.
+Use `make run ARGS="--dev-mode"` only when intentionally testing a custom `http://` origin.
+
+Verification commands:
+
+```bash
+make test
+make coverage
+```
 
 Expected result:
 

@@ -154,6 +154,28 @@ func TestUpdateSetupCoversNavigationAndInput(t *testing.T) {
 		t.Fatalf("expected input value")
 	}
 
+	model.setup.ValidationMessage = "stale"
+	updated, cmd = model.Update(tea.PasteMsg{Content: "https://paste.example"})
+	_ = runCmdFlow(cmd)
+	model = updated.(*Model)
+	if model.setup.ValidationMessage != "" {
+		t.Fatalf("expected paste to clear setup validation message")
+	}
+	if model.setup.OriginInput.Value() == "" {
+		t.Fatalf("expected setup paste to update origin input")
+	}
+
+	model.setup.InputFocused = false
+	updated, cmd = model.Update(tea.PasteStartMsg{})
+	if cmd != nil || updated.(*Model).active != setupScreenKey {
+		t.Fatalf("expected unfocused setup paste start to be ignored")
+	}
+	updated, cmd = model.Update(tea.PasteEndMsg{})
+	if cmd != nil || updated.(*Model).active != setupScreenKey {
+		t.Fatalf("expected unfocused setup paste end to be ignored")
+	}
+	model = updated.(*Model)
+
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
 	model = updated.(*Model)
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
@@ -273,11 +295,31 @@ func TestUpdateSyncValidationCoversInputValidationAndBack(t *testing.T) {
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Text: "t", Code: 't'}))
 	_ = runCmdFlow(cmd)
 	model = updated.(*Model)
+	model.sync.ValidationMessage = "stale"
+	updated, cmd = model.Update(tea.PasteMsg{Content: "token"})
+	_ = runCmdFlow(cmd)
+	model = updated.(*Model)
+	if model.sync.ValidationMessage != "" {
+		t.Fatalf("expected paste to clear sync validation message")
+	}
+	if model.active != syncValidationScreenKey {
+		t.Fatalf("expected sync paste to remain in sync validation workflow")
+	}
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
 	model = updated.(*Model)
 	if model.sync.InputFocused {
 		t.Fatalf("expected input blur")
 	}
+
+	updated, cmd = model.Update(tea.PasteStartMsg{})
+	if cmd != nil || updated.(*Model).active != syncValidationScreenKey {
+		t.Fatalf("expected unfocused sync paste start to be ignored")
+	}
+	updated, cmd = model.Update(tea.PasteEndMsg{})
+	if cmd != nil || updated.(*Model).active != syncValidationScreenKey {
+		t.Fatalf("expected unfocused sync paste end to be ignored")
+	}
+	model = updated.(*Model)
 
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*Model)
@@ -301,6 +343,28 @@ func TestUpdateSyncValidationCoversInputValidationAndBack(t *testing.T) {
 	}
 }
 
+func TestFocusedInputEnterReturnsToPrimaryMenus(t *testing.T) {
+	t.Parallel()
+
+	var model = newTestModel(t, nil)
+	model.setup.InputFocused = true
+	updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = updated.(*Model)
+	if model.setup.InputFocused || model.setup.MenuIndex != 2 {
+		t.Fatalf("expected enter to return focused setup input to save menu path")
+	}
+
+	var config = mustSetupConfig(t)
+	model = newTestModel(t, &config)
+	model.active = syncValidationScreenKey
+	model.sync.InputFocused = true
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = updated.(*Model)
+	if model.sync.InputFocused || model.sync.MenuIndex != 0 {
+		t.Fatalf("expected enter to return focused sync input to validation menu path")
+	}
+}
+
 func TestUpdateSyncValidationCoversBusyIgnoreAndSetupRedirect(t *testing.T) {
 	t.Parallel()
 
@@ -313,12 +377,17 @@ func TestUpdateSyncValidationCoversBusyIgnoreAndSetupRedirect(t *testing.T) {
 	if !model.sync.Busy {
 		t.Fatalf("expected busy state to ignore key input")
 	}
+	updated, cmd := model.Update(tea.PasteMsg{Content: "token"})
+	if cmd != nil || !updated.(*Model).sync.Busy {
+		t.Fatalf("expected busy sync paste to be ignored")
+	}
+	model = updated.(*Model)
 
 	model.sync.Busy = false
 	model.currentConfig = nil
 	model.sync.TokenInput.SetValue("token")
 	model.sync.InputFocused = false
-	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	_ = runCmdFlow(cmd)
 	if updated.(*Model).active != setupScreenKey {
 		t.Fatalf("expected setup redirect when config is missing")

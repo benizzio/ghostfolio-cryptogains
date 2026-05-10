@@ -59,3 +59,76 @@ func TestMainMenuEnterNavigatesToSyncValidation(t *testing.T) {
 		t.Fatalf("expected sync validation, got %s", model.ActiveScreen())
 	}
 }
+
+func TestFocusedTokenInputEnterReturnsToValidationMenuPath(t *testing.T) {
+	t.Parallel()
+
+	var config, err = configmodel.NewSetupConfig(configmodel.ServerModeGhostfolioCloud, configmodel.GhostfolioCloudOrigin, false, time.Now())
+	if err != nil {
+		t.Fatalf("new setup config: %v", err)
+	}
+
+	var model = flow.NewModel(flow.Dependencies{
+		Options:     bootstrap.DefaultOptions(),
+		Startup:     bootstrap.StartupState{ActiveConfig: &config},
+		ConfigStore: configstore.NewJSONStore(t.TempDir()),
+		SyncService: integrationSyncService{},
+	})
+
+	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	_ = runCmd(cmd)
+	model = updated.(*flow.Model)
+
+	updated, _ = model.Update(tea.PasteMsg{Content: "token-123"})
+	model = updated.(*flow.Model)
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = updated.(*flow.Model)
+
+	if got := model.View().Content; !contains(got, "> Validate Communication") {
+		t.Fatalf("expected sync menu focus to return to Validate Communication, got %q", got)
+	}
+
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = updated.(*flow.Model)
+	if got := model.View().Content; !contains(got, "Validating Ghostfolio communication") {
+		t.Fatalf("expected validation path to remain reachable, got %q", got)
+	}
+	_ = runCmd(cmd)
+}
+
+func TestFocusedTokenInputPasteDoesNotTriggerWorkflowNavigation(t *testing.T) {
+	t.Parallel()
+
+	var config, err = configmodel.NewSetupConfig(configmodel.ServerModeGhostfolioCloud, configmodel.GhostfolioCloudOrigin, false, time.Now())
+	if err != nil {
+		t.Fatalf("new setup config: %v", err)
+	}
+
+	var model = flow.NewModel(flow.Dependencies{
+		Options:     bootstrap.DefaultOptions(),
+		Startup:     bootstrap.StartupState{ActiveConfig: &config},
+		ConfigStore: configstore.NewJSONStore(t.TempDir()),
+		SyncService: integrationSyncService{},
+	})
+
+	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	_ = runCmd(cmd)
+	model = updated.(*flow.Model)
+
+	updated, _ = model.Update(tea.PasteStartMsg{})
+	model = updated.(*flow.Model)
+	updated, _ = model.Update(tea.PasteMsg{Content: "token-123"})
+	model = updated.(*flow.Model)
+	updated, _ = model.Update(tea.PasteEndMsg{})
+	model = updated.(*flow.Model)
+
+	if model.ActiveScreen() != "sync_validation" {
+		t.Fatalf("expected sync validation screen to remain active during paste, got %s", model.ActiveScreen())
+	}
+	if got := model.View().Content; !contains(got, "*********") {
+		t.Fatalf("expected pasted token to remain masked, got %q", got)
+	}
+	if got := model.View().Content; !contains(got, "Validate Communication") {
+		t.Fatalf("expected sync workflow to remain active after paste, got %q", got)
+	}
+}

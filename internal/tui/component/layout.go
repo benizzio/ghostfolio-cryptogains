@@ -8,6 +8,16 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 )
 
+// ApplicationIdentityName is the persistent project name shown in every
+// full-screen view.
+// Authored by: OpenCode
+const ApplicationIdentityName = "ghostfolio-cryptogains"
+
+// ApplicationIdentityCue is the shared ASCII-safe Ghostfolio visual cue shown
+// alongside the project name.
+// Authored by: OpenCode
+const ApplicationIdentityCue = "[Ghostfolio]"
+
 // MenuItem describes a renderable primary action in a vertical menu.
 //
 // Example:
@@ -53,6 +63,16 @@ func RenderMenu(theme Theme, items []MenuItem, selected int) string {
 	return strings.Join(lines, "\n")
 }
 
+// renderApplicationIdentity renders the persistent project header shared across
+// every full-screen view.
+// Authored by: OpenCode
+func renderApplicationIdentity(theme Theme) string {
+	return strings.TrimSpace(
+		theme.AppIdentity.Render(ApplicationIdentityName) + " " +
+			theme.AppIdentityCue.Render(ApplicationIdentityCue),
+	)
+}
+
 // RenderScreen composes a full-screen layout with header, body, status, and
 // footer regions.
 //
@@ -70,7 +90,7 @@ func RenderScreen(theme Theme, width int, height int, title string, subtitle str
 		height = 32
 	}
 
-	var header = theme.Panel.Width(width - 4).Render(strings.TrimSpace(theme.Title.Render(title) + "\n" + theme.Subtitle.Render(subtitle)))
+	var header = theme.Panel.Width(width - 4).Render(strings.TrimSpace(renderApplicationIdentity(theme) + "\n" + theme.Title.Render(title) + "\n" + theme.Subtitle.Render(subtitle)))
 	var bodyPanel = theme.SummaryPanel.Width(width - 4).Render(body)
 	var statusPanel = theme.Panel.Width(width - 4).Render(status)
 	var footerPanel = theme.Panel.Width(width - 4).Render(footer)

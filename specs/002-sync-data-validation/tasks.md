@@ -74,7 +74,7 @@ description: "Task list for Sync Data Validation implementation"
 - [X] T010 [P] [US1] Add setup-screen contract coverage from `specs/002-sync-data-validation/contracts/tui-workflows.md` in `tests/contract/setup_workflow_contract_test.go`
 - [X] T011 [P] [US1] Add first-run setup completion, remembered-setup startup, invalid-remembered-setup startup fallback, setup-file removal-after-load behavior, and no-pre-sync-network integration coverage for clean and remembered bootstrap states in `tests/integration/setup_flow_test.go`
 - [X] T012 [P] [US1] Add bootstrap config store, setup-file protection, startup-readable field validation, and origin validation unit coverage in `tests/unit/config_store_test.go`, `tests/unit/config_permissions_test.go`, and `tests/unit/origin_validator_test.go`
-- [ ] T037 [P] [US1] Add focused custom-origin input contract and integration coverage for `Enter` return-to-menu behavior and paste-safe text entry in `tests/contract/setup_workflow_contract_test.go` and `tests/integration/setup_flow_test.go`
+- [X] T037 [P] [US1] Add focused custom-origin input contract and integration coverage for `Enter` return-to-menu behavior and paste-safe text entry in `tests/contract/setup_workflow_contract_test.go` and `tests/integration/setup_flow_test.go`
 
 ### Implementation for User Story 1
 
@@ -82,7 +82,7 @@ description: "Task list for Sync Data Validation implementation"
 - [X] T014 [US1] Implement setup workflow state transitions and validation messaging in `internal/tui/flow/setup_flow.go`
 - [X] T015 [P] [US1] Implement startup bootstrap loading and incomplete-setup redirect logic in `internal/app/bootstrap/startup.go`
 - [X] T016 [US1] Wire setup completion, persisted setup reuse, and edit-setup entry into `internal/tui/flow/model.go`
-- [ ] T040 [US1] Implement focused custom-origin input `Enter` return-to-menu behavior and paste-safe input handling in `internal/tui/screen/setup_screen.go` and `internal/tui/flow/setup_flow.go`
+- [X] T040 [US1] Implement focused custom-origin input `Enter` return-to-menu behavior and paste-safe input handling in `internal/tui/screen/setup_screen.go` and `internal/tui/flow/setup_flow.go`
 
 **Checkpoint**: The setup path is independently runnable and remembered across launches.
 
@@ -98,17 +98,17 @@ description: "Task list for Sync Data Validation implementation"
 
 - [X] T017 [P] [US2] Add main-menu and sync-entry screen contract coverage from `specs/002-sync-data-validation/contracts/tui-workflows.md` in `tests/contract/main_menu_workflow_contract_test.go` and `tests/contract/sync_entry_workflow_contract_test.go`
 - [X] T018 [P] [US2] Add main-menu, workflow-selection, and non-reporting-outcome integration coverage in `tests/integration/main_menu_flow_test.go`
-- [ ] T019 [P] [US2] ⚠️ Reopened Add focus-aware key routing unit coverage for focused-input `Enter` release and paste-safe routing in `tests/unit/key_routing_test.go` (reopened — BUG-001)
-- [ ] T038 [P] [US2] Add persistent application-identity header contract coverage for setup, main-menu, and sync-entry screens in `tests/contract/setup_workflow_contract_test.go`, `tests/contract/main_menu_workflow_contract_test.go`, and `tests/contract/sync_entry_workflow_contract_test.go`
-- [ ] T039 [P] [US2] Add focused Ghostfolio security-token input contract and integration coverage for `Enter` return-to-menu behavior and paste-safe text entry in `tests/contract/sync_entry_workflow_contract_test.go` and `tests/integration/main_menu_flow_test.go`
+- [X] T019 [P] [US2] ⚠️ Reopened Add focus-aware key routing unit coverage for focused-input `Enter` release and paste-safe routing in `tests/unit/key_routing_test.go` (reopened — BUG-001)
+- [X] T038 [P] [US2] Add persistent application-identity header contract coverage for setup, main-menu, and sync-entry screens in `tests/contract/setup_workflow_contract_test.go`, `tests/contract/main_menu_workflow_contract_test.go`, and `tests/contract/sync_entry_workflow_contract_test.go`
+- [X] T039 [P] [US2] Add focused Ghostfolio security-token input contract and integration coverage for `Enter` return-to-menu behavior and paste-safe text entry in `tests/contract/sync_entry_workflow_contract_test.go` and `tests/integration/main_menu_flow_test.go`
 
 ### Implementation for User Story 2
 
 - [X] T020 [P] [US2] Implement the main menu screen with `Sync Data` as the only business action in `internal/tui/screen/main_menu_screen.go`
 - [X] T021 [P] [US2] Implement the sync validation entry screen with a masked token input and primary actions in `internal/tui/screen/sync_validation_screen.go`
 - [X] T022 [US2] Implement main-menu, edit-setup, and sync-entry navigation in `internal/tui/flow/navigation.go`
-- [ ] T041 [US2] Implement a persistent ASCII-safe application-identity header for setup, main-menu, and sync-entry screens in `internal/tui/component/layout.go`, `internal/tui/component/theme.go`, and the affected screen files
-- [ ] T042 [US2] Implement focused Ghostfolio security-token input `Enter` return-to-menu behavior and paste-safe input handling in `internal/tui/screen/sync_validation_screen.go` and `internal/tui/flow/navigation.go`
+- [X] T041 [US2] Implement a persistent ASCII-safe application-identity header for setup, main-menu, and sync-entry screens in `internal/tui/component/layout.go`, `internal/tui/component/theme.go`, and the affected screen files
+- [X] T042 [US2] Implement focused Ghostfolio security-token input `Enter` return-to-menu behavior and paste-safe input handling in `internal/tui/screen/sync_validation_screen.go` and `internal/tui/flow/navigation.go`
 
 **Checkpoint**: The user can reach the sync workflow entry point without storage or report-generation paths.
 
@@ -148,8 +148,8 @@ description: "Task list for Sync Data Validation implementation"
 - [X] T034 [P] Reconcile the `Launch The Application`, `Remembered Setup Path`, `Sync Validation Failure Paths`, and `Negative Check: No Persistence Beyond Setup` sections in `specs/002-sync-data-validation/quickstart.md`, including the supported failure categories and invalid-remembered-setup behavior
 - [X] T035 Run `mkdir -p dist/coverage && go test ./... -covermode=atomic -coverprofile=dist/coverage/coverage.out && gocoverageplus -i dist/coverage/coverage.out -o dist/coverage/coverage.xml`, then verify the generated artifacts in `dist/coverage/coverage.out` and `dist/coverage/coverage.xml` report 100% statement coverage plus 100% branch and file coverage for project-owned code
 - [X] T036 [P] Document the OWASP Top 10 review for setup persistence, Ghostfolio token handling, and Ghostfolio API calls in `specs/002-sync-data-validation/checklists/requirements.md`
-- [ ] T043 [P] Add maintained `make run`, `make test`, and `make coverage` targets in `Makefile` for the slice's launch, test, and coverage workflows
-- [ ] T044 [P] Update `README.md`, `specs/002-sync-data-validation/quickstart.md`, and Phase 6 verification references to use `make run`, `make test`, and `make coverage`, then verify coverage artifacts through the `make coverage` path
+- [X] T043 [P] Add maintained `make run`, `make test`, and `make coverage` targets in `Makefile` for the slice's launch, test, and coverage workflows
+- [X] T044 [P] Update `README.md`, `specs/002-sync-data-validation/quickstart.md`, and Phase 6 verification references to use `make run`, `make test`, and `make coverage`, then verify coverage artifacts through the `make coverage` path
 
 ---
 

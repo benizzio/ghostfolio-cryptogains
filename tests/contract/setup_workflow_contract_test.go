@@ -24,4 +24,6 @@ func TestSetupWorkflowContract(t *testing.T) {
 	assertContains(t, content, "Save And Continue")
 	assertContains(t, content, "Custom Server Origin")
 	assertContains(t, content, "Production-like custom origins")
+	assertContains(t, content, "ghostfolio-cryptogains")
+	assertContains(t, content, "[Ghostfolio]")
 }
