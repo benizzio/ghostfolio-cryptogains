@@ -8,8 +8,6 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 )
 
-const minimumPanelWidth = 1
-
 // ApplicationIdentityName is the persistent project name shown in every
 // full-screen view.
 // Authored by: OpenCode
@@ -125,6 +123,8 @@ func RenderScreen(
 // not produce negative or zero-width panels after shared padding is applied.
 // Authored by: OpenCode
 func contentPanelWidth(width int) int {
+	const minimumPanelWidth = 1
+
 	if width <= 4 {
 		return minimumPanelWidth
 	}

@@ -258,7 +258,7 @@ func TestReplaceSetupFileWindowsReplacesExistingDestination(t *testing.T) {
 		t.Fatalf("expected replaced content, got %q", string(content))
 	}
 
-	if _, err := os.Stat(store.Path() + ".bak"); !errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(store.Path() + backupFileSuffix); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("expected backup file cleanup, got %v", err)
 	}
 }

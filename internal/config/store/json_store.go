@@ -20,6 +20,7 @@ import (
 const (
 	appDirectoryName  = "ghostfolio-cryptogains"
 	setupFileName     = "setup.json"
+	backupFileSuffix  = ".bak"
 	directoryFileMode = 0o700
 	setupFileMode     = 0o600
 )
@@ -306,7 +307,7 @@ func (s *JSONStore) replaceSetupFile(tempPath string) error {
 // repeated saves can replace an existing file on Windows.
 // Authored by: OpenCode
 func (s *JSONStore) replaceSetupFileWindows(tempPath string) error {
-	var backupPath = s.path + ".bak"
+	var backupPath = s.path + backupFileSuffix
 
 	cleanupTempFile(backupPath)
 
