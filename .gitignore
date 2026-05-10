@@ -1,1 +1,11 @@
-.idea
+.DS_Store
+.idea/
+.vscode/
+Thumbs.db
+*.exe
+*.out
+*.swp
+*.test
+*.tmp
+dist/coverage/
+vendor/

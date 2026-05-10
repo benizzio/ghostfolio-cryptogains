@@ -40,6 +40,19 @@
 - Integration wording now references the validated Ghostfolio sync contract instead of embedding raw API details in the feature spec.
 - Key entities now reuse the validated subset of the reference model: `AppSetupConfig`, `GhostfolioSession`, and `SyncValidationAttempt`.
 
+## OWASP Top 10 Review
+
+- [x] A01 Broken Access Control: The application persists one bootstrap profile under the current OS user's config directory and does not implement multi-user sharing inside the product. Residual exposure is limited to compromise of the local workstation account.
+- [x] A02 Cryptographic Failures: This slice persists no Ghostfolio security token, JWT, or activities payload. Custom origins default to `https`, and `http` is allowed only with explicit development mode. Unix-like platforms apply restrictive file permissions where supported.
+- [x] A03 Injection: Ghostfolio requests use fixed endpoints, standard HTTP request construction, and JSON encoding for the token field. This slice does not invoke shells, SQL interpreters, or template engines with user-controlled content.
+- [x] A04 Insecure Design: Setup must complete before sync validation can run. Token entry is deferred until the `Sync Data` workflow, and successful validation explicitly does not enable storage or reporting behavior.
+- [x] A05 Security Misconfiguration: Stored origins are canonicalized and revalidated on every startup. Remembered `http` origins are rejected unless the current process was started with explicit development mode.
+- [x] A06 Vulnerable and Outdated Components: The slice keeps a small dependency set limited to Bubble Tea, selected Bubbles widgets, Lip Gloss, and a development-only coverage helper pinned in `go.mod`.
+- [x] A07 Identification and Authentication Failures: The Ghostfolio security token is sent only to the selected canonical origin. The returned JWT remains runtime-only and is cleared after each attempt.
+- [x] A08 Software and Data Integrity Failures: Bootstrap setup writes go through a temporary file, `fsync`, and atomic rename so interrupted writes do not leave partially accepted configuration behind.
+- [x] A09 Security Logging and Monitoring Failures: Project-owned user messages and diagnostics must not expose the Ghostfolio token, JWT, request body, or raw response payload. Redaction helpers cover project-owned diagnostic surfaces.
+- [x] A10 Server-Side Request Forgery (SSRF): This is a user-run terminal client rather than a server-side fetcher, but the selected origin still controls outbound requests. Origin validation constrains targets to absolute origins with no path, query, fragment, or user info, and plain `http` requires explicit development mode.
+
 ## Generated Deep Audit
 
 **Purpose**: Deep author-facing review of requirements quality for the sync-data-validation slice

@@ -1,8 +1,10 @@
-for next features/specs
-
-- Since in this feature we can receive activities with different base currencies for asset pricing, we need to come with a strategy for currency conversion and add to the plan
-  - the strategy in the current spec should be to select a currency between USD and EUR so the entire report is calculated in the same base currency.
-  - when selected, the prices that are in a different currency need to be converted before gains or losses are calculated. The conversion should be based on conversion values supplied by the financial authorithy of that fiat currrency, given:
-    - USD: Federal Reserve
-    - EUR: European Central Bank
-  - the plan research must contain be done to integrate to the APIs provided by or officially trusted by those authorities.
+- MAKEFILE: all command to perform actions in the project must be added to a Makefile.
+- When the sync data process is selected
+  - BUG: I cannot exit the security token typing process. Pressing enter does no action and I am stuck in the process
+  - Unplanned feature: copy/paste does not work. It should be a supported feature, and it should not interfere with the TUI process when normal paste hotkeys are used. Let's make sure we modify the relevant spec docs to include it and then implement it.
+- When configuring a new custom server:
+  - BUG: I cannot exit the security token typing process. Pressing enter does no action and I am stuck in the process
+  - Unplanned feature: copy/paste does not work. It should be a supported feature, and it should not interfere with the TUI process when normal paste hotkeys are used. Let's make sure we modify the relevant spec docs to include it and then implement it.
+- USER EXPERIENCE IMPROVEMENT: The TUI does not indicate what application is running. Let's add a small ASC artwork section title with the project name and the Ghostfolio logo. Add this to the relevant spec docs and then implement it.
+- make sure to cover all fixes with the relevant tests
+- There are multiple divergences from the instructions in AGENTS.md. Make the code conform

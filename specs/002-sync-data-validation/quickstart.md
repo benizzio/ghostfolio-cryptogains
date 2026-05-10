@@ -12,7 +12,7 @@ Validate the first runnable application slice that covers:
 
 ## Prerequisites
 
-- Go 1.26.2 installed
+- Go 1.26.3 installed
 - a terminal that supports alternate-screen applications
 - one reachable Ghostfolio target:
   - the hosted default at `https://ghostfol.io`, or
@@ -28,9 +28,11 @@ Run:
 go run ./cmd/ghostfolio-cryptogains
 ```
 
+Use `go run ./cmd/ghostfolio-cryptogains --dev-mode` only when intentionally testing a custom `http://` origin.
+
 Expected result:
 
-- the application opens in the full terminal screen
+- the application takes over the full terminal screen immediately
 - a clearly delimited setup or main-menu screen is shown
 - the footer displays the currently available hotkeys
 
@@ -62,6 +64,20 @@ Expected result:
 - the app skips setup
 - the remembered Ghostfolio origin is shown on the main menu
 - the user does not need to enter the Ghostfolio token at startup
+- `Ctrl+E` returns to setup to replace the remembered server selection
+
+## Invalid Remembered Setup Path
+
+Validate at least one invalid remembered setup case:
+
+1. Save a custom `http://` origin while the app is running with `--dev-mode`, then relaunch without `--dev-mode`.
+2. Or manually corrupt the saved `setup.json` file so the stored origin or mode is no longer valid.
+
+Expected result:
+
+- the app starts in setup instead of the main menu
+- the screen explains that the saved server selection is no longer valid
+- no Ghostfolio network request is made before setup is completed again
 
 ## Sync Validation Success Path
 
@@ -79,21 +95,18 @@ Expected result:
 
 ## Sync Validation Failure Paths
 
-Validate each of these cases separately:
+Validate each failure category separately:
 
-1. Invalid Ghostfolio token
-2. Unreachable server or timeout
-3. Non-2xx auth response
-4. Non-2xx activities response
-5. Malformed JSON response
-6. Missing `authToken`
-7. Missing `activities` or invalid `count`
-8. `count > 0` with no first activity item
-9. First activity item missing `id`, `date`, or `type`
+1. `rejected token`: auth returns `403 Forbidden`
+2. `timeout`: auth or activities does not finish within the configured timeout
+3. `connectivity problem`: the selected origin cannot be reached
+4. `unsuccessful server response`: auth returns a non-2xx response other than `403`, or activities returns `401`, `403`, or another non-2xx response other than `400`
+5. `incompatible server contract`: auth or activities returns unsupported content type, malformed JSON, missing required fields, contradictory `count` and `activities` values, more than one returned activity for the probe, or an unreadable required activity timestamp
 
 Expected result for each case:
 
 - a failure result screen appears
+- exactly one supported failure category is shown
 - the message explains that communication validation did not succeed
 - the message does not expose the token, JWT, or raw unprotected payload
 - `Validate Again` is available without repeating setup
@@ -109,6 +122,16 @@ Expected result:
 - the origin is accepted only in development mode
 - the rest of the validation workflow is unchanged
 
+## Bootstrap Setup File
+
+The bootstrap setup file is stored as `ghostfolio-cryptogains/setup.json` under the current user's config directory.
+
+- Linux: `$XDG_CONFIG_HOME/ghostfolio-cryptogains/setup.json` or `~/.config/ghostfolio-cryptogains/setup.json`
+- macOS: `~/Library/Application Support/ghostfolio-cryptogains/setup.json`
+- Windows: `%AppData%\ghostfolio-cryptogains\setup.json`
+
+Delete that file to force the next launch back to first-run setup.
+
 ## Negative Check: No Persistence Beyond Setup
 
 After both successful and failed sync attempts, verify:
@@ -117,3 +140,4 @@ After both successful and failed sync attempts, verify:
 - no Ghostfolio token or JWT was written to disk
 - no report-generation screen or action is exposed
 - only the bootstrap setup file remains persisted
+- the config directory contains only `setup.json`

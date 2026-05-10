@@ -11,7 +11,7 @@ Build the first runnable Go terminal application slice for this repository. The 
 
 ## Technical Context
 
-**Language/Version**: Go 1.26.2  
+**Language/Version**: Go 1.26.3  
 **Primary Dependencies**: `charm.land/bubbletea/v2`, selected `charm.land/bubbles/v2` components (`list`, `textinput`, `help`, `key`, `spinner`), Go standard library (`net/http`, `encoding/json`, `context`, `net/url`, `os`, `path/filepath`)  
 **Storage**: Local-only machine-scoped JSON setup file in the OS config or app-data directory, scoped to the current OS user profile and containing only `schema_version`, `setup_complete`, `server_mode`, `server_origin`, `allow_dev_http`, and `updated_at`; written atomically with restrictive filesystem permissions where supported; no Ghostfolio token, JWT, or activity payload persistence in this slice  
 **Testing**: `go test` with `httptest.Server` integration suites for first-run setup completion, remembered-setup startup without pre-sync network requests, invalid-remembered-setup startup fallback, repeated validation after both success and failure, setup-file removal after startup load, delayed-request busy states, terminal resize responsiveness, and Ghostfolio validation flows across rejected-token, timeout, connectivity, unsuccessful-response, and incompatible-server categories; table-driven unit tests for validators, setup-file protection, protected config placement or restrictive permission behavior, and focus routing; `go test -coverprofile`, branch and file coverage gate via `github.com/Fabianexe/gocoverageplus`  
@@ -86,7 +86,7 @@ tests/
 
 ## Full-Screen TUI Rules
 
-- Launch the root Bubble Tea program with `tea.WithAltScreen()` so the application owns the entire terminal immediately.
+- Render the root Bubble Tea views with `tea.View.AltScreen = true` so the application owns the entire terminal immediately.
 - Every screen uses a stable full-screen layout with clearly delimited regions for title and explanation, main workflow content, transient status, and visible hotkeys.
 - Use Ghostfolio's general visual identity as the TUI design reference: Inter-style clean sans typography, primary teal accents around `#36cfcc`, secondary blue accents around `#3686cf`, warning and error red around `#dc3545`, and restrained light or dark neutral surfaces rather than saturated backgrounds.
 - Adapt that palette to terminal capabilities by using truecolor when available and the nearest readable ANSI fallbacks when it is not. Preserve the palette hierarchy even when exact hex values are unavailable.

@@ -1,0 +1,18 @@
+{
+  "OutputFormat": "cobertura",
+  "SourcePath": "./",
+  "ExcludePaths": [
+    "tests",
+    "tools"
+  ],
+  "Cleaner": {
+    "ErrorIf": false,
+    "NoneCodeLines": true,
+    "Generated": true,
+    "CustomIf": []
+  },
+  "Complexity": {
+    "Active": false,
+    "Type": "cognitive"
+  }
+}

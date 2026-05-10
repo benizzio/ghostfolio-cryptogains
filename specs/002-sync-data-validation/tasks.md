@@ -34,9 +34,9 @@ description: "Task list for Sync Data Validation implementation"
 
 **Purpose**: Bootstrap the Go module, tool pinning, and the executable shell.
 
-- [ ] T001 Initialize the Go module, Bubble Tea dependencies, and module metadata in `go.mod` and `go.sum`
-- [ ] T002 Create the executable startup shell in `cmd/ghostfolio-cryptogains/main.go`
-- [ ] T003 [P] Pin the coverage gate helper with a build-tagged tools file in `tools/tools.go`
+- [X] T001 Initialize the Go module, Bubble Tea dependencies, and module metadata in `go.mod` and `go.sum`
+- [X] T002 Create the executable startup shell in `cmd/ghostfolio-cryptogains/main.go`
+- [X] T003 [P] Pin the coverage gate helper with a build-tagged tools file in `tools/tools.go`
 
 ---
 
@@ -46,12 +46,12 @@ description: "Task list for Sync Data Validation implementation"
 
 **Critical**: Finish this phase before starting story implementation.
 
-- [ ] T004 Implement runtime options and application assembly for config paths and development mode in `internal/app/bootstrap/options.go` and `internal/app/runtime/runtime.go`
-- [ ] T005 [P] Implement `AppSetupConfig` and origin canonicalization rules in `internal/config/model/app_setup_config.go`
-- [ ] T006 [P] Implement atomic JSON setup persistence and restrictive file permissions in `internal/config/store/store.go` and `internal/config/store/json_store.go`
-- [ ] T007 [P] Implement shared full-screen theme, layout, and hotkey help components in `internal/tui/component/theme.go`, `internal/tui/component/layout.go`, and `internal/tui/component/help.go`
-- [ ] T008 Implement the root Bubble Tea model and screen router in `internal/tui/flow/model.go`
-- [ ] T009 [P] Implement token-safe redaction helpers for diagnostics and transient status text in `internal/support/redact/redact.go`
+- [X] T004 Implement runtime options and application assembly for config paths and development mode in `internal/app/bootstrap/options.go` and `internal/app/runtime/runtime.go`
+- [X] T005 [P] Implement `AppSetupConfig` and origin canonicalization rules in `internal/config/model/app_setup_config.go`
+- [X] T006 [P] Implement atomic JSON setup persistence and restrictive file permissions in `internal/config/store/store.go` and `internal/config/store/json_store.go`
+- [X] T007 [P] Implement shared full-screen theme, layout, and hotkey help components in `internal/tui/component/theme.go`, `internal/tui/component/layout.go`, and `internal/tui/component/help.go`
+- [X] T008 Implement the root Bubble Tea model and screen router in `internal/tui/flow/model.go`
+- [X] T009 [P] Implement token-safe redaction helpers for diagnostics and transient status text in `internal/support/redact/redact.go`
 
 **Checkpoint**: The application can start, locate bootstrap configuration, and host screen-specific workflows without business behavior yet.
 
@@ -65,16 +65,16 @@ description: "Task list for Sync Data Validation implementation"
 
 ### Tests for User Story 1
 
-- [ ] T010 [P] [US1] Add setup-screen contract coverage from `specs/002-sync-data-validation/contracts/tui-workflows.md` in `tests/contract/setup_workflow_contract_test.go`
-- [ ] T011 [P] [US1] Add first-run setup completion, remembered-setup startup, invalid-remembered-setup startup fallback, setup-file removal-after-load behavior, and no-pre-sync-network integration coverage for clean and remembered bootstrap states in `tests/integration/setup_flow_test.go`
-- [ ] T012 [P] [US1] Add bootstrap config store, setup-file protection, startup-readable field validation, and origin validation unit coverage in `tests/unit/config_store_test.go`, `tests/unit/config_permissions_test.go`, and `tests/unit/origin_validator_test.go`
+- [X] T010 [P] [US1] Add setup-screen contract coverage from `specs/002-sync-data-validation/contracts/tui-workflows.md` in `tests/contract/setup_workflow_contract_test.go`
+- [X] T011 [P] [US1] Add first-run setup completion, remembered-setup startup, invalid-remembered-setup startup fallback, setup-file removal-after-load behavior, and no-pre-sync-network integration coverage for clean and remembered bootstrap states in `tests/integration/setup_flow_test.go`
+- [X] T012 [P] [US1] Add bootstrap config store, setup-file protection, startup-readable field validation, and origin validation unit coverage in `tests/unit/config_store_test.go`, `tests/unit/config_permissions_test.go`, and `tests/unit/origin_validator_test.go`
 
 ### Implementation for User Story 1
 
-- [ ] T013 [P] [US1] Implement the setup screen menu, labeled custom-origin input, and save gating in `internal/tui/screen/setup_screen.go`
-- [ ] T014 [US1] Implement setup workflow state transitions and validation messaging in `internal/tui/flow/setup_flow.go`
-- [ ] T015 [P] [US1] Implement startup bootstrap loading and incomplete-setup redirect logic in `internal/app/bootstrap/startup.go`
-- [ ] T016 [US1] Wire setup completion, persisted setup reuse, and edit-setup entry into `internal/tui/flow/model.go`
+- [X] T013 [P] [US1] Implement the setup screen menu, labeled custom-origin input, and save gating in `internal/tui/screen/setup_screen.go`
+- [X] T014 [US1] Implement setup workflow state transitions and validation messaging in `internal/tui/flow/setup_flow.go`
+- [X] T015 [P] [US1] Implement startup bootstrap loading and incomplete-setup redirect logic in `internal/app/bootstrap/startup.go`
+- [X] T016 [US1] Wire setup completion, persisted setup reuse, and edit-setup entry into `internal/tui/flow/model.go`
 
 **Checkpoint**: The setup path is independently runnable and remembered across launches.
 
@@ -88,15 +88,15 @@ description: "Task list for Sync Data Validation implementation"
 
 ### Tests for User Story 2
 
-- [ ] T017 [P] [US2] Add main-menu and sync-entry screen contract coverage from `specs/002-sync-data-validation/contracts/tui-workflows.md` in `tests/contract/main_menu_workflow_contract_test.go` and `tests/contract/sync_entry_workflow_contract_test.go`
-- [ ] T018 [P] [US2] Add main-menu, workflow-selection, and non-reporting-outcome integration coverage in `tests/integration/main_menu_flow_test.go`
-- [ ] T019 [P] [US2] Add focus-aware key routing unit coverage in `tests/unit/key_routing_test.go`
+- [X] T017 [P] [US2] Add main-menu and sync-entry screen contract coverage from `specs/002-sync-data-validation/contracts/tui-workflows.md` in `tests/contract/main_menu_workflow_contract_test.go` and `tests/contract/sync_entry_workflow_contract_test.go`
+- [X] T018 [P] [US2] Add main-menu, workflow-selection, and non-reporting-outcome integration coverage in `tests/integration/main_menu_flow_test.go`
+- [X] T019 [P] [US2] Add focus-aware key routing unit coverage in `tests/unit/key_routing_test.go`
 
 ### Implementation for User Story 2
 
-- [ ] T020 [P] [US2] Implement the main menu screen with `Sync Data` as the only business action in `internal/tui/screen/main_menu_screen.go`
-- [ ] T021 [P] [US2] Implement the sync validation entry screen with a masked token input and primary actions in `internal/tui/screen/sync_validation_screen.go`
-- [ ] T022 [US2] Implement main-menu, edit-setup, and sync-entry navigation in `internal/tui/flow/navigation.go`
+- [X] T020 [P] [US2] Implement the main menu screen with `Sync Data` as the only business action in `internal/tui/screen/main_menu_screen.go`
+- [X] T021 [P] [US2] Implement the sync validation entry screen with a masked token input and primary actions in `internal/tui/screen/sync_validation_screen.go`
+- [X] T022 [US2] Implement main-menu, edit-setup, and sync-entry navigation in `internal/tui/flow/navigation.go`
 
 **Checkpoint**: The user can reach the sync workflow entry point without storage or report-generation paths.
 
@@ -110,19 +110,19 @@ description: "Task list for Sync Data Validation implementation"
 
 ### Tests for User Story 3
 
-- [ ] T023 [P] [US3] Add Ghostfolio auth and activities contract coverage from `specs/002-sync-data-validation/contracts/ghostfolio-sync-validation.md` in `tests/contract/ghostfolio_sync_validation_contract_test.go`
-- [ ] T024 [P] [US3] Add validation-result and busy-state screen contract coverage from `specs/002-sync-data-validation/contracts/tui-workflows.md` in `tests/contract/validation_result_workflow_contract_test.go`
-- [ ] T025 [P] [US3] Add sync validation success, categorized failure outcomes, retry after success and failure, no-persistence, abandoned-attempt, and in-flight resize responsiveness integration coverage in `tests/integration/sync_validation_flow_test.go`
-- [ ] T026 [P] [US3] Add payload validation, contradictory one-page probe validation, token-redaction, and failure-diagnostic coverage in `tests/unit/response_validator_test.go`, `tests/unit/redact_test.go`, and `tests/integration/diagnostic_redaction_test.go`
+- [X] T023 [P] [US3] Add Ghostfolio auth and activities contract coverage from `specs/002-sync-data-validation/contracts/ghostfolio-sync-validation.md` in `tests/contract/ghostfolio_sync_validation_contract_test.go`
+- [X] T024 [P] [US3] Add validation-result and busy-state screen contract coverage from `specs/002-sync-data-validation/contracts/tui-workflows.md` in `tests/contract/validation_result_workflow_contract_test.go`
+- [X] T025 [P] [US3] Add sync validation success, categorized failure outcomes, retry after success and failure, no-persistence, abandoned-attempt, and in-flight resize responsiveness integration coverage in `tests/integration/sync_validation_flow_test.go`
+- [X] T026 [P] [US3] Add payload validation, contradictory one-page probe validation, token-redaction, and failure-diagnostic coverage in `tests/unit/response_validator_test.go`, `tests/unit/redact_test.go`, and `tests/integration/diagnostic_redaction_test.go`
 
 ### Implementation for User Story 3
 
-- [ ] T027 [P] [US3] Implement Ghostfolio auth and activities probe DTOs in `internal/ghostfolio/dto/auth_response.go` and `internal/ghostfolio/dto/activities_probe_response.go`
-- [ ] T028 [P] [US3] Implement Ghostfolio response validation rules for auth and activities probes in `internal/ghostfolio/validator/response_validator.go`
-- [ ] T029 [US3] Implement the Ghostfolio client for anonymous auth and one-page activities probes in `internal/ghostfolio/client/client.go`
-- [ ] T030 [US3] Implement `GhostfolioSession`, `SyncValidationAttempt`, and `ValidationOutcome` orchestration with secret clearing in `internal/app/runtime/sync_service.go`
-- [ ] T031 [US3] Implement async busy-state transitions, in-flight resize handling, and retryable sync workflow behavior in `internal/tui/flow/sync_flow.go`
-- [ ] T032 [US3] Implement success and failure result screens with no-persistence messaging in `internal/tui/screen/validation_result_screen.go`
+- [X] T027 [P] [US3] Implement Ghostfolio auth and activities probe DTOs in `internal/ghostfolio/dto/auth_response.go` and `internal/ghostfolio/dto/activities_probe_response.go`
+- [X] T028 [P] [US3] Implement Ghostfolio response validation rules for auth and activities probes in `internal/ghostfolio/validator/response_validator.go`
+- [X] T029 [US3] Implement the Ghostfolio client for anonymous auth and one-page activities probes in `internal/ghostfolio/client/client.go`
+- [X] T030 [US3] Implement `GhostfolioSession`, `SyncValidationAttempt`, and `ValidationOutcome` orchestration with secret clearing in `internal/app/runtime/sync_service.go`
+- [X] T031 [US3] Implement async busy-state transitions, in-flight resize handling, and retryable sync workflow behavior in `internal/tui/flow/sync_flow.go`
+- [X] T032 [US3] Implement success and failure result screens with no-persistence messaging in `internal/tui/screen/validation_result_screen.go`
 
 **Checkpoint**: Ghostfolio communication validation works end to end and does not persist tokens, JWTs, or payloads.
 
@@ -132,10 +132,10 @@ description: "Task list for Sync Data Validation implementation"
 
 **Purpose**: Finish documentation, verification, and release-level checks across all stories.
 
-- [ ] T033 [P] Update the `README.md` sections `Local Setup Storage`, `Removing Local Setup`, `Development Mode`, and `Current Slice Scope`, including Linux, macOS, and Windows setup-file location expectations and protection notes
-- [ ] T034 [P] Reconcile the `Launch The Application`, `Remembered Setup Path`, `Sync Validation Failure Paths`, and `Negative Check: No Persistence Beyond Setup` sections in `specs/002-sync-data-validation/quickstart.md`, including the supported failure categories and invalid-remembered-setup behavior
-- [ ] T035 Run `mkdir -p dist/coverage && go test ./... -covermode=atomic -coverprofile=dist/coverage/coverage.out && gocoverageplus -i dist/coverage/coverage.out -o dist/coverage/coverage.xml`, then verify the generated artifacts in `dist/coverage/coverage.out` and `dist/coverage/coverage.xml` report 100% statement coverage plus 100% branch and file coverage for project-owned code
-- [ ] T036 [P] Document the OWASP Top 10 review for setup persistence, Ghostfolio token handling, and Ghostfolio API calls in `specs/002-sync-data-validation/plan.md`
+- [X] T033 [P] Update the `README.md` sections `Local Setup Storage`, `Removing Local Setup`, `Development Mode`, and `Current Slice Scope`, including Linux, macOS, and Windows setup-file location expectations and protection notes
+- [X] T034 [P] Reconcile the `Launch The Application`, `Remembered Setup Path`, `Sync Validation Failure Paths`, and `Negative Check: No Persistence Beyond Setup` sections in `specs/002-sync-data-validation/quickstart.md`, including the supported failure categories and invalid-remembered-setup behavior
+- [X] T035 Run `mkdir -p dist/coverage && go test ./... -covermode=atomic -coverprofile=dist/coverage/coverage.out && gocoverageplus -i dist/coverage/coverage.out -o dist/coverage/coverage.xml`, then verify the generated artifacts in `dist/coverage/coverage.out` and `dist/coverage/coverage.xml` report 100% statement coverage plus 100% branch and file coverage for project-owned code
+- [X] T036 [P] Document the OWASP Top 10 review for setup persistence, Ghostfolio token handling, and Ghostfolio API calls in `specs/002-sync-data-validation/checklists/requirements.md`
 
 ---
 
