@@ -2,7 +2,7 @@
 
 ## 1.1.0 (2026-04-21)
 
-- - Add `/speckit.bugfix.switch` command for switching bugfix context
+- Add `/speckit.bugfix.switch` command for switching bugfix context
 
 ## 1.0.0 (2026-04-09)
 
