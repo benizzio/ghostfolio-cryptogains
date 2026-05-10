@@ -14,6 +14,13 @@
 - Q: What self-hosted server origins are allowed in this slice? → A: Dev HTTP, prod HTTPS only.
 - Q: How should remembered setup state be protected in this slice? → A: Machine-local protected config.
 
+### Session 2026-05-10
+
+- Q: What should `Enter` do while the custom-origin or Ghostfolio security-token input is focused? → A: Commit the current field value and return focus to that workflow's primary-action menu.
+- Q: Should focused setup-origin and Ghostfolio security-token inputs support paste? → A: Yes. Terminal paste sequences and common paste shortcuts insert text and must not trigger workflow actions while the field is focused.
+- Q: Should startup and workflow screens include a persistent application identity? → A: Yes. Every full-screen view shows a small ASCII-safe project header with a Ghostfolio visual cue.
+- Q: How should contributors invoke launch, test, and coverage workflows for this slice? → A: Through maintained `Makefile` targets.
+
 ## Plain-Language Summary
 
 - The application saves only the minimum local setup needed to remember which Ghostfolio server the user chose.
@@ -54,6 +61,9 @@ A user starting the application for the first time can complete the minimum setu
 9. **Given** a valid remembered setup was loaded for the current run, **When** the bootstrap setup file is removed before the next persisted read, **Then** the current run continues using the already loaded in-memory setup and the next launch returns to first-run setup unless the user saves new valid setup first.
 10. **Given** setup is incomplete, **When** the user attempts to execute a feature, **Then** the application blocks the action and returns the user to finish setup.
 11. **Given** the user needs to locate or reset remembered setup, **When** the user reads the project documentation for this slice, **Then** the documentation names the saved-setup location for Linux, macOS, and Windows, explains the expected local protection approach on each platform, and explains the safe removal procedure that resets setup on the next launch.
+12. **Given** the user reaches the first actionable setup screen, **When** the screen renders, **Then** the application shows a persistent ASCII-safe header that identifies the project and includes a Ghostfolio visual cue.
+13. **Given** the custom-origin input is focused during setup, **When** the user presses `Enter`, **Then** the application keeps the current input value and returns focus to the setup primary-action menu so the user can continue the advertised save path.
+14. **Given** the custom-origin input is focused during setup, **When** the user pastes text into the field, **Then** the application inserts the pasted text into the input and does not trigger workflow navigation or hotkeys.
 
 ---
 
@@ -70,6 +80,7 @@ After setup is complete, a user can select the sync data feature as the only ava
 1. **Given** setup is complete, **When** the user reaches the main workflow selection step, **Then** the application shows sync data as an executable feature.
 2. **Given** the user selects sync data, **When** the workflow starts, **Then** the application prompts only for the Ghostfolio security token needed to validate communication with the selected Ghostfolio server.
 3. **Given** the user is using this release, **When** the user finishes setup and enters the main workflow selection step, **Then** the application does not offer persistence or report-generation workflows as executable outcomes.
+4. **Given** the user is on the main workflow selection or sync-entry screen, **When** the screen renders, **Then** the application keeps the same persistent ASCII-safe project header and Ghostfolio visual cue visible.
 
 ---
 
@@ -93,6 +104,8 @@ When the user runs sync data, the application authenticates and probes activity 
 8. **Given** a previous sync data attempt failed, **When** the user starts sync data again, **Then** the application allows a new validation attempt without requiring setup to be repeated.
 9. **Given** a previous sync data attempt succeeded, **When** the user chooses to validate again or starts sync data again later in the same run, **Then** the application allows a new validation attempt without requiring setup to be repeated.
 10. **Given** the user exits the application or the application terminates during an in-flight validation attempt, **When** the user launches the application again, **Then** the previous attempt is not resumed and no earlier validation result is shown.
+11. **Given** the Ghostfolio security-token input is focused, **When** the user presses `Enter`, **Then** the application keeps the current token value masked and returns focus to the sync workflow primary-action menu so the user can continue the advertised validation path.
+12. **Given** the Ghostfolio security-token input is focused, **When** the user pastes text into the field, **Then** the application inserts the pasted text into the input and does not trigger workflow navigation or hotkeys.
 
 ---
 
@@ -109,6 +122,8 @@ When the user runs sync data, the application authenticates and probes activity 
 - The application encounters a crash, trace, or diagnostic event during the workflow; the Ghostfolio security token must not appear in any application-produced logs, dumps, traces, crash text, or persisted diagnostics.
 - The user completes setup successfully, but exits before selecting a feature.
 - The user expects data to be stored after a successful communication check; the application must clearly state that persistence is not part of this release.
+- The user presses `Enter` while the custom-origin input or Ghostfolio security-token input is still focused; the workflow must return focus to the primary-action menu instead of trapping the user inside text entry.
+- The user pastes multi-character text into the custom-origin input or Ghostfolio security-token input; the application must accept the pasted content as input and must not treat the paste as workflow navigation or hotkey input.
 
 ## Requirements *(mandatory)*
 
@@ -140,12 +155,15 @@ those areas.
 - **FR-020**: If the user leaves setup before saving, the system MUST not persist partial setup state. If a previous valid remembered setup exists, it MUST remain unchanged; otherwise the next launch MUST begin in first-run setup.
 - **FR-021**: If the remembered setup file is removed after the application has already loaded a valid setup into memory, the current run MAY continue using that in-memory setup. A later launch without a new successful setup save MUST return to first-run setup.
 - **FR-022**: The system MUST treat user exit or application termination during an in-flight validation request as an abandoned attempt: no success or failure result is remembered for later display, the token and any temporary session credential are cleared from transient state, and the next launch returns only to setup or the main menu according to remembered setup.
+- **FR-023**: While the labeled custom-origin input or Ghostfolio security-token input is focused, pressing `Enter` MUST preserve the current field value and return focus to that workflow's primary-action menu rather than trapping the user inside text entry or triggering an unrelated action.
+- **FR-024**: While the labeled custom-origin input or Ghostfolio security-token input is focused, terminal paste sequences and common paste shortcuts MUST insert text into the active field and MUST not trigger workflow navigation or hotkeys.
+- **FR-025**: The system MUST render a persistent ASCII-safe application-identity header on every full-screen view. The header MUST include the project name and a Ghostfolio visual cue.
 
 ### Acceptance Coverage By Requirement
 
-- `FR-001` to `FR-005`, `FR-018`, `FR-019`, `FR-020`, and `FR-021` are accepted by User Story 1 scenarios 1 through 10.
-- `FR-006`, `FR-007`, and `FR-014` are accepted by User Story 2 scenarios 1 through 3.
-- `FR-008` to `FR-016` and `FR-022` are accepted by User Story 3 scenarios 1 through 10.
+- `FR-001` to `FR-005`, `FR-017` to `FR-021`, `FR-023`, `FR-024`, and `FR-025` are accepted by User Story 1 scenarios 1 through 14 together with User Story 2 scenario 4 and User Story 3 scenarios 11 and 12 for the shared full-screen workflow behavior.
+- `FR-006`, `FR-007`, `FR-014`, and `FR-025` are accepted by User Story 2 scenarios 1 through 4.
+- `FR-008` to `FR-016`, `FR-022`, `FR-023`, `FR-024`, and `FR-025` are accepted by User Story 3 scenarios 1 through 12.
 - `FR-017` is accepted when user-facing project documentation names the saved-setup location for Linux, macOS, and Windows, explains the expected protection approach on each platform, and explains the safe removal procedure that resets setup on the next launch.
 
 ### Security, Precision, and Integration Constraints
@@ -157,9 +175,12 @@ those areas.
 - **SEC-005**: The origin transport-security rule MUST be enforced both when setup data is entered and when persisted setup is reloaded for runtime use: production usage rejects self-hosted `http` server origins and allows only `https`, while `http` is permitted only when the application was started with the same explicit development-mode opt-in that allowed it to be saved. Reloading a remembered `http` origin without that opt-in MUST invalidate remembered setup and return the user to setup.
 - **FIN-001**: Financial calculation rules are out of scope for this slice; any numeric values received during validation are used only to confirm that the minimal expected response structure was returned and not to derive balances, gains, losses, or reports.
 - **QUAL-001**: Automated validation MUST cover first-run setup gating, setup completion, setup persistence between runs, invalid remembered setup at startup, local device protection of persisted setup state through restrictive permissions where the operating system exposes them and protected app-config placement otherwise, self-hosted origin acceptance rules for development and production modes, remembered `http`-origin invalidation without explicit development mode, sync data selection, Ghostfolio security token-only input, successful communication validation, rejected-token handling, timeout handling, connectivity failure, unsuccessful response handling, incompatible-server handling, contradictory activity-page handling, invalid response payload handling, token non-persistence, token non-exposure in application-produced diagnostics, retry after both failure and success, abandoned in-flight attempt behavior, and confirmation that no data persistence or report flow occurs.
-- **QUAL-002**: Automated validation MUST cover startup rendering of the first actionable setup screen from a clean config directory and of the first actionable main menu from a remembered setup directory. In this slice, `first actionable` means the first full-screen view that offers an enabled primary action or required labeled input; passive splash or bootstrap status views do not satisfy this requirement. Validation MUST confirm that these startup screens use only local bootstrap state and require no Ghostfolio network requests or token entry before the user starts sync data.
+- **QUAL-001**: Automated validation MUST cover first-run setup gating, setup completion, setup persistence between runs, invalid remembered setup at startup, local device protection of persisted setup state through restrictive permissions where the operating system exposes them and protected app-config placement otherwise, self-hosted origin acceptance rules for development and production modes, remembered `http`-origin invalidation without explicit development mode, sync data selection, Ghostfolio security token-only input, successful communication validation, rejected-token handling, timeout handling, connectivity failure, unsuccessful response handling, incompatible-server handling, contradictory activity-page handling, invalid response payload handling, focused-input `Enter` return to the primary-action menu, paste handling for focused origin and token inputs, token non-persistence, token non-exposure in application-produced diagnostics, retry after both failure and success, abandoned in-flight attempt behavior, and confirmation that no data persistence or report flow occurs.
+- **QUAL-002**: Automated validation MUST cover startup rendering of the first actionable setup screen from a clean config directory and of the first actionable main menu from a remembered setup directory. In this slice, `first actionable` means the first full-screen view that offers an enabled primary action or required labeled input; passive splash or bootstrap status views do not satisfy this requirement. Validation MUST confirm that these startup screens show the persistent application-identity header, use only local bootstrap state, and require no Ghostfolio network requests or token entry before the user starts sync data.
 - **QUAL-003**: Automated validation MUST cover Bubble Tea busy-state progress updates and terminal resize handling while Ghostfolio authentication and activities requests are in flight so the event loop remains responsive during communication validation.
 - **QUAL-004**: When truecolor is unavailable, the full-screen TUI MUST still preserve menu-selection state, primary-action emphasis, and failure-state distinction through readable ANSI color choices or, if the terminal is effectively monochrome, through visible non-color cues such as labels, prefixes, or emphasis.
+- **QUAL-005**: Automated validation MUST cover the persistent application-identity header on startup and workflow screens and confirm that it remains visible across setup, main-menu, sync-entry, busy-state, and validation-result views.
+- **QUAL-006**: The repository MUST expose maintained `make run`, `make test`, and `make coverage` entry points for this slice, and contributor-facing slice documentation and verification steps MUST reference those targets instead of raw command strings.
 - **INT-001**: The feature depends on a compatible Ghostfolio server that accepts the Ghostfolio security token through this slice's supported authentication and one-page activity-probe contract and returns the required minimal payload shape. A reachable server that responds with contract drift, unsupported authentication behavior, unsupported response format, contradictory activity-page semantics, unreadable minimum field values, or missing supported endpoints is treated as an incompatible server rather than as a generic connectivity failure. The integration MUST validate that compatibility at runtime rather than assume a permanently stable remote contract.
 
 ### Key Entities *(include if feature involves data)*
@@ -180,13 +201,17 @@ This slice reuses the earlier reporting reference model and includes only the su
 - **SC-004**: 100% of successful communication-validation runs end without storing returned Ghostfolio data locally.
 - **SC-005**: 100% of user-visible outcomes in this slice are limited to setup completion, sync data selection, and communication-validation messaging, with no report-generation outcome exposed.
 - **SC-006**: In controlled validation runs with delayed Ghostfolio responses, 100% of sync-validation attempts continue to render busy-state updates and process terminal resize events until the request finishes.
+- **SC-007**: In automated setup and sync-entry runs, 100% of focused custom-origin and Ghostfolio security-token input flows allow the user to press `Enter` to return to the primary-action menu and continue the documented workflow without losing the current field value.
+- **SC-008**: In automated startup and workflow screen assertions, 100% of full-screen views show the persistent application-identity header with the project name and Ghostfolio visual cue.
+- **SC-009**: 100% of contributor-facing launch, test, and coverage instructions for this slice use maintained `make run`, `make test`, and `make coverage` targets instead of raw command strings.
 
 ### Measurement Notes
 
 - For **SC-001**, the `first actionable` screen is the first full-screen view that offers an enabled primary action or a required labeled input the user can use immediately. Passive splash or bootstrap status views do not count.
 - For **SC-001** through **SC-006**, `100% of launches` and `100% of attempts` refer to the full automated fixture set for this slice: clean setup, remembered setup, invalid remembered setup, valid token, rejected token, timeout, connectivity failure, unsuccessful response, incompatible server response, contradictory activities page, unreadable timestamp, delayed response, repeated success, repeated failure, abandoned in-flight attempt, and setup-file removal after startup load.
+- For **SC-001** through **SC-008**, `100% of launches` and `100% of attempts` refer to the full automated fixture set for this slice: clean setup, remembered setup, invalid remembered setup, valid token, rejected token, timeout, connectivity failure, unsuccessful response, incompatible server response, contradictory activities page, unreadable timestamp, delayed response, repeated success, repeated failure, abandoned in-flight attempt, setup-file removal after startup load, focused-input `Enter` return, and focused-input paste.
 - Controlled validation runs use deterministic local test fixtures or equivalent fixed-response stubs so the audited scope is stable and repeatable.
-- **SC-001**, **SC-002**, **SC-003**, **SC-004**, and **SC-006** are verified by automated tests. **SC-005** is verified by automated screen assertions that only setup, sync-data selection, and communication-validation outcomes are visible in this slice.
+- **SC-001**, **SC-002**, **SC-003**, **SC-004**, **SC-006**, **SC-007**, and **SC-008** are verified by automated tests. **SC-005** is verified by automated screen assertions that only setup, sync-data selection, and communication-validation outcomes are visible in this slice. **SC-009** is verified by contributor-facing documentation and verification-step review.
 - A validation attempt counts as successful for **SC-002** only when the visible success result also satisfies **FR-011** and **FR-015**. A failed attempt counts as correct for **SC-003** only when the visible failure result satisfies **FR-012**.
 - A responsiveness result counts as correct for **SC-006** only when, during a delayed-response fixture, the interface visibly advances at least one busy-state update after the request starts and still applies at least one terminal-resize event before the request finishes.
 
@@ -201,6 +226,14 @@ This slice reuses the earlier reporting reference model and includes only the su
 - This slice reuses the validated Ghostfolio sync contract from the earlier reporting reference work to define the supported authentication and activity-retrieval boundary.
 - Development mode is enabled only by an explicit startup opt-in, is distinct from installed production usage, and is the only mode in which the `FR-003` and `SEC-005` self-hosted `http` exception applies.
 - Development mode must not be inferred from remembered setup content, server responses, or any ambient environment assumption that the user did not deliberately enable for that application start.
+- Contributors execute the slice's supported launch, test, and coverage workflows through maintained `Makefile` entry points so project actions remain stable as commands evolve.
+
+## Bugfix Notes
+
+- **Bugfix**: 2026-05-10 — [BUG-001] Added focused-input completion requirements so `Enter` returns setup and sync flows to their primary-action menus.
+- **Bugfix**: 2026-05-10 — [BUG-002] Added paste-handling requirements for focused setup-origin and Ghostfolio security-token inputs.
+- **Bugfix**: 2026-05-10 — [BUG-003] Added a persistent ASCII-safe application-identity header requirement for startup and workflow screens.
+- **Bugfix**: 2026-05-10 — [BUG-004] Added maintained `Makefile` entry-point requirements for launch, test, and coverage workflows.
 
 ## Explicitly Deferred In This Slice
 

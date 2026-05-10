@@ -7,18 +7,25 @@
 
 ## Summary
 
-Build the first runnable Go terminal application slice for this repository. The application launches into a full-screen Bubble Tea interface, guides first-run setup for Ghostfolio server selection, persists only startup-readable machine-local setup state, presents `Sync Data` as the only business workflow, prompts for a Ghostfolio security token only when that workflow starts, validates Ghostfolio communication through the minimal authenticated activities contract, and reports success or failure without persisting returned Ghostfolio data or exposing any reporting features. The slice also treats its probe-specific validation models as transitional scaffolding that must be removed or evolved when later specs introduce real sync normalization and protected persistence.
+Build the first runnable Go terminal application slice for this repository. The application launches into a full-screen Bubble Tea interface, shows a persistent ASCII-safe application-identity header, guides first-run setup for Ghostfolio server selection, persists only startup-readable machine-local setup state, presents `Sync Data` as the only business workflow, prompts for a Ghostfolio security token only when that workflow starts, returns focused text inputs to the primary-action path on `Enter`, supports normal paste behavior while inputs are focused, validates Ghostfolio communication through the minimal authenticated activities contract, and reports success or failure without persisting returned Ghostfolio data or exposing any reporting features. Contributor launch, test, and coverage flows are exposed through maintained `Makefile` targets. The slice also treats its probe-specific validation models as transitional scaffolding that must be removed or evolved when later specs introduce real sync normalization and protected persistence.
+
+## Bugfix Notes
+
+- **Bugfix**: 2026-05-10 — [BUG-001] Updated focused-input workflow rules so `Enter` returns setup and sync entry to the primary-action path.
+- **Bugfix**: 2026-05-10 — [BUG-002] Updated focused-input routing rules to preserve normal paste behavior.
+- **Bugfix**: 2026-05-10 — [BUG-003] Updated the shared TUI plan to require a persistent application-identity header.
+- **Bugfix**: 2026-05-10 — [BUG-004] Updated contributor workflow planning to use maintained `Makefile` targets.
 
 ## Technical Context
 
 **Language/Version**: Go 1.26.3  
 **Primary Dependencies**: `charm.land/bubbletea/v2`, selected `charm.land/bubbles/v2` components (`list`, `textinput`, `help`, `key`, `spinner`), Go standard library (`net/http`, `encoding/json`, `context`, `net/url`, `os`, `path/filepath`)  
 **Storage**: Local-only machine-scoped JSON setup file in the OS config or app-data directory, scoped to the current OS user profile and containing only `schema_version`, `setup_complete`, `server_mode`, `server_origin`, `allow_dev_http`, and `updated_at`; written atomically with restrictive filesystem permissions where supported; no Ghostfolio token, JWT, or activity payload persistence in this slice  
-**Testing**: `go test` with `httptest.Server` integration suites for first-run setup completion, remembered-setup startup without pre-sync network requests, invalid-remembered-setup startup fallback, repeated validation after both success and failure, setup-file removal after startup load, delayed-request busy states, terminal resize responsiveness, and Ghostfolio validation flows across rejected-token, timeout, connectivity, unsuccessful-response, and incompatible-server categories; table-driven unit tests for validators, setup-file protection, protected config placement or restrictive permission behavior, and focus routing; `go test -coverprofile`, branch and file coverage gate via `github.com/Fabianexe/gocoverageplus`  
+**Testing**: `make test` wrapping `go test` with `httptest.Server` integration suites for first-run setup completion, remembered-setup startup without pre-sync network requests, invalid-remembered-setup startup fallback, repeated validation after both success and failure, setup-file removal after startup load, delayed-request busy states, terminal resize responsiveness, focused-input `Enter` return and paste handling, persistent application-identity header visibility, and Ghostfolio validation flows across rejected-token, timeout, connectivity, unsuccessful-response, and incompatible-server categories; table-driven unit tests for validators, setup-file protection, protected config placement or restrictive permission behavior, and focus routing; `make coverage` wrapping `go test -coverprofile` plus the branch and file coverage gate via `github.com/Fabianexe/gocoverageplus`  
 **Target Platform**: Installed terminal application for Linux, macOS, and Windows terminals with local filesystem access  
 **Project Type**: Single-module Go TUI application  
 **Performance Goals**: Render the first actionable setup or main-menu screen using only local bootstrap state before any Ghostfolio network request can occur, continue to process busy-state updates and terminal resize messages while auth or activities requests are in flight, and complete the one-page communication probe without blocking the Bubble Tea event loop  
-**Constraints**: Ghostfolio token is runtime-only and cleared after each attempt; no Ghostfolio payload persistence; production-like custom origins require HTTPS and only explicit development mode may allow HTTP; development mode is entered only through an explicit startup flag and must not be inferred from remembered setup or remote behavior; the TUI always owns the full terminal screen; primary next-step actions are presented as arrow-key menus; optional side actions are exposed only as clearly labeled hotkeys; labeled text inputs suppress conflicting hotkeys while they are focused; report generation, PDF output, financial calculations, and multi-user token-derived storage are out of scope  
+**Constraints**: Ghostfolio token is runtime-only and cleared after each attempt; no Ghostfolio payload persistence; production-like custom origins require HTTPS and only explicit development mode may allow HTTP; development mode is entered only through an explicit startup flag and must not be inferred from remembered setup or remote behavior; the TUI always owns the full terminal screen; every full-screen view shows the same persistent ASCII-safe application-identity header; primary next-step actions are presented as arrow-key menus; optional side actions are exposed only as clearly labeled hotkeys; labeled text inputs suppress conflicting hotkeys while they are focused, treat `Enter` as a return to the primary-action menu, and must accept normal paste behavior without triggering workflow actions; report generation, PDF output, financial calculations, and multi-user token-derived storage are out of scope  
 **Scale/Scope**: One application-level setup profile per local OS user profile, one selected Ghostfolio origin, one executable business workflow (`Sync Data`), one anonymous-auth request plus one `take=1` activities probe per validation attempt, and successful empty activity lists are accepted when the response contract is otherwise valid
 
 ## Constitution Check
@@ -84,16 +91,21 @@ tests/
 
 **Structure Decision**: Use a single Go module rooted at the repository root. `internal/config` owns startup-readable setup persistence, `internal/ghostfolio` owns auth and activities contract validation, `internal/tui` owns full-screen Bubble Tea screens and key routing, and `internal/app` assembles the runtime so the UI flow remains separate from transport and storage concerns.
 
+Shared TUI layout scope includes a reusable application-identity header so startup and workflow screens stay visually identifiable through the same component contract.
+
 ## Full-Screen TUI Rules
 
 - Render the root Bubble Tea views with `tea.View.AltScreen = true` so the application owns the entire terminal immediately.
 - Every screen uses a stable full-screen layout with clearly delimited regions for title and explanation, main workflow content, transient status, and visible hotkeys.
+- Every full-screen view keeps a persistent ASCII-safe application-identity header that shows the project name and a Ghostfolio visual cue.
 - Use Ghostfolio's general visual identity as the TUI design reference: Inter-style clean sans typography, primary teal accents around `#36cfcc`, secondary blue accents around `#3686cf`, warning and error red around `#dc3545`, and restrained light or dark neutral surfaces rather than saturated backgrounds.
 - Adapt that palette to terminal capabilities by using truecolor when available and the nearest readable ANSI fallbacks when it is not. Preserve the palette hierarchy even when exact hex values are unavailable.
 - If terminal capabilities are effectively monochrome, add visible non-color cues so selection state, primary-action emphasis, and failure state remain distinguishable.
 - The next main workflow steps are always shown as a vertical arrow-key menu. `Up` and `Down` move selection, and `Enter` activates the selected primary action.
 - Optional side steps remain available through visible hotkeys shown in the footer or help region. Prefer modifier-based hotkeys such as `Ctrl+` combinations so they do not collide with text entry.
 - Labeled text inputs are rendered outside placeholder text and must take focus explicitly. While an input is focused, plain-character hotkeys are disabled so typing never triggers application actions.
+- While the custom-origin or Ghostfolio security-token input is focused, `Enter` commits the current field value and returns focus to that workflow's primary-action menu.
+- Focused text inputs must accept terminal paste sequences and common paste shortcuts as text entry and must not treat pasted content as workflow navigation or hotkeys.
 - Token entry is always masked. Origin entry remains unmasked but uses the same focus rules.
 - Busy states replace the primary menu with a progress view and non-secret status text. Navigation is limited to actions that are actually safe during the active request.
 - Busy states must be driven by asynchronous Bubble Tea commands so spinner ticks, safe status updates, and terminal resize messages continue while Ghostfolio requests are in flight.
@@ -138,3 +150,8 @@ tests/
 ## Complexity Tracking
 
 No constitution violations require justification for this plan.
+
+- Focused-input edge case: setup-origin and Ghostfolio security-token inputs now require explicit `Enter` routing back to the primary-action menu so the documented workflow remains reachable.
+- Focused-input edge case: setup-origin and Ghostfolio security-token inputs now require paste-safe routing so multi-character paste does not trigger menu actions.
+- Shared-layout edge case: the persistent application-identity header must remain visible across startup, setup, main-menu, sync-entry, busy-state, and result views.
+- Contributor workflow edge case: launch, test, and coverage instructions must stay aligned with maintained `Makefile` targets rather than raw command strings.
