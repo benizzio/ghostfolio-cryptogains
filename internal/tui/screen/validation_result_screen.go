@@ -13,10 +13,10 @@ import (
 // ValidationResultScreenParams contains the render state for the validation
 // result screen.
 //
-// Example:
-//
-//	view := screen.ValidationResultScreenView(screen.ValidationResultScreenParams{Theme: component.DefaultTheme(), Width: 100, Height: 32, Outcome: runtime.ValidationOutcome{Success: true}})
-//	_ = view
+// Populate this value with the final validation outcome, the result-menu state,
+// and footer help text for the result workflow. The renderer converts the
+// structured outcome into user-facing summary and follow-up text without owning
+// any retry or navigation behavior.
 //
 // Authored by: OpenCode
 type ValidationResultScreenParams struct {
@@ -37,11 +37,21 @@ type ValidationResultScreenParams struct {
 //	view := screen.ValidationResultScreenView(params)
 //	_ = view
 //
+// `ValidationResultScreenView` formats the completed communication outcome,
+// follow-up guidance, and available next actions into the shared full-screen
+// layout. Use it after a validation attempt finishes so the user can retry or
+// return to the main menu without persisting any remote data.
+//
 // Authored by: OpenCode
 func ValidationResultScreenView(params ValidationResultScreenParams) string {
 	var resultLine = params.Theme.SuccessStatus.Render("Success")
 	if !params.Outcome.Success {
-		resultLine = params.Theme.FailureStatus.Render(fmt.Sprintf("Failure Category: %s", params.Outcome.FailureReason))
+		resultLine = params.Theme.FailureStatus.Render(
+			fmt.Sprintf(
+				"Failure Category: %s",
+				params.Outcome.FailureReason,
+			),
+		)
 	}
 
 	var body = fmt.Sprintf(

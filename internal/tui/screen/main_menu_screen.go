@@ -11,10 +11,10 @@ import (
 
 // MainMenuScreenParams contains the render state for the main menu.
 //
-// Example:
-//
-//	view := screen.MainMenuScreenView(screen.MainMenuScreenParams{Theme: component.DefaultTheme(), Width: 100, Height: 32})
-//	_ = view
+// Supply the shared `Theme`, terminal dimensions, current menu selection, the
+// active server summary, and footer help text that should be visible while the
+// main menu is active. The screen renderer reads these values only and does not
+// own any workflow state transitions.
 //
 // Authored by: OpenCode
 type MainMenuScreenParams struct {
@@ -33,6 +33,11 @@ type MainMenuScreenParams struct {
 //
 //	view := screen.MainMenuScreenView(params)
 //	_ = view
+//
+// `MainMenuScreenView` formats the startup-complete state, the selected server
+// summary, the primary menu, and the footer help into the shared full-screen
+// layout. Use it after setup has completed and the application should expose
+// `Sync Data` as the only available business workflow.
 //
 // Authored by: OpenCode
 func MainMenuScreenView(params MainMenuScreenParams) string {

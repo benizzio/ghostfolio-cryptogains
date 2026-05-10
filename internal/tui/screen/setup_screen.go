@@ -11,10 +11,10 @@ import (
 
 // SetupScreenParams contains the render state for the setup screen.
 //
-// Example:
-//
-//	view := screen.SetupScreenView(screen.SetupScreenParams{Theme: component.DefaultTheme(), Width: 100, Height: 32})
-//	_ = view
+// Populate this value with the current setup menu, optional custom-origin input
+// state, any startup invalidation message, and the footer help text for the
+// setup workflow. The renderer treats the struct as immutable view data and
+// expects the caller to decide whether saving is currently allowed.
 //
 // Authored by: OpenCode
 type SetupScreenParams struct {
@@ -38,6 +38,11 @@ type SetupScreenParams struct {
 //	view := screen.SetupScreenView(params)
 //	_ = view
 //
+// `SetupScreenView` formats the server-selection workflow into the shared
+// full-screen layout, including the primary menu, optional custom-origin input,
+// validation messaging, and footer help. Use it whenever setup must be
+// completed or repaired before `Sync Data` can run.
+//
 // Authored by: OpenCode
 func SetupScreenView(params SetupScreenParams) string {
 	var bodyParts = []string{
@@ -46,7 +51,8 @@ func SetupScreenView(params SetupScreenParams) string {
 		params.Theme.MutedText.Render("Production-like custom origins require https. http is allowed only in explicit development mode."),
 	}
 	if params.ShowOriginInput {
-		bodyParts = append(bodyParts,
+		bodyParts = append(
+			bodyParts,
 			params.Theme.InputLabel.Render("Custom Server Origin"),
 			params.OriginInput,
 		)

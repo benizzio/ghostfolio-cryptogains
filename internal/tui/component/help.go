@@ -9,13 +9,18 @@ import (
 	"charm.land/bubbles/v2/key"
 )
 
-// Bindings groups visible hotkeys for a screen and satisfies the Bubbles help
-// contract.
+// Bindings groups the hotkeys that one screen exposes through the shared help
+// footer and optional expanded help view.
 //
 // Example:
 //
 //	bindings := component.Bindings{Short: []key.Binding{}}
 //	_ = bindings.ShortHelp()
+//
+// Populate `Short` with the bindings that should remain visible in the compact
+// footer. Populate `Full` when a screen also needs grouped extended help. The
+// type satisfies the Bubbles help contract directly, so callers can pass a
+// `Bindings` value anywhere the help component expects a provider.
 //
 // Authored by: OpenCode
 type Bindings struct {
@@ -58,6 +63,12 @@ func (b Bindings) FullHelp() [][]key.Binding {
 //
 //	text := component.RenderHelp(80, bindings)
 //	_ = text
+//
+// `RenderHelp` applies the shared help presenter used across the full-screen
+// workflows, trims surrounding whitespace from the Bubbles output, and falls
+// back to a readable minimum width when the caller provides a non-positive
+// width. Use it when a screen needs footer help text that stays visually
+// aligned with the rest of the TUI.
 //
 // Authored by: OpenCode
 func RenderHelp(width int, bindings Bindings) string {

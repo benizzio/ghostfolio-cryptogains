@@ -20,10 +20,9 @@ const ApplicationIdentityCue = "[Ghostfolio]"
 
 // MenuItem describes a renderable primary action in a vertical menu.
 //
-// Example:
-//
-//	items := []component.MenuItem{{Label: "Sync Data", Enabled: true}}
-//	_ = items
+// Use `Label` for the visible action name, `Enabled` to control whether the
+// item can be chosen, and `Description` for short inline context when the
+// screen needs to explain the action without extra prose.
 //
 // Authored by: OpenCode
 type MenuItem struct {
@@ -38,6 +37,11 @@ type MenuItem struct {
 //
 //	menu := component.RenderMenu(component.DefaultTheme(), []component.MenuItem{{Label: "Sync Data", Enabled: true}}, 0)
 //	_ = menu
+//
+// `RenderMenu` applies the shared selection and disabled-state styling used by
+// the workflow screens. Pass the same `Theme` that the surrounding screen uses,
+// provide items in render order, and supply the current selected index so the
+// function can mark the active choice with the menu cursor.
 //
 // Authored by: OpenCode
 func RenderMenu(theme Theme, items []MenuItem, selected int) string {
@@ -81,8 +85,23 @@ func renderApplicationIdentity(theme Theme) string {
 //	view := component.RenderScreen(component.DefaultTheme(), 100, 32, "Title", "Subtitle", "Body", "Status", "Help")
 //	_ = view
 //
+// `RenderScreen` is the shared layout entry point for full-screen views in this
+// slice. It renders the persistent application identity header, then places the
+// provided body, status, and help regions into stacked panels sized to the
+// current terminal dimensions. Use it from screen-specific render helpers
+// instead of composing those shared regions independently.
+//
 // Authored by: OpenCode
-func RenderScreen(theme Theme, width int, height int, title string, subtitle string, body string, status string, footer string) string {
+func RenderScreen(
+	theme Theme,
+	width int,
+	height int,
+	title string,
+	subtitle string,
+	body string,
+	status string,
+	footer string,
+) string {
 	if width <= 0 {
 		width = 100
 	}

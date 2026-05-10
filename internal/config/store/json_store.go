@@ -14,6 +14,9 @@ import (
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 )
 
+// Setup storage constants define the persisted file names and restrictive file
+// modes used by the JSON store.
+// Authored by: OpenCode
 const (
 	appDirectoryName  = "ghostfolio-cryptogains"
 	setupFileName     = "setup.json"
@@ -21,6 +24,9 @@ const (
 	setupFileMode     = 0o600
 )
 
+// temporaryFile defines the transient file contract used during atomic setup
+// saves.
+// Authored by: OpenCode
 type temporaryFile interface {
 	Name() string
 	Chmod(os.FileMode) error
@@ -36,20 +42,34 @@ type temporarySetupFile struct {
 	path string
 }
 
+// Test seams wrap filesystem reads so unit tests can replace them safely.
+// Authored by: OpenCode
 var readFile = os.ReadFile
 
+// Test seams wrap JSON encoding so unit tests can replace it safely.
+// Authored by: OpenCode
 var marshalIndent = json.MarshalIndent
 
+// Test seams wrap temporary-file creation so unit tests can replace it safely.
+// Authored by: OpenCode
 var createTempFile = func(dir string, pattern string) (temporaryFile, error) {
 	return os.CreateTemp(dir, pattern)
 }
 
+// Test seams wrap directory creation so unit tests can replace it safely.
+// Authored by: OpenCode
 var mkdirAll = os.MkdirAll
 
+// Test seams wrap path chmod calls so unit tests can replace them safely.
+// Authored by: OpenCode
 var chmodPath = os.Chmod
 
+// Test seams wrap atomic rename calls so unit tests can replace them safely.
+// Authored by: OpenCode
 var renamePath = os.Rename
 
+// Test seams wrap file removal so unit tests can replace it safely.
+// Authored by: OpenCode
 var removePath = os.Remove
 
 // JSONStore persists the setup file as a JSON document under the user config
@@ -181,6 +201,7 @@ func (s *JSONStore) Delete(_ context.Context) error {
 }
 
 // ensureParentDirectory creates the application config directory when needed.
+// Authored by: OpenCode
 func (s *JSONStore) ensureParentDirectory() error {
 	var parentDir = filepath.Dir(s.path)
 	var err = mkdirAll(parentDir, directoryFileMode)
@@ -281,12 +302,14 @@ func applyPathMode(path string, mode os.FileMode, operation string) error {
 }
 
 // cleanupTempFile removes a stale temporary file after save attempts.
+// Authored by: OpenCode
 func cleanupTempFile(path string) {
 	_ = removePath(path)
 }
 
 // ignoresPermissionBits reports whether the current platform does not expose
 // Unix-style permission bits in a meaningful way for these checks.
+// Authored by: OpenCode
 func ignoresPermissionBits() bool {
 	return runtime.GOOS == "windows"
 }

@@ -6,10 +6,10 @@ import lipgloss "charm.land/lipgloss/v2"
 
 // Theme defines the shared visual language used across the full-screen TUI.
 //
-// Example:
-//
-//	theme := component.DefaultTheme()
-//	_ = theme.Title
+// A `Theme` value carries the reusable Lip Gloss styles that screen and layout
+// helpers apply to headers, menus, status text, and shared panels. Keep one
+// theme per render path so related views use the same visual contract instead
+// of rebuilding styles piecemeal.
 //
 // Authored by: OpenCode
 type Theme struct {
@@ -36,6 +36,11 @@ type Theme struct {
 //
 //	theme := component.DefaultTheme()
 //	_ = theme.SelectedItem
+//
+// `DefaultTheme` centralizes the palette and style defaults shared by all
+// full-screen views in this slice. Call it once during model initialization and
+// pass the returned `Theme` into screen and component render helpers so the
+// application header, menus, status messages, and panels remain consistent.
 //
 // Authored by: OpenCode
 func DefaultTheme() Theme {

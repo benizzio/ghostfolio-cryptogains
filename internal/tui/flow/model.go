@@ -21,11 +21,12 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/screen"
 )
 
-type activeScreen string
-
 // activeScreen identifies the currently rendered workflow screen.
 // Authored by: OpenCode
+type activeScreen string
 
+// Screen keys identify the workflow views that the root model can render.
+// Authored by: OpenCode
 const (
 	setupScreenKey            activeScreen = "setup"
 	mainMenuScreenKey         activeScreen = "main_menu"

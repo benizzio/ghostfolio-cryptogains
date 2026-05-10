@@ -16,14 +16,12 @@ import (
 // ValidationFailureReason identifies the supported structured failure outcome
 // for a communication-validation attempt.
 //
-// Example:
-//
-//	var reason runtime.ValidationFailureReason = runtime.ValidationFailureTimeout
-//	_ = reason
-//
 // Authored by: OpenCode
 type ValidationFailureReason string
 
+// Validation failure reasons define the supported user-visible failure taxonomy
+// for one communication-validation attempt.
+// Authored by: OpenCode
 const (
 	// ValidationFailureNone indicates that validation completed successfully.
 	ValidationFailureNone ValidationFailureReason = ""
@@ -59,6 +57,9 @@ const (
 // Authored by: OpenCode
 type AttemptStatus string
 
+// Attempt statuses define the observable lifecycle phases for one validation
+// attempt.
+// Authored by: OpenCode
 const (
 	// AttemptStatusIdle indicates that no validation attempt is running.
 	AttemptStatusIdle AttemptStatus = "idle"
@@ -163,6 +164,9 @@ type SyncService interface {
 	Validate(context.Context, ValidateRequest) ValidationOutcome
 }
 
+// syncService coordinates one validation attempt across the Ghostfolio client
+// boundary and response validators.
+// Authored by: OpenCode
 type syncService struct {
 	client         *ghostfolioclient.Client
 	requestTimeout time.Duration
@@ -266,7 +270,11 @@ func finalizeFailure(session *GhostfolioSession, attempt *SyncValidationAttempt,
 
 // finalizeValidationFailure converts a payload validation error into the supported incompatible-server outcome.
 // Authored by: OpenCode
-func finalizeValidationFailure(session *GhostfolioSession, attempt *SyncValidationAttempt, err error) ValidationOutcome {
+func finalizeValidationFailure(
+	session *GhostfolioSession,
+	attempt *SyncValidationAttempt,
+	err error,
+) ValidationOutcome {
 	_ = err
 	attempt.Status = AttemptStatusFailure
 	attempt.CompletedAt = time.Now().UTC()

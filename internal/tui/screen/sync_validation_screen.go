@@ -13,10 +13,10 @@ import (
 // SyncValidationScreenParams contains the render state for the sync-validation
 // entry screen.
 //
-// Example:
-//
-//	view := screen.SyncValidationScreenView(screen.SyncValidationScreenParams{Theme: component.DefaultTheme(), Width: 100, Height: 32})
-//	_ = view
+// Supply the current token input rendering, the primary menu state, any
+// validation message, and busy-state details when a communication check is in
+// flight. The renderer uses these fields to switch between the idle entry view
+// and the busy progress view without mutating workflow state.
 //
 // Authored by: OpenCode
 type SyncValidationScreenParams struct {
@@ -39,6 +39,12 @@ type SyncValidationScreenParams struct {
 //
 //	view := screen.SyncValidationScreenView(params)
 //	_ = view
+//
+// `SyncValidationScreenView` renders the token-entry workflow for `Sync Data`.
+// It shows the runtime-only security-token field, the primary action menu when
+// idle, or the progress indicator when validation is running. Use it for the
+// communication-check step that runs after setup and before any later sync
+// features exist.
 //
 // Authored by: OpenCode
 func SyncValidationScreenView(params SyncValidationScreenParams) string {

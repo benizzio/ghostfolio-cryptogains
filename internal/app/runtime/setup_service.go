@@ -47,18 +47,6 @@ type SaveSetupResult struct {
 
 // SetupService validates and persists the bootstrap setup chosen in the TUI.
 //
-// Example:
-//
-//	result, err := service.Save(context.Background(), runtime.SaveSetupRequest{
-//		ServerMode:   configmodel.ServerModeGhostfolioCloud,
-//		ServerOrigin: configmodel.GhostfolioCloudOrigin,
-//		SavedAt:      time.Now(),
-//	})
-//	if err != nil {
-//		panic(err)
-//	}
-//	_ = result.Config.SetupComplete
-//
 // The service centralizes setup normalization and persistence so the TUI layer
 // only manages input state and screen transitions.
 // Authored by: OpenCode
@@ -66,6 +54,9 @@ type SetupService interface {
 	Save(context.Context, SaveSetupRequest) (SaveSetupResult, error)
 }
 
+// setupService implements setup normalization and persistence behind the
+// application-facing setup service boundary.
+// Authored by: OpenCode
 type setupService struct {
 	store        configstore.Store
 	allowDevHTTP bool
