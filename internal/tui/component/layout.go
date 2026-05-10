@@ -130,7 +130,8 @@ func RenderScreen(
 // Example:
 //
 //	panelWidth := component.ContentWidthForScreen(80)
-//	_ = panelWidth
+//	view := component.DefaultTheme().Panel.Width(panelWidth).Render("Body")
+//	_ = view
 //
 // Authored by: OpenCode
 func ContentWidthForScreen(width int) int {
