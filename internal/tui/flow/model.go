@@ -340,36 +340,25 @@ func (m *Model) setupHelpText() string {
 	if m.currentConfig != nil {
 		bindings = append(bindings, cancelBinding())
 	}
-	return component.RenderHelp(m.helpWidth(), component.Bindings{Short: bindings})
+	return component.RenderHelp(component.ContentWidthForScreen(m.width), component.Bindings{Short: bindings})
 }
 
 // mainMenuHelpText renders the visible hotkeys for the main menu.
 // Authored by: OpenCode
 func (m *Model) mainMenuHelpText() string {
-	return component.RenderHelp(m.helpWidth(), component.Bindings{Short: []key.Binding{enterBinding(), editSetupBinding(), quitBinding()}})
+	return component.RenderHelp(component.ContentWidthForScreen(m.width), component.Bindings{Short: []key.Binding{enterBinding(), editSetupBinding(), quitBinding()}})
 }
 
 // syncHelpText renders the visible hotkeys for the sync screen.
 // Authored by: OpenCode
 func (m *Model) syncHelpText() string {
-	return component.RenderHelp(m.helpWidth(), component.Bindings{Short: []key.Binding{upBinding(), downBinding(), enterBinding(), focusBinding(), quitBinding()}})
+	return component.RenderHelp(component.ContentWidthForScreen(m.width), component.Bindings{Short: []key.Binding{upBinding(), downBinding(), enterBinding(), focusBinding(), quitBinding()}})
 }
 
 // resultHelpText renders the visible hotkeys for the validation-result screen.
 // Authored by: OpenCode
 func (m *Model) resultHelpText() string {
-	return component.RenderHelp(m.helpWidth(), component.Bindings{Short: []key.Binding{upBinding(), downBinding(), enterBinding(), quitBinding()}})
-}
-
-// helpWidth clamps the shared help-region width so narrow terminals still render
-// a valid footer without relying on negative widths.
-// Authored by: OpenCode
-func (m *Model) helpWidth() int {
-	if m.width <= 4 {
-		return 1
-	}
-
-	return m.width - 4
+	return component.RenderHelp(component.ContentWidthForScreen(m.width), component.Bindings{Short: []key.Binding{upBinding(), downBinding(), enterBinding(), quitBinding()}})
 }
 
 // cancelActiveValidation aborts the active validation request when one exists.

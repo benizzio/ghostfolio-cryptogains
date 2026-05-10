@@ -8,6 +8,11 @@ import (
 	lipgloss "charm.land/lipgloss/v2"
 )
 
+const (
+	screenHorizontalPadding = 4
+	minimumPanelWidth       = 1
+)
+
 // ApplicationIdentityName is the persistent project name shown in every
 // full-screen view.
 // Authored by: OpenCode
@@ -109,7 +114,7 @@ func RenderScreen(
 		height = 32
 	}
 
-	var panelWidth = contentPanelWidth(width)
+	var panelWidth = ContentWidthForScreen(width)
 	var header = theme.Panel.Width(panelWidth).Render(strings.TrimSpace(renderApplicationIdentity(theme) + "\n" + theme.Title.Render(title) + "\n" + theme.Subtitle.Render(subtitle)))
 	var bodyPanel = theme.SummaryPanel.Width(panelWidth).Render(body)
 	var statusPanel = theme.Panel.Width(panelWidth).Render(status)
@@ -119,15 +124,19 @@ func RenderScreen(
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Top, content)
 }
 
-// contentPanelWidth clamps the interior panel width so very narrow terminals do
-// not produce negative or zero-width panels after shared padding is applied.
+// ContentWidthForScreen clamps the interior panel width so very narrow terminals
+// do not produce negative or zero-width panels after shared padding is applied.
+//
+// Example:
+//
+//	panelWidth := component.ContentWidthForScreen(80)
+//	_ = panelWidth
+//
 // Authored by: OpenCode
-func contentPanelWidth(width int) int {
-	const minimumPanelWidth = 1
-
-	if width <= 4 {
+func ContentWidthForScreen(width int) int {
+	if width <= screenHorizontalPadding {
 		return minimumPanelWidth
 	}
 
-	return width - 4
+	return width - screenHorizontalPadding
 }
