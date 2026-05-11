@@ -15,12 +15,6 @@ import (
 // SetupRequirementReason identifies why startup routing requires the setup
 // workflow instead of the main menu.
 //
-// Example:
-//
-//	if state.SetupRequirementReason == bootstrap.SetupRequirementInvalidRememberedSetup {
-//		// Render a setup-specific explanation in the TUI layer.
-//	}
-//
 // Authored by: OpenCode
 type SetupRequirementReason string
 
@@ -39,14 +33,6 @@ const (
 
 // StartupState captures the initial bootstrap outcome used to choose the first
 // TUI workflow screen.
-//
-// Example:
-//
-//	state, err := bootstrap.LoadStartupState(context.Background(), bootstrapStore, false)
-//	if err != nil {
-//		panic(err)
-//	}
-//	_ = state.NeedsSetup
 //
 // Authored by: OpenCode
 type StartupState struct {

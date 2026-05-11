@@ -14,24 +14,13 @@ var ErrNotFound = errors.New("bootstrap setup file not found")
 
 // Store defines the persistence contract for the bootstrap setup file.
 //
-// Example:
-//
-//	var bootstrapStore store.Store
-//	var config, err = bootstrapStore.Load(context.Background())
-//	if err != nil && !errors.Is(err, store.ErrNotFound) {
-//		panic(err)
-//	}
-//	_ = config
-//	_ = bootstrapStore.Save(context.Background(), configmodel.AppSetupConfig{})
-//	_ = bootstrapStore.Delete(context.Background())
-//	_ = bootstrapStore.Path()
-//
 // Store implementations load and persist only startup-readable machine-local
 // setup. `Load` returns `ErrNotFound` when no setup exists yet. `Save` is
 // expected to replace the full document atomically, and `Delete` removes the
 // remembered setup without treating an already-missing file as an error.
 // `Path` returns the concrete location used for the saved setup file so tests
 // and documentation can refer to it deterministically.
+//
 // Authored by: OpenCode
 type Store interface {
 	Load(context.Context) (configmodel.AppSetupConfig, error)

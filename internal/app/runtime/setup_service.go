@@ -13,15 +13,6 @@ import (
 // SaveSetupRequest contains the setup selection that should be normalized and
 // persisted for startup use.
 //
-// Example:
-//
-//	request := runtime.SaveSetupRequest{
-//		ServerMode:   configmodel.ServerModeGhostfolioCloud,
-//		ServerOrigin: configmodel.GhostfolioCloudOrigin,
-//		SavedAt:      time.Now(),
-//	}
-//	_ = request.ServerMode
-//
 // Authored by: OpenCode
 type SaveSetupRequest struct {
 	ServerMode   string
@@ -32,14 +23,6 @@ type SaveSetupRequest struct {
 // SaveSetupResult contains the normalized setup configuration written by the
 // application layer.
 //
-// Example:
-//
-//	result, err := service.Save(ctx, request)
-//	if err != nil {
-//		panic(err)
-//	}
-//	_ = result.Config.ServerOrigin
-//
 // Authored by: OpenCode
 type SaveSetupResult struct {
 	Config configmodel.AppSetupConfig
@@ -49,6 +32,7 @@ type SaveSetupResult struct {
 //
 // The service centralizes setup normalization and persistence so the TUI layer
 // only manages input state and screen transitions.
+//
 // Authored by: OpenCode
 type SetupService interface {
 	Save(context.Context, SaveSetupRequest) (SaveSetupResult, error)
@@ -56,6 +40,7 @@ type SetupService interface {
 
 // setupService implements setup normalization and persistence behind the
 // application-facing setup service boundary.
+//
 // Authored by: OpenCode
 type setupService struct {
 	store        configstore.Store

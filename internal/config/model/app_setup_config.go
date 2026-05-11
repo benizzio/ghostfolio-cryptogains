@@ -46,14 +46,6 @@ var (
 // AppSetupConfig is the machine-local bootstrap configuration loaded before
 // any Ghostfolio token is requested.
 //
-// Example:
-//
-//	config, err := model.NewSetupConfig(model.ServerModeGhostfolioCloud, model.GhostfolioCloudOrigin, false, time.Now())
-//	if err != nil {
-//		panic(err)
-//	}
-//	_ = config.ServerOrigin
-//
 // Authored by: OpenCode
 type AppSetupConfig struct {
 	SchemaVersion int       `json:"schema_version"`

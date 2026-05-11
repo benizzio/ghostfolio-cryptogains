@@ -6,11 +6,6 @@ package dto
 // ActivitiesProbeResponse is the minimal successful activities probe response
 // required by this slice.
 //
-// Example:
-//
-//	response := dto.ActivitiesProbeResponse{Count: 0, Activities: []dto.ActivityProbeEntry{}}
-//	_ = response.Count
-//
 // Authored by: OpenCode
 type ActivitiesProbeResponse struct {
 	Activities []ActivityProbeEntry `json:"activities"`
@@ -19,11 +14,6 @@ type ActivitiesProbeResponse struct {
 
 // ActivityProbeEntry is the minimal activity shape required by the one-page
 // validation probe in this slice.
-//
-// Example:
-//
-//	entry := dto.ActivityProbeEntry{ID: "id", Date: "2026-01-31T10:00:00.000Z", Type: "BUY"}
-//	_ = entry.Type
 //
 // Authored by: OpenCode
 type ActivityProbeEntry struct {

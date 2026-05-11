@@ -14,17 +14,10 @@ import (
 
 // App contains the assembled dependencies required by the Bubble Tea model.
 //
-// Example:
-//
-//	app, err := runtime.New(bootstrap.DefaultOptions())
-//	if err != nil {
-//		panic(err)
-//	}
-//	_ = app.ConfigStore
-//
 // App keeps the bootstrap store available for startup loading and exposes the
 // application services that the TUI uses for setup persistence and sync
 // validation.
+//
 // Authored by: OpenCode
 type App struct {
 	Options      bootstrap.Options
@@ -58,7 +51,10 @@ func New(options bootstrap.Options) (*App, error) {
 
 	var bootstrapStore = configstore.NewJSONStore(baseConfigDir)
 	var setupService = NewSetupService(bootstrapStore, options.AllowDevHTTP)
-	var syncService = NewSyncService(ghostfolioclient.New(&http.Client{Timeout: options.RequestTimeout}), options.RequestTimeout)
+	var syncService = NewSyncService(
+		ghostfolioclient.New(&http.Client{Timeout: options.RequestTimeout}),
+		options.RequestTimeout,
+	)
 
 	return &App{
 		Options:      options,

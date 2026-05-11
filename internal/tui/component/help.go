@@ -12,11 +12,6 @@ import (
 // Bindings groups the hotkeys that one screen exposes through the shared help
 // footer and optional expanded help view.
 //
-// Example:
-//
-//	bindings := component.Bindings{Short: []key.Binding{}}
-//	_ = bindings.ShortHelp()
-//
 // Populate `Short` with the bindings that should remain visible in the compact
 // footer. Populate `Full` when a screen also needs grouped extended help. The
 // type satisfies the Bubbles help contract directly, so callers can pass a

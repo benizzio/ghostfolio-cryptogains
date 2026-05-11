@@ -18,14 +18,6 @@ const (
 // Options contains process-level runtime options used during application
 // bootstrap.
 //
-// Example:
-//
-//	opts, err := bootstrap.ParseOptions([]string{"--dev-mode"})
-//	if err != nil {
-//		panic(err)
-//	}
-//	_ = opts.AllowDevHTTP
-//
 // Authored by: OpenCode
 type Options struct {
 	ConfigDir           string
@@ -77,8 +69,18 @@ func ParseOptions(args []string) (Options, error) {
 	flags.StringVar(&opts.ConfigDir, "config-dir", opts.ConfigDir, "override the base config directory")
 	flags.BoolVar(&opts.AllowDevHTTP, "dev-mode", opts.AllowDevHTTP, "allow http custom origins for development use")
 	flags.StringVar(&requestTimeout, "request-timeout", opts.RequestTimeout.String(), "validation request timeout")
-	flags.IntVar(&opts.InitialWindowWidth, "window-width", opts.InitialWindowWidth, "initial test-friendly window width")
-	flags.IntVar(&opts.InitialWindowHeight, "window-height", opts.InitialWindowHeight, "initial test-friendly window height")
+	flags.IntVar(
+		&opts.InitialWindowWidth,
+		"window-width",
+		opts.InitialWindowWidth,
+		"initial test-friendly window width",
+	)
+	flags.IntVar(
+		&opts.InitialWindowHeight,
+		"window-height",
+		opts.InitialWindowHeight,
+		"initial test-friendly window height",
+	)
 
 	var err = flags.Parse(args)
 	if err != nil {

@@ -55,11 +55,6 @@ type validationFinishedMsg struct {
 // Dependencies contains the runtime services required by the root Bubble Tea
 // model.
 //
-// Example:
-//
-//	deps := flow.Dependencies{Options: bootstrap.DefaultOptions()}
-//	_ = deps.Options
-//
 // Authored by: OpenCode
 type Dependencies struct {
 	Options      bootstrap.Options
@@ -100,11 +95,6 @@ type resultState struct {
 }
 
 // Model is the root Bubble Tea model for the application workflow.
-//
-// Example:
-//
-//	model := flow.NewModel(flow.Dependencies{Options: bootstrap.DefaultOptions()})
-//	_ = model
 //
 // Authored by: OpenCode
 type Model struct {
@@ -210,53 +200,61 @@ func (m *Model) View() tea.View {
 	var rendered string
 	switch m.active {
 	case setupScreenKey:
-		rendered = screen.SetupScreenView(screen.SetupScreenParams{
-			Theme:               m.theme,
-			Width:               m.width,
-			Height:              m.height,
-			MenuItems:           m.setupMenuItems(),
-			SelectedIndex:       m.setup.MenuIndex,
-			ShowOriginInput:     m.setup.SelectedMode == configmodel.ServerModeCustomOrigin,
-			OriginInput:         m.setup.OriginInput.View(),
-			InvalidSetupMessage: setupInvalidMessage(m.setup.StartupReason),
-			ValidationMessage:   m.setup.ValidationMessage,
-			HelpText:            m.setupHelpText(),
-			CanSave:             m.setupCanSave(),
-		})
+		rendered = screen.SetupScreenView(
+			screen.SetupScreenParams{
+				Theme:               m.theme,
+				Width:               m.width,
+				Height:              m.height,
+				MenuItems:           m.setupMenuItems(),
+				SelectedIndex:       m.setup.MenuIndex,
+				ShowOriginInput:     m.setup.SelectedMode == configmodel.ServerModeCustomOrigin,
+				OriginInput:         m.setup.OriginInput.View(),
+				InvalidSetupMessage: setupInvalidMessage(m.setup.StartupReason),
+				ValidationMessage:   m.setup.ValidationMessage,
+				HelpText:            m.setupHelpText(),
+				CanSave:             m.setupCanSave(),
+			},
+		)
 	case mainMenuScreenKey:
-		rendered = screen.MainMenuScreenView(screen.MainMenuScreenParams{
-			Theme:         m.theme,
-			Width:         m.width,
-			Height:        m.height,
-			MenuItems:     m.mainMenuItems(),
-			SelectedIndex: 0,
-			ServerOrigin:  m.currentServerOrigin(),
-			HelpText:      m.mainMenuHelpText(),
-		})
+		rendered = screen.MainMenuScreenView(
+			screen.MainMenuScreenParams{
+				Theme:         m.theme,
+				Width:         m.width,
+				Height:        m.height,
+				MenuItems:     m.mainMenuItems(),
+				SelectedIndex: 0,
+				ServerOrigin:  m.currentServerOrigin(),
+				HelpText:      m.mainMenuHelpText(),
+			},
+		)
 	case syncValidationScreenKey:
-		rendered = screen.SyncValidationScreenView(screen.SyncValidationScreenParams{
-			Theme:             m.theme,
-			Width:             m.width,
-			Height:            m.height,
-			MenuItems:         m.syncMenuItems(),
-			SelectedIndex:     m.sync.MenuIndex,
-			TokenInput:        m.sync.TokenInput.View(),
-			ValidationMessage: m.sync.ValidationMessage,
-			HelpText:          m.syncHelpText(),
-			Busy:              m.sync.Busy,
-			BusyText:          m.sync.BusyText,
-			SpinnerFrame:      m.spinner.View(),
-		})
+		rendered = screen.SyncValidationScreenView(
+			screen.SyncValidationScreenParams{
+				Theme:             m.theme,
+				Width:             m.width,
+				Height:            m.height,
+				MenuItems:         m.syncMenuItems(),
+				SelectedIndex:     m.sync.MenuIndex,
+				TokenInput:        m.sync.TokenInput.View(),
+				ValidationMessage: m.sync.ValidationMessage,
+				HelpText:          m.syncHelpText(),
+				Busy:              m.sync.Busy,
+				BusyText:          m.sync.BusyText,
+				SpinnerFrame:      m.spinner.View(),
+			},
+		)
 	case validationResultScreenKey:
-		rendered = screen.ValidationResultScreenView(screen.ValidationResultScreenParams{
-			Theme:         m.theme,
-			Width:         m.width,
-			Height:        m.height,
-			MenuItems:     m.resultMenuItems(),
-			SelectedIndex: m.result.MenuIndex,
-			Outcome:       m.result.Outcome,
-			HelpText:      m.resultHelpText(),
-		})
+		rendered = screen.ValidationResultScreenView(
+			screen.ValidationResultScreenParams{
+				Theme:         m.theme,
+				Width:         m.width,
+				Height:        m.height,
+				MenuItems:     m.resultMenuItems(),
+				SelectedIndex: m.result.MenuIndex,
+				Outcome:       m.result.Outcome,
+				HelpText:      m.resultHelpText(),
+			},
+		)
 	default:
 		rendered = ""
 	}
@@ -345,21 +343,41 @@ func (m *Model) setupHelpText() string {
 }
 
 // mainMenuHelpText renders the visible hotkeys for the main menu.
+//
 // Authored by: OpenCode
 func (m *Model) mainMenuHelpText() string {
-	return component.RenderHelp(component.ContentWidthForScreen(m.width), component.Bindings{Short: []key.Binding{enterBinding(), editSetupBinding(), quitBinding()}})
+	return component.RenderHelp(
+		component.ContentWidthForScreen(m.width),
+		component.Bindings{Short: []key.Binding{enterBinding(), editSetupBinding(), quitBinding()}},
+	)
 }
 
 // syncHelpText renders the visible hotkeys for the sync screen.
+//
 // Authored by: OpenCode
 func (m *Model) syncHelpText() string {
-	return component.RenderHelp(component.ContentWidthForScreen(m.width), component.Bindings{Short: []key.Binding{upBinding(), downBinding(), enterBinding(), focusBinding(), quitBinding()}})
+	return component.RenderHelp(
+		component.ContentWidthForScreen(m.width),
+		component.Bindings{
+			Short: []key.Binding{
+				upBinding(),
+				downBinding(),
+				enterBinding(),
+				focusBinding(),
+				quitBinding(),
+			},
+		},
+	)
 }
 
 // resultHelpText renders the visible hotkeys for the validation-result screen.
+//
 // Authored by: OpenCode
 func (m *Model) resultHelpText() string {
-	return component.RenderHelp(component.ContentWidthForScreen(m.width), component.Bindings{Short: []key.Binding{upBinding(), downBinding(), enterBinding(), quitBinding()}})
+	return component.RenderHelp(
+		component.ContentWidthForScreen(m.width),
+		component.Bindings{Short: []key.Binding{upBinding(), downBinding(), enterBinding(), quitBinding()}},
+	)
 }
 
 // cancelActiveValidation aborts the active validation request when one exists.

@@ -49,11 +49,6 @@ const (
 
 // AttemptStatus identifies the current phase of a validation attempt.
 //
-// Example:
-//
-//	var status runtime.AttemptStatus = runtime.AttemptStatusAuthenticating
-//	_ = status
-//
 // Authored by: OpenCode
 type AttemptStatus string
 
@@ -83,11 +78,6 @@ const (
 // GhostfolioSession is the transient authenticated runtime state for one
 // validation attempt.
 //
-// Example:
-//
-//	session := runtime.GhostfolioSession{ServerOrigin: "https://ghostfol.io"}
-//	_ = session.ServerOrigin
-//
 // Authored by: OpenCode
 type GhostfolioSession struct {
 	ServerOrigin    string
@@ -99,11 +89,6 @@ type GhostfolioSession struct {
 
 // SyncValidationAttempt is the transient workflow state for one sync-data
 // validation run.
-//
-// Example:
-//
-//	attempt := runtime.SyncValidationAttempt{AttemptID: "attempt-1", Status: runtime.AttemptStatusIdle}
-//	_ = attempt.AttemptID
 //
 // Authored by: OpenCode
 type SyncValidationAttempt struct {
@@ -117,13 +102,9 @@ type SyncValidationAttempt struct {
 // ValidationOutcome is the structured result of a completed validation
 // attempt.
 //
-// Example:
-//
-//	outcome := runtime.ValidationOutcome{Success: true, DetailReason: "communication_ok"}
-//	_ = outcome.Success
-//
 // The application layer returns outcome semantics only. Presentation layers are
 // expected to convert the result into final user-facing wording.
+//
 // Authored by: OpenCode
 type ValidationOutcome struct {
 	Success       bool
@@ -135,11 +116,6 @@ type ValidationOutcome struct {
 // ValidateRequest contains the bootstrap configuration and runtime-only token
 // needed for a single Ghostfolio communication check.
 //
-// Example:
-//
-//	request := runtime.ValidateRequest{Config: config, SecurityToken: "token"}
-//	_ = request.SecurityToken
-//
 // Authored by: OpenCode
 type ValidateRequest struct {
 	Config        configmodel.AppSetupConfig
@@ -149,18 +125,15 @@ type ValidateRequest struct {
 // SyncService validates Ghostfolio communication for the currently selected
 // bootstrap setup.
 //
-// Example:
-//
-//	outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token"})
-//	_ = outcome.DetailReason
-//
-// Validate runs the anonymous-auth and one-page activities probe for the given
-// setup and returns a structured semantic result. Successful outcomes never
-// persist tokens or Ghostfolio payload data. Failed outcomes classify the
-// attempt into one supported failure reason without exposing transport-layer
-// implementation types to callers.
 // Authored by: OpenCode
 type SyncService interface {
+	// Validate runs the anonymous-auth and one-page activities probe for the given
+	// setup and returns a structured semantic result. Successful outcomes never
+	// persist tokens or Ghostfolio payload data. Failed outcomes classify the
+	// attempt into one supported failure reason without exposing transport-layer
+	// implementation types to callers.
+	//
+	// Authored by: OpenCode
 	Validate(context.Context, ValidateRequest) ValidationOutcome
 }
 

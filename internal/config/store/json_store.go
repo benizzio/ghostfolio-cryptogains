@@ -83,11 +83,6 @@ var isWindowsPlatform = func() bool {
 // JSONStore persists the setup file as a JSON document under the user config
 // directory.
 //
-// Example:
-//
-//	bootstrapStore := store.NewJSONStore("/tmp/config")
-//	_ = bootstrapStore.Path()
-//
 // Authored by: OpenCode
 type JSONStore struct {
 	path string

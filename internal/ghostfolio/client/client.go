@@ -25,11 +25,6 @@ const defaultHTTPClientTimeout = 30 * time.Second
 // FailureCategory identifies the single user-visible failure category produced
 // by the Ghostfolio boundary in this slice.
 //
-// Example:
-//
-//	var category client.FailureCategory = client.FailureRejectedToken
-//	_ = category
-//
 // Authored by: OpenCode
 type FailureCategory string
 
@@ -54,11 +49,6 @@ const (
 
 // RequestFailure captures a categorized boundary failure without exposing
 // secrets or raw payload details.
-//
-// Example:
-//
-//	err := &client.RequestFailure{Category: client.FailureTimeout, Message: "request timed out"}
-//	_ = err.Error()
 //
 // Authored by: OpenCode
 type RequestFailure struct {
@@ -96,11 +86,6 @@ func (e *RequestFailure) Unwrap() error {
 
 // Client executes the minimal Ghostfolio auth and activities-probe requests for
 // this slice.
-//
-// Example:
-//
-//	transportClient := client.New(http.DefaultClient)
-//	_ = transportClient
 //
 // Authored by: OpenCode
 type Client struct {
@@ -149,15 +134,17 @@ func (c *Client) Authenticate(ctx context.Context, origin string, accessToken st
 	var endpoint = strings.TrimRight(origin, "/") + apiBasePath + "/auth/anonymous"
 	var requestBody = strings.NewReader(fmt.Sprintf("{\"accessToken\":%q}", accessToken))
 
-	return executeJSONRequest[dto.AuthResponse](c.httpClient, ctx, requestSpec{
-		Method:             http.MethodPost,
-		Endpoint:           endpoint,
-		Body:               requestBody,
-		Headers:            map[string]string{"Content-Type": "application/json"},
-		BuildErrorMessage:  "build auth request",
-		DecodeErrorMessage: "auth response was not valid JSON",
-		StatusClassifier:   classifyAuthStatus,
-	})
+	return executeJSONRequest[dto.AuthResponse](
+		c.httpClient, ctx, requestSpec{
+			Method:             http.MethodPost,
+			Endpoint:           endpoint,
+			Body:               requestBody,
+			Headers:            map[string]string{"Content-Type": "application/json"},
+			BuildErrorMessage:  "build auth request",
+			DecodeErrorMessage: "auth response was not valid JSON",
+			StatusClassifier:   classifyAuthStatus,
+		},
+	)
 }
 
 // FetchActivitiesProbe executes the one-page activities validation boundary for
@@ -172,17 +159,26 @@ func (c *Client) Authenticate(ctx context.Context, origin string, accessToken st
 //	_ = response.Count
 //
 // Authored by: OpenCode
-func (c *Client) FetchActivitiesProbe(ctx context.Context, origin string, authToken string) (dto.ActivitiesProbeResponse, error) {
-	var endpoint = strings.TrimRight(origin, "/") + apiBasePath + "/activities?skip=0&take=1&sortColumn=date&sortDirection=asc"
+func (c *Client) FetchActivitiesProbe(
+	ctx context.Context,
+	origin string,
+	authToken string,
+) (dto.ActivitiesProbeResponse, error) {
+	var endpoint = strings.TrimRight(
+		origin,
+		"/",
+	) + apiBasePath + "/activities?skip=0&take=1&sortColumn=date&sortDirection=asc"
 
-	return executeJSONRequest[dto.ActivitiesProbeResponse](c.httpClient, ctx, requestSpec{
-		Method:             http.MethodGet,
-		Endpoint:           endpoint,
-		Headers:            map[string]string{"Authorization": "Bearer " + authToken},
-		BuildErrorMessage:  "build activities request",
-		DecodeErrorMessage: "activities response was not valid JSON",
-		StatusClassifier:   classifyActivitiesStatus,
-	})
+	return executeJSONRequest[dto.ActivitiesProbeResponse](
+		c.httpClient, ctx, requestSpec{
+			Method:             http.MethodGet,
+			Endpoint:           endpoint,
+			Headers:            map[string]string{"Authorization": "Bearer " + authToken},
+			BuildErrorMessage:  "build activities request",
+			DecodeErrorMessage: "activities response was not valid JSON",
+			StatusClassifier:   classifyActivitiesStatus,
+		},
+	)
 }
 
 // executeJSONRequest runs one JSON-based Ghostfolio boundary request through the
@@ -251,7 +247,10 @@ func classifyAuthStatus(response *http.Response) error {
 func classifyActivitiesStatus(response *http.Response) error {
 	switch response.StatusCode {
 	case http.StatusBadRequest:
-		return &RequestFailure{Category: FailureIncompatibleServerContract, Message: "activities request did not match the supported server contract"}
+		return &RequestFailure{
+			Category: FailureIncompatibleServerContract,
+			Message:  "activities request did not match the supported server contract",
+		}
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return unsuccessfulResponseFailure("activities request", response.StatusCode)
 	}
@@ -264,7 +263,10 @@ func classifyActivitiesStatus(response *http.Response) error {
 // unsuccessfulResponseFailure builds a categorized non-success HTTP response error.
 // Authored by: OpenCode
 func unsuccessfulResponseFailure(requestName string, statusCode int) error {
-	return &RequestFailure{Category: FailureUnsuccessfulServerResponse, Message: fmt.Sprintf("%s returned HTTP %d", requestName, statusCode)}
+	return &RequestFailure{
+		Category: FailureUnsuccessfulServerResponse,
+		Message:  fmt.Sprintf("%s returned HTTP %d", requestName, statusCode),
+	}
 }
 
 // incompatibleServerFailure builds a categorized incompatible-contract error.
@@ -285,7 +287,11 @@ func classifyTransportFailure(err error) error {
 		return &RequestFailure{Category: FailureTimeout, Message: "request timed out", Err: err}
 	}
 
-	return &RequestFailure{Category: FailureConnectivityProblem, Message: "could not reach the selected Ghostfolio server", Err: err}
+	return &RequestFailure{
+		Category: FailureConnectivityProblem,
+		Message:  "could not reach the selected Ghostfolio server",
+		Err:      err,
+	}
 }
 
 // requireJSONContentType validates that a response declares JSON content.
