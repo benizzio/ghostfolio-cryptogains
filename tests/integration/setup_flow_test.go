@@ -188,3 +188,25 @@ func replaceSetupOriginInput(t *testing.T, model *flow.Model, origin string) *fl
 	updated, _ := model.Update(tea.PasteMsg{Content: origin})
 	return assertFlowModel(t, updated)
 }
+
+func TestReplaceSetupOriginInputReplacesPrefilledOrigin(t *testing.T) {
+	t.Parallel()
+
+	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementMissing}, false, integrationSyncService{}))
+
+	updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	model = assertFlowModel(t, updated)
+	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	_ = testutil.RunCmd(cmd)
+	model = assertFlowModel(t, updated)
+
+	model = replaceSetupOriginInput(t, model, "https://example.com")
+
+	var content = model.View().Content
+	if !testutil.Contains(content, "https://example.com") {
+		t.Fatalf("expected replacement origin in view, got %q", content)
+	}
+	if testutil.Contains(content, configmodel.GhostfolioCloudOrigin+"https://example.com") {
+		t.Fatalf("expected prefilled origin to be replaced, got %q", content)
+	}
+}

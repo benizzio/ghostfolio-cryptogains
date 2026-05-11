@@ -199,6 +199,26 @@ func TestValidateStartupReadyRejectsServerModeOriginMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateServerModeOriginCoversAllBranches(t *testing.T) {
+	t.Parallel()
+
+	if err := validateServerModeOrigin(ServerModeGhostfolioCloud, GhostfolioCloudOrigin); err != nil {
+		t.Fatalf("expected cloud origin to be valid for cloud mode: %v", err)
+	}
+	if err := validateServerModeOrigin(ServerModeCustomOrigin, "https://example.com"); err != nil {
+		t.Fatalf("expected custom origin to be valid for custom mode: %v", err)
+	}
+	if err := validateServerModeOrigin(ServerModeGhostfolioCloud, "https://example.com"); !errors.Is(err, ErrInvalidServerOrigin) {
+		t.Fatalf("expected invalid origin for cloud mode, got %v", err)
+	}
+	if err := validateServerModeOrigin(ServerModeCustomOrigin, GhostfolioCloudOrigin); !errors.Is(err, ErrInvalidServerOrigin) {
+		t.Fatalf("expected invalid origin for custom mode, got %v", err)
+	}
+	if err := validateServerModeOrigin("invalid", GhostfolioCloudOrigin); !errors.Is(err, ErrInvalidServerMode) {
+		t.Fatalf("expected invalid server mode, got %v", err)
+	}
+}
+
 func TestNormalizeOriginRejectsUnsupportedSchemeAndEmptyHostname(t *testing.T) {
 	t.Parallel()
 

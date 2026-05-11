@@ -65,3 +65,15 @@ func mustCloudSetupConfig(t *testing.T) configmodel.AppSetupConfig {
 
 	return config
 }
+
+func TestMustCloudSetupConfigReturnsValidCloudSetup(t *testing.T) {
+	t.Parallel()
+
+	var config = mustCloudSetupConfig(t)
+	if config.ServerMode != configmodel.ServerModeGhostfolioCloud {
+		t.Fatalf("unexpected server mode: %q", config.ServerMode)
+	}
+	if config.ServerOrigin != configmodel.GhostfolioCloudOrigin {
+		t.Fatalf("unexpected server origin: %q", config.ServerOrigin)
+	}
+}
