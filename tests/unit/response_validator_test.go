@@ -24,6 +24,14 @@ func TestValidateActivitiesProbeAllowsEmptyHistory(t *testing.T) {
 	}
 }
 
+func TestValidateActivitiesProbeRejectsMissingActivitiesField(t *testing.T) {
+	t.Parallel()
+
+	if err := validator.ValidateActivitiesProbeResponse(dto.ActivitiesProbeResponse{Count: 0}); err == nil {
+		t.Fatalf("expected missing activities validation error")
+	}
+}
+
 func TestValidateActivitiesProbeRejectsContradictoryCount(t *testing.T) {
 	t.Parallel()
 

@@ -26,9 +26,10 @@ func TestValidateActivitiesProbeResponseCoversBranches(t *testing.T) {
 		wantErr  bool
 	}{
 		{name: "negative count", response: dto.ActivitiesProbeResponse{Count: -1}, wantErr: true},
+		{name: "missing activities field", response: dto.ActivitiesProbeResponse{Count: 0}, wantErr: true},
 		{name: "more than one activity", response: dto.ActivitiesProbeResponse{Count: 2, Activities: []dto.ActivityProbeEntry{{ID: "1", Date: "2026-01-31T10:00:00Z", Type: "BUY"}, {ID: "2", Date: "2026-01-31T10:00:00Z", Type: "SELL"}}}, wantErr: true},
 		{name: "count zero with activity", response: dto.ActivitiesProbeResponse{Count: 0, Activities: []dto.ActivityProbeEntry{{ID: "1", Date: "2026-01-31T10:00:00Z", Type: "BUY"}}}, wantErr: true},
-		{name: "count positive without activity", response: dto.ActivitiesProbeResponse{Count: 1}, wantErr: true},
+		{name: "count positive without activity", response: dto.ActivitiesProbeResponse{Count: 1, Activities: []dto.ActivityProbeEntry{}}, wantErr: true},
 		{name: "empty history", response: dto.ActivitiesProbeResponse{Count: 0, Activities: []dto.ActivityProbeEntry{}}, wantErr: false},
 		{name: "missing id", response: dto.ActivitiesProbeResponse{Count: 1, Activities: []dto.ActivityProbeEntry{{Date: "2026-01-31T10:00:00Z", Type: "BUY"}}}, wantErr: true},
 		{name: "missing type", response: dto.ActivitiesProbeResponse{Count: 1, Activities: []dto.ActivityProbeEntry{{ID: "1", Date: "2026-01-31T10:00:00Z"}}}, wantErr: true},

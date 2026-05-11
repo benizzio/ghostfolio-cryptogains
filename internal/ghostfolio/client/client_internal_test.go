@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"errors"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -34,8 +33,12 @@ func TestRequestFailureHelpers(t *testing.T) {
 func TestNewUsesDefaultClientWhenNil(t *testing.T) {
 	t.Parallel()
 
-	if client := New(nil); client.httpClient == nil {
+	var client = New(nil)
+	if client.httpClient == nil {
 		t.Fatalf("expected default http client")
+	}
+	if client.httpClient.Timeout != defaultHTTPClientTimeout {
+		t.Fatalf("unexpected default timeout: got %v want %v", client.httpClient.Timeout, defaultHTTPClientTimeout)
 	}
 }
 
@@ -235,27 +238,24 @@ func TestRequireJSONContentTypeRejectsInvalidValue(t *testing.T) {
 func TestCloseBodyClosesResponseBody(t *testing.T) {
 	t.Parallel()
 
-	var listener, err = net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
-	_ = listener.Close()
 	var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		_, _ = writer.Write([]byte(`{"authToken":"jwt"}`))
 	}))
 	defer server.Close()
 
-	var response *http.Response
-	response, err = server.Client().Get(server.URL)
+	var response, err = server.Client().Get(server.URL)
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
 	closeBody(response)
 }
 
+// roundTripFunc is a test-only http.RoundTripper that delegates response
+// behavior to the wrapped function.
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
+// RoundTrip implements http.RoundTripper by delegating to the wrapped function.
 func (f roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
 	return f(request)
 }

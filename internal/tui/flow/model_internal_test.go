@@ -34,6 +34,17 @@ func (s *cancellingSyncService) Validate(ctx context.Context, _ runtime.Validate
 	return runtime.ValidationOutcome{Success: false, DetailReason: string(runtime.ValidationFailureTimeout), FailureReason: runtime.ValidationFailureTimeout}
 }
 
+func assertUpdatedModel(t *testing.T, updated tea.Model) *Model {
+	t.Helper()
+
+	var model, ok = updated.(*Model)
+	if !ok {
+		t.Fatalf("expected updated model to be *Model, got %T", updated)
+	}
+
+	return model
+}
+
 func TestModelInitAndHelpers(t *testing.T) {
 	t.Parallel()
 
@@ -86,7 +97,7 @@ func TestModelInitAndHelpers(t *testing.T) {
 	_ = model.View()
 	model.active = activeScreen("unknown")
 	updated, cmd := model.Update(struct{}{})
-	if cmd != nil || updated.(*Model).active != activeScreen("unknown") {
+	if cmd != nil || assertUpdatedModel(t, updated).active != activeScreen("unknown") {
 		t.Fatalf("expected unknown active screen to ignore messages")
 	}
 	model.active = setupScreenKey
@@ -173,11 +184,11 @@ func TestUpdateSetupCoversNavigationAndInput(t *testing.T) {
 
 	model.setup.InputFocused = false
 	updated, cmd = model.Update(tea.PasteStartMsg{})
-	if cmd != nil || updated.(*Model).active != setupScreenKey {
+	if cmd != nil || assertUpdatedModel(t, updated).active != setupScreenKey {
 		t.Fatalf("expected unfocused setup paste start to be ignored")
 	}
 	updated, cmd = model.Update(tea.PasteEndMsg{})
-	if cmd != nil || updated.(*Model).active != setupScreenKey {
+	if cmd != nil || assertUpdatedModel(t, updated).active != setupScreenKey {
 		t.Fatalf("expected unfocused setup paste end to be ignored")
 	}
 	model = updated.(*Model)
@@ -207,7 +218,7 @@ func TestUpdateSetupCoversNavigationAndInput(t *testing.T) {
 
 	model.deps.Options.AllowDevHTTP = true
 	model.deps.SetupService = runtime.NewSetupService(configstore.NewJSONStore(t.TempDir()), true)
-	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	_, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	msg := runCmdFlow(cmd)
 	updated, _ = model.Update(msg)
 	model = updated.(*Model)

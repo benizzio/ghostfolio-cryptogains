@@ -44,6 +44,9 @@ func ValidateActivitiesProbeResponse(response dto.ActivitiesProbeResponse) error
 	if response.Count < 0 {
 		return fmt.Errorf("count must be non-negative")
 	}
+	if response.Activities == nil {
+		return fmt.Errorf("activities must be present")
+	}
 	if len(response.Activities) > 1 {
 		return fmt.Errorf("activities probe must return at most one activity")
 	}

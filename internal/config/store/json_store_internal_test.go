@@ -22,11 +22,11 @@ type failingTempFile struct {
 
 func (f *failingTempFile) Name() string            { return f.name }
 func (f *failingTempFile) Chmod(os.FileMode) error { return f.chmodErr }
-func (f *failingTempFile) Write([]byte) (int, error) {
+func (f *failingTempFile) Write(content []byte) (int, error) {
 	if f.writeErr != nil {
 		return f.writeBytes, f.writeErr
 	}
-	return f.writeBytes, nil
+	return len(content), nil
 }
 func (f *failingTempFile) Sync() error  { return f.syncErr }
 func (f *failingTempFile) Close() error { return f.closeErr }

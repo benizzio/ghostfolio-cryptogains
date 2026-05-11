@@ -49,7 +49,7 @@ func TestClientAuthenticateRejectedToken(t *testing.T) {
 	}
 }
 
-func TestClientFetchActivitiesProbeContractFailure(t *testing.T) {
+func TestClientFetchActivitiesProbeValidResponse(t *testing.T) {
 	t.Parallel()
 
 	var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

@@ -13,11 +13,14 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/dto"
 )
 
 const apiBasePath = "/api/v1"
+
+const defaultHTTPClientTimeout = 30 * time.Second
 
 // FailureCategory identifies the single user-visible failure category produced
 // by the Ghostfolio boundary in this slice.
@@ -126,7 +129,7 @@ type requestSpec struct {
 // Authored by: OpenCode
 func New(httpClient *http.Client) *Client {
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		httpClient = &http.Client{Timeout: defaultHTTPClientTimeout}
 	}
 	return &Client{httpClient: httpClient}
 }

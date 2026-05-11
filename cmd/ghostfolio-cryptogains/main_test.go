@@ -46,7 +46,8 @@ func TestDefaultNewProgramReturnsRunner(t *testing.T) {
 	defer func() { newProgram = previous }()
 
 	newProgram = previous
-	if runner := newProgram(fakeModel{}); runner == nil {
+	var runner = newProgram(fakeModel{})
+	if runner == nil {
 		t.Fatalf("expected program runner")
 	}
 }

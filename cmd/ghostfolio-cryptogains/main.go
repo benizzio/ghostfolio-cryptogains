@@ -37,7 +37,9 @@ var exitFunc = os.Exit
 func main() {
 	var err = run()
 	if err != nil {
-		fmt.Fprintln(stderrWriter, err)
+		if _, writeErr := fmt.Fprintln(stderrWriter, err); writeErr != nil {
+			_, _ = fmt.Fprintln(os.Stderr, err)
+		}
 		exitFunc(1)
 	}
 }

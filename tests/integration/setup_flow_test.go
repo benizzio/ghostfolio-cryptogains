@@ -37,7 +37,7 @@ func TestFreshRunCompletesSetupAndReachesMainMenu(t *testing.T) {
 	model = updated.(*flow.Model)
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 	model = updated.(*flow.Model)
-	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	_, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	result := runCmd(cmd)
 	updated, _ = model.Update(result)
 	model = updated.(*flow.Model)
@@ -128,7 +128,7 @@ func TestFocusedCustomOriginInputEnterReturnsToSavePath(t *testing.T) {
 		t.Fatalf("expected setup menu focus to return to Save And Continue, got %q", got)
 	}
 
-	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	_, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	result := runCmd(cmd)
 	updated, _ = model.Update(result)
 	model = updated.(*flow.Model)
