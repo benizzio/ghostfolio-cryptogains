@@ -81,10 +81,9 @@ func LoadStartupState(ctx context.Context, bootstrapStore configstore.Store, all
 		return StartupState{}, fmt.Errorf("load bootstrap setup: %w", err)
 	}
 
-	var validationErr = config.ValidateStartupReady(allowDevHTTP)
-	if validationErr != nil {
-		return StartupState{NeedsSetup: true, SetupRequirementReason: SetupRequirementInvalidRememberedSetup}, nil
+	if config.ValidateStartupReady(allowDevHTTP) == nil {
+		return StartupState{ActiveConfig: &config}, nil
 	}
 
-	return StartupState{ActiveConfig: &config}, nil
+	return StartupState{NeedsSetup: true, SetupRequirementReason: SetupRequirementInvalidRememberedSetup}, nil
 }

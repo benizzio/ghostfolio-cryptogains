@@ -10,46 +10,56 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 )
 
+var (
+	cachedUpBinding        = key.NewBinding(key.WithKeys("up"), key.WithHelp("up", "move up"))
+	cachedDownBinding      = key.NewBinding(key.WithKeys("down"), key.WithHelp("down", "move down"))
+	cachedEnterBinding     = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "select"))
+	cachedFocusBinding     = key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "toggle focus"))
+	cachedCancelBinding    = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel"))
+	cachedEditSetupBinding = key.NewBinding(key.WithKeys("ctrl+e"), key.WithHelp("ctrl+e", "edit setup"))
+	cachedQuitBinding      = key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit"))
+)
+
 // upBinding returns the shared upward menu navigation binding.
 // Authored by: OpenCode
 func upBinding() key.Binding {
-	return key.NewBinding(key.WithKeys("up"), key.WithHelp("up", "move up"))
+	return cachedUpBinding
 }
 
 // downBinding returns the shared downward menu navigation binding.
 // Authored by: OpenCode
 func downBinding() key.Binding {
-	return key.NewBinding(key.WithKeys("down"), key.WithHelp("down", "move down"))
+	return cachedDownBinding
 }
 
 // enterBinding returns the shared primary-action binding.
 // Authored by: OpenCode
 func enterBinding() key.Binding {
-	return key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "select"))
+	return cachedEnterBinding
 }
 
 // focusBinding returns the shared input-focus toggle binding.
 // Authored by: OpenCode
 func focusBinding() key.Binding {
-	return key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "toggle focus"))
+	return cachedFocusBinding
 }
 
 // cancelBinding returns the setup cancel binding for remembered setup edits.
 // Authored by: OpenCode
 func cancelBinding() key.Binding {
-	return key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel"))
+	return cachedCancelBinding
 }
 
 // editSetupBinding returns the main-menu edit-setup binding.
 // Authored by: OpenCode
 func editSetupBinding() key.Binding {
-	return key.NewBinding(key.WithKeys("ctrl+e"), key.WithHelp("ctrl+e", "edit setup"))
+	return cachedEditSetupBinding
 }
 
 // quitBinding returns the shared quit binding.
 // Authored by: OpenCode
 func quitBinding() key.Binding {
-	return key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit"))
+	return cachedQuitBinding
 }
 
 // updateMainMenu handles main-menu navigation.

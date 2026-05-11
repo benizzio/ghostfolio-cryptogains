@@ -124,7 +124,7 @@ func (m *Model) updateSetupOriginInput(message tea.Msg) (tea.Model, tea.Cmd) {
 // Authored by: OpenCode
 func (m *Model) releaseSetupInputToSavePath() (tea.Model, tea.Cmd, bool) {
 	m.blurSetupOriginInput()
-	m.setup.MenuIndex = 2
+	m.setup.MenuIndex = setupMenuSavePathIndex
 	return m, nil, true
 }
 
@@ -147,12 +147,12 @@ func (m *Model) blurSetupOriginInput() {
 // menu allows it.
 // Authored by: OpenCode
 func (m *Model) focusSetupOriginInputFromMenu() (tea.Model, tea.Cmd) {
-	if m.setup.SelectedMode != configmodel.ServerModeCustomOrigin && m.setup.MenuIndex != 1 {
+	if m.setup.SelectedMode != configmodel.ServerModeCustomOrigin && m.setup.MenuIndex != setupMenuCustomOriginIndex {
 		return m, nil
 	}
 
 	m.setup.SelectedMode = configmodel.ServerModeCustomOrigin
-	m.setup.MenuIndex = 1
+	m.setup.MenuIndex = setupMenuCustomOriginIndex
 	m.setup.InputFocused = true
 	return m, m.setup.OriginInput.Focus()
 }
@@ -161,12 +161,12 @@ func (m *Model) focusSetupOriginInputFromMenu() (tea.Model, tea.Cmd) {
 // Authored by: OpenCode
 func (m *Model) activateSetupSelection() (tea.Model, tea.Cmd) {
 	switch m.setup.MenuIndex {
-	case 0:
+	case setupMenuGhostfolioCloudIndex:
 		return m.selectGhostfolioCloud()
-	case 1:
+	case setupMenuCustomOriginIndex:
 		m.setup.ValidationMessage = ""
 		return m.focusSetupOriginInputFromMenu()
-	case 2:
+	case setupMenuSavePathIndex:
 		return m.saveSetupSelection()
 	default:
 		return m, nil

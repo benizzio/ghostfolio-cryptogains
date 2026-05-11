@@ -1,3 +1,7 @@
+// Package integration verifies black-box workflow behavior for the current
+// slice, including diagnostic redaction paths that must never expose secrets in
+// user-visible output.
+// Authored by: OpenCode
 package integration
 
 import (

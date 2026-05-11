@@ -11,6 +11,10 @@ import (
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 )
 
+// TestJSONStoreUsesRestrictiveFilePermissionsWhereSupported verifies that the
+// JSON setup store writes the bootstrap file with owner-only permissions on
+// platforms that expose reliable Unix-style mode bits.
+// Authored by: OpenCode
 func TestJSONStoreUsesRestrictiveFilePermissionsWhereSupported(t *testing.T) {
 	t.Parallel()
 

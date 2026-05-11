@@ -17,7 +17,14 @@ var ErrNotFound = errors.New("bootstrap setup file not found")
 // Example:
 //
 //	var bootstrapStore store.Store
-//	_ = bootstrapStore
+//	var config, err = bootstrapStore.Load(context.Background())
+//	if err != nil && !errors.Is(err, store.ErrNotFound) {
+//		panic(err)
+//	}
+//	_ = config
+//	_ = bootstrapStore.Save(context.Background(), configmodel.AppSetupConfig{})
+//	_ = bootstrapStore.Delete(context.Background())
+//	_ = bootstrapStore.Path()
 //
 // Store implementations load and persist only startup-readable machine-local
 // setup. `Load` returns `ErrNotFound` when no setup exists yet. `Save` is

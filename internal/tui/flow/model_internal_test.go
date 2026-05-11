@@ -1,3 +1,6 @@
+// Package flow tests the root Bubble Tea workflow model, including internal
+// helper behavior used to drive setup, sync validation, and result navigation.
+// Authored by: OpenCode
 package flow
 
 import (
@@ -34,6 +37,9 @@ func (s *cancellingSyncService) Validate(ctx context.Context, _ runtime.Validate
 	return runtime.ValidationOutcome{Success: false, DetailReason: string(runtime.ValidationFailureTimeout), FailureReason: runtime.ValidationFailureTimeout}
 }
 
+// assertUpdatedModel converts an updated Bubble Tea model into the concrete
+// flow model type for deterministic test assertions.
+// Authored by: OpenCode
 func assertUpdatedModel(t *testing.T, updated tea.Model) *Model {
 	t.Helper()
 
@@ -569,6 +575,8 @@ func TestUpdateMainMenuCoversEnterAndDefaultKey(t *testing.T) {
 	}
 }
 
+// newTestModel builds a root model with repository-default test dependencies.
+// Authored by: OpenCode
 func newTestModel(t *testing.T, config *configmodel.AppSetupConfig) *Model {
 	t.Helper()
 	var startup = bootstrap.StartupState{}
@@ -587,6 +595,9 @@ func newTestModel(t *testing.T, config *configmodel.AppSetupConfig) *Model {
 	})
 }
 
+// mustSetupConfig returns a valid Ghostfolio Cloud setup configuration for
+// model tests that need remembered startup state.
+// Authored by: OpenCode
 func mustSetupConfig(t *testing.T) configmodel.AppSetupConfig {
 	t.Helper()
 	var config, err = configmodel.NewSetupConfig(configmodel.ServerModeGhostfolioCloud, configmodel.GhostfolioCloudOrigin, false, time.Now())
@@ -596,6 +607,8 @@ func mustSetupConfig(t *testing.T) configmodel.AppSetupConfig {
 	return config
 }
 
+// runCmdFlow executes one Bubble Tea command and returns its resulting message.
+// Authored by: OpenCode
 func runCmdFlow(cmd tea.Cmd) tea.Msg {
 	if cmd == nil {
 		return nil

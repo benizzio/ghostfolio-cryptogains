@@ -14,6 +14,7 @@ import (
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 )
 
 type scriptedSyncService struct {
@@ -50,11 +51,11 @@ func TestSyncValidationSuccessShowsTransientSuccessResult(t *testing.T) {
 
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*flow.Model)
-	if got := model.View().Content; !contains(got, "Validating Ghostfolio communication") {
+	if got := model.View().Content; !testutil.Contains(got, "Validating Ghostfolio communication") {
 		t.Fatalf("expected busy state after submit, got %q", got)
 	}
 
-	_ = runCmd(cmd)
+	_ = testutil.RunCmd(cmd)
 	updated, _ = model.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	model = updated.(*flow.Model)
 	if got := model.View().Content; got == "" {
@@ -77,7 +78,7 @@ func TestSyncValidationRetryUsesResultMenuPath(t *testing.T) {
 	model = blurTokenInput(t, model)
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*flow.Model)
-	_ = runCmd(cmd)
+	_ = testutil.RunCmd(cmd)
 
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*flow.Model)
@@ -106,7 +107,7 @@ func TestSyncValidationNoPersistenceBeyondSetup(t *testing.T) {
 	model = blurTokenInput(t, model)
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*flow.Model)
-	_ = runCmd(cmd)
+	_ = testutil.RunCmd(cmd)
 
 	var entries []os.DirEntry
 	entries, err = os.ReadDir(filepath.Dir(store.Path()))
@@ -116,7 +117,7 @@ func TestSyncValidationNoPersistenceBeyondSetup(t *testing.T) {
 	if len(entries) != 1 || entries[0].Name() != "setup.json" {
 		t.Fatalf("unexpected persisted files: %#v", entries)
 	}
-	if got := model.View().Content; !contains(got, "Validating Ghostfolio communication") {
+	if got := model.View().Content; !testutil.Contains(got, "Validating Ghostfolio communication") {
 		t.Fatalf("expected busy state content, got %q", got)
 	}
 }
@@ -124,7 +125,7 @@ func TestSyncValidationNoPersistenceBeyondSetup(t *testing.T) {
 func openSyncValidation(t *testing.T, model *flow.Model) *flow.Model {
 	t.Helper()
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	_ = runCmd(cmd)
+	_ = testutil.RunCmd(cmd)
 	return updated.(*flow.Model)
 }
 
@@ -132,7 +133,7 @@ func typeToken(t *testing.T, model *flow.Model, token string) *flow.Model {
 	t.Helper()
 	for _, runeValue := range token {
 		updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Text: string(runeValue), Code: runeValue}))
-		_ = runCmd(cmd)
+		_ = testutil.RunCmd(cmd)
 		model = updated.(*flow.Model)
 	}
 	return model
@@ -141,6 +142,6 @@ func typeToken(t *testing.T, model *flow.Model, token string) *flow.Model {
 func blurTokenInput(t *testing.T, model *flow.Model) *flow.Model {
 	t.Helper()
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
-	_ = runCmd(cmd)
+	_ = testutil.RunCmd(cmd)
 	return updated.(*flow.Model)
 }

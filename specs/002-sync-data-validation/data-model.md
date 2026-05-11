@@ -123,8 +123,6 @@ State transitions:
 
 - `idle -> authenticating -> requesting_activities -> validating_payload -> success`
 - `idle -> authenticating -> failure`
-- `idle -> requesting_activities -> failure`
-- `idle -> validating_payload -> failure`
 
 Future slice note:
 

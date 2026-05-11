@@ -1,3 +1,6 @@
+// Package integration verifies black-box workflow behavior for the current
+// slice, including the setup flow and its test-specific sync validation stub.
+// Authored by: OpenCode
 package integration
 
 import (
@@ -12,10 +15,16 @@ import (
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 )
 
+// integrationSyncService returns a stable successful validation outcome for
+// setup-centric integration tests.
+// Authored by: OpenCode
 type integrationSyncService struct{}
 
+// Validate implements runtime.SyncService for setup-centric integration tests.
+// Authored by: OpenCode
 func (integrationSyncService) Validate(context.Context, runtime.ValidateRequest) runtime.ValidationOutcome {
 	return runtime.ValidationOutcome{Success: true, DetailReason: "communication_ok"}
 }
@@ -27,20 +36,13 @@ func TestFreshRunCompletesSetupAndReachesMainMenu(t *testing.T) {
 	var model = flow.NewModel(newFlowDependenciesWithStore(t, bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementMissing}, false, integrationSyncService{}, store))
 
 	updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
-	model = updated.(*flow.Model)
-	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	_ = runCmd(cmd)
-	model = updated.(*flow.Model)
-
-	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
-	_ = runCmd(cmd)
-	model = updated.(*flow.Model)
+	model = assertFlowModel(t, updated)
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
-	model = updated.(*flow.Model)
-	_, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	result := runCmd(cmd)
+	model = assertFlowModel(t, updated)
+	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	result := testutil.RunCmd(cmd)
 	updated, _ = model.Update(result)
-	model = updated.(*flow.Model)
+	model = assertFlowModel(t, updated)
 
 	if model.ActiveScreen() != "main_menu" {
 		t.Fatalf("expected main menu, got %s", model.ActiveScreen())
@@ -78,7 +80,7 @@ func TestInvalidRememberedSetupFallsBackToSetup(t *testing.T) {
 	if model.ActiveScreen() != "setup" {
 		t.Fatalf("expected setup screen, got %s", model.ActiveScreen())
 	}
-	if got := model.View().Content; !contains(got, "saved server selection is no longer valid") {
+	if got := model.View().Content; !testutil.Contains(got, "saved server selection is no longer valid") {
 		t.Fatalf("expected invalid remembered setup message, got %q", got)
 	}
 }
@@ -102,8 +104,8 @@ func TestSetupFileRemovalAfterStartupDoesNotBreakCurrentRun(t *testing.T) {
 	}
 
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	_ = runCmd(cmd)
-	model = updated.(*flow.Model)
+	_ = testutil.RunCmd(cmd)
+	model = assertFlowModel(t, updated)
 
 	if model.ActiveScreen() != "sync_validation" {
 		t.Fatalf("expected current run to keep working after setup file removal")
@@ -116,27 +118,29 @@ func TestFocusedCustomOriginInputEnterReturnsToSavePath(t *testing.T) {
 	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementMissing}, false, integrationSyncService{}))
 
 	updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
-	model = updated.(*flow.Model)
+	model = assertFlowModel(t, updated)
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	_ = runCmd(cmd)
-	model = updated.(*flow.Model)
+	result := testutil.RunCmd(cmd)
+	updated, _ = model.Update(result)
+	model = assertFlowModel(t, updated)
 
+	model = replaceSetupOriginInput(t, model, "https://example.com")
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	model = updated.(*flow.Model)
+	model = assertFlowModel(t, updated)
 
-	if got := model.View().Content; !contains(got, "> Save And Continue") {
+	if got := model.View().Content; !testutil.Contains(got, "> Save And Continue") {
 		t.Fatalf("expected setup menu focus to return to Save And Continue, got %q", got)
 	}
 
 	_, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	result := runCmd(cmd)
+	result = testutil.RunCmd(cmd)
 	updated, _ = model.Update(result)
-	model = updated.(*flow.Model)
+	model = assertFlowModel(t, updated)
 
 	if model.ActiveScreen() != "main_menu" {
 		t.Fatalf("expected save path to remain reachable, got %s", model.ActiveScreen())
 	}
-	if got := model.View().Content; !contains(got, "ghostfolio-cryptogains") {
+	if got := model.View().Content; !testutil.Contains(got, "ghostfolio-cryptogains") {
 		t.Fatalf("expected persistent header on main menu, got %q", got)
 	}
 }
@@ -147,25 +151,40 @@ func TestFocusedCustomOriginInputPasteDoesNotTriggerWorkflowNavigation(t *testin
 	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementMissing}, false, integrationSyncService{}))
 
 	updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
-	model = updated.(*flow.Model)
+	model = assertFlowModel(t, updated)
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	_ = runCmd(cmd)
-	model = updated.(*flow.Model)
+	_ = testutil.RunCmd(cmd)
+	model = assertFlowModel(t, updated)
 
 	updated, _ = model.Update(tea.PasteStartMsg{})
-	model = updated.(*flow.Model)
+	model = assertFlowModel(t, updated)
 	updated, _ = model.Update(tea.PasteMsg{Content: "https://localhost:8080"})
-	model = updated.(*flow.Model)
+	model = assertFlowModel(t, updated)
 	updated, _ = model.Update(tea.PasteEndMsg{})
-	model = updated.(*flow.Model)
+	model = assertFlowModel(t, updated)
 
 	if model.ActiveScreen() != "setup" {
 		t.Fatalf("expected setup screen to remain active during paste, got %s", model.ActiveScreen())
 	}
-	if got := model.View().Content; !contains(got, "https://localhost:8080") {
+	if got := model.View().Content; !testutil.Contains(got, "https://localhost:8080") {
 		t.Fatalf("expected pasted origin in setup input, got %q", got)
 	}
-	if got := model.View().Content; !contains(got, "Use Custom Server") {
+	if got := model.View().Content; !testutil.Contains(got, "Use Custom Server") {
 		t.Fatalf("expected setup workflow to remain active after paste, got %q", got)
 	}
+}
+
+// replaceSetupOriginInput clears the prefilled custom-origin value and replaces
+// it with the provided origin while the setup input owns focus.
+// Authored by: OpenCode
+func replaceSetupOriginInput(t *testing.T, model *flow.Model, origin string) *flow.Model {
+	t.Helper()
+
+	for range configmodel.GhostfolioCloudOrigin {
+		updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyBackspace}))
+		model = assertFlowModel(t, updated)
+	}
+
+	updated, _ := model.Update(tea.PasteMsg{Content: origin})
+	return assertFlowModel(t, updated)
 }

@@ -1,3 +1,6 @@
+// Package redact tests the secret-redaction helpers used by application-owned
+// diagnostics so runtime errors and status text never leak token material.
+// Authored by: OpenCode
 package redact
 
 import (

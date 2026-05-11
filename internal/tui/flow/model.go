@@ -32,6 +32,10 @@ const (
 	mainMenuScreenKey         activeScreen = "main_menu"
 	syncValidationScreenKey   activeScreen = "sync_validation"
 	validationResultScreenKey activeScreen = "validation_result"
+
+	setupMenuGhostfolioCloudIndex = 0
+	setupMenuCustomOriginIndex    = 1
+	setupMenuSavePathIndex        = 2
 )
 
 // setupSavedMsg reports the result of an application-layer setup save request.
@@ -141,9 +145,6 @@ func NewModel(deps Dependencies) *Model {
 		model.active = mainMenuScreenKey
 	} else {
 		model.active = setupScreenKey
-	}
-	if model.setup.StartupReason == bootstrap.SetupRequirementNone && model.currentConfig == nil {
-		model.setup.StartupReason = deps.Startup.SetupRequirementReason
 	}
 
 	return model
@@ -389,7 +390,7 @@ func newSetupState(config *configmodel.AppSetupConfig, startupReason bootstrap.S
 		state.SelectedMode = config.ServerMode
 		state.OriginInput.SetValue(config.ServerOrigin)
 		if config.ServerMode == configmodel.ServerModeCustomOrigin {
-			state.MenuIndex = 1
+			state.MenuIndex = setupMenuCustomOriginIndex
 		}
 	}
 

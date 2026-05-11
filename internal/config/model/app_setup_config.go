@@ -35,6 +35,10 @@ var (
 	// ErrInvalidOrigin indicates that an origin is malformed for this slice.
 	ErrInvalidOrigin = errors.New("server origin must be an absolute origin with no path, query, fragment, or user info")
 
+	// ErrInvalidServerOrigin indicates that the selected origin does not match the
+	// configured server mode.
+	ErrInvalidServerOrigin = errors.New("server origin does not match the selected server mode")
+
 	// ErrDisallowedTransport indicates that the selected transport is not allowed.
 	ErrDisallowedTransport = errors.New("custom origins must use https unless explicit development mode is enabled")
 )
@@ -79,6 +83,9 @@ func NewSetupConfig(serverMode string, origin string, allowDevHTTP bool, now tim
 
 	if serverMode != ServerModeGhostfolioCloud && serverMode != ServerModeCustomOrigin {
 		return AppSetupConfig{}, ErrInvalidServerMode
+	}
+	if err := validateServerModeOrigin(serverMode, normalizedOrigin); err != nil {
+		return AppSetupConfig{}, err
 	}
 
 	return AppSetupConfig{
@@ -125,6 +132,29 @@ func (c AppSetupConfig) ValidateStartupReady(allowDevHTTP bool) error {
 	}
 	if c.AllowDevHTTP != strings.HasPrefix(c.ServerOrigin, "http://") {
 		return fmt.Errorf("allow_dev_http does not match server origin")
+	}
+	if err := validateServerModeOrigin(c.ServerMode, normalizedOrigin); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateServerModeOrigin enforces that the canonical origin matches the
+// selected startup server mode.
+// Authored by: OpenCode
+func validateServerModeOrigin(serverMode string, normalizedOrigin string) error {
+	switch serverMode {
+	case ServerModeGhostfolioCloud:
+		if normalizedOrigin != GhostfolioCloudOrigin {
+			return ErrInvalidServerOrigin
+		}
+	case ServerModeCustomOrigin:
+		if normalizedOrigin == GhostfolioCloudOrigin {
+			return ErrInvalidServerOrigin
+		}
+	default:
+		return ErrInvalidServerMode
 	}
 
 	return nil

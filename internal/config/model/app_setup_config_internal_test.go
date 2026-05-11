@@ -144,6 +144,17 @@ func TestNewSetupConfigRejectsInvalidOrigin(t *testing.T) {
 	}
 }
 
+func TestNewSetupConfigRejectsServerModeOriginMismatch(t *testing.T) {
+	t.Parallel()
+
+	if _, err := NewSetupConfig(ServerModeGhostfolioCloud, "https://example.com", false, time.Now()); !errors.Is(err, ErrInvalidServerOrigin) {
+		t.Fatalf("expected invalid server origin for cloud mode, got %v", err)
+	}
+	if _, err := NewSetupConfig(ServerModeCustomOrigin, GhostfolioCloudOrigin, false, time.Now()); !errors.Is(err, ErrInvalidServerOrigin) {
+		t.Fatalf("expected invalid server origin for custom mode, got %v", err)
+	}
+}
+
 func TestValidateStartupReadyRejectsStoredOriginNormalizationFailure(t *testing.T) {
 	t.Parallel()
 
@@ -157,6 +168,34 @@ func TestValidateStartupReadyRejectsStoredOriginNormalizationFailure(t *testing.
 	}
 	if err := config.ValidateStartupReady(false); !errors.Is(err, ErrInvalidOrigin) {
 		t.Fatalf("expected invalid origin error, got %v", err)
+	}
+}
+
+func TestValidateStartupReadyRejectsServerModeOriginMismatch(t *testing.T) {
+	t.Parallel()
+
+	var invalidCloudConfig = AppSetupConfig{
+		SchemaVersion: SchemaVersion,
+		SetupComplete: true,
+		ServerMode:    ServerModeGhostfolioCloud,
+		ServerOrigin:  "https://example.com",
+		AllowDevHTTP:  false,
+		UpdatedAt:     time.Now(),
+	}
+	if err := invalidCloudConfig.ValidateStartupReady(false); !errors.Is(err, ErrInvalidServerOrigin) {
+		t.Fatalf("expected invalid server origin for cloud mode, got %v", err)
+	}
+
+	var invalidCustomConfig = AppSetupConfig{
+		SchemaVersion: SchemaVersion,
+		SetupComplete: true,
+		ServerMode:    ServerModeCustomOrigin,
+		ServerOrigin:  GhostfolioCloudOrigin,
+		AllowDevHTTP:  false,
+		UpdatedAt:     time.Now(),
+	}
+	if err := invalidCustomConfig.ValidateStartupReady(false); !errors.Is(err, ErrInvalidServerOrigin) {
+		t.Fatalf("expected invalid server origin for custom mode, got %v", err)
 	}
 }
 

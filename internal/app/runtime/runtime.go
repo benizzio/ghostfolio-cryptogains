@@ -58,7 +58,7 @@ func New(options bootstrap.Options) (*App, error) {
 
 	var bootstrapStore = configstore.NewJSONStore(baseConfigDir)
 	var setupService = NewSetupService(bootstrapStore, options.AllowDevHTTP)
-	var syncService = NewSyncService(ghostfolioclient.New(&http.Client{}), options.RequestTimeout)
+	var syncService = NewSyncService(ghostfolioclient.New(&http.Client{Timeout: options.RequestTimeout}), options.RequestTimeout)
 
 	return &App{
 		Options:      options,

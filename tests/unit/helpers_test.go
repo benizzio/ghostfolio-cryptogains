@@ -1,10 +1,7 @@
 package unit
 
 import (
-	"strings"
 	"testing"
-
-	tea "charm.land/bubbletea/v2"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
@@ -12,22 +9,17 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 )
 
-func runCmd(cmd tea.Cmd) tea.Msg {
-	if cmd == nil {
-		return nil
-	}
-	return cmd()
-}
-
-func contains(content string, expected string) bool {
-	return strings.Contains(content, expected)
-}
-
+// newFlowDependencies constructs test workflow dependencies using a temporary
+// JSON-backed setup store for the current test.
+// Authored by: OpenCode
 func newFlowDependencies(t *testing.T, startup bootstrap.StartupState, allowDevHTTP bool, syncService runtime.SyncService) flow.Dependencies {
 	t.Helper()
 	return newFlowDependenciesWithStore(t, startup, allowDevHTTP, syncService, configstore.NewJSONStore(t.TempDir()))
 }
 
+// newFlowDependenciesWithStore constructs test workflow dependencies using the
+// provided store and the repository's default bootstrap options.
+// Authored by: OpenCode
 func newFlowDependenciesWithStore(t *testing.T, startup bootstrap.StartupState, allowDevHTTP bool, syncService runtime.SyncService, store configstore.Store) flow.Dependencies {
 	t.Helper()
 
