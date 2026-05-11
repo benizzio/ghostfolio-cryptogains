@@ -91,7 +91,7 @@ those areas.
 - **FR-001**: System MUST [specific capability, e.g., "allow users to create accounts"]
 - **FR-002**: System MUST [specific capability, e.g., "validate email addresses"]  
 - **FR-003**: Users MUST be able to [key interaction, e.g., "reset their password"]
-- **FR-004**: System MUST [data requirement, e.g., "persist locally encrypted user preferences with documented justification"]
+- **FR-004**: System MUST [data requirement, e.g., "persist local configuration with documented justification and protection appropriate to its sensitivity"]
 - **FR-005**: System MUST [behavior, e.g., "log all security events"]
 
 *Example of marking unclear requirements:*
@@ -103,9 +103,12 @@ those areas.
 
 - **SEC-001**: [Describe how secrets are supplied, kept in memory only, and kept
   out of logs, output, and persisted artifacts]
-- **SEC-002**: [State whether any data is persisted. If yes, justify it, keep it
-  local only, and describe encryption tied to the active Ghostfolio token in
-  alignment with the OWASP Cryptographic Storage Cheat Sheet]
+- **SEC-002**: [State whether any data is persisted. If yes, justify it and keep
+  it local only. For persisted data that contains financial information or can
+  be connected to a specific person or user, describe token-derived encryption
+  aligned with the OWASP Cryptographic Storage Cheat Sheet. For less-sensitive
+  bootstrap or machine-local configuration, describe the proportionate local
+  protection approach instead]
 - **FIN-001**: [Define the numeric representation, scale, and rounding rules for
   every financial value involved]
 - **QUAL-001**: [Describe the automated integration tests, mocked or stubbed

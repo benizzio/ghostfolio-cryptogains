@@ -1,0 +1,142 @@
+// Package component contains shared TUI styling and rendering helpers.
+// Authored by: OpenCode
+package component
+
+import (
+	"strings"
+
+	lipgloss "charm.land/lipgloss/v2"
+)
+
+const (
+	screenHorizontalPadding = 4
+	minimumPanelWidth       = 1
+)
+
+// ApplicationIdentityName is the persistent project name shown in every
+// full-screen view.
+// Authored by: OpenCode
+const ApplicationIdentityName = "ghostfolio-cryptogains"
+
+// ApplicationIdentityCue is the shared ASCII-safe Ghostfolio visual cue shown
+// alongside the project name.
+// Authored by: OpenCode
+const ApplicationIdentityCue = "[Ghostfolio]"
+
+// MenuItem describes a renderable primary action in a vertical menu.
+//
+// Use `Label` for the visible action name, `Enabled` to control whether the
+// item can be chosen, and `Description` for short inline context when the
+// screen needs to explain the action without extra prose.
+//
+// Authored by: OpenCode
+type MenuItem struct {
+	Label       string
+	Enabled     bool
+	Description string
+}
+
+// RenderMenu renders the current screen's primary vertical menu.
+//
+// Example:
+//
+//	menu := component.RenderMenu(component.DefaultTheme(), []component.MenuItem{{Label: "Sync Data", Enabled: true}}, 0)
+//	_ = menu
+//
+// `RenderMenu` applies the shared selection and disabled-state styling used by
+// the workflow screens. Pass the same `Theme` that the surrounding screen uses,
+// provide items in render order, and supply the current selected index so the
+// function can mark the active choice with the menu cursor.
+//
+// Authored by: OpenCode
+func RenderMenu(theme Theme, items []MenuItem, selected int) string {
+	var lines []string
+	for index, item := range items {
+		var prefix = "  "
+		var style = theme.BodyText
+		if index == selected {
+			prefix = "> "
+			style = theme.SelectedItem
+		}
+		if !item.Enabled {
+			prefix = "x "
+			style = theme.DisabledItem
+		}
+
+		var line = prefix + item.Label
+		if item.Description != "" {
+			line += " - " + item.Description
+		}
+		lines = append(lines, style.Render(line))
+	}
+	return strings.Join(lines, "\n")
+}
+
+// renderApplicationIdentity renders the persistent project header shared across
+// every full-screen view.
+// Authored by: OpenCode
+func renderApplicationIdentity(theme Theme) string {
+	return strings.TrimSpace(
+		theme.AppIdentity.Render(ApplicationIdentityName) + " " +
+			theme.AppIdentityCue.Render(ApplicationIdentityCue),
+	)
+}
+
+// RenderScreen composes a full-screen layout with header, body, status, and
+// footer regions.
+//
+// Example:
+//
+//	view := component.RenderScreen(component.DefaultTheme(), 100, 32, "Title", "Subtitle", "Body", "Status", "Help")
+//	_ = view
+//
+// `RenderScreen` is the shared layout entry point for full-screen views in this
+// slice. It renders the persistent application identity header, then places the
+// provided body, status, and help regions into stacked panels sized to the
+// current terminal dimensions. Use it from screen-specific render helpers
+// instead of composing those shared regions independently.
+//
+// Authored by: OpenCode
+func RenderScreen(
+	theme Theme,
+	width int,
+	height int,
+	title string,
+	subtitle string,
+	body string,
+	status string,
+	footer string,
+) string {
+	if width <= 0 {
+		width = 100
+	}
+	if height <= 0 {
+		height = 32
+	}
+
+	var panelWidth = ContentWidthForScreen(width)
+	var header = theme.Panel.Width(panelWidth).Render(strings.TrimSpace(renderApplicationIdentity(theme) + "\n" + theme.Title.Render(title) + "\n" + theme.Subtitle.Render(subtitle)))
+	var bodyPanel = theme.SummaryPanel.Width(panelWidth).Render(body)
+	var statusPanel = theme.Panel.Width(panelWidth).Render(status)
+	var footerPanel = theme.Panel.Width(panelWidth).Render(footer)
+
+	var content = lipgloss.JoinVertical(lipgloss.Left, header, bodyPanel, statusPanel, footerPanel)
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Top, content)
+}
+
+// ContentWidthForScreen clamps the interior panel width so very narrow terminals
+// do not produce negative or zero-width panels after shared padding is applied.
+//
+// Example:
+//
+//	panelWidth := component.ContentWidthForScreen(80)
+//	component.DefaultTheme().Panel.Width(panelWidth).Render("Body")
+//
+// Authored by: OpenCode
+func ContentWidthForScreen(width int) int {
+	if width <= screenHorizontalPadding {
+		return minimumPanelWidth
+	}
+
+	return width - screenHorizontalPadding
+}

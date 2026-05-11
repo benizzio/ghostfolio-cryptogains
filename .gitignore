@@ -1,1 +1,15 @@
-.idea
+.DS_Store
+.idea/
+.vscode/
+Thumbs.db
+.env*
+*.exe
+*.log
+*.out
+*.swp
+*.test
+*.tmp
+build/
+dist/coverage/
+node_modules/
+vendor/

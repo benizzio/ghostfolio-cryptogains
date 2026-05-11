@@ -19,7 +19,7 @@
 
 **Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
 **Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, local-only encrypted files, local-only encrypted database, or N/A]  
+**Storage**: [if applicable, local-only files or database with protection appropriate to the persisted data sensitivity, or N/A]  
 **Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
 **Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
 **Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app or NEEDS CLARIFICATION]  
@@ -32,9 +32,10 @@
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
 - [ ] Security: no Ghostfolio token persistence or output, justified local-only
-      persistence, token-derived encryption approach, OWASP Cryptographic
-      Storage Cheat Sheet alignment, and most recent published OWASP Top 10
-      review scope are defined.
+      persistence, documented protection appropriate to the sensitivity of any
+      persisted data, token-derived encryption and OWASP Cryptographic Storage
+      Cheat Sheet alignment for any persisted financial or person-linked data,
+      and most recent published OWASP Top 10 review scope are defined.
 - [ ] Precision: all financial calculations use fixed-point decimals or integer
       minor units, never floating point in domain logic.
 - [ ] Testing: integration-first automated tests, mocked or stubbed outside

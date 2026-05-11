@@ -1,6 +1,6 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+shell commands, and other important information, read `specs/002-sync-data-validation/plan.md`
 <!-- SPECKIT END -->
 
 <!--suppress HtmlUnknownTag -->
@@ -61,10 +61,11 @@ TO BE DEFINED
 <LiteratureAndIndustryReferences>
 
 - Follow the general principles of "Clean code: A handbook of agile software craftsmanship" by Robert C. Martin
-    - Give special importance to:
+    - Give SPECIAL importance to:
         - Choose descriptive and unambiguous names
         - Following SOLID principles
-        - Decomposing code into smaller functions
+          - Give extra SPECIAL importance to the Single Responsibility Principle (SRP)
+        - Decomposing code into smaller functions tied to a single responsibility
         - Avoiding code duplication (DRY principle)
         - Be consistent
     - Ignore rules that establish specific numbers of lines of code for functions, files, etc.
@@ -85,7 +86,7 @@ TO BE DEFINED
             - for public methods/functions, a detailed description of the purpose of the method, including an example of
               usage
             - for components/modules/packages, a detailed description of the purpose
-            - for classes/entities/components, a detailed description of the purpose
+            - for classes/entities/components, a detailed description of the purpose. No example usage should be added.
         - all agent touched code must contain authoring information
             - new code created by an agent must include only the agent as the author
             - existing code unauthored can be considered as authored by a human user
@@ -95,7 +96,7 @@ TO BE DEFINED
           ```plaintext
           Authored by: <agent name>
           or
-          Co-authored by: <agent name> and <git human user name>
+          Co-authored by: <agent name>, <other agent name> and <git human user name>
           ```
     - public API code (as in usable in other packages or modules) must contain very detailed usage instructions
     - code docs, when added, HAVE TO FOLLOW the standards of the language

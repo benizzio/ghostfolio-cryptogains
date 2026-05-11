@@ -1,19 +1,20 @@
 <!--
 Sync Impact Report
-Version change: 1.1.0 -> 1.1.1
+Version change: 1.1.1 -> 2.0.0
 Modified principles:
 - I. Security-First Financial Data Handling
+- Operational Constraints
 - Delivery Workflow & Quality Gates
-- Governance
 Modified sections:
 - I. Security-First Financial Data Handling
+- Operational Constraints
 - Delivery Workflow & Quality Gates
-- Governance
 Added sections:
 - None
 Removed sections:
 - None
 Templates requiring updates:
+- ✅ .specify/templates/spec-template.md
 - ✅ .specify/templates/plan-template.md
 - ✅ .specify/templates/tasks-template.md
 Follow-up TODOs:
@@ -31,11 +32,19 @@ Follow-up TODOs:
 - Persisted data MUST remain local to the user's machine. Remote storage,
   synchronization, telemetry export, or third-party persistence of financial data
   is prohibited unless this constitution is amended.
-- Persisted data MUST be encrypted at rest with key material derived from the
-  active Ghostfolio security token so that the stored data is unreadable without
-  re-supplying a valid token in a later session.
-- Cryptographic storage design MUST follow the [OWASP Cryptographic Storage
-  Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html),
+- Persisted data that contains financial information or can be connected to a
+  specific person or user MUST be encrypted at rest with key material derived
+  from the active Ghostfolio security token so that the stored data is
+  unreadable without re-supplying a valid token in a later session.
+- Persisted data that contains neither financial information nor person- or
+  user-linkable data MAY use proportionate machine-local protection instead of
+  Ghostfolio-token-derived encryption, but the feature specification or
+  implementation plan MUST explicitly justify the stored fields, show that they
+  do not cross that sensitivity threshold, and document the local protection
+  approach.
+- When persisted data contains financial information or can be connected to a
+  specific person or user, its cryptographic storage design MUST follow the
+  [OWASP Cryptographic Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html),
   including minimizing stored sensitive data, using established algorithms,
   providing integrity protection, generating salts/nonces/IVs from a
   cryptographically secure random source, and separating persisted ciphertext
@@ -48,8 +57,9 @@ Follow-up TODOs:
   authenticated request path to the Ghostfolio API.
 - Every feature MUST document a review of the most recent published OWASP Top 10
   relevant to the attack surface before merge.
-- Every feature that persists protected data MUST document how its storage
-  design follows the OWASP Cryptographic Storage Cheat Sheet before merge.
+- Every feature that persists financial information or person- or user-linkable
+  data MUST document how its storage design follows the OWASP Cryptographic
+  Storage Cheat Sheet before merge.
 Rationale: Financial data and authentication secrets create direct privacy,
 fraud, and account access risk.
 
@@ -116,7 +126,10 @@ the codebase maintainable.
 
 - The default persistence policy is no persistence. When persistence is needed,
   the specification or plan MUST record what is stored, why it is stored, how it
-  is encrypted, and how the user can remove it.
+  is protected, and how the user can remove it. When the persisted data contains
+  financial information or person- or user-linkable data, this documentation
+  MUST also describe token-derived encryption and the applicable OWASP
+  Cryptographic Storage Cheat Sheet controls.
 - Secret handling is runtime-only. Tokens, credentials, and sensitive financial
   data MUST be redacted from logs, screenshots, examples, fixtures, and
   documentation.
@@ -133,9 +146,10 @@ the codebase maintainable.
 - Every feature specification MUST capture the feature's impacts on persistence,
   token handling, financial precision, testing strategy, dependency choices, and
   external integrations when applicable.
-- Every feature or change that persists protected data MUST record its OWASP
-  Cryptographic Storage Cheat Sheet compliance evidence in `spec.md`, `plan.md`,
-  `tasks.md`, or equivalent review notes.
+- Every feature or change that persists financial information or person- or
+  user-linkable data MUST record its OWASP Cryptographic Storage Cheat Sheet
+  compliance evidence in `spec.md`, `plan.md`, `tasks.md`, or equivalent review
+  notes.
 - Every implementation plan MUST pass a constitution check before research and
   again before implementation.
 - Every task list MUST include work for automated integration testing, coverage
@@ -167,4 +181,4 @@ the codebase maintainable.
   review notes, or equivalent artifacts. Missing evidence counts as
   non-compliance.
 
-**Version**: 1.1.1 | **Ratified**: 2026-05-01 | **Last Amended**: 2026-05-06
+**Version**: 2.0.0 | **Ratified**: 2026-05-01 | **Last Amended**: 2026-05-09

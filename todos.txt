@@ -1,8 +1,0 @@
-for next features/specs
-
-- Since in this feature we can receive activities with different base currencies for asset pricing, we need to come with a strategy for currency conversion and add to the plan
-  - the strategy in the current spec should be to select a currency between USD and EUR so the entire report is calculated in the same base currency.
-  - when selected, the prices that are in a different currency need to be converted before gains or losses are calculated. The conversion should be based on conversion values supplied by the financial authorithy of that fiat currrency, given:
-    - USD: Federal Reserve
-    - EUR: European Central Bank
-  - the plan research must contain be done to integrate to the APIs provided by or officially trusted by those authorities.
