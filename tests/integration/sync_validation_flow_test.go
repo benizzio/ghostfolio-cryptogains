@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -51,7 +52,7 @@ func TestSyncValidationSuccessShowsTransientSuccessResult(t *testing.T) {
 
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*flow.Model)
-	if got := model.View().Content; !testutil.Contains(got, "Validating Ghostfolio communication") {
+	if got := model.View().Content; !strings.Contains(got, "Validating Ghostfolio communication") {
 		t.Fatalf("expected busy state after submit, got %q", got)
 	}
 
@@ -117,7 +118,7 @@ func TestSyncValidationNoPersistenceBeyondSetup(t *testing.T) {
 	if len(entries) != 1 || entries[0].Name() != "setup.json" {
 		t.Fatalf("unexpected persisted files: %#v", entries)
 	}
-	if got := model.View().Content; !testutil.Contains(got, "Validating Ghostfolio communication") {
+	if got := model.View().Content; !strings.Contains(got, "Validating Ghostfolio communication") {
 		t.Fatalf("expected busy state content, got %q", got)
 	}
 }

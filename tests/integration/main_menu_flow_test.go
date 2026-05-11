@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -18,10 +19,10 @@ func TestMainMenuOnlyExposesSyncDataWorkflow(t *testing.T) {
 	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &config}, false, integrationSyncService{}))
 
 	var content = model.View().Content
-	if !testutil.Contains(content, "Sync Data") {
+	if !strings.Contains(content, "Sync Data") {
 		t.Fatalf("expected Sync Data action")
 	}
-	if testutil.Contains(content, "Report") {
+	if strings.Contains(content, "Report") {
 		t.Fatalf("unexpected reporting workflow exposure: %q", content)
 	}
 }
@@ -58,13 +59,13 @@ func TestFocusedTokenInputEnterReturnsToValidationMenuPath(t *testing.T) {
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*flow.Model)
 
-	if got := model.View().Content; !testutil.Contains(got, "> Validate Communication") {
+	if got := model.View().Content; !strings.Contains(got, "> Validate Communication") {
 		t.Fatalf("expected sync menu focus to return to Validate Communication, got %q", got)
 	}
 
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*flow.Model)
-	if got := model.View().Content; !testutil.Contains(got, "Validating Ghostfolio communication") {
+	if got := model.View().Content; !strings.Contains(got, "Validating Ghostfolio communication") {
 		t.Fatalf("expected validation path to remain reachable, got %q", got)
 	}
 	_ = testutil.RunCmd(cmd)
@@ -91,10 +92,10 @@ func TestFocusedTokenInputPasteDoesNotTriggerWorkflowNavigation(t *testing.T) {
 	if model.ActiveScreen() != "sync_validation" {
 		t.Fatalf("expected sync validation screen to remain active during paste, got %s", model.ActiveScreen())
 	}
-	if got := model.View().Content; !testutil.Contains(got, "*********") {
+	if got := model.View().Content; !strings.Contains(got, "*********") {
 		t.Fatalf("expected pasted token to remain masked, got %q", got)
 	}
-	if got := model.View().Content; !testutil.Contains(got, "Validate Communication") {
+	if got := model.View().Content; !strings.Contains(got, "Validate Communication") {
 		t.Fatalf("expected sync workflow to remain active after paste, got %q", got)
 	}
 }

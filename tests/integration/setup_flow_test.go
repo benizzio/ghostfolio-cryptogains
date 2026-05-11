@@ -5,6 +5,7 @@ package integration
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -39,7 +40,7 @@ func TestFreshRunCompletesSetupAndReachesMainMenu(t *testing.T) {
 	model = assertFlowModel(t, updated)
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 	model = assertFlowModel(t, updated)
-	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	_, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	result := testutil.RunCmd(cmd)
 	updated, _ = model.Update(result)
 	model = assertFlowModel(t, updated)
@@ -80,7 +81,7 @@ func TestInvalidRememberedSetupFallsBackToSetup(t *testing.T) {
 	if model.ActiveScreen() != "setup" {
 		t.Fatalf("expected setup screen, got %s", model.ActiveScreen())
 	}
-	if got := model.View().Content; !testutil.Contains(got, "saved server selection is no longer valid") {
+	if got := model.View().Content; !strings.Contains(got, "saved server selection is no longer valid") {
 		t.Fatalf("expected invalid remembered setup message, got %q", got)
 	}
 }
@@ -119,7 +120,7 @@ func TestFocusedCustomOriginInputEnterReturnsToSavePath(t *testing.T) {
 
 	updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 	model = assertFlowModel(t, updated)
-	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	_, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	result := testutil.RunCmd(cmd)
 	updated, _ = model.Update(result)
 	model = assertFlowModel(t, updated)
@@ -128,7 +129,7 @@ func TestFocusedCustomOriginInputEnterReturnsToSavePath(t *testing.T) {
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = assertFlowModel(t, updated)
 
-	if got := model.View().Content; !testutil.Contains(got, "> Save And Continue") {
+	if got := model.View().Content; !strings.Contains(got, "> Save And Continue") {
 		t.Fatalf("expected setup menu focus to return to Save And Continue, got %q", got)
 	}
 
@@ -140,7 +141,7 @@ func TestFocusedCustomOriginInputEnterReturnsToSavePath(t *testing.T) {
 	if model.ActiveScreen() != "main_menu" {
 		t.Fatalf("expected save path to remain reachable, got %s", model.ActiveScreen())
 	}
-	if got := model.View().Content; !testutil.Contains(got, "ghostfolio-cryptogains") {
+	if got := model.View().Content; !strings.Contains(got, "ghostfolio-cryptogains") {
 		t.Fatalf("expected persistent header on main menu, got %q", got)
 	}
 }
@@ -166,10 +167,10 @@ func TestFocusedCustomOriginInputPasteDoesNotTriggerWorkflowNavigation(t *testin
 	if model.ActiveScreen() != "setup" {
 		t.Fatalf("expected setup screen to remain active during paste, got %s", model.ActiveScreen())
 	}
-	if got := model.View().Content; !testutil.Contains(got, "https://localhost:8080") {
+	if got := model.View().Content; !strings.Contains(got, "https://localhost:8080") {
 		t.Fatalf("expected pasted origin in setup input, got %q", got)
 	}
-	if got := model.View().Content; !testutil.Contains(got, "Use Custom Server") {
+	if got := model.View().Content; !strings.Contains(got, "Use Custom Server") {
 		t.Fatalf("expected setup workflow to remain active after paste, got %q", got)
 	}
 }
@@ -203,10 +204,10 @@ func TestReplaceSetupOriginInputReplacesPrefilledOrigin(t *testing.T) {
 	model = replaceSetupOriginInput(t, model, "https://example.com")
 
 	var content = model.View().Content
-	if !testutil.Contains(content, "https://example.com") {
+	if !strings.Contains(content, "https://example.com") {
 		t.Fatalf("expected replacement origin in view, got %q", content)
 	}
-	if testutil.Contains(content, configmodel.GhostfolioCloudOrigin+"https://example.com") {
+	if strings.Contains(content, configmodel.GhostfolioCloudOrigin+"https://example.com") {
 		t.Fatalf("expected prefilled origin to be replaced, got %q", content)
 	}
 }

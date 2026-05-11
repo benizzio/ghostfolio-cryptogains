@@ -2,6 +2,7 @@ package unit
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -40,7 +41,7 @@ func TestTokenInputConsumesPlainCharactersWithoutTriggeringActions(t *testing.T)
 	if model.ActiveScreen() != "sync_validation" {
 		t.Fatalf("expected to remain on sync validation screen")
 	}
-	if view := model.View().Content; !testutil.Contains(view, "*") {
+	if view := model.View().Content; !strings.Contains(view, "*") {
 		t.Fatalf("expected masked token input after typing, got %q", view)
 	}
 }
@@ -63,7 +64,7 @@ func TestFocusedInputsEnterReleaseToPrimaryMenusAndPasteSafely(t *testing.T) {
 
 	updated, _ = setupModel.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	setupModel = updated.(*flow.Model)
-	if got := setupModel.View().Content; !testutil.Contains(got, "> Save And Continue") {
+	if got := setupModel.View().Content; !strings.Contains(got, "> Save And Continue") {
 		t.Fatalf("expected setup enter to return to save menu path, got %q", got)
 	}
 
@@ -79,7 +80,7 @@ func TestFocusedInputsEnterReleaseToPrimaryMenusAndPasteSafely(t *testing.T) {
 	if setupPasteModel.ActiveScreen() != "setup" {
 		t.Fatalf("expected setup paste to stay in setup workflow")
 	}
-	if got := setupPasteModel.View().Content; !testutil.Contains(got, "https://example.com") {
+	if got := setupPasteModel.View().Content; !strings.Contains(got, "https://example.com") {
 		t.Fatalf("expected pasted setup origin to remain in the input, got %q", got)
 	}
 
@@ -92,10 +93,10 @@ func TestFocusedInputsEnterReleaseToPrimaryMenusAndPasteSafely(t *testing.T) {
 	syncModel = updated.(*flow.Model)
 	updated, _ = syncModel.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	syncModel = updated.(*flow.Model)
-	if got := syncModel.View().Content; !testutil.Contains(got, "> Validate Communication") {
+	if got := syncModel.View().Content; !strings.Contains(got, "> Validate Communication") {
 		t.Fatalf("expected sync enter to return to validation menu path, got %q", got)
 	}
-	if view := syncModel.View().Content; !testutil.Contains(view, "*********") {
+	if view := syncModel.View().Content; !strings.Contains(view, "*********") {
 		t.Fatalf("expected masked pasted token after blur, got %q", view)
 	}
 }

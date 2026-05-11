@@ -27,16 +27,20 @@ func TestMaskEmptySecretReturnsEmptyString(t *testing.T) {
 func TestTextAndErrorTextRedactSecrets(t *testing.T) {
 	t.Parallel()
 
-	if got := Text("token=abc jwt=xyz", "abc", "xyz"); got != "token=[REDACTED] jwt=[REDACTED]" {
+	var got = Text("token=abc jwt=xyz", "abc", "xyz")
+	if got != "token=[REDACTED] jwt=[REDACTED]" {
 		t.Fatalf("unexpected redacted text: %q", got)
 	}
-	if got := ErrorText(errors.New("secret abc"), "abc"); got != "secret [REDACTED]" {
+	got = ErrorText(errors.New("secret abc"), "abc")
+	if got != "secret [REDACTED]" {
 		t.Fatalf("unexpected redacted error text: %q", got)
 	}
-	if got := ErrorText(nil, "abc"); got != "" {
+	got = ErrorText(nil, "abc")
+	if got != "" {
 		t.Fatalf("expected empty error text, got %q", got)
 	}
-	if got := Mask("abc"); got != "[REDACTED]" {
+	got = Mask("abc")
+	if got != "[REDACTED]" {
 		t.Fatalf("unexpected mask result: %q", got)
 	}
 }
