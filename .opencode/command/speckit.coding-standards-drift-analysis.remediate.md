@@ -1,9 +1,9 @@
 ---
-description: "Execute unresolved remediation tasks and correct flagged code-standard drift"
+description: Execute unresolved remediation tasks and correct flagged code-standard drift
 ---
 
-<!-- Extension: code-standard-drift-analysis -->
-<!-- Config: .specify/extensions/code-standard-drift-analysis/ -->
+<!-- Extension: coding-standards-drift-analysis -->
+<!-- Config: .specify/extensions/coding-standards-drift-analysis/ -->
 # Remediate Code Standard Drift
 
 Execute unresolved remediation tasks for the active feature and update the remediation checklist as work completes.
@@ -37,7 +37,7 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 
 ## Outline
 
-1. Load `AGENTS.md`, `.specify/memory/constitution.md` when present, the drift report, the remediation checklist, and the relevant feature artifacts.
+1. Load `AGENTS.md`, any other known proprietary agent-instruction files present in repository or feature scope, `.specify/memory/constitution.md` when present, the drift report, the remediation checklist, and the relevant feature artifacts.
 2. Determine the target drift items from user input or from all unchecked checklist entries.
 3. For each target item:
    - read the cited evidence files and enough surrounding code to understand the drift
@@ -51,7 +51,7 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
    - validations run
    - checklist items completed
    - remaining open or blocked items
-6. Recommend rerunning `/speckit.code-standard-drift-analysis.report` and `/speckit.code-standard-drift-analysis.checklist` when the user wants a refreshed post-remediation snapshot.
+6. Recommend rerunning `/speckit.coding-standards-drift-analysis.report` and `/speckit.coding-standards-drift-analysis.checklist` when the user wants a refreshed post-remediation snapshot.
 
 ## Rules
 

@@ -2,8 +2,8 @@
 description: "Generate or extend code-standard-drift-remediation.md from the drift report"
 ---
 
-<!-- Extension: code-standard-drift-analysis -->
-<!-- Config: .specify/extensions/code-standard-drift-analysis/ -->
+<!-- Extension: coding-standards-drift-analysis -->
+<!-- Config: .specify/extensions/coding-standards-drift-analysis/ -->
 # Generate Code Standard Drift Remediation Checklist
 
 Generate or extend the remediation checklist for the active feature code-standard drift report.
@@ -26,7 +26,7 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 
 1. Verify a Spec Kit project exists by checking for `.specify/`.
 2. Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` from repo root and parse the absolute `FEATURE_DIR`.
-3. Verify `FEATURE_DIR/code-standard-drift-report.md` exists. If it does not, stop and instruct the user to run `/speckit.code-standard-drift-analysis.report` first.
+3. Verify `FEATURE_DIR/code-standard-drift-report.md` exists. If it does not, stop and instruct the user to run `/speckit.coding-standards-drift-analysis.report` first.
 
 ## Outline
 

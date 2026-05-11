@@ -1,9 +1,9 @@
 ---
-description: Generate or refresh code-standard-drift-report.md for the active feature
+description: "Generate or refresh code-standard-drift-report.md for the active feature"
 ---
 
-<!-- Extension: code-standard-drift-analysis -->
-<!-- Config: .specify/extensions/code-standard-drift-analysis/ -->
+<!-- Extension: coding-standards-drift-analysis -->
+<!-- Config: .specify/extensions/coding-standards-drift-analysis/ -->
 # Generate Code Standard Drift Report
 
 Review the active feature implementation for divergences from the repository coding-standards baseline and write a structured drift report.
@@ -27,7 +27,7 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 1. Verify a Spec Kit project exists by checking for `.specify/`.
 2. Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` from repo root and parse the absolute `FEATURE_DIR`.
 3. Verify `spec.md`, `plan.md`, and `tasks.md` exist in `FEATURE_DIR`.
-4. Load `AGENTS.md`.
+4. Discover and load `AGENTS.md` plus any other known proprietary agent-instruction files present in repository or feature scope, such as `CLAUDE.md`, `GEMINI.md`, `copilot-instructions.md`, `.cursorrules`, `.cursor/rules/**`, `.windsurfrules`, or `.clinerules`.
 5. Load `.specify/memory/constitution.md` if it exists.
 
 ## Review Scope
@@ -42,7 +42,8 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 Evaluate the implementation against the repository engineering policy baseline:
 
 1. `AGENTS.md`
-2. `.specify/memory/constitution.md` when present
+2. Any other known proprietary agent-instruction files present in repository or feature scope
+3. `.specify/memory/constitution.md` when present
 
 Prioritize repo-defined rules around:
 
@@ -62,7 +63,7 @@ Prioritize repo-defined rules around:
    - `tasks.md`
    - `research.md`, `data-model.md`, `quickstart.md`, and `contracts/` when they help define the implementation surface
 3. Inspect the relevant implementation files in the repository.
-4. Identify only concrete drift items that have explicit repository-policy evidence. Avoid speculative or generic commentary that is not grounded in `AGENTS.md` or the constitution.
+4. Identify only concrete drift items that have explicit repository-policy evidence from the loaded policy baseline. Avoid speculative or generic commentary that is not grounded in the loaded agent-instruction files or the constitution.
 5. Assign severity:
    - `High`: architectural boundary drift, mixed responsibilities across layers, or duplication and cohesion problems with clear maintenance or evolution risk
    - `Medium`: decomposition, documentation, or consistency drift that weakens maintainability but is not immediately architecture-breaking
@@ -121,6 +122,7 @@ Write a Markdown report with this structure:
 - The report MUST be implementation-specific, not a generic coding-style lecture.
 - Every finding MUST cite exact file references.
 - Every finding MUST map to an explicit repo policy source.
+- The `## Standards Baseline` section MUST list every loaded agent-instruction or constitution file used as review evidence.
 - Do not include remediation checkboxes in this report. That belongs in the remediation checklist.
 - If no drift is found, still write the report with `## Findings` stating that no coding-standard drift was identified in the reviewed scope.
 - Keep wording grounded and empirical.

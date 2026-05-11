@@ -2,7 +2,7 @@ installed:
   - git
   - bugfix
   - data-model-diagram
-  - code-standard-drift-analysis
+  - coding-standards-drift-analysis
 settings:
   auto_execute_hooks: true
 hooks:
@@ -126,11 +126,11 @@ hooks:
     description: Auto-commit after task generation
     condition: null
   after_implement:
-  - extension: code-standard-drift-analysis
-    command: speckit.code-standard-drift-analysis.report
+  - extension: coding-standards-drift-analysis
+    command: speckit.coding-standards-drift-analysis.report
     enabled: true
     optional: true
-    prompt: Run code-standard drift analysis after implementation?
+    prompt: Run coding-standards drift analysis after implementation?
     description: Generate or refresh the coding-standard drift report for the active feature
     condition: null
   - extension: git
