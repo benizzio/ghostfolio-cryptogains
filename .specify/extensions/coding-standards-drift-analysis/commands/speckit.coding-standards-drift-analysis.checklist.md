@@ -27,12 +27,12 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 1. Verify a Spec Kit project exists by checking for `.specify/`.
 2. Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` from repo root and parse the absolute `FEATURE_DIR`.
 3. Verify `FEATURE_DIR/code-standard-drift-report.md` exists. If it does not, stop and instruct the user to run `/speckit.coding-standards-drift-analysis.report` first.
-4. Verify `FEATURE_DIR/checklists/code-standard-drift-remediation.md` exists. If it does not, stop and instruct the user to generate it first before rerunning this command.
+4. If `FEATURE_DIR/checklists/code-standard-drift-remediation.md` does not exist, initialize it with the required output structure before merging findings.
 
 ## Outline
 
 1. Read `FEATURE_DIR/code-standard-drift-report.md`.
-2. Read `FEATURE_DIR/checklists/code-standard-drift-remediation.md`.
+2. Read `FEATURE_DIR/checklists/code-standard-drift-remediation.md` if it exists. Otherwise, initialize the checklist with the required output structure and treat it as empty for merge purposes.
 3. Extract every `DRIFT-###` finding and its severity from the report.
 4. For each finding:
    - If the checklist already contains an item referencing the same `DRIFT-###`, preserve that item and its current `[x]` or `[ ]` state.
@@ -53,17 +53,21 @@ Write a Markdown checklist with this structure:
 **Created**: [YYYY-MM-DD]
 **Feature**: [spec.md](../spec.md)
 
-## High Priority
+## Critical Priority
 
 - [ ] DRIFT-001 [Actionable remediation task]
 
-## Medium Priority
+## High Priority
 
 - [ ] DRIFT-002 [Actionable remediation task]
 
-## Low Priority
+## Medium Priority
 
 - [ ] DRIFT-003 [Actionable remediation task]
+
+## Low Priority
+
+- [ ] DRIFT-004 [Actionable remediation task]
 
 ## Closure Criteria
 
@@ -75,7 +79,7 @@ Write a Markdown checklist with this structure:
 ## Rules
 
 - Add only missing checklist items. Do not duplicate items that already reference the same drift ID.
-- Fail immediately if `FEATURE_DIR/checklists/code-standard-drift-remediation.md` does not already exist, and direct the user to generate it first.
+- If `FEATURE_DIR/checklists/code-standard-drift-remediation.md` does not exist, create it first using the required output structure, then add findings per the merge rules.
 - Preserve existing `[x]` and `[ ]` states for matching items.
 - Keep checklist text actionable and implementation-oriented.
 - Do not silently remove historical items from an existing checklist. If a finding disappeared from the latest report, leave the checklist untouched and let the user decide whether to archive it.

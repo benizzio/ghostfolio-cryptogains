@@ -29,7 +29,7 @@ hooks:
     command: speckit.coding-standards-drift-analysis.report
     optional: true
     prompt: "Run coding-standards drift analysis after implementation?"
-    description: "Generate or refresh the coding-standard drift report for the active feature"
+    description: "Generate or refresh the coding-standards drift report for the active feature"
 
 tags:
   - "analysis"

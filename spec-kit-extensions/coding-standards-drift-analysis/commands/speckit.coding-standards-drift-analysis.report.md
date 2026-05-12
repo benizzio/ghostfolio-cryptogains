@@ -49,7 +49,7 @@ Evaluate the implementation against the repository engineering policy baseline:
 
 Prioritize the loaded baseline rules around:
 
-- code structure naming, and related rules
+- code structure, naming, and related rules
 - industry or literature patterns and standards cited. Examples:
   - SOLID patterns, Gang Of Four Patterns, Enterprise Integration Patterns, and similar cited references
   - cohesion, coupling, and consistency
