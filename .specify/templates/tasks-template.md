@@ -10,8 +10,9 @@ description: "Task list template for feature implementation"
 
 **Tests**: Tests are MANDATORY. Every feature MUST include automated tests that
 maintain 100% coverage for project-owned code. Prefer integration tests with
-mocked or stubbed outside services. Add unit tests only when complexity
-justifies isolated verification.
+mocked or stubbed outside services. Add unit tests only when complexity or an
+integration-only coverage gap justifies isolated verification. Remove
+substantially overlapping unit tests once integration coverage replaces them.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 

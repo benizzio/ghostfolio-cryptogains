@@ -14,6 +14,8 @@ type fakeProgram struct {
 	err error
 }
 
+type failingWriter struct{}
+
 type fakeModel struct{}
 
 func (fakeModel) Init() tea.Cmd                       { return nil }
@@ -22,6 +24,10 @@ func (fakeModel) View() tea.View                      { return tea.NewView("") }
 
 func (f fakeProgram) Run() (tea.Model, error) {
 	return nil, f.err
+}
+
+func (failingWriter) Write([]byte) (int, error) {
+	return 0, errors.New("write boom")
 }
 
 func TestRunUsesInjectedProgramRunner(t *testing.T) {
@@ -131,6 +137,28 @@ func TestMainWritesErrorAndExits(t *testing.T) {
 	}
 	if stderr.Len() == 0 {
 		t.Fatalf("expected error to be written to stderr")
+	}
+}
+
+func TestMainFallsBackToOSStderrWhenConfiguredWriterFails(t *testing.T) {
+	var previousWriter = stderrWriter
+	var previousExit = exitFunc
+	var previousArgs = os.Args
+	defer func() {
+		stderrWriter = previousWriter
+		exitFunc = previousExit
+		os.Args = previousArgs
+	}()
+
+	var exitCode int
+	stderrWriter = failingWriter{}
+	exitFunc = func(code int) { exitCode = code }
+	os.Args = []string{"ghostfolio-cryptogains", "--unknown-flag"}
+
+	main()
+
+	if exitCode != 1 {
+		t.Fatalf("expected exit code 1, got %d", exitCode)
 	}
 }
 

@@ -82,6 +82,9 @@ func TestModelInitAndHelpers(t *testing.T) {
 	_ = nextAttemptID()
 	_ = quitCmd()
 	model.cancelActiveValidation()
+	if got := setupInvalidMessage(bootstrap.SetupRequirementInvalidRememberedSetup); got == "" {
+		t.Fatalf("expected invalid-remembered-setup message")
+	}
 	var config = mustSetupConfig(t)
 	model.currentConfig = &config
 	_ = model.currentServerOrigin()
@@ -284,6 +287,18 @@ func TestUpdateSetupCoversNavigationAndInput(t *testing.T) {
 	if updated.(*Model).setup.ValidationMessage == "" {
 		t.Fatalf("expected invalid server mode save error")
 	}
+
+	model.setup.MenuIndex = 99
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	if updated.(*Model).setup.MenuIndex != 99 {
+		t.Fatalf("expected unsupported setup selection to be ignored")
+	}
+
+	model.setup.MenuIndex = 2
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Text: "x", Code: 'x'}))
+	if updated.(*Model).active != setupScreenKey {
+		t.Fatalf("expected unrelated setup-menu key to be ignored")
+	}
 }
 
 func TestUpdateSyncValidationCoversResultAndBusyBranches(t *testing.T) {
@@ -447,12 +462,35 @@ func TestUpdateSyncValidationCoversBusyIgnoreAndSetupRedirect(t *testing.T) {
 	if runCmdFlow(cmd) == nil || !updated.(*Model).sync.InputFocused {
 		t.Fatalf("expected tab to focus token input")
 	}
+	model = updated.(*Model)
+
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+	model = updated.(*Model)
+	if model.sync.InputFocused {
+		t.Fatalf("expected tab while focused to blur token input")
+	}
+
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Text: "x", Code: 'x'}))
+	if cmd != nil || updated.(*Model).sync.MenuIndex != 1 {
+		t.Fatalf("expected unrelated sync-menu key to be ignored")
+	}
+
+	model.sync.MenuIndex = 99
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	if cmd != nil || updated.(*Model).sync.MenuIndex != 99 {
+		t.Fatalf("expected unsupported sync selection to be ignored")
+	}
 
 	model = newTestModel(t, &config)
 	model.active = syncValidationScreenKey
 	updated, cmd = model.Update(spinner.TickMsg{ID: model.spinner.ID()})
 	if cmd != nil || updated.(*Model).sync.Busy {
 		t.Fatalf("expected idle spinner tick to be ignored")
+	}
+
+	updated, cmd = model.Update(struct{}{})
+	if cmd != nil || updated.(*Model).active != syncValidationScreenKey {
+		t.Fatalf("expected unrelated sync message to be ignored")
 	}
 }
 

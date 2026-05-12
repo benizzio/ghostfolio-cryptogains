@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
@@ -260,6 +261,140 @@ func TestReplaceSetupFileWindowsReplacesExistingDestination(t *testing.T) {
 
 	if _, err := os.Stat(store.Path() + backupFileSuffix); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("expected backup file cleanup, got %v", err)
+	}
+}
+
+func TestReplaceSetupFileWindowsRestoresBackupWhenReplacementFails(t *testing.T) {
+	var previousRename = renamePath
+	var previousPlatform = isWindowsPlatform
+	defer func() {
+		renamePath = previousRename
+		isWindowsPlatform = previousPlatform
+	}()
+
+	isWindowsPlatform = func() bool { return true }
+
+	var replaceAttempted bool
+	renamePath = func(source string, destination string) error {
+		if filepath.Base(source) == "setup.json" && strings.HasSuffix(destination, backupFileSuffix) {
+			return os.Rename(source, destination)
+		}
+		if strings.Contains(filepath.Base(source), "temp-setup") && filepath.Base(destination) == "setup.json" {
+			replaceAttempted = true
+			return errors.New("replace boom")
+		}
+		if strings.HasSuffix(source, backupFileSuffix) && filepath.Base(destination) == "setup.json" {
+			return os.Rename(source, destination)
+		}
+		return os.Rename(source, destination)
+	}
+
+	var store = NewJSONStore(t.TempDir())
+	if err := store.ensureParentDirectory(); err != nil {
+		t.Fatalf("ensure parent directory: %v", err)
+	}
+
+	if err := os.WriteFile(store.Path(), []byte("old"), 0o600); err != nil {
+		t.Fatalf("write existing setup file: %v", err)
+	}
+
+	var tempPath = filepath.Join(filepath.Dir(store.Path()), "temp-setup.json")
+	if err := os.WriteFile(tempPath, []byte("new"), 0o600); err != nil {
+		t.Fatalf("write temporary setup file: %v", err)
+	}
+
+	if err := store.replaceSetupFile(tempPath); err == nil {
+		t.Fatalf("expected replacement failure")
+	}
+	if !replaceAttempted {
+		t.Fatalf("expected replacement rename to be attempted")
+	}
+
+	var content, err = os.ReadFile(store.Path())
+	if err != nil {
+		t.Fatalf("read restored setup file: %v", err)
+	}
+	if string(content) != "old" {
+		t.Fatalf("expected original content to be restored, got %q", string(content))
+	}
+}
+
+func TestReplaceSetupFileWindowsReturnsBackupMoveError(t *testing.T) {
+	var previousRename = renamePath
+	var previousPlatform = isWindowsPlatform
+	defer func() {
+		renamePath = previousRename
+		isWindowsPlatform = previousPlatform
+	}()
+
+	isWindowsPlatform = func() bool { return true }
+	renamePath = func(source string, destination string) error {
+		if filepath.Base(source) == "setup.json" && strings.HasSuffix(destination, backupFileSuffix) {
+			return errors.New("backup move boom")
+		}
+		return os.Rename(source, destination)
+	}
+
+	var store = NewJSONStore(t.TempDir())
+	if err := store.ensureParentDirectory(); err != nil {
+		t.Fatalf("ensure parent directory: %v", err)
+	}
+
+	if err := os.WriteFile(store.Path(), []byte("old"), 0o600); err != nil {
+		t.Fatalf("write existing setup file: %v", err)
+	}
+
+	var tempPath = filepath.Join(filepath.Dir(store.Path()), "temp-setup.json")
+	if err := os.WriteFile(tempPath, []byte("new"), 0o600); err != nil {
+		t.Fatalf("write temporary setup file: %v", err)
+	}
+
+	if err := store.replaceSetupFileWindows(tempPath); err == nil {
+		t.Fatalf("expected backup move error")
+	}
+}
+
+func TestReplaceSetupFileWindowsReturnsInspectError(t *testing.T) {
+	var store = NewJSONStore(strings.Repeat("x", 5000))
+	var tempPath = filepath.Join(t.TempDir(), "temp-setup.json")
+	if err := os.WriteFile(tempPath, []byte("new"), 0o600); err != nil {
+		t.Fatalf("write temporary setup file: %v", err)
+	}
+
+	if err := store.replaceSetupFileWindows(tempPath); err == nil {
+		t.Fatalf("expected inspect existing setup file error")
+	}
+}
+
+func TestReplaceSetupFileWindowsReturnsChmodError(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission-bit path error is ignored on this platform")
+	}
+
+	var previousChmod = chmodPath
+	defer func() {
+		chmodPath = previousChmod
+	}()
+
+	chmodPath = func(path string, mode os.FileMode) error {
+		if filepath.Base(path) == "setup.json" {
+			return errors.New("chmod boom")
+		}
+		return os.Chmod(path, mode)
+	}
+
+	var store = NewJSONStore(t.TempDir())
+	if err := store.ensureParentDirectory(); err != nil {
+		t.Fatalf("ensure parent directory: %v", err)
+	}
+
+	var tempPath = filepath.Join(filepath.Dir(store.Path()), "temp-setup.json")
+	if err := os.WriteFile(tempPath, []byte("new"), 0o600); err != nil {
+		t.Fatalf("write temporary setup file: %v", err)
+	}
+
+	if err := store.replaceSetupFileWindows(tempPath); err == nil {
+		t.Fatalf("expected chmod error")
 	}
 }
 
