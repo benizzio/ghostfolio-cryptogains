@@ -10,8 +10,25 @@ import (
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
+	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	ghostfolioclient "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/client"
 )
+
+type failingStore struct {
+	saveErr error
+}
+
+func (f failingStore) Load(context.Context) (configmodel.AppSetupConfig, error) {
+	return configmodel.AppSetupConfig{}, configstore.ErrNotFound
+}
+
+func (f failingStore) Save(context.Context, configmodel.AppSetupConfig) error {
+	return f.saveErr
+}
+
+func (failingStore) Delete(context.Context) error { return nil }
+
+func (failingStore) Path() string { return "" }
 
 func TestNewUsesExplicitConfigDirectory(t *testing.T) {
 	t.Parallel()
@@ -26,6 +43,52 @@ func TestNewUsesExplicitConfigDirectory(t *testing.T) {
 	}
 	if app.SetupService == nil {
 		t.Fatalf("expected setup service")
+	}
+}
+
+func TestSetupServiceSaveReturnsValidationError(t *testing.T) {
+	t.Parallel()
+
+	var service = NewSetupService(failingStore{}, false)
+	_, err := service.Save(context.Background(), SaveSetupRequest{
+		ServerMode:   configmodel.ServerModeCustomOrigin,
+		ServerOrigin: "http://localhost:8080",
+		SavedAt:      time.Now(),
+	})
+	if !errors.Is(err, configmodel.ErrDisallowedTransport) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
+func TestSetupServiceSaveReturnsStoreError(t *testing.T) {
+	t.Parallel()
+
+	var expected = errors.New("save boom")
+	var service = NewSetupService(failingStore{saveErr: expected}, false)
+	_, err := service.Save(context.Background(), SaveSetupRequest{
+		ServerMode:   configmodel.ServerModeGhostfolioCloud,
+		ServerOrigin: configmodel.GhostfolioCloudOrigin,
+		SavedAt:      time.Now(),
+	})
+	if !errors.Is(err, expected) {
+		t.Fatalf("expected wrapped store error, got %v", err)
+	}
+}
+
+func TestSetupServiceSaveReturnsPersistedConfig(t *testing.T) {
+	t.Parallel()
+
+	var service = NewSetupService(failingStore{}, true)
+	var result, err = service.Save(context.Background(), SaveSetupRequest{
+		ServerMode:   configmodel.ServerModeCustomOrigin,
+		ServerOrigin: "http://localhost:8080",
+		SavedAt:      time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("expected successful save result, got %v", err)
+	}
+	if result.Config.ServerOrigin != "http://localhost:8080" || result.Config.ServerMode != configmodel.ServerModeCustomOrigin {
+		t.Fatalf("unexpected persisted config: %#v", result.Config)
 	}
 }
 
@@ -80,6 +143,31 @@ func TestFinalizeFailureFallsBackToConnectivityCategory(t *testing.T) {
 	var outcome = finalizeFailure(&GhostfolioSession{}, &SyncValidationAttempt{}, errors.New("boom"))
 	if outcome.FailureReason != ValidationFailureConnectivityProblem {
 		t.Fatalf("expected connectivity fallback, got %#v", outcome)
+	}
+}
+
+func TestValidationFailureReasonFromBoundaryCoversAllCategories(t *testing.T) {
+	t.Parallel()
+
+	var testCases = []struct {
+		name     string
+		category ghostfolioclient.FailureCategory
+		want     ValidationFailureReason
+	}{
+		{name: "rejected token", category: ghostfolioclient.FailureRejectedToken, want: ValidationFailureRejectedToken},
+		{name: "timeout", category: ghostfolioclient.FailureTimeout, want: ValidationFailureTimeout},
+		{name: "connectivity", category: ghostfolioclient.FailureConnectivityProblem, want: ValidationFailureConnectivityProblem},
+		{name: "unsuccessful response", category: ghostfolioclient.FailureUnsuccessfulServerResponse, want: ValidationFailureUnsuccessfulServerResponse},
+		{name: "incompatible contract", category: ghostfolioclient.FailureIncompatibleServerContract, want: ValidationFailureIncompatibleServerContract},
+		{name: "unknown", category: ghostfolioclient.FailureCategory("unknown"), want: ValidationFailureConnectivityProblem},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := validationFailureReasonFromBoundary(testCase.category); got != testCase.want {
+				t.Fatalf("validation failure reason mismatch: got %q want %q", got, testCase.want)
+			}
+		})
 	}
 }
 

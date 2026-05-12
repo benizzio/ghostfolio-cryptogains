@@ -39,8 +39,10 @@
 - [ ] Precision: all financial calculations use fixed-point decimals or integer
       minor units, never floating point in domain logic.
 - [ ] Testing: integration-first automated tests, mocked or stubbed outside
-      services, unit tests only for justified complex units, and 100% coverage
-      for project-owned code are planned.
+      services, unit tests only for justified complex units or integration
+      gaps, overlapping unit tests are avoided, and 100% coverage for
+      project-owned code is planned through coverage instrumentation that counts
+      black-box contract and integration execution.
 - [ ] Dependencies: every new third-party library is justified against a core
       implementation and includes research on maintenance, community acceptance,
       security posture, release freshness, and recent activity.

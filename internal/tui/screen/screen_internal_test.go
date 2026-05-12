@@ -111,3 +111,70 @@ func TestValidationResultScreenViewCoversFailureBranch(t *testing.T) {
 		t.Fatalf("expected rendered content")
 	}
 }
+
+// TestValidationResultScreenViewCoversSuccessBranch exercises the successful
+// validation render path.
+// Authored by: OpenCode
+func TestValidationResultScreenViewCoversSuccessBranch(t *testing.T) {
+	t.Parallel()
+
+	var content = ValidationResultScreenView(ValidationResultScreenParams{
+		Theme:         component.DefaultTheme(),
+		Width:         80,
+		Height:        24,
+		MenuItems:     []component.MenuItem{{Label: "Main Menu", Enabled: true}},
+		SelectedIndex: 0,
+		Outcome:       runtime.ValidationOutcome{Success: true},
+		HelpText:      "help",
+	})
+	if content == "" {
+		t.Fatalf("expected rendered content")
+	}
+	if !strings.Contains(content, "Success") {
+		t.Fatalf("expected success status in rendered content, got %q", content)
+	}
+	if !strings.Contains(content, "Communication with the selected Ghostfolio server is working.") {
+		t.Fatalf("expected success summary text, got %q", content)
+	}
+	if !strings.Contains(content, "No Ghostfolio data was stored locally, and reporting is not available") || !strings.Contains(content, "in this slice.") {
+		t.Fatalf("expected success follow-up text, got %q", content)
+	}
+	if !strings.Contains(content, "ghostfolio-cryptogains") || !strings.Contains(content, "[Ghostfolio]") {
+		t.Fatalf("expected persistent application identity header, got %q", content)
+	}
+}
+
+// TestValidationResultScreenViewCoversIncompatibleContractBranch exercises the
+// unsupported-server guidance branch.
+// Authored by: OpenCode
+func TestValidationResultScreenViewCoversIncompatibleContractBranch(t *testing.T) {
+	t.Parallel()
+
+	var content = ValidationResultScreenView(ValidationResultScreenParams{
+		Theme:         component.DefaultTheme(),
+		Width:         80,
+		Height:        24,
+		MenuItems:     []component.MenuItem{{Label: "Validate Again", Enabled: true}, {Label: "Main Menu", Enabled: true}},
+		SelectedIndex: 0,
+		Outcome: runtime.ValidationOutcome{
+			Success:       false,
+			FailureReason: runtime.ValidationFailureIncompatibleServerContract,
+		},
+		HelpText: "help",
+	})
+	if content == "" {
+		t.Fatalf("expected rendered content")
+	}
+	if !strings.Contains(content, "Failure Category: incompatible server contract") {
+		t.Fatalf("expected incompatible-contract failure status, got %q", content)
+	}
+	if !strings.Contains(content, "The selected server responded, but it did not satisfy the supported") || !strings.Contains(content, "contract for this slice.") {
+		t.Fatalf("expected incompatible-contract guidance, got %q", content)
+	}
+	if strings.Contains(content, "Validate again or return to the main menu. No Ghostfolio data was stored locally.") {
+		t.Fatalf("expected special incompatible-contract guidance instead of default failure guidance, got %q", content)
+	}
+	if !strings.Contains(content, "ghostfolio-cryptogains") || !strings.Contains(content, "[Ghostfolio]") {
+		t.Fatalf("expected persistent application identity header, got %q", content)
+	}
+}

@@ -1,13 +1,10 @@
 <!--
 Sync Impact Report
-Version change: 1.1.1 -> 2.0.0
+Version change: 2.0.0 -> 2.1.0
 Modified principles:
-- I. Security-First Financial Data Handling
-- Operational Constraints
-- Delivery Workflow & Quality Gates
+- III. Testability with Full Coverage
 Modified sections:
-- I. Security-First Financial Data Handling
-- Operational Constraints
+- III. Testability with Full Coverage
 - Delivery Workflow & Quality Gates
 Added sections:
 - None
@@ -83,8 +80,15 @@ reporting.
   100%.
 - Integration tests are the default and MUST verify user journeys and
   Ghostfolio-facing workflows, with outside services mocked or stubbed.
-- Unit tests MUST be added when a function, type, or module has enough
+- Coverage commands and CI workflows MUST instrument project-owned packages in a
+  way that counts execution driven from black-box contract and integration test
+  packages. Coverage gates that only count same-package tests are not
+  sufficient.
+- Unit tests MUST be added only when coverage is not realistically fulfillable
+  through integration tests or when a function, type, or module has enough
   complexity that isolated verification materially lowers risk.
+- Unit tests that substantially duplicate the same behavior already verified by
+  integration tests MUST be removed.
 - A feature is incomplete until required tests, coverage gates, and relevant
   regressions pass in CI or in the local verification path when CI is
   unavailable.
@@ -154,6 +158,8 @@ the codebase maintainable.
   again before implementation.
 - Every task list MUST include work for automated integration testing, coverage
   verification, security review, and any required dependency or API research.
+- Pull requests MUST run the repository test workflow automatically on each push
+  while the change is under review.
 - Code review MUST block changes that violate a core principle or omit the
   evidence required to prove compliance.
 - If the tooling cannot measure a required gate yet, adding that measurement is a
@@ -181,4 +187,4 @@ the codebase maintainable.
   review notes, or equivalent artifacts. Missing evidence counts as
   non-compliance.
 
-**Version**: 2.0.0 | **Ratified**: 2026-05-01 | **Last Amended**: 2026-05-09
+**Version**: 2.1.0 | **Ratified**: 2026-05-01 | **Last Amended**: 2026-05-12

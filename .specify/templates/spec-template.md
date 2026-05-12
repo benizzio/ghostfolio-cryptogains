@@ -112,7 +112,8 @@ those areas.
 - **FIN-001**: [Define the numeric representation, scale, and rounding rules for
   every financial value involved]
 - **QUAL-001**: [Describe the automated integration tests, mocked or stubbed
-  outside services, and how 100% coverage will be enforced]
+  outside services, how overlapping unit tests will be avoided, and how 100%
+  coverage will be enforced across project-owned packages]
 - **INT-001**: [List any new dependencies or external APIs and the research or
   justification required before implementation]
 
