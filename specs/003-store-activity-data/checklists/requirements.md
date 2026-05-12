@@ -36,3 +36,7 @@
 - Scope is explicitly limited to full retrieval, normalization, validation, and secure storage of future-reporting-ready activity history.
 - Reporting, report preview, gains-or-losses calculation, and cached-data browsing are explicitly deferred.
 - Security wording now distinguishes between bootstrap setup that must remain readable before token entry and protected activity data that must remain inaccessible without the Ghostfolio security token.
+- The spec now makes permanent token loss explicitly unrecoverable, with no alternate unlock, recovery, or bypass path.
+- The spec now requires existing protected data to remain untouched until a full replacement sync succeeds.
+- The spec now distinguishes between an invalid token and a different valid token, requiring the latter to create a separate isolated protected snapshot.
+- The spec now requires protected snapshots to carry stored-data version markers and to fail gracefully when the current application version cannot read them.
