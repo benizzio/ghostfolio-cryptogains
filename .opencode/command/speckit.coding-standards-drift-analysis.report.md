@@ -18,7 +18,7 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 
 ## Purpose
 
-- Focus on coding standards and engineering practices only.
+- Focus on coding standards and software engineering practices only.
 - Do not review domain correctness, product behavior, contract compliance, or feature completeness unless that context is required to explain a coding-standard drift.
 - This command is rerunnable. Overwrite the report with a fresh snapshot, but preserve existing `DRIFT-###` identifiers for substantively unchanged findings when possible.
 
@@ -29,12 +29,14 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 3. Verify `spec.md`, `plan.md`, and `tasks.md` exist in `FEATURE_DIR`.
 4. Discover and load `AGENTS.md` plus any other known proprietary agent-instruction files present in repository or feature scope, such as `CLAUDE.md`, `GEMINI.md`, `copilot-instructions.md`, `.cursorrules`, `.cursor/rules/**`, `.windsurfrules`, or `.clinerules`.
 5. Load `.specify/memory/constitution.md` if it exists.
+6. If the loaded instructions and constitution do not enforce concrete coding standards or software engineering practices, derive the best-guess baseline conservatively from the existing code style, structure, documentation patterns, and architectural boundaries in the active feature scope and directly related code.
 
 ## Review Scope
 
-- Use the active feature implementation as the primary scope.
-- Derive candidate files from `tasks.md`, `plan.md`, current feature documentation, and the implementation files that support the feature.
-- Expand to adjacent files only when needed to explain architectural boundaries, duplication, or cross-cutting drift.
+- Treat the active feature spec and its implementation as the default and preferred scope.
+- Derive candidate files from `spec.md`, `plan.md`, `tasks.md`, current feature documentation, and the source files touched by or directly supporting that feature.
+- Expand beyond the active feature only when a directly related supporting file is required to explain architectural boundaries, duplication, or cross-cutting drift.
+- Avoid repository-wide exploration that would bloat the report beyond the active feature slice.
 - Prefer exact file and line evidence over broad repository-wide claims.
 
 ## Standards Baseline
@@ -45,14 +47,16 @@ Evaluate the implementation against the repository engineering policy baseline:
 2. Any other known proprietary agent-instruction files present in repository or feature scope
 3. `.specify/memory/constitution.md` when present
 
-Prioritize repo-defined rules around:
+Prioritize the loaded baseline rules around:
 
-- descriptive and unambiguous naming
-- SRP, cohesion, and architectural boundaries
-- DRY and consistency
-- separation of domain, application, presentation, and infrastructure concerns where the repo expects it
-- documentation and author-attribution requirements for AI-touched code
-- any local style rules explicitly stated by the repo
+- code structure naming, and related rules
+- industry or literature patterns and standards cited. Examples:
+  - SOLID patterns, Gang Of Four Patterns, Enterprise Integration Patterns, and similar cited references
+  - cohesion, coupling, and consistency
+  - Don't Repeat Yourself, Keep it Simple, Locality of Behaviour, and Descriptive and Meaningful Phrases
+- code documentation requirements
+- code ownership, author-attribution, or AI-touch documentation requirements when the baseline defines them
+- any other local coding-standard or software-engineering rules explicitly stated by the loaded baseline
 
 ## Outline
 
