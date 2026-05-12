@@ -1,7 +1,7 @@
 GO ?= go
 GOCOVERAGEPLUS ?= $(GO) run github.com/Fabianexe/gocoverageplus@v1.2.0
 ARGS ?=
-PRODUCTION_PACKAGES := $(shell $(GO) list ./cmd/... ./internal/... | paste -sd,)
+PRODUCTION_PACKAGES = $(shell $(GO) run ./tools/coverpkg -go $(GO) ./cmd/... ./internal/...)
 
 .PHONY: run test coverage
 
