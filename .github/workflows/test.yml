@@ -4,8 +4,8 @@ permissions:
   contents: read
 
 env:
-  GOCACHE: ~/.cache/go-build
-  GOMODCACHE: ~/go/pkg/mod
+  GOCACHE: ${{ github.workspace }}/.cache/go-build
+  GOMODCACHE: ${{ github.workspace }}/.cache/go-mod
 
 on:
   pull_request:

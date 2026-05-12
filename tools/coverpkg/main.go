@@ -16,7 +16,7 @@ import (
 //
 // Authored by: Copilot
 func main() {
-	var goBinary = flag.String("go", "go", "Go binary used to run go list")
+	var goBinaryFlag = flag.String("go", "go", "Go binary used to run go list")
 
 	flag.Parse()
 
@@ -25,25 +25,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	var args = append([]string{"list", "-f", "{{.ImportPath}}"}, flag.Args()...)
-	var command = exec.Command(*goBinary, args...)
-	var output bytes.Buffer
+	var listArgs = append([]string{"list", "-f", "{{.ImportPath}}"}, flag.Args()...)
+	var listCommand = exec.Command(*goBinaryFlag, listArgs...)
+	var outputBuffer bytes.Buffer
 
-	command.Stdout = &output
-	command.Stderr = os.Stderr
+	listCommand.Stdout = &outputBuffer
+	listCommand.Stderr = os.Stderr
 
-	if err := command.Run(); err != nil {
+	if err := listCommand.Run(); err != nil {
 		os.Exit(1)
 	}
 
 	var packages []string
-	for _, line := range strings.Split(output.String(), "\n") {
-		var packagePath = strings.TrimSpace(line)
-		if packagePath == "" {
+	for _, line := range strings.Split(outputBuffer.String(), "\n") {
+		var importPath = strings.TrimSpace(line)
+		if importPath == "" {
 			continue
 		}
 
-		packages = append(packages, packagePath)
+		packages = append(packages, importPath)
 	}
 
 	fmt.Print(strings.Join(packages, ","))
