@@ -12,6 +12,14 @@
 - Each protected snapshot carries stored-data version markers so an application version that cannot read that snapshot fails safely without exposing or damaging local data.
 - This slice stops after secure retrieval, normalization, validation, and protected persistence. It does not calculate gains or losses, preview activity data, or generate any report.
 
+## Clarifications
+
+### Session 2026-05-14
+
+- Q: How should the application locate existing protected snapshots when multiple token-isolated snapshots may exist on the same machine? → A: Try unlocking only snapshots associated with the currently selected Ghostfolio server using the supplied token.
+- Q: How should the application handle newly synced data that the current application version cannot safely store or read? → A: Keep any existing readable protected snapshot active, discard the newly synced incompatible data, inform the user, and let the user continue with the previously readable data instead.
+- Q: How should available report years be derived from Ghostfolio activity timestamps? → A: Derive years from each activity timestamp using the timestamp's own offset and calendar date as provided by Ghostfolio.
+
 ## Terms Used In This Spec
 
 - **Bootstrap setup**: The startup-readable machine-local setup persisted by the previous slice. It remembers setup completion and the selected Ghostfolio server before the user enters a Ghostfolio security token.
@@ -21,6 +29,7 @@
 - **Defensible history**: A normalized activity history that still supports reproducible future basis calculations and year-based reporting.
 - **Server mismatch**: A later sync attempt where the currently selected Ghostfolio server does not match the server reference stored with the protected snapshot.
 - **Stored-data version**: The compatibility marker stored with each protected snapshot that identifies the protected-snapshot format and normalized synced-data model used to write that history.
+- **Available report year**: A calendar year derived from an activity timestamp using the timestamp's own offset and date as provided by Ghostfolio, without converting that event to machine-local time or forcing UTC year boundaries first.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -44,11 +53,11 @@ After setup is complete, the user can run `Sync Data`, provide a Ghostfolio secu
 
 ### User Story 2 - Reuse Token-Locked Stored Data (Priority: P1)
 
-After a successful sync, the user can later refresh the stored activity history with the same Ghostfolio security token. If a different valid token is supplied, the application creates a separate isolated protected store for that token instead of altering existing local data. If stored data was written in an unsupported version, the application fails safely and leaves it untouched.
+After a successful sync, the user can later refresh the stored activity history with the same Ghostfolio security token. If a different valid token is supplied, the application creates a separate isolated protected store for that token instead of altering existing local data. If stored data was written in an unsupported version, or if a newly retrieved history cannot be safely stored by the current application version, the application fails safely and preserves any existing readable protected data.
 
 **Why this priority**: The user asked for stored activity data that remains accessible only through the Ghostfolio security token, so protected reuse is part of the core scope rather than a later enhancement.
 
-**Independent Test**: After one successful sync, restart the application and run `Sync Data` again. With the correct token, the protected snapshot can be refreshed. With a different valid token, a separate isolated protected snapshot is created only after a full successful sync. With an invalid token or an unsupported stored-data version, existing local data remains inaccessible and unchanged.
+**Independent Test**: After one successful sync, restart the application and run `Sync Data` again. With the correct token, the protected snapshot can be refreshed. With a different valid token, a separate isolated protected snapshot is created only after a full successful sync. With an invalid token, an unsupported stored-data version, or newly synced data that the current version cannot safely store, existing local data remains inaccessible or unchanged as appropriate, and incompatible new data is discarded.
 
 **Acceptance Scenarios**:
 
@@ -58,6 +67,7 @@ After a successful sync, the user can later refresh the stored activity history 
 4. **Given** protected local data already exists, **When** a refresh attempt fails after retrieval starts but before a new protected snapshot is written successfully, **Then** the previously stored protected data remains unchanged.
 5. **Given** the application starts after a successful earlier sync, **When** startup completes before the user enters a Ghostfolio security token, **Then** only bootstrap setup is readable and the protected activity data remains inaccessible until the correct token is supplied in the sync workflow.
 6. **Given** protected local data already exists, **When** the current application version cannot read that snapshot's stored-data version, **Then** the system shows a compatibility failure message, leaves the protected snapshot unchanged, and does not expose or overwrite the protected data.
+7. **Given** a readable protected snapshot already exists, **When** a new sync retrieves data that the current application version cannot safely normalize, store, or later read within its supported stored-data model, **Then** the system discards the newly retrieved incompatible data, keeps the existing readable protected snapshot unchanged as the active local data, informs the user, and offers to continue with that previously readable protected snapshot instead of replacing it.
 
 ---
 
@@ -95,6 +105,7 @@ The user can trust that only future-reporting-ready activity histories are store
 - The user supplies a Ghostfolio security token that cannot unlock the existing protected snapshot; a token that successfully authenticates with Ghostfolio creates a separate isolated protected snapshot, while a token rejected by Ghostfolio changes no local data.
 - The application exits or fails while a new protected snapshot is being written; the previous protected snapshot must remain intact and no partially readable replacement may remain.
 - An existing protected snapshot carries a stored-data version that the current application version cannot read; the system must fail gracefully, leave the stored data untouched, and avoid any silent overwrite.
+- A new sync retrieves activity data that the current application version cannot safely normalize into or persist as its supported stored-data model; the new data must be discarded, any existing readable protected snapshot must remain active and unchanged, and the user must be informed.
 - The source provides wallet or account scope for some activities but not enough to treat that scope as reliable for all later reporting decisions.
 
 ## Requirements *(mandatory)*
@@ -124,42 +135,45 @@ those areas.
 - **FR-017**: The system MUST treat a normalized `SELL` activity record with unit price `0` and an explanatory comment as a non-taxable holding reduction to be preserved in stored history for future reporting use.
 - **FR-018**: The system MUST preserve, in each stored activity record, the activity data needed for future reporting, including asset identity, event time, quantity, unit price, value, fees, explanatory comments when present, and any available source holding-scope data.
 - **FR-019**: The system MUST preserve or derive the set of years present in the stored activity history so future reporting slices can limit year selection to years that actually exist in the cached data.
-- **FR-020**: The system MUST evaluate normalized histories for gaps or inconsistencies that would prevent defensible future basis calculations and MUST reject such histories before persistence.
-- **FR-021**: The system MUST establish a deterministic order for same-asset activities that share the same timestamp when the source history provides enough stable ordering information, and MUST reject the sync if deterministic ordering cannot be established.
-- **FR-022**: The system MUST record whether source holding-scope data is reliable enough for future scope-local reporting decisions or whether future reporting will need to broaden those activities to asset-level scope.
-- **FR-023**: The system MUST write successful protected sync results atomically as a complete protected-snapshot replacement rather than as partial record updates, and any existing protected data MUST remain untouched until that replacement write succeeds.
-- **FR-024**: The system MUST allow the user to run sync again after both successful and failed attempts without requiring setup to be repeated.
-- **FR-025**: The system MUST show user-facing sync outcomes that either confirm successful protected storage or explain the failure and next step without exposing the Ghostfolio security token or unprotected activity data.
-- **FR-026**: The system MUST treat a successful sync with an empty activity history as a valid protected local state for that selected server and token.
-- **FR-027**: The system MUST refuse access to an existing protected snapshot when the supplied Ghostfolio security token cannot unlock it, and MUST leave the stored data unchanged.
-- **FR-028**: The system MUST not expose report generation, report preview, gains-or-losses calculation, or direct cached-activity browsing in this slice.
-- **FR-029**: The system MUST not persist transient failure messages, raw unprotected Ghostfolio payloads, or recoverable Ghostfolio security-token traces for later display, diagnostics, or storage.
-- **FR-030**: The system MUST support multiple isolated protected snapshots on the same computer when different valid Ghostfolio security tokens are used, and those snapshots MUST remain unreadable to one another without their matching tokens.
-- **FR-031**: When a supplied Ghostfolio security token does not unlock an existing protected snapshot but does authenticate successfully with the selected Ghostfolio server, the system MUST treat that token as a separate local-user context and MUST create a new isolated protected snapshot only after a full successful sync, without altering any existing protected snapshot.
-- **FR-032**: When a supplied Ghostfolio security token does not unlock an existing protected snapshot and the selected Ghostfolio server rejects that token, the system MUST inform the user that the token is invalid and MUST not modify any local data.
-- **FR-033**: The system MUST persist version information with each protected snapshot that identifies the protected-snapshot format and the normalized synced-data model used to write that stored history.
-- **FR-034**: When an existing protected snapshot cannot be read by the current application version because its stored-data version is unsupported, the system MUST fail gracefully with a compatibility error, MUST not expose protected data, MUST not partially load or automatically overwrite the snapshot, and MUST leave the stored data unchanged.
+- **FR-020**: The system MUST derive each available report year from the corresponding activity timestamp using that timestamp's own offset and calendar date as provided by Ghostfolio, without first converting the event to machine-local time or forcing UTC year boundaries.
+- **FR-021**: The system MUST evaluate normalized histories for gaps or inconsistencies that would prevent defensible future basis calculations and MUST reject such histories before persistence.
+- **FR-022**: The system MUST establish a deterministic order for same-asset activities that share the same timestamp when the source history provides enough stable ordering information, and MUST reject the sync if deterministic ordering cannot be established.
+- **FR-023**: The system MUST record whether source holding-scope data is reliable enough for future scope-local reporting decisions or whether future reporting will need to broaden those activities to asset-level scope.
+- **FR-024**: The system MUST write successful protected sync results atomically as a complete protected-snapshot replacement rather than as partial record updates, and any existing protected data MUST remain untouched until that replacement write succeeds.
+- **FR-025**: The system MUST allow the user to run sync again after both successful and failed attempts without requiring setup to be repeated.
+- **FR-026**: The system MUST show user-facing sync outcomes that either confirm successful protected storage or explain the failure and next step without exposing the Ghostfolio security token or unprotected activity data.
+- **FR-027**: The system MUST treat a successful sync with an empty activity history as a valid protected local state for that selected server and token.
+- **FR-028**: The system MUST refuse access to an existing protected snapshot when the supplied Ghostfolio security token cannot unlock it, and MUST leave the stored data unchanged.
+- **FR-029**: The system MUST not expose report generation, report preview, gains-or-losses calculation, or direct cached-activity browsing in this slice.
+- **FR-030**: The system MUST not persist transient failure messages, raw unprotected Ghostfolio payloads, or recoverable Ghostfolio security-token traces for later display, diagnostics, or storage.
+- **FR-031**: The system MUST support multiple isolated protected snapshots on the same computer when different valid Ghostfolio security tokens are used, and those snapshots MUST remain unreadable to one another without their matching tokens.
+- **FR-032**: When a supplied Ghostfolio security token does not unlock an existing protected snapshot but does authenticate successfully with the selected Ghostfolio server, the system MUST treat that token as a separate local-user context and MUST create a new isolated protected snapshot only after a full successful sync, without altering any existing protected snapshot.
+- **FR-033**: When a supplied Ghostfolio security token does not unlock an existing protected snapshot and the selected Ghostfolio server rejects that token, the system MUST inform the user that the token is invalid and MUST not modify any local data.
+- **FR-034**: The system MUST persist version information with each protected snapshot that identifies the protected-snapshot format and the normalized synced-data model used to write that stored history.
+- **FR-035**: When an existing protected snapshot cannot be read by the current application version because its stored-data version is unsupported, the system MUST fail gracefully with a compatibility error, MUST not expose protected data, MUST not partially load or automatically overwrite the snapshot, and MUST leave the stored data unchanged.
+- **FR-036**: When attempting to unlock existing protected data, the system MUST consider only protected snapshots whose non-secret envelope metadata matches the currently selected Ghostfolio server, and MUST try the supplied Ghostfolio security token only against that server-scoped candidate set.
+- **FR-037**: When a sync attempt retrieves activity data that the current application version cannot safely normalize, store, or later read within its supported stored-data model, the system MUST discard the newly retrieved incompatible data, MUST leave any existing readable protected snapshot unchanged, MUST inform the user that the new data was not stored, and MUST allow the workflow to continue with the previously readable protected snapshot instead of replacing it.
 
 ### Acceptance Coverage By Requirement
 
-- `FR-001` to `FR-005`, `FR-024`, `FR-025`, and `FR-026` are accepted by User Story 1 scenarios 1 through 5 together with the empty-history edge case.
-- `FR-003`, `FR-006` to `FR-012`, `FR-023`, `FR-024`, `FR-025`, `FR-027`, `FR-029`, and `FR-030` to `FR-034` are accepted by User Story 2 scenarios 1 through 6, User Story 3 scenarios 6 through 9, and the unrecoverable token-loss edge case.
-- `FR-013` to `FR-022`, `FR-025`, and `FR-029` are accepted by User Story 3 scenarios 1 through 9 together with the invalid-history and deterministic-ordering edge cases.
-- `FR-028` is accepted by User Story 1 scenario 5 and by explicit scope review of all workflow outcomes in this slice.
+- `FR-001` to `FR-007`, `FR-026`, and `FR-027` are accepted by User Story 1 scenarios 1 through 5 together with the empty-history edge case.
+- `FR-003`, `FR-008` to `FR-012`, `FR-024`, `FR-025`, `FR-028`, and `FR-030` to `FR-037` are accepted by User Story 2 scenarios 1 through 7, User Story 3 scenarios 6 through 9, and the unrecoverable token-loss edge case.
+- `FR-013` to `FR-023` are accepted by User Story 3 scenarios 1 through 9 together with the invalid-history and deterministic-ordering edge cases.
+- `FR-029` is accepted by User Story 1 scenario 5 and by explicit scope review of all workflow outcomes in this slice.
 
 ### Security, Precision, and Integration Constraints
 
 - **SEC-001**: The Ghostfolio security token MUST be entered explicitly by the user for each sync attempt, kept only for the active session, used as the unlock basis for protected sync data, cleared when the attempt ends or the application exits, and excluded from logs, output, and persisted artifacts.
-- **SEC-002**: Persisted activity data and user-specific sync state created by this slice MUST remain local to the user's computer and MUST be protected with token-derived encryption aligned with the OWASP Cryptographic Storage Cheat Sheet, including established cryptography, integrity protection, fresh randomness on rewrite, minimal cleartext metadata, and no stored token, token hash, or reusable token verifier. Any cleartext version marker retained for compatibility checks MUST be limited to the minimum metadata needed to detect unreadable stored-data versions safely.
+- **SEC-002**: Persisted activity data and user-specific sync state created by this slice MUST remain local to the user's computer and MUST be protected with token-derived encryption aligned with the OWASP Cryptographic Storage Cheat Sheet, including established cryptography, integrity protection, fresh randomness on rewrite, minimal cleartext metadata, and no stored token, token hash, or reusable token verifier. Any cleartext metadata retained outside the encrypted payload MUST be limited to the minimum needed for compatibility checks and selected-server snapshot discovery.
 - **SEC-003**: The startup-readable bootstrap setup carried forward from the previous slice MUST remain proportionately machine-local protected and MUST never include activity history, available report years, registered-local-user identity data created by this slice, or anything that would weaken the rule that stored activity data is accessible only through the Ghostfolio security token.
 - **FIN-001**: Every stored quantity, unit price, gross value, and fee value MUST preserve exact source precision in storage without rounding or currency conversion in this slice. Zero-priced `BUY` records are rejected, and zero-priced `SELL` records are stored only as non-taxable holding reductions when accompanied by an explanatory comment.
-- **QUAL-001**: Automated validation MUST cover full-history retrieval across multiple pages or batches, successful empty-history sync, first successful protected-profile creation, token-required unlock of existing protected data, wrong-token denial, creation of a separate isolated protected snapshot for a different valid token, retention of the previous protected snapshot after failed refresh, server-mismatch confirmation and replacement behavior, unsupported activity-type rejection, zero-priced `BUY` rejection, zero-priced `SELL` acceptance with explanation, chronological normalization, exact-duplicate removal, deterministic same-timestamp ordering or rejection, rejection of non-defensible normalized histories, scope-reliability preservation, available-year derivation, atomic protected-snapshot replacement, graceful failure on unsupported stored-data versions, and confirmation that no reporting workflow is exposed.
+- **QUAL-001**: Automated validation MUST cover full-history retrieval across multiple pages or batches, successful empty-history sync, first successful protected-profile creation, token-required unlock of existing protected data, wrong-token denial, creation of a separate isolated protected snapshot for a different valid token, retention of the previous protected snapshot after failed refresh, server-mismatch confirmation and replacement behavior, unsupported activity-type rejection, zero-priced `BUY` rejection, zero-priced `SELL` acceptance with explanation, chronological normalization, exact-duplicate removal, deterministic same-timestamp ordering or rejection, rejection of non-defensible normalized histories, scope-reliability preservation, available-year derivation from each activity timestamp's own offset and calendar date, atomic protected-snapshot replacement, graceful failure on unsupported stored-data versions, discard of newly synced incompatible data while preserving previously readable protected data, and confirmation that no reporting workflow is exposed.
 - **INT-001**: The feature depends on the selected Ghostfolio server exposing authenticated full activity history with enough asset identity, timestamps, quantities, prices, values, fees, explanatory comments, and any available source holding-scope information to build a normalized future-reporting-ready local history. Empty history is still a compatible success case. Contract drift or incomplete source data that prevents defensible future reporting is treated as sync failure rather than as partially stored success.
 
 ### Key Entities *(include if feature involves data)*
 
 - **Bootstrap Setup Record**: The startup-readable machine-local setup carried forward from the previous slice. It remembers setup completion and the selected Ghostfolio server, but never stores synced activity data or unlockable protected user data.
-- **Encrypted Snapshot Envelope**: The opaque local container that stores all persisted sync data created by this slice for one registered local user while exposing only minimal non-secret metadata needed to attempt unlock and compatibility checks.
+- **Encrypted Snapshot Envelope**: The opaque local container that stores all persisted sync data created by this slice for one registered local user while exposing only minimal non-secret metadata needed for compatibility checks and to limit unlock attempts to snapshots associated with the currently selected Ghostfolio server.
 - **Snapshot Payload**: The decrypted protected state for one registered local user after the correct Ghostfolio security token is supplied. It contains the protected setup profile, protected activity cache, the years available for future reporting, and the stored-data version markers needed for compatibility checks.
 - **Registered Local User**: The local protected profile created only after a successful full sync and bound to one Ghostfolio security token through unlockability rather than through any stored secret copy. Multiple registered local users may coexist on the same computer as separate isolated protected snapshots.
 - **Setup Profile**: The protected server reference and related sync profile data stored together with the protected activity history.
@@ -183,6 +197,8 @@ those areas.
 - **SC-008**: In controlled precision checks, 100% of stored quantity, price, value, and fee inputs match the source precision exactly, with no rounding or currency conversion applied by this slice.
 - **SC-009**: In controlled runs where a supplied token cannot unlock an existing protected snapshot but does authenticate successfully with Ghostfolio, 100% of successful syncs create a separate isolated protected snapshot and leave all pre-existing protected snapshots unchanged.
 - **SC-010**: In controlled compatibility-mismatch runs, 100% of attempts to read unsupported stored-data versions end with a clear compatibility failure message and leave existing protected data unchanged.
+- **SC-011**: In controlled runs where a new sync returns data that the current application version cannot safely normalize or persist into its supported stored-data model, 100% of attempts discard the newly retrieved incompatible data, preserve any previously readable protected snapshot unchanged, and inform the user that the old readable data remains available instead.
+- **SC-012**: In controlled year-boundary runs, 100% of derived available report years match the calendar years obtained from each activity timestamp's own offset and date as provided by Ghostfolio, with no year changes caused solely by machine-local timezone conversion or forced UTC conversion.
 
 ### Measurement Notes
 
@@ -190,6 +206,8 @@ those areas.
 - A sync counts as successful for **SC-001**, **SC-002**, **SC-006**, **SC-007**, and **SC-008** only when the user-visible outcome also confirms protected local storage and still exposes no reporting workflow.
 - Wrong-token and server-replacement outcomes for **SC-004** and **SC-005** are verified both by user-visible workflow results and by confirming that the previously stored protected snapshot remains the active protected local state.
 - Different-valid-token and stored-data-version mismatch outcomes for **SC-009** and **SC-010** are verified with deterministic protected-snapshot fixtures and controlled Ghostfolio responses so isolation and graceful compatibility failure can be audited repeatably.
+- Newly incompatible sync-data outcomes for **SC-011** are verified with deterministic fixtures that force a write-time or model-compatibility rejection after retrieval, then confirm that the newly retrieved data is discarded and the previously readable protected snapshot remains the active local state.
+- Year-boundary outcomes for **SC-012** are verified with deterministic fixtures containing timestamps near calendar-year boundaries across differing offsets, then confirming that available years follow the source timestamp dates rather than machine-local or forced UTC conversion.
 
 ## Assumptions
 
