@@ -229,9 +229,7 @@ The payload contains:
 - stored-data version markers
 - protected setup profile with the stored server reference
 - registered local user metadata
-- normalized activity cache
-- available report years
-- sync metadata
+- normalized activity cache, including available report years and sync metadata
 
 ### Write Rules
 

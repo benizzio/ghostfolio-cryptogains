@@ -35,7 +35,6 @@ erDiagram
         RegisteredLocalUser registered_local_user
         SetupProfile setup_profile
         ProtectedActivityCache protected_activity_cache
-        integer_array available_report_years
     }
 
     RegisteredLocalUser {
@@ -59,6 +58,7 @@ erDiagram
         timestamp synced_at
         integer retrieved_count
         integer activity_count
+        integer_array available_report_years
         enum scope_reliability
         ActivityRecord_array activities
         RegisteredLocalUser registered_local_user

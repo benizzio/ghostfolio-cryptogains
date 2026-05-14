@@ -30,7 +30,7 @@ Selected storage details:
 - cleartext header fields: magic, `format_version`, `server_discovery_key`, KDF parameters, salt, nonce
 - `server_discovery_key = SHA-256(canonical_server_origin)`
 - cleartext header bytes are authenticated as AEAD additional authenticated data
-- encrypted payload fields: stored-data version markers, protected setup profile, registered local user metadata, normalized activity cache, available report years, and sync metadata
+- encrypted payload fields: stored-data version markers, protected setup profile, registered local user metadata, and a normalized activity cache with available report years and sync metadata
 - every rewrite uses fresh salt and nonce and replaces the snapshot atomically through temp file plus rename
 
 Alternatives considered: SQLite or another embedded database was rejected because this slice persists one cohesive protected snapshot per local context and does not need queryable tables. SQLCipher was rejected because it adds distribution complexity and CGO concerns that are unnecessary for a Go TUI. A plaintext profile index was rejected because the spec and constitution allow only minimal cleartext metadata outside the encrypted payload. Storing a token hash or reusable token verifier was rejected explicitly by `SEC-002`.
@@ -53,7 +53,7 @@ Alternatives considered: Keeping the `take=1` activities probe from `002` was re
 
 ## Normalization, Deduplication, And Validation Pipeline
 
-Decision: Convert transport DTOs into normalized stored `ActivityRecord` values, sort the full history chronologically, remove exact duplicates after canonical normalization, enforce the `BUY` and `SELL` support boundary from `001`, preserve source timestamps with their original offsets, and derive available report years from those source timestamps before persistence.
+Decision: Convert transport DTOs into normalized stored `ActivityRecord` values, sort the full history chronologically, remove exact duplicates after canonical normalization, enforce the `BUY` and `SELL` support boundary from `001`, preserve source timestamps with their original offsets, and derive available report years into the protected activity cache from those source timestamps before persistence.
 
 Rationale: `003` explicitly inherits the reporting-ready activity-model subset from `001` while still forbidding reporting behavior in this slice. The stored data needs to be defensible for later basis calculations, so the sync pipeline must normalize and validate now rather than postpone correctness checks. The clarification in `specs/003-store-activity-data/spec.md` requires report-year derivation from each timestamp's own offset and calendar date, which means the stored model must not discard source offset information during normalization.
 
@@ -68,7 +68,7 @@ Selected normalization rules:
 - reject normalized `BUY` records with `unit_price = 0`
 - accept normalized `SELL` records with `unit_price = 0` only when an explanatory comment is present, storing them as non-taxable holding reductions for future reporting
 - preserve available source-scope data and record whether scope is reliable enough for later reporting decisions
-- derive `available_report_years` from the stored source timestamps after normalization completes
+- derive `available_report_years` into the `ProtectedActivityCache` from the stored source timestamps after normalization completes
 
 Alternatives considered: Skipping unsupported activities was rejected because both `001` and `003` require the whole sync to fail on unsupported source activity types. Using machine-local time or forced UTC conversion for year derivation was rejected because it would violate the source-offset rule in `003`. Inferring transfer linkage from free-text comments was rejected because `001` already limits comments to explanatory text only.
 

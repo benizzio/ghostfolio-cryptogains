@@ -102,7 +102,7 @@ tests/
 - The on-disk cleartext header contains only the fields needed before decrypt: envelope magic, `format_version`, KDF parameters, random salt, AEAD nonce, and a `server_discovery_key` derived from the canonical selected server origin.
 - Define `server_discovery_key = SHA-256(canonical_server_origin)` so snapshot discovery can stay server-scoped without writing the plaintext origin or any token-derived verifier into the snapshot header.
 - Authenticate the serialized cleartext header as AEAD additional authenticated data so header tampering fails decryption even though the header itself remains readable.
-- Keep a versioned encrypted payload that contains stored-data version markers, protected setup profile, registered local user metadata, normalized activity cache, available report years, and sync metadata.
+- Keep a versioned encrypted payload that contains stored-data version markers, protected setup profile, registered local user metadata, and a normalized activity cache with derived available report years and sync metadata.
 - Write every successful protected update through a temp file, `fsync`, and atomic rename. A failed write, validation failure, or canceled replacement must leave the previously readable snapshot untouched.
 - Document removal paths clearly: deleting `setup.json` resets bootstrap setup, while deleting protected snapshot files removes token-locked synced data. Neither operation persists or reveals the Ghostfolio security token.
 
@@ -118,7 +118,7 @@ tests/
   - sort chronologically
   - remove exact duplicates by a hash of normalized source fields
   - validate supported activity rules and defensibility
-  - derive `available_report_years` from each timestamp's own offset and calendar date
+  - derive `available_report_years` into the normalized activity cache from each timestamp's own offset and calendar date
 - Use deterministic ordering for same-asset events that share the same instant: `occurred_at` ascending, then `source_id` ascending. Reject the sync if stable ordering cannot be established.
 - Support only `BUY` and `SELL`. Any other activity type fails the sync. Normalized `BUY` records must have `unit_price > 0`. Normalized `SELL` records may have `unit_price = 0` only when an explanatory comment is present, in which case they are stored as non-taxable holding reductions for future reporting.
 - Preserve source holding scope when present, but record scope reliability rather than making any reporting decision in this slice. Missing or unreliable scope data does not fail sync by itself.

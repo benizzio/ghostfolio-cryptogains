@@ -106,7 +106,7 @@ Validation rules:
 
 ## SnapshotPayload
 
-Purpose: Decrypted protected state for one isolated local user context.
+Purpose: Decrypted protected container for one isolated local user context.
 
 Fields:
 
@@ -116,7 +116,6 @@ Fields:
 | `registered_local_user` | `RegisteredLocalUser` | Protected local user metadata |
 | `setup_profile` | `SetupProfile` | Protected selected-server reference and related sync profile data |
 | `protected_activity_cache` | `ProtectedActivityCache` | Normalized stored history and sync metadata |
-| `available_report_years` | integer array | Distinct years derived from stored activity timestamps |
 
 Relationships:
 
@@ -129,7 +128,7 @@ Validation rules:
 
 - Persist only after successful auth, full retrieval, normalization, validation, and protected write preparation.
 - Rewrite atomically as one whole payload.
-- Empty history remains valid when `available_report_years` is empty and the cache reflects a successful empty sync.
+- Empty history remains valid when the contained cache has an empty `available_report_years` set and reflects a successful empty sync.
 
 ## RegisteredLocalUser
 
@@ -189,7 +188,7 @@ State transitions:
 
 ## ProtectedActivityCache
 
-Purpose: Normalized, deduplicated, validated activity history and sync metadata reused across sessions.
+Purpose: Normalized, deduplicated, validated activity history, derived report-year metadata, and sync metadata reused across sessions.
 
 Fields:
 
@@ -198,6 +197,7 @@ Fields:
 | `synced_at` | timestamp | Time of the last successful sync |
 | `retrieved_count` | integer | Number of source records retrieved before normalization |
 | `activity_count` | integer | Number of stored activities after normalization and duplicate removal |
+| `available_report_years` | integer array | Distinct years derived from stored activity timestamps |
 | `scope_reliability` | enum | `reliable`, `partial`, `unavailable` |
 | `activities` | `ActivityRecord[]` | Chronologically ordered normalized activity history |
 
@@ -209,8 +209,8 @@ Relationships:
 Validation rules:
 
 - Persist only after full pagination succeeds.
-- Persist only after chronological sorting, duplicate removal, exact-decimal parsing, activity-type validation, zero-price rule validation, available-year derivation, and defensibility checks complete.
-- A valid empty history uses `retrieved_count = 0`, `activity_count = 0`, and an empty `activities` list.
+- Persist only after chronological sorting, duplicate removal, exact-decimal parsing, activity-type validation, zero-price rule validation, available-year derivation into `available_report_years`, and defensibility checks complete.
+- A valid empty history uses `retrieved_count = 0`, `activity_count = 0`, an empty `activities` list, and an empty `available_report_years` set.
 
 ## ActivityRecord
 
