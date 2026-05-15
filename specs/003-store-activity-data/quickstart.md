@@ -8,6 +8,7 @@ Validate the slice that:
 - retrieves the full supported Ghostfolio activity history
 - normalizes and validates that history for future reporting use
 - stores successful results only inside token-locked protected snapshots
+- writes eligible synced-data diagnostic reports locally with production redaction and explicit-development-mode auto-generation rules
 - still exposes no reporting or cached-data browsing workflow
 
 ## Prerequisites
@@ -28,6 +29,7 @@ Run:
 ```bash
 make test
 make coverage
+GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1 go test ./tests/integration -run TestSyncPerformanceFlowLargeHistoryFixture -count=1 -v
 ```
 
 Expected automated coverage scope for this slice includes:
@@ -43,7 +45,25 @@ Expected automated coverage scope for this slice includes:
 - server-mismatch confirmation and cancel path
 - unsupported stored-data version failure
 - incompatible newly synced data discarded while existing readable snapshot remains active
+- eligible synced-data diagnostic-report prompting, auto-generation, redaction, and path disclosure
+- persisted-artifact leakage checks for setup, snapshots, and diagnostics
 - confirmation that no reporting workflow is available
+
+## Workflow Result Categories
+
+Successful sync confirms protected local storage and still exposes no reporting workflow.
+
+Failed sync ends with exactly one user-visible category:
+
+- `rejected token`
+- `timeout`
+- `connectivity problem`
+- `unsuccessful server response`
+- `incompatible server contract`
+- `unsupported activity history`
+- `unsupported stored-data version`
+- `incompatible new sync data`
+- `server replacement cancelled`
 
 ## Launch The Application
 
@@ -152,6 +172,30 @@ Expected result for each case:
 - the final result category is `unsupported activity history`
 - any previously readable snapshot remains unchanged
 
+## Production Diagnostic Report Path
+
+1. Run an eligible synced-data failure outside explicit development mode.
+2. On the result screen, choose `Generate Diagnostic Report`.
+
+Expected result:
+
+- the result screen discloses the written `.diagnostic.json` path only after the explicit choice
+- the generated report includes failure category, attempt timing, selected server origin, and allowed offending-record context
+- the generated report redacts `quantity`, `unit_price`, `gross_value`, and `fee_amount`
+- the report still excludes the Ghostfolio security token, JWT, and raw unprotected Ghostfolio payload fragments
+
+## Explicit Development Mode Diagnostic Report Path
+
+1. Launch with `make run-dev`.
+2. Run the same eligible synced-data failure.
+
+Expected result:
+
+- the result screen skips the extra prompt
+- one diagnostic report is written automatically
+- the result screen discloses the written path
+- the report may include offending-record financial values, but it still excludes the Ghostfolio security token, JWT, and raw unprotected Ghostfolio payload fragments
+
 ## Server Replacement Path
 
 1. Complete a successful sync.
@@ -200,11 +244,44 @@ Protected snapshot directory location:
 - macOS: `~/Library/Application Support/ghostfolio-cryptogains/snapshots/`
 - Windows: `%AppData%\ghostfolio-cryptogains\snapshots\`
 
+Diagnostic report directory location:
+
+- Linux: `$XDG_CONFIG_HOME/ghostfolio-cryptogains/diagnostics/` or `~/.config/ghostfolio-cryptogains/diagnostics/`
+- macOS: `~/Library/Application Support/ghostfolio-cryptogains/diagnostics/`
+- Windows: `%AppData%\ghostfolio-cryptogains\diagnostics\`
+
 Removal behavior:
 
 - deleting `setup.json` resets bootstrap setup on the next launch
 - deleting the `snapshots/` directory removes protected synced activity data
+- deleting the `diagnostics/` directory removes generated synced-data diagnostic reports
 - neither deletion path reveals or recovers the Ghostfolio security token
+
+## Persisted Artifact Inspection
+
+After one successful sync and one eligible synced-data failure that generated a diagnostic report, inspect the application-data root.
+
+Expected result:
+
+- `setup.json` contains only bootstrap fields
+- `snapshots/` contains opaque `.snapshot` files and does not expose plaintext activity data or token material
+- `diagnostics/` contains structured `.diagnostic.json` files only when a report was generated
+- no persisted artifact stores the Ghostfolio security token, raw unprotected Ghostfolio payload fragments, or transient result-screen failure text
+- production diagnostic reports do not expose `quantity`, `unit_price`, `gross_value`, or `fee_amount`
+
+## Large-History Performance Verification
+
+Run:
+
+```bash
+GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1 go test ./tests/integration -run TestSyncPerformanceFlowLargeHistoryFixture -count=1 -v
+```
+
+Expected result:
+
+- the command runs a deterministic 10,000-activity fixture spanning at least 5 calendar years
+- the timed path includes authenticated retrieval, normalization, validation, and protected snapshot refresh
+- the logged runtime stays under the `SC-006` threshold of 2 minutes
 
 ## Negative Checks
 
@@ -213,5 +290,7 @@ After both successful and failed sync attempts, verify:
 - the Ghostfolio security token was not written to disk
 - the Ghostfolio JWT was not written to disk
 - raw unprotected Ghostfolio payloads were not written to disk
-- only bootstrap setup and protected snapshot files remain persisted
+- transient sync-failure screen text was not written to disk
+- production diagnostic reports redact disallowed financial-value fields
+- only bootstrap setup, protected snapshot, and explicitly generated diagnostic-report files remain persisted
 - no report-generation, report-preview, or cached-data browsing action is exposed in the UI

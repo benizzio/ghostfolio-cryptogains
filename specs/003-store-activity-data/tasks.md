@@ -144,12 +144,12 @@ description: "Task list for Store Activity Data implementation"
 
 **Purpose**: Finish documentation, release checks, security verification, and cross-story verification.
 
-- [ ] T043 [P] Update protected-storage, diagnostic-report, removal, and no-reporting documentation in `README.md`
-- [ ] T044 [P] Reconcile `specs/003-store-activity-data/quickstart.md` with the implemented sync result categories, diagnostic-report generation and inspection steps, persisted-artifact inspection steps, large-history performance verification steps, and verification commands in `specs/003-store-activity-data/quickstart.md`
-- [ ] T045 [P] Document the OWASP Top 10 and Cryptographic Storage review, refreshed dependency and API research evidence, and the `SC-006` performance-verification evidence in `specs/003-store-activity-data/checklists/requirements.md`
-- [ ] T049 [P] Add integration coverage that bootstrap files, protected snapshots, generated diagnostic reports, and persisted workflow artifacts never store Ghostfolio tokens, raw payload fragments, transient sync-failure messages, or production-disallowed financial-value fields in `tests/integration/persistence_security_flow_test.go`
-- [ ] T050 [P] Add deterministic large-history performance verification coverage for authenticated retrieval, normalization, validation, and protected replacement in `tests/integration/sync_performance_flow_test.go`
-- [ ] T046 Run `make test`, `make coverage`, and the documented large-history performance verification, then verify the generated artifacts in `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`
+- [X] T043 [P] Update protected-storage, diagnostic-report, removal, and no-reporting documentation in `README.md`
+- [X] T044 [P] Reconcile `specs/003-store-activity-data/quickstart.md` with the implemented sync result categories, diagnostic-report generation and inspection steps, persisted-artifact inspection steps, large-history performance verification steps, and verification commands in `specs/003-store-activity-data/quickstart.md`
+- [X] T045 [P] Document the OWASP Top 10 and Cryptographic Storage review, refreshed dependency and API research evidence, and the `SC-006` performance-verification evidence in `specs/003-store-activity-data/checklists/requirements.md`
+- [X] T049 [P] Add integration coverage that bootstrap files, protected snapshots, generated diagnostic reports, and persisted workflow artifacts never store Ghostfolio tokens, raw payload fragments, transient sync-failure messages, or production-disallowed financial-value fields in `tests/integration/persistence_security_flow_test.go`
+- [X] T050 [P] Add deterministic large-history performance verification coverage for authenticated retrieval, normalization, validation, and protected replacement in `tests/integration/sync_performance_flow_test.go`
+- [X] T046 Run `make test`, `make coverage`, and the documented large-history performance verification, then verify the generated artifacts in `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`
 
 ---
 
