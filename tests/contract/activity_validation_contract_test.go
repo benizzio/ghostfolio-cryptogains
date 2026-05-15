@@ -97,6 +97,45 @@ func TestActivityValidationContractDerivesScopeReliabilityOutcomes(t *testing.T)
 	}
 }
 
+// TestActivityValidationContractOrdersSameAssetSameDayUsingActivityTypeBeforeSourceID
+// verifies the reopened same-day Ghostfolio ordering contract.
+// Authored by: OpenCode
+func TestActivityValidationContractOrdersSameAssetSameDayUsingActivityTypeBeforeSourceID(t *testing.T) {
+	t.Parallel()
+
+	records := []syncmodel.ActivityRecord{
+		activityValidationContractRecord(t, "sell-z", "2024-01-10T00:00:00Z", syncmodel.ActivityTypeSell, "BTC", "1", "120", "120", nil),
+		activityValidationContractRecord(t, "buy-a", "2024-01-10T23:59:59Z", syncmodel.ActivityTypeBuy, "BTC", "2", "100", "200", nil),
+		activityValidationContractRecord(t, "buy-b", "2024-01-10T12:00:00Z", syncmodel.ActivityTypeBuy, "BTC", "1", "110", "110", nil),
+	}
+
+	cache, err := syncnormalize.NewNormalizer().Normalize(records)
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	if err := syncvalidate.NewValidator().Validate(cache); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+
+	var got = []string{
+		cache.Activities[0].SourceID,
+		cache.Activities[1].SourceID,
+		cache.Activities[2].SourceID,
+	}
+	var want = []string{"buy-a", "buy-b", "sell-z"}
+	for index := range want {
+		if got[index] != want[index] {
+			t.Fatalf("unexpected same-day order: got %#v want %#v", got, want)
+		}
+	}
+	if cache.Activities[0].OccurredAt != "2024-01-10T23:59:59Z" {
+		t.Fatalf("expected original occurred_at to stay preserved, got %q", cache.Activities[0].OccurredAt)
+	}
+	if cache.Activities[2].OccurredAt != "2024-01-10T00:00:00Z" {
+		t.Fatalf("expected original occurred_at to stay preserved, got %q", cache.Activities[2].OccurredAt)
+	}
+}
+
 func activityValidationContractRecord(
 	t *testing.T,
 	sourceID string,

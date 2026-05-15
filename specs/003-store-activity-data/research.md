@@ -55,13 +55,13 @@ Alternatives considered: Keeping the `take=1` activities probe from `002` was re
 
 Decision: Convert transport DTOs into normalized stored `ActivityRecord` values, sort the full history chronologically, remove exact duplicates after canonical normalization, enforce the `BUY` and `SELL` support boundary from `001`, preserve source timestamps with their original offsets, and derive available report years into the protected activity cache from those source timestamps before persistence.
 
-Rationale: `003` explicitly inherits the reporting-ready activity-model subset from `001` while still forbidding reporting behavior in this slice. The stored data needs to be defensible for later basis calculations, so the sync pipeline must normalize and validate now rather than postpone correctness checks. The clarification in `specs/003-store-activity-data/spec.md` requires report-year derivation from each timestamp's own offset and calendar date, which means the stored model must not discard source offset information during normalization.
+Rationale: `003` explicitly inherits the reporting-ready activity-model subset from `001` while still forbidding reporting behavior in this slice. The stored data needs to be defensible for later basis calculations, so the sync pipeline must normalize and validate now rather than postpone correctness checks. The clarification in `specs/003-store-activity-data/spec.md` requires report-year derivation from each timestamp's own offset and calendar date, which means the stored model must not discard source offset information during normalization. The refreshed 2026-05-15 Ghostfolio review also confirmed that activity capture is date-based, so the upstream `date` field's time-of-day is not authoritative for same-asset replay order even though the original timestamp still needs to be preserved for storage and year derivation.
 
 Selected normalization rules:
 
 - map each supported Ghostfolio activity into a normalized `ActivityRecord`
 - preserve the timestamp in RFC3339 form with its source offset intact
-- establish deterministic order as `occurred_at` ascending and `source_id` ascending for same-asset same-instant ties
+- establish deterministic same-asset same-day order from the source calendar date in `occurred_at`, then `activity_type` with `BUY` before `SELL`, then `source_id`, while preserving the original `occurred_at` value in stored records
 - compute a `raw_hash` from normalized source fields and remove exact duplicates by that hash
 - reject the full sync if a supported deterministic order cannot be established
 - reject any activity type other than `BUY` or `SELL`

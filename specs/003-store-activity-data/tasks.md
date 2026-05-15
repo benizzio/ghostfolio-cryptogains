@@ -35,7 +35,7 @@ description: "Task list for Store Activity Data implementation"
 - [X] T002 [P] Create the protected snapshot package skeleton in `internal/snapshot/envelope/`, `internal/snapshot/model/`, and `internal/snapshot/store/`
 - [X] T003 [P] Create the normalized sync package skeleton in `internal/sync/model/`, `internal/sync/normalize/`, and `internal/sync/validate/`
 - [X] T047 [P] Refresh dependency due-diligence evidence for `github.com/cockroachdb/apd/v3` and `golang.org/x/crypto/argon2` in `specs/003-store-activity-data/research.md`
-- [ ] T048 [P] ⚠️ Reopened Refresh Ghostfolio auth and pagination contract review evidence in `specs/003-store-activity-data/research.md` and `specs/003-store-activity-data/contracts/ghostfolio-sync.md` (reopened — BUG-002: document that `/api/v1/activities` `date` time-of-day precision is not authoritative for same-asset ordering)
+- [X] T048 [P] ⚠️ Reopened Refresh Ghostfolio auth and pagination contract review evidence in `specs/003-store-activity-data/research.md` and `specs/003-store-activity-data/contracts/ghostfolio-sync.md` (reopened — BUG-002: document that `/api/v1/activities` `date` time-of-day precision is not authoritative for same-asset ordering)
 
 ---
 
@@ -76,14 +76,14 @@ description: "Task list for Store Activity Data implementation"
 
 - [X] T017 [P] [US1] Implement paginated Ghostfolio activities retrieval with `skip`, `take`, and ascending date order in `internal/ghostfolio/client/client.go`
 - [X] T018 [P] [US1] Implement Ghostfolio activity-to-normalized-record mapping in `internal/ghostfolio/mapper/activity_mapper.go`
-- [ ] T019 [P] [US1] ⚠️ Reopened Implement chronological normalization, same-asset source-calendar-date ordering, duplicate hashing, and available-year derivation in `internal/sync/normalize/activity_history.go` (reopened — BUG-002: preserve original timestamps in stored records while establishing the normalized same-asset ordering rule)
+- [X] T019 [P] [US1] ⚠️ Reopened Implement chronological normalization, same-asset source-calendar-date ordering, duplicate hashing, and available-year derivation in `internal/sync/normalize/activity_history.go` (reopened — BUG-002: preserve original timestamps in stored records while establishing the normalized same-asset ordering rule)
 - [X] T020 [P] [US1] Implement supported-history validation for `BUY` and `SELL` activity rules in `internal/sync/validate/activity_history.go`
 - [X] T021 [P] [US1] Implement protected snapshot encryption, decryption, and atomic persistence in `internal/snapshot/store/encrypted_store.go`
 - [X] T022 [US1] Implement full sync orchestration from auth through protected write in `internal/app/runtime/sync_service.go`
 - [X] T023 [US1] Update sync flow busy-state lifecycle and result routing for full-history storage in `internal/tui/flow/sync_flow.go`
 - [X] T024 [US1] Replace validation-only sync entry and result screens with storage-focused wording in `internal/tui/screen/sync_validation_screen.go` and `internal/tui/screen/validation_result_screen.go`
 
-**Checkpoint**: User Story 1 is independently functional. The app can fetch full history and store a protected snapshot without exposing reporting workflows. The deterministic-ordering bugfix task `T019` still needs to finish before this story is fully complete for release.
+**Checkpoint**: User Story 1 is independently functional. The app can fetch full history, preserve original source timestamps, apply deterministic same-asset same-day ordering, and store a protected snapshot without exposing reporting workflows.
 
 ---
 
@@ -121,22 +121,22 @@ description: "Task list for Store Activity Data implementation"
 
 ### Tests for User Story 3
 
-- [ ] T033 [P] [US3] ⚠️ Reopened Add normalization and defensibility contract coverage for supported activity rules, below-zero holdings rejection, and scope-reliability outcome categories in `tests/contract/activity_validation_contract_test.go` (reopened — BUG-002: cover same-asset same-day Ghostfolio histories with arbitrary time values)
+- [X] T033 [P] [US3] ⚠️ Reopened Add normalization and defensibility contract coverage for supported activity rules, below-zero holdings rejection, and scope-reliability outcome categories in `tests/contract/activity_validation_contract_test.go` (reopened — BUG-002: cover same-asset same-day Ghostfolio histories with arbitrary time values)
 - [X] T034 [P] [US3] Add server-mismatch confirmation workflow contract coverage in `tests/contract/server_replacement_workflow_contract_test.go`
-- [ ] T035 [P] [US3] ⚠️ Reopened Add integration coverage for unsupported activity history, duplicate removal, deterministic ordering, below-zero holdings rejection, and zero-price rule handling in `tests/integration/activity_validation_flow_test.go` (reopened — BUG-002: cover same-asset same-day histories that must order `BUY` before `SELL` before `source_id` when Ghostfolio time values are arbitrary)
+- [X] T035 [P] [US3] ⚠️ Reopened Add integration coverage for unsupported activity history, duplicate removal, deterministic ordering, below-zero holdings rejection, and zero-price rule handling in `tests/integration/activity_validation_flow_test.go` (reopened — BUG-002: cover same-asset same-day histories that must order `BUY` before `SELL` before `source_id` when Ghostfolio time values are arbitrary)
 - [X] T036 [P] [US3] Add integration coverage for server replacement confirm, cancel, success, and failed-replacement retention in `tests/integration/server_replacement_flow_test.go`
-- [ ] T037 [P] [US3] ⚠️ Reopened Add unit coverage for duplicate hashing, tie-break ordering, running-quantity defensibility checks, and scope-reliability derivation in `tests/unit/activity_normalization_test.go` and `tests/unit/scope_reliability_test.go` (reopened — BUG-002: tie-break ordering must use source calendar date, `activity_type`, then `source_id`)
+- [X] T037 [P] [US3] ⚠️ Reopened Add unit coverage for duplicate hashing, tie-break ordering, running-quantity defensibility checks, and scope-reliability derivation in `tests/unit/activity_normalization_test.go` and `tests/unit/scope_reliability_test.go` (reopened — BUG-002: tie-break ordering must use source calendar date, `activity_type`, then `source_id`)
 
 ### Implementation for User Story 3
 
-- [ ] T038 [P] [US3] ⚠️ Reopened Implement running-quantity replay support and source-scope reliability derivation in `internal/sync/normalize/activity_history.go` so they consume the same-asset source-calendar-date ordering established in `T019` (reopened — BUG-002: replay must use source calendar date, `activity_type`, then `source_id`)
-- [ ] T039 [P] [US3] ⚠️ Reopened Implement defensibility checks for missing or contradictory normalized fields, below-zero holdings, zero-priced `SELL` comment rules, and unsupported-history rejection in `internal/sync/validate/activity_history.go` (reopened — BUG-002: defensibility must evaluate same-asset ordering after source calendar date, `activity_type`, and `source_id` tie-breaking)
+- [X] T038 [P] [US3] ⚠️ Reopened Implement running-quantity replay support and source-scope reliability derivation in `internal/sync/normalize/activity_history.go` so they consume the same-asset source-calendar-date ordering established in `T019` (reopened — BUG-002: replay must use source calendar date, `activity_type`, then `source_id`)
+- [X] T039 [P] [US3] ⚠️ Reopened Implement defensibility checks for missing or contradictory normalized fields, below-zero holdings, zero-priced `SELL` comment rules, and unsupported-history rejection in `internal/sync/validate/activity_history.go` (reopened — BUG-002: defensibility must evaluate same-asset ordering after source calendar date, `activity_type`, and `source_id` tie-breaking)
 - [X] T053 [US3] Extend mapping, normalization, and validation failures to surface offending-record diagnostic context and production/dev redaction inputs in `internal/ghostfolio/mapper/activity_mapper.go`, `internal/sync/normalize/activity_history.go`, `internal/sync/validate/activity_history.go`, and `internal/app/runtime/sync_service.go`
 - [X] T040 [P] [US3] Implement server-mismatch detection and replacement gating against the active readable snapshot in `internal/app/runtime/sync_service.go`
 - [X] T041 [US3] Implement server replacement confirmation screen and navigation in `internal/tui/screen/server_replacement_screen.go` and `internal/tui/flow/sync_flow.go`
 - [X] T042 [US3] Update the main menu and sync entry screens to surface protected-data-exists state without exposing cached activity details in `internal/tui/screen/main_menu_screen.go` and `internal/tui/screen/sync_validation_screen.go`
 
-**Checkpoint**: User Story 3 still needs the deterministic-ordering bugfix tasks `T033`, `T035`, `T037`, `T038`, and `T039` before it is fully complete for release.
+**Checkpoint**: User Story 3 is functionally complete for deterministic same-asset same-day ordering, defensibility checks, duplicate removal, scope-reliability derivation, and server-boundary protection.
 
 ---
 

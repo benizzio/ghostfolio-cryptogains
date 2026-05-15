@@ -16,6 +16,7 @@ Observed upstream review evidence refreshed on 2026-05-15:
 - `apps/api/src/app/auth/auth.controller.ts` exposes `@Post('anonymous')` and returns `{ authToken }` on success while rejected access tokens surface as HTTP `403 Forbidden`.
 - `apps/api/src/app/activities/activities.controller.ts` exposes `GET /activities` with `skip`, `take`, `sortColumn`, and `sortDirection` query parameters and returns `{ activities, count }`.
 - `apps/api/src/app/activities/activities.service.ts` applies `skip` and `take`, defaults to date ordering, and appends `id` as a deterministic tie-break when explicit sorting is requested.
+- Ghostfolio activity capture is date-based, so the `/api/v1/activities` `date` field must be preserved exactly for storage and year derivation but its time-of-day precision is not treated as authoritative for same-asset local ordering.
 
 ## Compatibility Rules
 
@@ -167,7 +168,7 @@ Optional preserved inputs:
 - A partial first page is never a complete sync.
 - Pagination must be monotonic. Contradictory `count`, duplicate page boundaries that cannot be normalized as exact duplicates, or other inconsistent paging behavior fail the sync.
 - A valid empty history is a successful retrieval when `count == 0` and `activities` is empty.
-- The upstream activities service currently appends `id` as a server-side tie-break after the requested sort order. The client still treats `occurred_at` plus `source_id` ordering as the defensible local normalization rule for this slice.
+- The upstream activities service currently appends `id` as a server-side tie-break after the requested sort order. The client still preserves the original `occurred_at` value, but for same-asset same-day local ordering it ignores Ghostfolio time-of-day precision and uses source calendar date, then `activity_type` with `BUY` before `SELL`, then `source_id`.
 
 ### Failure Handling Rules
 
@@ -181,8 +182,8 @@ Optional preserved inputs:
 - Normalize the complete retrieved history before persistence.
 - Preserve timestamps in RFC3339 form with the source offset intact.
 - Sort normalized history chronologically.
-- For same-asset events that share the same instant, break ties with `source_id` ascending.
-- Reject the sync if stable deterministic ordering cannot be established.
+- For same-asset events that share the same source calendar date, ignore Ghostfolio time-of-day precision and break ties by `activity_type` with `BUY` before `SELL`, then `source_id` ascending.
+- Reject the sync if the source calendar date cannot be read from `occurred_at` or if stable deterministic same-asset ordering still cannot be established after exact-duplicate removal.
 - Remove exact duplicates only after canonical normalization.
 - Supported normalized activity types are only:
 

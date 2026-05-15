@@ -57,17 +57,21 @@ func TestActivityValidationFlowRejectsUnsupportedHistoryAndKeepsExistingSnapshot
 	}
 }
 
-func TestActivityValidationFlowNormalizesDuplicatesAndSameTimestampOrdering(t *testing.T) {
+// TestActivityValidationFlowNormalizesDuplicatesAndSameAssetSameDayOrdering
+// verifies duplicate removal and persisted same-day ordering through the full sync flow.
+// Authored by: OpenCode
+func TestActivityValidationFlowNormalizesDuplicatesAndSameAssetSameDayOrdering(t *testing.T) {
 	t.Parallel()
 
 	baseDir := t.TempDir()
 	server := newTokenAwareStorageServer(t)
 	server.SetTokenPages("token-one", []storagePageFixture{{
-		Count: 3,
+		Count: 4,
 		ActivitiesJSON: `[
-			{"id":"b","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}},
-			{"id":"a","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}},
-			{"id":"a","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}
+			{"id":"sell-z","date":"2024-01-01T00:00:00Z","type":"SELL","quantity":1,"valueInBaseCurrency":120,"unitPriceInAssetProfileCurrency":120,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}},
+			{"id":"buy-a","date":"2024-01-01T23:59:59Z","type":"BUY","quantity":2,"valueInBaseCurrency":200,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}},
+			{"id":"buy-a","date":"2024-01-01T23:59:59Z","type":"BUY","quantity":2,"valueInBaseCurrency":200,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}},
+			{"id":"buy-b","date":"2024-01-01T12:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":110,"unitPriceInAssetProfileCurrency":110,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}
 		]`,
 	}})
 	service := newActivityValidationSyncService(baseDir, server)
@@ -86,14 +90,17 @@ func TestActivityValidationFlowNormalizesDuplicatesAndSameTimestampOrdering(t *t
 	if err != nil {
 		t.Fatalf("read payload: %v", err)
 	}
-	if payload.ProtectedActivityCache.ActivityCount != 2 {
+	if payload.ProtectedActivityCache.ActivityCount != 3 {
 		t.Fatalf("expected duplicate removal, got %d activities", payload.ProtectedActivityCache.ActivityCount)
 	}
-	if payload.ProtectedActivityCache.Activities[0].SourceID != "a" || payload.ProtectedActivityCache.Activities[1].SourceID != "b" {
-		t.Fatalf("expected deterministic same-timestamp ordering, got %#v", payload.ProtectedActivityCache.Activities)
+	if payload.ProtectedActivityCache.Activities[0].SourceID != "buy-a" || payload.ProtectedActivityCache.Activities[1].SourceID != "buy-b" || payload.ProtectedActivityCache.Activities[2].SourceID != "sell-z" {
+		t.Fatalf("expected deterministic same-day ordering, got %#v", payload.ProtectedActivityCache.Activities)
 	}
 	if payload.ProtectedActivityCache.Activities[0].RawHash == "" {
 		t.Fatalf("expected normalized activities to persist duplicate hashes")
+	}
+	if payload.ProtectedActivityCache.Activities[0].OccurredAt != "2024-01-01T23:59:59Z" || payload.ProtectedActivityCache.Activities[2].OccurredAt != "2024-01-01T00:00:00Z" {
+		t.Fatalf("expected preserved original timestamps, got %#v", payload.ProtectedActivityCache.Activities)
 	}
 }
 
@@ -115,6 +122,45 @@ func TestActivityValidationFlowRejectsBelowZeroHoldings(t *testing.T) {
 	outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token-one"})
 	if outcome.FailureReason != runtime.SyncFailureUnsupportedActivityHistory {
 		t.Fatalf("expected below-zero holdings rejection, got %#v", outcome)
+	}
+}
+
+// TestActivityValidationFlowUsesSameDayReplayOrderingForArbitraryGhostfolioTimes
+// verifies that same-day holdings replay ignores arbitrary Ghostfolio clock values.
+// Authored by: OpenCode
+func TestActivityValidationFlowUsesSameDayReplayOrderingForArbitraryGhostfolioTimes(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	server := newTokenAwareStorageServer(t)
+	server.SetTokenPages("token-one", []storagePageFixture{{
+		Count: 2,
+		ActivitiesJSON: `[
+			{"id":"sell-early-clock","date":"2024-01-01T00:00:00Z","type":"SELL","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}},
+			{"id":"buy-late-clock","date":"2024-01-01T23:59:59Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}
+		]`,
+	}})
+	service := newActivityValidationSyncService(baseDir, server)
+	config := mustActivityValidationConfig(t, server.URL())
+	inspector := snapshotstore.NewEncryptedStore(baseDir, nil)
+
+	outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token-one"})
+	if !outcome.Success {
+		t.Fatalf("expected same-day replay ordering success, got %#v", outcome)
+	}
+	candidates, err := snapshotstore.DiscoverServerCandidates(context.Background(), inspector, server.URL())
+	if err != nil {
+		t.Fatalf("discover candidates: %v", err)
+	}
+	payload, err := inspector.Read(context.Background(), snapshotstore.ReadRequest{Candidate: candidates[0], SecurityToken: "token-one"})
+	if err != nil {
+		t.Fatalf("read payload: %v", err)
+	}
+	if payload.ProtectedActivityCache.Activities[0].SourceID != "buy-late-clock" || payload.ProtectedActivityCache.Activities[1].SourceID != "sell-early-clock" {
+		t.Fatalf("expected same-day replay ordering to ignore arbitrary Ghostfolio times, got %#v", payload.ProtectedActivityCache.Activities)
+	}
+	if payload.ProtectedActivityCache.Activities[0].OccurredAt != "2024-01-01T23:59:59Z" || payload.ProtectedActivityCache.Activities[1].OccurredAt != "2024-01-01T00:00:00Z" {
+		t.Fatalf("expected stored timestamps to remain unchanged, got %#v", payload.ProtectedActivityCache.Activities)
 	}
 }
 

@@ -27,30 +27,61 @@ func TestActivityNormalizationRemovesDuplicatesByNormalizedHash(t *testing.T) {
 	}
 }
 
-func TestActivityNormalizationOrdersSameTimestampBySourceID(t *testing.T) {
+// TestActivityNormalizationOrdersSameAssetSameDayByActivityTypeThenSourceID
+// verifies that same-asset same-day ordering ignores arbitrary Ghostfolio clock values.
+// Authored by: OpenCode
+func TestActivityNormalizationOrdersSameAssetSameDayByActivityTypeThenSourceID(t *testing.T) {
 	t.Parallel()
 
 	cache, err := syncnormalize.NewNormalizer().Normalize([]syncmodel.ActivityRecord{
-		unitActivityRecord(t, "b", "2024-01-01T10:00:00Z", syncmodel.ActivityTypeBuy, "BTC", "1", "100", "100", nil),
-		unitActivityRecord(t, "a", "2024-01-01T10:00:00Z", syncmodel.ActivityTypeBuy, "BTC", "1", "100", "100", nil),
+		unitActivityRecord(t, "sell-z", "2024-01-01T00:00:00Z", syncmodel.ActivityTypeSell, "BTC", "1", "100", "100", nil),
+		unitActivityRecord(t, "buy-b", "2024-01-01T10:00:00Z", syncmodel.ActivityTypeBuy, "BTC", "1", "100", "100", nil),
+		unitActivityRecord(t, "buy-a", "2024-01-01T23:59:59Z", syncmodel.ActivityTypeBuy, "BTC", "1", "100", "100", nil),
 	})
 	if err != nil {
 		t.Fatalf("normalize: %v", err)
 	}
-	if cache.Activities[0].SourceID != "a" || cache.Activities[1].SourceID != "b" {
+	if cache.Activities[0].SourceID != "buy-a" || cache.Activities[1].SourceID != "buy-b" || cache.Activities[2].SourceID != "sell-z" {
 		t.Fatalf("unexpected deterministic order: %#v", cache.Activities)
+	}
+	if cache.Activities[0].OccurredAt != "2024-01-01T23:59:59Z" || cache.Activities[2].OccurredAt != "2024-01-01T00:00:00Z" {
+		t.Fatalf("expected normalization to preserve original timestamps, got %#v", cache.Activities)
 	}
 }
 
-func TestActivityNormalizationRejectsAmbiguousSameTimestampSameSourceOrdering(t *testing.T) {
+// TestActivityNormalizationRejectsAmbiguousSameAssetSameDaySameTypeSameSourceOrdering
+// verifies that unresolved same-day tie-breaking still fails normalization.
+// Authored by: OpenCode
+func TestActivityNormalizationRejectsAmbiguousSameAssetSameDaySameTypeSameSourceOrdering(t *testing.T) {
 	t.Parallel()
 
 	_, err := syncnormalize.NewNormalizer().Normalize([]syncmodel.ActivityRecord{
 		unitActivityRecord(t, "activity-1", "2024-01-01T10:00:00Z", syncmodel.ActivityTypeBuy, "BTC", "1", "100", "100", nil),
-		unitActivityRecord(t, "activity-1", "2024-01-01T10:00:00Z", syncmodel.ActivityTypeBuy, "BTC", "2", "100", "200", nil),
+		unitActivityRecord(t, "activity-1", "2024-01-01T23:00:00Z", syncmodel.ActivityTypeBuy, "BTC", "2", "100", "200", nil),
 	})
 	if err == nil {
 		t.Fatalf("expected ambiguous same-source ordering rejection")
+	}
+}
+
+// TestActivityNormalizationValidationUsesSameDayReplayOrderForBelowZeroHoldings
+// verifies that replay defensibility follows the reopened same-day ordering rule.
+// Authored by: OpenCode
+func TestActivityNormalizationValidationUsesSameDayReplayOrderForBelowZeroHoldings(t *testing.T) {
+	t.Parallel()
+
+	cache, err := syncnormalize.NewNormalizer().Normalize([]syncmodel.ActivityRecord{
+		unitActivityRecord(t, "sell-early-clock", "2024-01-01T00:00:00Z", syncmodel.ActivityTypeSell, "BTC", "1", "100", "100", nil),
+		unitActivityRecord(t, "buy-late-clock", "2024-01-01T23:59:59Z", syncmodel.ActivityTypeBuy, "BTC", "1", "100", "100", nil),
+	})
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	if err := syncvalidate.NewValidator().Validate(cache); err != nil {
+		t.Fatalf("expected same-day replay ordering to keep holdings defensible, got %v", err)
+	}
+	if cache.Activities[0].SourceID != "buy-late-clock" || cache.Activities[1].SourceID != "sell-early-clock" {
+		t.Fatalf("expected validator input to honor same-day replay order, got %#v", cache.Activities)
 	}
 }
 
