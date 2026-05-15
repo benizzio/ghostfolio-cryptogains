@@ -2,23 +2,24 @@
 
 **Branch**: `[003-store-activity-data]` | **Date**: 2026-05-14 | **Spec**: `/specs/003-store-activity-data/spec.md`
 **Input**: Feature specification from `/specs/003-store-activity-data/spec.md`
+**Bugfix**: 2026-05-15 — [BUG-001] Added synced-data diagnostic-report design and verification requirements.
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/plan-template.md` for the execution workflow.
 
 ## Summary
 
-Extend the existing Go Bubble Tea sync-validation slice from `specs/002-sync-data-validation/` into a full-history secure-storage slice. The application keeps `setup.json` as the only startup-readable bootstrap state, replaces the one-page activities probe with full authenticated pagination, normalizes and validates reporting-ready `BUY` and `SELL` activity data using the technical rules established in `specs/001-ghostfolio-gains-reporting/`, and persists successful results only as token-derived encrypted local snapshots. Successful sync now ends after protected storage is updated and confirmed. Reporting, cached-data browsing, and gains-or-losses calculation remain out of scope.
+Extend the existing Go Bubble Tea sync-validation slice from `specs/002-sync-data-validation/` into a full-history secure-storage slice. The application keeps `setup.json` as the only startup-readable bootstrap state, replaces the one-page activities probe with full authenticated pagination, normalizes and validates reporting-ready `BUY` and `SELL` activity data using the technical rules established in `specs/001-ghostfolio-gains-reporting/`, and persists successful results only as token-derived encrypted local snapshots. Successful sync now ends after protected storage is updated and confirmed. Eligible synced-data failures can also produce local diagnostic reports, with explicit user opt-in outside explicit development mode and automatic generation inside it. Reporting, cached-data browsing, and gains-or-losses calculation remain out of scope.
 
 ## Technical Context
 
 **Language/Version**: Go 1.26.3  
 **Primary Dependencies**: `charm.land/bubbletea/v2`, selected `charm.land/bubbles/v2` components, `github.com/cockroachdb/apd/v3`, `golang.org/x/crypto/argon2`, Go standard library (`net/http`, `encoding/json`, `crypto/aes`, `crypto/cipher`, `crypto/rand`, `crypto/sha256`, `os`, `path/filepath`)  
-**Storage**: Local-only bootstrap `setup.json` plus local-only encrypted snapshot files under the OS config or app-data directory in `ghostfolio-cryptogains/snapshots/`; Argon2id key derivation from the runtime Ghostfolio security token; AES-256-GCM protected payload; minimal authenticated cleartext header with envelope version and server discovery key; atomic rewrite with `fsync` and rename  
-**Testing**: `make test` and `make coverage`; integration-first `go test` suites with `httptest.Server`, temp directories, deterministic Ghostfolio fixtures, explicit persisted-artifact leakage checks, a documented large-history performance verification path, and branch/file coverage via `github.com/Fabianexe/gocoverageplus`  
+**Storage**: Local-only bootstrap `setup.json` plus local-only encrypted snapshot files under the OS config or app-data directory in `ghostfolio-cryptogains/snapshots/`; separate local-only diagnostic reports under `ghostfolio-cryptogains/diagnostics/`; Argon2id key derivation from the runtime Ghostfolio security token; AES-256-GCM protected payload; minimal authenticated cleartext header with envelope version and server discovery key; atomic rewrite with `fsync` and rename  
+**Testing**: `make test` and `make coverage`; integration-first `go test` suites with `httptest.Server`, temp directories, deterministic Ghostfolio fixtures, explicit persisted-artifact leakage checks, diagnostic-report opt-in and auto-generation checks, a documented large-history performance verification path, and branch/file coverage via `github.com/Fabianexe/gocoverageplus`  
 **Target Platform**: Installed terminal application for Linux, macOS, and Windows terminals with local filesystem access  
 **Project Type**: Single-module Go TUI application  
 **Performance Goals**: Complete full-history retrieval, normalization, and protected replacement for up to 10,000 activities spanning at least 5 years in under 2 minutes; selected-server snapshot discovery and unlock responsiveness stays under 2 seconds on supported hardware; Bubble Tea busy-state updates remain responsive while sync work is in flight  
-**Constraints**: Bootstrap setup remains the only state readable before token entry; Ghostfolio token and JWT are runtime-only; no raw Ghostfolio payload persistence; support only `BUY` and `SELL`; normalized `BUY` records require non-zero unit price; zero-priced `SELL` records require an explanatory comment and are stored as non-taxable holding reductions; available report years are derived from each source timestamp's own offset and calendar date; deterministic ordering is mandatory; unlock attempts are limited to selected-server snapshot candidates; failed or incompatible replacements must preserve the existing readable snapshot; no reporting, preview, or cached-data browsing is exposed in this slice  
+**Constraints**: Bootstrap setup remains the only state readable before token entry; Ghostfolio token and JWT are runtime-only; no raw Ghostfolio payload persistence; support only `BUY` and `SELL`; normalized `BUY` records require non-zero unit price; zero-priced `SELL` records require an explanatory comment and are stored as non-taxable holding reductions; available report years are derived from each source timestamp's own offset and calendar date; deterministic ordering is mandatory; unlock attempts are limited to selected-server snapshot candidates; failed or incompatible replacements must preserve the existing readable snapshot; eligible synced-data failures offer redacted diagnostic-report generation outside explicit development mode and generate it automatically inside explicit development mode; no reporting, preview, or cached-data browsing is exposed in this slice  
 **Scale/Scope**: One bootstrap setup profile per local OS user profile; multiple protected snapshots per machine for different valid Ghostfolio tokens; one executable business workflow (`Sync Data`) plus setup edit path; full Ghostfolio `api/v1` auth and paginated activity retrieval; up to 10,000 normalized activities per protected snapshot
 
 ## Constitution Check
@@ -141,9 +142,20 @@ tests/
 - If a supplied token does not unlock any selected-server snapshot candidate and Ghostfolio rejects the token, leave all local protected data unchanged.
 - If newly retrieved data cannot be normalized or persisted within the current supported stored-data model, discard the new in-memory data, keep any existing readable snapshot active and unchanged, and show a user-visible incompatibility result instead of overwriting the old snapshot.
 
+## Sync Diagnostic Report Rules
+
+- Only failures rooted in stored-data compatibility, synced-data normalization, synced-data validation, or protected persistence qualify for diagnostic-report generation. Token rejection, connectivity, timeout, and generic unsuccessful-response failures keep the existing brief outcome flow.
+- When the application is not running in explicit development mode, show an explicit user choice before writing a diagnostic report. When the application is running in explicit development mode, write the report automatically for the same eligible failure categories.
+- Reuse the explicit-development-mode startup opt-in introduced in `specs/002-sync-data-validation/` for this behavior. This slice does not add a separate diagnostic-report mode switch and must not infer development mode from remembered setup, environment defaults, or Ghostfolio responses.
+- Store generated reports under a separate local-only `ghostfolio-cryptogains/diagnostics/` directory using timestamped opaque filenames. These artifacts remain outside bootstrap state and protected snapshots and do not change snapshot compatibility or replacement rules.
+- Persist structured troubleshooting data rather than raw payload dumps or transient screen strings. Include the failure category, attempt timing, selected server origin, and the allowed offending-record context needed to troubleshoot the synced-data failure.
+- Outside explicit development mode, redact quantity, unit price, gross value, fee value, and other financial-value fields from offending-record details. In explicit development mode, include full non-secret offending-record context while still excluding the Ghostfolio security token, bearer JWT, raw unprotected payload fragments, and any reusable token verifier.
+- After a report is written, the result workflow must tell the user that it was generated and where to find it.
+
 ## Verification Additions
 
-- Add automated checks that inspect `setup.json`, protected snapshot files, and any persisted workflow artifacts from successful and failed runs to confirm that Ghostfolio security tokens, raw unprotected Ghostfolio payload fragments, and transient sync-failure messages are never written to disk.
+- Add automated checks that inspect `setup.json`, protected snapshot files, generated diagnostic reports, and any persisted workflow artifacts from successful and failed runs to confirm that Ghostfolio security tokens, raw unprotected Ghostfolio payload fragments, and transient sync-failure messages are never written to disk.
+- Add automated checks that eligible synced-data failures ask before report generation outside explicit development mode, generate reports automatically in explicit development mode, disclose the written path, and apply the required redaction rules.
 - Add a documented large-history verification path that runs against a deterministic 10,000-activity fixture spanning at least 5 calendar years and measures end-to-end authenticated retrieval, normalization, validation, and protected atomic replacement against the `SC-006` threshold.
 
 ## Complexity Tracking

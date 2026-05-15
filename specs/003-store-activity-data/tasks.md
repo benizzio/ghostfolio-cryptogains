@@ -10,6 +10,8 @@ description: "Task list for Store Activity Data implementation"
 
 **Tests**: Automated tests are mandatory for this feature. Write each story's tests first, make them fail for the targeted behavior, keep 100% statement coverage from `go test` plus 100% branch and file coverage for project-owned code with the `gocoverageplus` gate, add persisted-artifact leakage checks, and keep a documented large-history performance verification path for `SC-006`.
 
+**Bugfix**: 2026-05-15 — [BUG-001] Added synced-data diagnostic-report tasks and security verification coverage.
+
 **Organization**: Tasks are grouped by user story so each story can be implemented and verified independently.
 
 ## Path Conventions
@@ -96,6 +98,7 @@ description: "Task list for Store Activity Data implementation"
 - [X] T026 [P] [US2] Add integration coverage for same-token refresh, wrong-token denial, different-valid-token isolation, and invalid-token no-change behavior in `tests/integration/snapshot_reuse_flow_test.go`
 - [X] T027 [P] [US2] Add integration coverage for unsupported envelope version, unsupported payload version, and incompatible new sync data retention in `tests/integration/snapshot_compatibility_flow_test.go`
 - [X] T028 [P] [US2] Add unit coverage for server-scoped candidate filtering and payload version checks in `tests/unit/snapshot_discovery_test.go` and `tests/unit/stored_data_version_test.go`
+- [ ] T051 [P] [US2] Add contract and integration coverage for production opt-in, explicit-development-mode automatic synced-data diagnostic reports, and generated-report path disclosure in `tests/contract/sync_storage_workflow_contract_test.go`, `tests/contract/validation_result_workflow_contract_test.go`, and `tests/integration/sync_diagnostic_report_flow_test.go`
 
 ### Implementation for User Story 2
 
@@ -103,8 +106,9 @@ description: "Task list for Store Activity Data implementation"
 - [X] T030 [P] [US2] Implement stored-data version compatibility checks for envelope and payload models in `internal/snapshot/model/version.go` and `internal/snapshot/store/compatibility.go`
 - [X] T031 [P] [US2] Implement protected snapshot unlock, active readable snapshot tracking, and isolated snapshot creation for new valid tokens in `internal/app/runtime/sync_service.go`
 - [X] T032 [US2] Implement failure and success result handling for rejected token, unsupported stored-data version, and incompatible new sync data in `internal/tui/flow/sync_flow.go` and `internal/tui/screen/validation_result_screen.go`
+- [ ] T052 [US2] Implement synced-data diagnostic-report policy using the existing explicit-development-mode runtime option, local artifact writes, and result-screen report-location messaging in `internal/app/runtime/sync_service.go`, `internal/tui/flow/sync_flow.go`, and `internal/tui/screen/validation_result_screen.go`
 
-**Checkpoint**: User Story 2 is independently functional. Snapshot reuse, token isolation, and compatibility failures behave safely without modifying protected data incorrectly.
+**Checkpoint**: User Story 2 remains functionally complete for snapshot reuse, token isolation, and compatibility failures. The diagnostic-report bugfix tasks `T051` and `T052` still need to finish before this story is fully complete for release.
 
 ---
 
@@ -126,11 +130,12 @@ description: "Task list for Store Activity Data implementation"
 
 - [X] T038 [P] [US3] Implement duplicate hashing, deterministic same-timestamp ordering, running-quantity replay support, and source-scope reliability derivation in `internal/sync/normalize/activity_history.go`
 - [X] T039 [P] [US3] Implement defensibility checks for missing or contradictory normalized fields, below-zero holdings, zero-priced `SELL` comment rules, and unsupported-history rejection in `internal/sync/validate/activity_history.go`
+- [ ] T053 [US3] Extend mapping, normalization, and validation failures to surface offending-record diagnostic context and production/dev redaction inputs in `internal/ghostfolio/mapper/activity_mapper.go`, `internal/sync/normalize/activity_history.go`, `internal/sync/validate/activity_history.go`, and `internal/app/runtime/sync_service.go`
 - [X] T040 [P] [US3] Implement server-mismatch detection and replacement gating against the active readable snapshot in `internal/app/runtime/sync_service.go`
 - [X] T041 [US3] Implement server replacement confirmation screen and navigation in `internal/tui/screen/server_replacement_screen.go` and `internal/tui/flow/sync_flow.go`
 - [X] T042 [US3] Update the main menu and sync entry screens to surface protected-data-exists state without exposing cached activity details in `internal/tui/screen/main_menu_screen.go` and `internal/tui/screen/sync_validation_screen.go`
 
-**Checkpoint**: User Story 3 is independently functional. Invalid histories and server-boundary changes cannot silently replace or contaminate protected data.
+**Checkpoint**: User Story 3 remains functionally complete for invalid-history rejection and server-boundary protection. The diagnostic-context bugfix task `T053` still needs to finish before this story is fully complete for release.
 
 ---
 
@@ -138,10 +143,10 @@ description: "Task list for Store Activity Data implementation"
 
 **Purpose**: Finish documentation, release checks, security verification, and cross-story verification.
 
-- [ ] T043 [P] Update protected-storage, removal, and no-reporting documentation in `README.md`
-- [ ] T044 [P] Reconcile `specs/003-store-activity-data/quickstart.md` with the implemented sync result categories, persisted-artifact inspection steps, large-history performance verification steps, and verification commands in `specs/003-store-activity-data/quickstart.md`
+- [ ] T043 [P] Update protected-storage, diagnostic-report, removal, and no-reporting documentation in `README.md`
+- [ ] T044 [P] Reconcile `specs/003-store-activity-data/quickstart.md` with the implemented sync result categories, diagnostic-report generation and inspection steps, persisted-artifact inspection steps, large-history performance verification steps, and verification commands in `specs/003-store-activity-data/quickstart.md`
 - [ ] T045 [P] Document the OWASP Top 10 and Cryptographic Storage review, refreshed dependency and API research evidence, and the `SC-006` performance-verification evidence in `specs/003-store-activity-data/checklists/requirements.md`
-- [ ] T049 [P] Add integration coverage that bootstrap files, protected snapshots, and persisted workflow artifacts never store Ghostfolio tokens, raw payload fragments, or transient sync-failure messages in `tests/integration/persistence_security_flow_test.go`
+- [ ] T049 [P] Add integration coverage that bootstrap files, protected snapshots, generated diagnostic reports, and persisted workflow artifacts never store Ghostfolio tokens, raw payload fragments, transient sync-failure messages, or production-disallowed financial-value fields in `tests/integration/persistence_security_flow_test.go`
 - [ ] T050 [P] Add deterministic large-history performance verification coverage for authenticated retrieval, normalization, validation, and protected replacement in `tests/integration/sync_performance_flow_test.go`
 - [ ] T046 Run `make test`, `make coverage`, and the documented large-history performance verification, then verify the generated artifacts in `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`
 
@@ -190,8 +195,8 @@ Cross-story runtime dependencies:
 - T001, T047, and T048 can run in parallel at the start of Phase 1; T002 and T003 can run in parallel after T001.
 - T005 through T010 can run in parallel once T004 defines the decimal primitives.
 - T012 through T016 can run in parallel for US1, then T017 through T021 can run in parallel before T022 through T024.
-- T025 through T028 can run in parallel for US2, then T029 and T030 can run in parallel before T031 and T032.
-- T033 through T037 can run in parallel for US3, then T038 through T040 can run in parallel before T041 and T042.
+- T025 through T028 and T051 can run in parallel for US2, then T029 and T030 can run in parallel before T031, T032, and T052.
+- T033 through T037 can run in parallel for US3, then T038 through T040 and T053 can run in parallel before T041 and T042.
 - T043 through T045 and T049 through T050 can run in parallel once the release scope is stable.
 
 ---
