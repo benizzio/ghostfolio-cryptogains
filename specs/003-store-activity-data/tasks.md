@@ -8,7 +8,7 @@ description: "Task list for Store Activity Data implementation"
 **Input**: Design documents from `/specs/003-store-activity-data/`
 **Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`
 
-**Tests**: Automated tests are mandatory for this feature. Write each story's tests first, make them fail for the targeted behavior, and keep 100% statement coverage from `go test` plus 100% branch and file coverage for project-owned code with the `gocoverageplus` gate.
+**Tests**: Automated tests are mandatory for this feature. Write each story's tests first, make them fail for the targeted behavior, keep 100% statement coverage from `go test` plus 100% branch and file coverage for project-owned code with the `gocoverageplus` gate, add persisted-artifact leakage checks, and keep a documented large-history performance verification path for `SC-006`.
 
 **Organization**: Tasks are grouped by user story so each story can be implemented and verified independently.
 
@@ -26,11 +26,13 @@ description: "Task list for Store Activity Data implementation"
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-**Purpose**: Add the new package skeleton and dependency wiring required for full-history sync and protected snapshot storage.
+**Purpose**: Add the new package skeleton, dependency wiring, and traceable research evidence required for full-history sync and protected snapshot storage.
 
 - [ ] T001 Update module dependencies for `github.com/cockroachdb/apd/v3` and `golang.org/x/crypto/argon2` in `go.mod` and `go.sum`
 - [ ] T002 [P] Create the protected snapshot package skeleton in `internal/snapshot/envelope/`, `internal/snapshot/model/`, and `internal/snapshot/store/`
 - [ ] T003 [P] Create the normalized sync package skeleton in `internal/sync/model/`, `internal/sync/normalize/`, and `internal/sync/validate/`
+- [ ] T047 [P] Refresh dependency due-diligence evidence for `github.com/cockroachdb/apd/v3` and `golang.org/x/crypto/argon2` in `specs/003-store-activity-data/research.md`
+- [ ] T048 [P] Refresh Ghostfolio auth and pagination contract review evidence in `specs/003-store-activity-data/research.md` and `specs/003-store-activity-data/contracts/ghostfolio-sync.md`
 
 ---
 
@@ -114,16 +116,16 @@ description: "Task list for Store Activity Data implementation"
 
 ### Tests for User Story 3
 
-- [ ] T033 [P] [US3] Add normalization and defensibility contract coverage for supported activity rules and outcome categories in `tests/contract/activity_validation_contract_test.go`
+- [ ] T033 [P] [US3] Add normalization and defensibility contract coverage for supported activity rules, below-zero holdings rejection, and scope-reliability outcome categories in `tests/contract/activity_validation_contract_test.go`
 - [ ] T034 [P] [US3] Add server-mismatch confirmation workflow contract coverage in `tests/contract/server_replacement_workflow_contract_test.go`
-- [ ] T035 [P] [US3] Add integration coverage for unsupported activity history, duplicate removal, deterministic ordering, and zero-price rule handling in `tests/integration/activity_validation_flow_test.go`
+- [ ] T035 [P] [US3] Add integration coverage for unsupported activity history, duplicate removal, deterministic ordering, below-zero holdings rejection, and zero-price rule handling in `tests/integration/activity_validation_flow_test.go`
 - [ ] T036 [P] [US3] Add integration coverage for server replacement confirm, cancel, success, and failed-replacement retention in `tests/integration/server_replacement_flow_test.go`
-- [ ] T037 [P] [US3] Add unit coverage for duplicate hashing, tie-break ordering, and scope-reliability derivation in `tests/unit/activity_normalization_test.go` and `tests/unit/scope_reliability_test.go`
+- [ ] T037 [P] [US3] Add unit coverage for duplicate hashing, tie-break ordering, running-quantity defensibility checks, and scope-reliability derivation in `tests/unit/activity_normalization_test.go` and `tests/unit/scope_reliability_test.go`
 
 ### Implementation for User Story 3
 
-- [ ] T038 [P] [US3] Implement duplicate hashing, deterministic same-timestamp ordering, and source-scope reliability derivation in `internal/sync/normalize/activity_history.go`
-- [ ] T039 [P] [US3] Implement defensibility checks, zero-priced `SELL` comment rules, and unsupported-history rejection in `internal/sync/validate/activity_history.go`
+- [ ] T038 [P] [US3] Implement duplicate hashing, deterministic same-timestamp ordering, running-quantity replay support, and source-scope reliability derivation in `internal/sync/normalize/activity_history.go`
+- [ ] T039 [P] [US3] Implement defensibility checks for missing or contradictory normalized fields, below-zero holdings, zero-priced `SELL` comment rules, and unsupported-history rejection in `internal/sync/validate/activity_history.go`
 - [ ] T040 [P] [US3] Implement server-mismatch detection and replacement gating against the active readable snapshot in `internal/app/runtime/sync_service.go`
 - [ ] T041 [US3] Implement server replacement confirmation screen and navigation in `internal/tui/screen/server_replacement_screen.go` and `internal/tui/flow/sync_flow.go`
 - [ ] T042 [US3] Update the main menu and sync entry screens to surface protected-data-exists state without exposing cached activity details in `internal/tui/screen/main_menu_screen.go` and `internal/tui/screen/sync_validation_screen.go`
@@ -134,12 +136,14 @@ description: "Task list for Store Activity Data implementation"
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-**Purpose**: Finish documentation, release checks, and cross-story verification.
+**Purpose**: Finish documentation, release checks, security verification, and cross-story verification.
 
 - [ ] T043 [P] Update protected-storage, removal, and no-reporting documentation in `README.md`
-- [ ] T044 [P] Reconcile `specs/003-store-activity-data/quickstart.md` with the implemented sync result categories and verification steps in `specs/003-store-activity-data/quickstart.md`
-- [ ] T045 [P] Document the OWASP Top 10 and Cryptographic Storage review for token-derived encrypted snapshots in `specs/003-store-activity-data/checklists/requirements.md`
-- [ ] T046 Run `make test` and `make coverage`, then verify the generated artifacts in `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`
+- [ ] T044 [P] Reconcile `specs/003-store-activity-data/quickstart.md` with the implemented sync result categories, persisted-artifact inspection steps, large-history performance verification steps, and verification commands in `specs/003-store-activity-data/quickstart.md`
+- [ ] T045 [P] Document the OWASP Top 10 and Cryptographic Storage review, refreshed dependency and API research evidence, and the `SC-006` performance-verification evidence in `specs/003-store-activity-data/checklists/requirements.md`
+- [ ] T049 [P] Add integration coverage that bootstrap files, protected snapshots, and persisted workflow artifacts never store Ghostfolio tokens, raw payload fragments, or transient sync-failure messages in `tests/integration/persistence_security_flow_test.go`
+- [ ] T050 [P] Add deterministic large-history performance verification coverage for authenticated retrieval, normalization, validation, and protected replacement in `tests/integration/sync_performance_flow_test.go`
+- [ ] T046 Run `make test`, `make coverage`, and the documented large-history performance verification, then verify the generated artifacts in `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`
 
 ---
 
@@ -183,12 +187,12 @@ Cross-story runtime dependencies:
 
 ### Parallel Opportunities
 
-- T002 and T003 can run in parallel after T001.
+- T001, T047, and T048 can run in parallel at the start of Phase 1; T002 and T003 can run in parallel after T001.
 - T005 through T010 can run in parallel once T004 defines the decimal primitives.
 - T012 through T016 can run in parallel for US1, then T017 through T021 can run in parallel before T022 through T024.
 - T025 through T028 can run in parallel for US2, then T029 and T030 can run in parallel before T031 and T032.
 - T033 through T037 can run in parallel for US3, then T038 through T040 can run in parallel before T041 and T042.
-- T043 through T045 can run in parallel once the release scope is stable.
+- T043 through T045 and T049 through T050 can run in parallel once the release scope is stable.
 
 ---
 
