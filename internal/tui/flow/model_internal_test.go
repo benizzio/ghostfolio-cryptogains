@@ -18,11 +18,21 @@ import (
 )
 
 type testSyncService struct {
-	outcome runtime.ValidationOutcome
+	outcome            runtime.ValidationOutcome
+	protectedDataState runtime.ProtectedDataState
+	replacementCheck   runtime.ServerReplacementCheck
 }
 
 func (s testSyncService) Validate(context.Context, runtime.ValidateRequest) runtime.ValidationOutcome {
 	return s.outcome
+}
+
+func (s testSyncService) ProtectedDataState() runtime.ProtectedDataState {
+	return s.protectedDataState
+}
+
+func (s testSyncService) CheckServerReplacement(configmodel.AppSetupConfig) runtime.ServerReplacementCheck {
+	return s.replacementCheck
 }
 
 type cancellingSyncService struct {
@@ -35,6 +45,14 @@ func (s *cancellingSyncService) Validate(ctx context.Context, _ runtime.Validate
 	<-ctx.Done()
 	s.ctxErr = ctx.Err()
 	return runtime.ValidationOutcome{Success: false, DetailReason: string(runtime.ValidationFailureTimeout), FailureReason: runtime.ValidationFailureTimeout}
+}
+
+func (*cancellingSyncService) ProtectedDataState() runtime.ProtectedDataState {
+	return runtime.ProtectedDataState{}
+}
+
+func (*cancellingSyncService) CheckServerReplacement(configmodel.AppSetupConfig) runtime.ServerReplacementCheck {
+	return runtime.ServerReplacementCheck{}
 }
 
 // assertUpdatedModel converts an updated Bubble Tea model into the concrete
@@ -494,6 +512,53 @@ func TestUpdateSyncValidationCoversBusyIgnoreAndSetupRedirect(t *testing.T) {
 	}
 }
 
+func TestUpdateSyncValidationRoutesToServerReplacementWhenRequired(t *testing.T) {
+	t.Parallel()
+
+	var config = mustSetupConfig(t)
+	var model = newTestModel(t, &config)
+	model.deps.SyncService = testSyncService{replacementCheck: runtime.ServerReplacementCheck{Required: true, ActiveServerOrigin: "https://old.example", SelectedServerOrigin: config.ServerOrigin}}
+	model.active = syncValidationScreenKey
+	model.sync.InputFocused = false
+	model.sync.TokenInput.SetValue("token")
+
+	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	if cmd != nil {
+		t.Fatalf("expected no async command before confirmation")
+	}
+	model = updated.(*Model)
+	if model.active != serverReplacementScreenKey {
+		t.Fatalf("expected server replacement screen, got %s", model.active)
+	}
+
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	model = updated.(*Model)
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = updated.(*Model)
+	if model.active != validationResultScreenKey {
+		t.Fatalf("expected cancellation to route to result screen")
+	}
+	if model.result.Outcome.FailureReason != runtime.SyncFailureServerReplacementCancelled {
+		t.Fatalf("expected cancellation outcome, got %#v", model.result.Outcome)
+	}
+
+	model = newTestModel(t, &config)
+	model.deps.SyncService = testSyncService{replacementCheck: runtime.ServerReplacementCheck{Required: true, ActiveServerOrigin: "https://old.example", SelectedServerOrigin: config.ServerOrigin}}
+	model.active = syncValidationScreenKey
+	model.sync.InputFocused = false
+	model.sync.TokenInput.SetValue("token")
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = updated.(*Model)
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	if cmd == nil {
+		t.Fatalf("expected confirmed replacement to start async sync")
+	}
+	model = updated.(*Model)
+	if model.active != syncValidationScreenKey || !model.sync.Busy {
+		t.Fatalf("expected confirmed replacement to resume sync busy state")
+	}
+}
+
 func TestCancelActiveValidationCancelsContextAndValidationCmdRuns(t *testing.T) {
 	t.Parallel()
 
@@ -629,7 +694,7 @@ func newTestModel(t *testing.T, config *configmodel.AppSetupConfig) *Model {
 		Options:      bootstrap.DefaultOptions(),
 		Startup:      startup,
 		SetupService: runtime.NewSetupService(store, false),
-		SyncService:  testSyncService{outcome: runtime.ValidationOutcome{Success: true, DetailReason: "communication_ok"}},
+		SyncService:  testSyncService{outcome: runtime.ValidationOutcome{Success: true, DetailReason: "activity_data_stored"}},
 	})
 }
 

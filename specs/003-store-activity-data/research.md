@@ -12,7 +12,7 @@ Alternatives considered: Replacing the TUI stack with `tview` or another framewo
 
 Decision: Introduce `github.com/cockroachdb/apd/v3` for all normalized quantity, unit price, gross value, and fee parsing and validation. Decode Ghostfolio JSON with `encoding/json.Decoder.UseNumber`, convert immediately into canonical decimal strings backed by `apd.Decimal`, and persist canonical decimal strings inside the protected snapshot.
 
-Rationale: The constitution forbids floating-point domain logic, and `FIN-001` in `specs/003-store-activity-data/spec.md` requires preserving exact source precision with no rounding or conversion in this slice. The `001` research already selected `apd/v3` as the exact-decimal library for financial inputs. This slice only needs the storage and validation part of that decision, not the later report-boundary rounding behavior.
+Rationale: The constitution forbids floating-point domain logic, and `FIN-001` in `specs/003-store-activity-data/spec.md` requires preserving exact source precision with no rounding or conversion in this slice. The `001` research already selected `apd/v3` as the exact-decimal library for financial inputs. The refreshed due-diligence check on 2026-05-15 confirms `github.com/cockroachdb/apd/v3` `v3.2.3` on `pkg.go.dev`, published on 2026-03-23 with a redistributable Apache-2.0 license, tagged stable module metadata, and 169 known importers. This slice only needs the storage and validation part of that decision, not the later report-boundary rounding behavior.
 
 Alternatives considered: `float64` was rejected by the constitution and by the spec's exact-precision requirement. `shopspring/decimal` was rejected because `apd/v3` was already chosen in `001` and provides the stricter error-aware arithmetic context preferred for later reporting work. `math/big.Rat` was rejected because it makes canonical decimal persistence and future human-readable output rules more awkward without adding value in this slice.
 
@@ -20,7 +20,7 @@ Alternatives considered: `float64` was rejected by the constitution and by the s
 
 Decision: Keep `setup.json` as the only plaintext bootstrap file and add a separate `snapshots/` directory containing one encrypted snapshot file per isolated local protected context. Use Argon2id for token-derived key derivation, AES-256-GCM for payload encryption, and a minimal authenticated cleartext header containing envelope metadata plus a server discovery key derived from the canonical selected server origin.
 
-Rationale: `specs/003-store-activity-data/spec.md` requires bootstrap state to stay readable before token entry while all synced activity data and user-specific sync state become token-locked. A per-snapshot encrypted blob matches the `001` storage direction, keeps the Ghostfolio token out of persistent storage, simplifies atomic replacement, and supports multiple isolated snapshots on the same machine. A small cleartext header is still necessary to reject unsupported envelope versions before decrypt and to limit unlock attempts to snapshots associated with the selected Ghostfolio server.
+Rationale: `specs/003-store-activity-data/spec.md` requires bootstrap state to stay readable before token entry while all synced activity data and user-specific sync state become token-locked. A per-snapshot encrypted blob matches the `001` storage direction, keeps the Ghostfolio token out of persistent storage, simplifies atomic replacement, and supports multiple isolated snapshots on the same machine. A small cleartext header is still necessary to reject unsupported envelope versions before decrypt and to limit unlock attempts to snapshots associated with the selected Ghostfolio server. The refreshed due-diligence check on 2026-05-15 confirms `golang.org/x/crypto/argon2` through `golang.org/x/crypto` `v0.51.0` on `pkg.go.dev`, published on 2026-05-08 with a BSD-3-Clause license, official Go subrepository stewardship, and 2,539 known importers for the `argon2` package.
 
 Selected storage details:
 
@@ -39,7 +39,7 @@ Alternatives considered: SQLite or another embedded database was rejected becaus
 
 Decision: Expand the current Ghostfolio boundary from a one-page communication probe into a full authenticated retrieval flow using `POST /api/v1/auth/anonymous` followed by paginated `GET /api/v1/activities` requests until the full available history has been collected.
 
-Rationale: `specs/003-store-activity-data/spec.md` turns `Sync Data` into full-history retrieval and protected persistence. `specs/001-ghostfolio-gains-reporting/contracts/ghostfolio-sync.md` already documents the observed `api/v1` auth and activities contract, including pagination rules and minimum required fields. The current `002` client and runtime service were intentionally transitional, and the `002` plan explicitly says their probe DTOs must be removed or evolved when real sync is introduced.
+Rationale: `specs/003-store-activity-data/spec.md` turns `Sync Data` into full-history retrieval and protected persistence. `specs/001-ghostfolio-gains-reporting/contracts/ghostfolio-sync.md` already documents the observed `api/v1` auth and activities contract, including pagination rules and minimum required fields. The refreshed contract review on 2026-05-15 confirms Ghostfolio release `3.3.0` published on 2026-05-14 and current upstream controller code in `apps/api/src/app/auth/auth.controller.ts`, `apps/api/src/app/activities/activities.controller.ts`, and `apps/api/src/app/activities/activities.service.ts`. That source still exposes `@Post('anonymous')`, returns `{ authToken }`, exposes `GET /activities` with `skip`, `take`, `sortColumn`, and `sortDirection`, and returns `{ activities, count }` while the service keeps date ordering and appends `id` as a deterministic tie-break when sorting. The current `002` client and runtime service were intentionally transitional, and the `002` plan explicitly says their probe DTOs must be removed or evolved when real sync is introduced.
 
 Selected retrieval rules:
 
@@ -117,12 +117,14 @@ Alternatives considered: Statement-only coverage was rejected because the consti
 
 ## Dependency Due Diligence Summary
 
+Refreshed evidence timestamp: 2026-05-15.
+
 | Dependency | Purpose In This Slice | Evidence Source | Acceptance And Risk Summary |
 |------------|-----------------------|-----------------|-----------------------------|
 | `bubbletea` | Existing full-screen TUI runtime | `specs/001-ghostfolio-gains-reporting/research.md`, implemented in `002` | Already adopted in-repo, active, and still the smallest correct UI foundation |
 | `bubbles` | Existing focused inputs, menus, help, spinner widgets | `specs/001-ghostfolio-gains-reporting/research.md`, implemented in `002` | Already adopted in-repo; use remains selective |
-| `github.com/cockroachdb/apd/v3` | Exact decimal parsing and normalized storage values | `specs/001-ghostfolio-gains-reporting/research.md` | Mature and well-suited for financial precision; new runtime dependency is justified by constitution requirements |
-| `golang.org/x/crypto/argon2` | Token-derived key derivation for protected snapshots | `specs/001-ghostfolio-gains-reporting/research.md` | Official Go-maintained crypto extension; justified because stdlib lacks Argon2id |
+| `github.com/cockroachdb/apd/v3` | Exact decimal parsing and normalized storage values | `pkg.go.dev` module page for `v3.2.3` reviewed on 2026-05-15 plus `specs/001-ghostfolio-gains-reporting/research.md` | Tagged stable Apache-2.0 module with recent 2026-03-23 publish date and 169 importers; justified by the constitution's exact-decimal requirement |
+| `golang.org/x/crypto/argon2` | Token-derived key derivation for protected snapshots | `pkg.go.dev` package page for `golang.org/x/crypto` `v0.51.0` reviewed on 2026-05-15 plus `specs/001-ghostfolio-gains-reporting/research.md` | Official Go-maintained BSD-3 crypto package with recent 2026-05-08 publish date and broad importer usage; justified because stdlib lacks Argon2id |
 | `github.com/Fabianexe/gocoverageplus` | Existing branch/file coverage gate | `specs/001-ghostfolio-gains-reporting/research.md`, implemented in `002` | Development-only helper already in use; acceptable while monitored |
 
 Dependencies intentionally deferred in this slice are PDF libraries and any database library. Reporting remains out of scope, and one encrypted snapshot file per local context is simpler than introducing a queryable store.

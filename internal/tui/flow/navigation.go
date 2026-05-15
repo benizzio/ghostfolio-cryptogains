@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 )
 
 var (
@@ -102,6 +103,34 @@ func (m *Model) updateValidationResult(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.enterSyncValidation()
 		}
 		m.enterMainMenu()
+	}
+
+	return m, nil
+}
+
+// updateServerReplacement handles server-mismatch confirmation navigation.
+// Authored by: OpenCode
+func (m *Model) updateServerReplacement(message tea.Msg) (tea.Model, tea.Cmd) {
+	var keyMessage, ok = message.(tea.KeyPressMsg)
+	if !ok {
+		return m, nil
+	}
+
+	switch {
+	case key.Matches(keyMessage, upBinding()):
+		if m.replacement.MenuIndex > 0 {
+			m.replacement.MenuIndex--
+		}
+	case key.Matches(keyMessage, downBinding()):
+		if m.replacement.MenuIndex < len(m.serverReplacementMenuItems())-1 {
+			m.replacement.MenuIndex++
+		}
+	case key.Matches(keyMessage, enterBinding()):
+		if m.replacement.MenuIndex == 0 {
+			return m.startConfirmedServerReplacement()
+		}
+		m.sync.TokenInput.Reset()
+		m.enterValidationResult(runtime.ValidationOutcome{Success: false, FailureReason: runtime.SyncFailureServerReplacementCancelled, DetailReason: string(runtime.SyncFailureServerReplacementCancelled)})
 	}
 
 	return m, nil

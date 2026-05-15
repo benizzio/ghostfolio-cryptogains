@@ -86,7 +86,7 @@ TO BE DEFINED
             - for public methods/functions, a detailed description of the purpose of the method, including an example of
               usage
             - for components/modules/packages, a detailed description of the purpose
-            - for classes/entities/components, a detailed description of the purpose. No example usage should be added.
+            - for classes/entities/components/structs/interfaces, a detailed description of the purpose. No example usage should be added.
         - all agent touched code must contain authoring information
             - new code created by an agent must include only the agent as the author
             - existing code unauthored can be considered as authored by a human user

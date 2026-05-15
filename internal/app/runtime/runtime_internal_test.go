@@ -12,6 +12,10 @@ import (
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	ghostfolioclient "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/client"
+	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	syncnormalize "github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
+	syncvalidate "github.com/benizzio/ghostfolio-cryptogains/internal/sync/validate"
 )
 
 type failingStore struct {
@@ -125,7 +129,7 @@ func TestValidateCoversInvalidAuthPayload(t *testing.T) {
 	}))
 	defer server.Close()
 
-	var service = NewSyncService(ghostfolioclient.New(server.Client()), time.Second)
+	var service = NewSyncService(ghostfolioclient.New(server.Client()), time.Second, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(t.TempDir(), nil))
 	var config, err = configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, server.URL, true, time.Now())
 	if err != nil {
 		t.Fatalf("new setup config: %v", err)
@@ -187,7 +191,7 @@ func TestValidateHandlesActivitiesTransportFailure(t *testing.T) {
 	}))
 	defer server.Close()
 
-	var service = NewSyncService(ghostfolioclient.New(server.Client()), time.Second)
+	var service = NewSyncService(ghostfolioclient.New(server.Client()), time.Second, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(t.TempDir(), nil))
 	var config, err = configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, server.URL, true, time.Now())
 	if err != nil {
 		t.Fatalf("new setup config: %v", err)
@@ -215,7 +219,7 @@ func TestValidateHandlesActivitiesPayloadValidationFailure(t *testing.T) {
 	}))
 	defer server.Close()
 
-	var service = NewSyncService(ghostfolioclient.New(server.Client()), time.Second)
+	var service = NewSyncService(ghostfolioclient.New(server.Client()), time.Second, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(t.TempDir(), nil))
 	var config, err = configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, server.URL, true, time.Now())
 	if err != nil {
 		t.Fatalf("new setup config: %v", err)
@@ -243,14 +247,14 @@ func TestValidateSuccessOutcomeIncludesAttemptAndMessages(t *testing.T) {
 	}))
 	defer server.Close()
 
-	var service = NewSyncService(ghostfolioclient.New(server.Client()), time.Second)
+	var service = NewSyncService(ghostfolioclient.New(server.Client()), time.Second, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(t.TempDir(), nil))
 	var config, err = configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, server.URL, true, time.Now())
 	if err != nil {
 		t.Fatalf("new setup config: %v", err)
 	}
 
 	var outcome = service.Validate(context.Background(), ValidateRequest{Config: config, SecurityToken: "token"})
-	if !outcome.Success || outcome.Attempt.Status != AttemptStatusSuccess || outcome.Attempt.AttemptID == "" || outcome.DetailReason != "communication_ok" || outcome.FailureReason != ValidationFailureNone {
+	if !outcome.Success || outcome.Attempt.Status != AttemptStatusSuccess || outcome.Attempt.AttemptID == "" || outcome.DetailReason != "activity_data_stored" || outcome.FailureReason != ValidationFailureNone {
 		t.Fatalf("unexpected success outcome: %#v", outcome)
 	}
 }
@@ -261,7 +265,7 @@ func TestValidateHandlesAuthTransportFailure(t *testing.T) {
 	var client = ghostfolioclient.New(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 		return nil, context.DeadlineExceeded
 	})})
-	var service = NewSyncService(client, time.Second)
+	var service = NewSyncService(client, time.Second, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(t.TempDir(), nil))
 	var config, err = configmodel.NewSetupConfig(configmodel.ServerModeGhostfolioCloud, configmodel.GhostfolioCloudOrigin, false, time.Now())
 	if err != nil {
 		t.Fatalf("new setup config: %v", err)

@@ -10,6 +10,13 @@ Reference sources of truth:
 - `specs/002-sync-data-validation/contracts/ghostfolio-sync-validation.md`
 - `specs/003-store-activity-data/spec.md`
 
+Observed upstream review evidence refreshed on 2026-05-15:
+
+- Ghostfolio release `3.3.0` published on 2026-05-14.
+- `apps/api/src/app/auth/auth.controller.ts` exposes `@Post('anonymous')` and returns `{ authToken }` on success while rejected access tokens surface as HTTP `403 Forbidden`.
+- `apps/api/src/app/activities/activities.controller.ts` exposes `GET /activities` with `skip`, `take`, `sortColumn`, and `sortDirection` query parameters and returns `{ activities, count }`.
+- `apps/api/src/app/activities/activities.service.ts` applies `skip` and `take`, defaults to date ordering, and appends `id` as a deterministic tie-break when explicit sorting is requested.
+
 ## Compatibility Rules
 
 - The selected Ghostfolio origin still comes from the bootstrap setup model introduced in `002`.
@@ -160,6 +167,7 @@ Optional preserved inputs:
 - A partial first page is never a complete sync.
 - Pagination must be monotonic. Contradictory `count`, duplicate page boundaries that cannot be normalized as exact duplicates, or other inconsistent paging behavior fail the sync.
 - A valid empty history is a successful retrieval when `count == 0` and `activities` is empty.
+- The upstream activities service currently appends `id` as a server-side tie-break after the requested sort order. The client still treats `occurred_at` plus `source_id` ordering as the defensible local normalization rule for this slice.
 
 ### Failure Handling Rules
 

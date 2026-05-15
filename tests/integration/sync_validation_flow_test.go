@@ -22,6 +22,10 @@ import (
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	ghostfolioclient "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/client"
+	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	syncnormalize "github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
+	syncvalidate "github.com/benizzio/ghostfolio-cryptogains/internal/sync/validate"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 )
@@ -51,10 +55,21 @@ type syncValidationFixture struct {
 func TestSyncValidationSuccessUsesProductionRuntimePath(t *testing.T) {
 	t.Parallel()
 
+	var tempDir = t.TempDir()
 	var server = newGhostfolioScenarioServer(t, ghostfolioScenario{
-		activitiesBody: `{"activities":[{"id":"activity-1","date":"2026-01-31T10:00:00Z","type":"BUY"}],"count":1}`,
+		activitiesBody: `{"activities":[{"id":"activity-1","date":"2026-01-31T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":10,"unitPriceInAssetProfileCurrency":10,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}],"count":1}`,
 	})
-	var fixture = newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
+	var fixture = syncValidationFixture{
+		config: mustCustomSetupConfig(t, server.URL),
+		service: runtime.NewSyncService(
+			ghostfolioclient.New(server.Client()),
+			time.Second,
+			decimalsupport.NewService(),
+			syncnormalize.NewNormalizer(),
+			syncvalidate.NewValidator(),
+			snapshotstore.NewEncryptedStore(tempDir, nil),
+		),
+	}
 	var model = newSyncValidationModel(t, fixture)
 
 	model = openSyncValidation(t, model)
@@ -69,10 +84,10 @@ func TestSyncValidationSuccessUsesProductionRuntimePath(t *testing.T) {
 	}
 
 	var content = model.View().Content
-	if !strings.Contains(content, "Communication with the selected Ghostfolio server is working.") {
-		t.Fatalf("expected successful validation summary, got %q", content)
+	if !strings.Contains(content, "Activity data was stored securely for future use.") {
+		t.Fatalf("expected successful sync summary, got %q", content)
 	}
-	if !strings.Contains(content, "No Ghostfolio data was stored locally, and reporting is not available in this slice.") {
+	if !strings.Contains(content, "No report-generation") || !strings.Contains(content, "cached-data browsing workflow") {
 		t.Fatalf("expected success follow-up text, got %q", content)
 	}
 	if strings.Contains(content, "abc123") || strings.Contains(content, "jwt") {
@@ -98,7 +113,7 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 				return newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
 			},
 			wantCategory:   runtime.ValidationFailureRejectedToken,
-			wantFollowUp:   "Validate again or return to the main menu. No Ghostfolio data was stored locally.",
+			wantFollowUp:   "The supplied token was rejected. Try again with a valid Ghostfolio security token.",
 			wantSecretSafe: true,
 		},
 		{
@@ -109,7 +124,7 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 				return newSyncValidationFixture(t, server.Client(), server.URL, 20*time.Millisecond)
 			},
 			wantCategory:   runtime.ValidationFailureTimeout,
-			wantFollowUp:   "Validate again or return to the main menu. No Ghostfolio data was stored locally.",
+			wantFollowUp:   "Sync again or return to the main menu. No protected activity data was stored.",
 			wantSecretSafe: true,
 		},
 		{
@@ -123,7 +138,7 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 				return newSyncValidationFixture(t, client, origin, time.Second)
 			},
 			wantCategory:   runtime.ValidationFailureConnectivityProblem,
-			wantFollowUp:   "Validate again or return to the main menu. No Ghostfolio data was stored locally.",
+			wantFollowUp:   "Sync again or return to the main menu. No protected activity data was stored.",
 			wantSecretSafe: true,
 		},
 		{
@@ -134,7 +149,7 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 				return newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
 			},
 			wantCategory:   runtime.ValidationFailureUnsuccessfulServerResponse,
-			wantFollowUp:   "Validate again or return to the main menu. No Ghostfolio data was stored locally.",
+			wantFollowUp:   "Sync again or return to the main menu. No protected activity data was stored.",
 			wantSecretSafe: true,
 		},
 		{
@@ -201,7 +216,7 @@ func TestFailedValidationDefaultActionRetriesValidation(t *testing.T) {
 	model = assertFlowModel(t, updated)
 
 	if model.ActiveScreen() != "sync_validation" {
-		t.Fatalf("expected Validate Again to reopen sync validation, got %s", model.ActiveScreen())
+		t.Fatalf("expected Sync Again to reopen sync validation, got %s", model.ActiveScreen())
 	}
 }
 
@@ -257,7 +272,17 @@ func TestSyncValidationNoPersistenceBeyondSetup(t *testing.T) {
 	var tempDir = t.TempDir()
 	var store = configstore.NewJSONStore(tempDir)
 	var server = newGhostfolioScenarioServer(t, ghostfolioScenario{})
-	var fixture = newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
+	var fixture = syncValidationFixture{
+		config: mustCustomSetupConfig(t, server.URL),
+		service: runtime.NewSyncService(
+			ghostfolioclient.New(server.Client()),
+			time.Second,
+			decimalsupport.NewService(),
+			syncnormalize.NewNormalizer(),
+			syncvalidate.NewValidator(),
+			snapshotstore.NewEncryptedStore(tempDir, nil),
+		),
+	}
 	if err := store.Save(context.Background(), fixture.config); err != nil {
 		t.Fatalf("save config: %v", err)
 	}
@@ -272,12 +297,20 @@ func TestSyncValidationNoPersistenceBeyondSetup(t *testing.T) {
 
 	var entries []os.DirEntry
 	var err error
-	entries, err = os.ReadDir(filepath.Dir(store.Path()))
+	entries, err = os.ReadDir(tempDir)
 	if err != nil {
 		t.Fatalf("read config directory: %v", err)
 	}
-	if len(entries) != 1 || entries[0].Name() != "setup.json" {
+	if len(entries) != 1 || entries[0].Name() != "ghostfolio-cryptogains" {
 		t.Fatalf("unexpected persisted files: %#v", entries)
+	}
+
+	var appEntries, readErr = os.ReadDir(filepath.Join(tempDir, "ghostfolio-cryptogains"))
+	if readErr != nil {
+		t.Fatalf("read app directory: %v", readErr)
+	}
+	if len(appEntries) != 2 {
+		t.Fatalf("expected setup plus snapshots directory, got %#v", appEntries)
 	}
 	if got := model.View().Content; strings.Contains(got, "abc123") || strings.Contains(got, "jwt") {
 		t.Fatalf("expected result screen to remain secret-safe, got %q", got)
@@ -346,7 +379,7 @@ func newSyncValidationFixture(t *testing.T, client *http.Client, origin string, 
 
 	return syncValidationFixture{
 		config:  mustCustomSetupConfig(t, origin),
-		service: runtime.NewSyncService(ghostfolioclient.New(client), requestTimeout),
+		service: runtime.NewSyncService(ghostfolioclient.New(client), requestTimeout, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(t.TempDir(), nil)),
 	}
 }
 
@@ -370,7 +403,7 @@ func startSyncValidationAttempt(t *testing.T, model *flow.Model) (*flow.Model, t
 	if cmd == nil {
 		t.Fatalf("expected validation batch command")
 	}
-	if got := model.View().Content; !strings.Contains(got, "Validating Ghostfolio communication") {
+	if got := model.View().Content; !strings.Contains(got, "Syncing and storing activity history") {
 		t.Fatalf("expected busy state after submit, got %q", got)
 	}
 

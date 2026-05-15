@@ -27,7 +27,15 @@ type integrationSyncService struct{}
 // Validate implements runtime.SyncService for setup-centric integration tests.
 // Authored by: OpenCode
 func (integrationSyncService) Validate(context.Context, runtime.ValidateRequest) runtime.ValidationOutcome {
-	return runtime.ValidationOutcome{Success: true, DetailReason: "communication_ok"}
+	return runtime.ValidationOutcome{Success: true, DetailReason: "activity_data_stored"}
+}
+
+func (integrationSyncService) ProtectedDataState() runtime.ProtectedDataState {
+	return runtime.ProtectedDataState{}
+}
+
+func (integrationSyncService) CheckServerReplacement(configmodel.AppSetupConfig) runtime.ServerReplacementCheck {
+	return runtime.ServerReplacementCheck{}
 }
 
 func TestFreshRunCompletesSetupAndReachesMainMenu(t *testing.T) {

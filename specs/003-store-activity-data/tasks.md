@@ -28,11 +28,11 @@ description: "Task list for Store Activity Data implementation"
 
 **Purpose**: Add the new package skeleton, dependency wiring, and traceable research evidence required for full-history sync and protected snapshot storage.
 
-- [ ] T001 Update module dependencies for `github.com/cockroachdb/apd/v3` and `golang.org/x/crypto/argon2` in `go.mod` and `go.sum`
-- [ ] T002 [P] Create the protected snapshot package skeleton in `internal/snapshot/envelope/`, `internal/snapshot/model/`, and `internal/snapshot/store/`
-- [ ] T003 [P] Create the normalized sync package skeleton in `internal/sync/model/`, `internal/sync/normalize/`, and `internal/sync/validate/`
-- [ ] T047 [P] Refresh dependency due-diligence evidence for `github.com/cockroachdb/apd/v3` and `golang.org/x/crypto/argon2` in `specs/003-store-activity-data/research.md`
-- [ ] T048 [P] Refresh Ghostfolio auth and pagination contract review evidence in `specs/003-store-activity-data/research.md` and `specs/003-store-activity-data/contracts/ghostfolio-sync.md`
+- [X] T001 Update module dependencies for `github.com/cockroachdb/apd/v3` and `golang.org/x/crypto/argon2` in `go.mod` and `go.sum`
+- [X] T002 [P] Create the protected snapshot package skeleton in `internal/snapshot/envelope/`, `internal/snapshot/model/`, and `internal/snapshot/store/`
+- [X] T003 [P] Create the normalized sync package skeleton in `internal/sync/model/`, `internal/sync/normalize/`, and `internal/sync/validate/`
+- [X] T047 [P] Refresh dependency due-diligence evidence for `github.com/cockroachdb/apd/v3` and `golang.org/x/crypto/argon2` in `specs/003-store-activity-data/research.md`
+- [X] T048 [P] Refresh Ghostfolio auth and pagination contract review evidence in `specs/003-store-activity-data/research.md` and `specs/003-store-activity-data/contracts/ghostfolio-sync.md`
 
 ---
 
@@ -42,14 +42,14 @@ description: "Task list for Store Activity Data implementation"
 
 **Critical**: Finish this phase before starting story implementation.
 
-- [ ] T004 Implement exact-decimal parsing and canonical string helpers in `internal/support/decimal/decimal.go`
-- [ ] T005 [P] Extend Ghostfolio transport DTOs for full paginated activities in `internal/ghostfolio/dto/auth_response.go` and `internal/ghostfolio/dto/activity_page_response.go`
-- [ ] T006 [P] Implement full-history response validation helpers for auth and paginated activities in `internal/ghostfolio/validator/response_validator.go`
-- [ ] T007 [P] Define normalized activity, scope, cache, and sync-attempt runtime models in `internal/sync/model/activity_record.go`, `internal/sync/model/protected_activity_cache.go`, and `internal/app/runtime/sync_types.go`
-- [ ] T008 [P] Define protected snapshot envelope, payload, version, and profile models in `internal/snapshot/model/envelope.go` and `internal/snapshot/model/payload.go`
-- [ ] T009 [P] Implement snapshot envelope encoding, server discovery key derivation, and AEAD header authentication helpers in `internal/snapshot/envelope/codec.go`
-- [ ] T010 [P] Implement protected snapshot path resolution, candidate enumeration, and atomic file-replacement helpers in `internal/snapshot/store/store.go`
-- [ ] T011 Implement runtime dependency wiring for decimal, sync, and snapshot services in `internal/app/runtime/runtime.go`
+- [X] T004 Implement exact-decimal parsing and canonical string helpers in `internal/support/decimal/decimal.go`
+- [X] T005 [P] Extend Ghostfolio transport DTOs for full paginated activities in `internal/ghostfolio/dto/auth_response.go` and `internal/ghostfolio/dto/activity_page_response.go`
+- [X] T006 [P] Implement full-history response validation helpers for auth and paginated activities in `internal/ghostfolio/validator/response_validator.go`
+- [X] T007 [P] Define normalized activity, scope, cache, and sync-attempt runtime models in `internal/sync/model/activity_record.go`, `internal/sync/model/protected_activity_cache.go`, and `internal/app/runtime/sync_types.go`
+- [X] T008 [P] Define protected snapshot envelope, payload, version, and profile models in `internal/snapshot/model/envelope.go` and `internal/snapshot/model/payload.go`
+- [X] T009 [P] Implement snapshot envelope encoding, server discovery key derivation, and AEAD header authentication helpers in `internal/snapshot/envelope/codec.go`
+- [X] T010 [P] Implement protected snapshot path resolution, candidate enumeration, and atomic file-replacement helpers in `internal/snapshot/store/store.go`
+- [X] T011 Implement runtime dependency wiring for decimal, sync, and snapshot services in `internal/app/runtime/runtime.go`
 
 **Checkpoint**: The codebase has the shared models and infrastructure needed for tests-first implementation of full sync, protected storage, and server-scoped snapshot reuse.
 
@@ -63,22 +63,22 @@ description: "Task list for Store Activity Data implementation"
 
 ### Tests for User Story 1
 
-- [ ] T012 [P] [US1] Add Ghostfolio full-history contract coverage for auth, pagination, and empty-history success in `tests/contract/ghostfolio_sync_storage_contract_test.go`
-- [ ] T013 [P] [US1] Add sync workflow contract coverage for busy-state, success result wording, and non-reporting UI scope in `tests/contract/sync_storage_workflow_contract_test.go`
-- [ ] T014 [P] [US1] Add integration coverage for first successful sync, multi-page retrieval, protected snapshot creation, and empty-history success in `tests/integration/sync_storage_flow_test.go`
-- [ ] T015 [P] [US1] Add unit coverage for exact-decimal parsing and year-derivation rules in `tests/unit/decimal_test.go` and `tests/unit/year_derivation_test.go`
-- [ ] T016 [P] [US1] Add unit coverage for envelope encoding, header authentication, and atomic snapshot replacement in `tests/unit/snapshot_envelope_test.go` and `tests/unit/snapshot_store_test.go`
+- [X] T012 [P] [US1] Add Ghostfolio full-history contract coverage for auth, pagination, and empty-history success in `tests/contract/ghostfolio_sync_storage_contract_test.go`
+- [X] T013 [P] [US1] Add sync workflow contract coverage for busy-state, success result wording, and non-reporting UI scope in `tests/contract/sync_storage_workflow_contract_test.go`
+- [X] T014 [P] [US1] Add integration coverage for first successful sync, multi-page retrieval, protected snapshot creation, and empty-history success in `tests/integration/sync_storage_flow_test.go`
+- [X] T015 [P] [US1] Add unit coverage for exact-decimal parsing and year-derivation rules in `tests/unit/decimal_test.go` and `tests/unit/year_derivation_test.go`
+- [X] T016 [P] [US1] Add unit coverage for envelope encoding, header authentication, and atomic snapshot replacement in `tests/unit/snapshot_envelope_test.go` and `tests/unit/snapshot_store_test.go`
 
 ### Implementation for User Story 1
 
-- [ ] T017 [P] [US1] Implement paginated Ghostfolio activities retrieval with `skip`, `take`, and ascending date order in `internal/ghostfolio/client/client.go`
-- [ ] T018 [P] [US1] Implement Ghostfolio activity-to-normalized-record mapping in `internal/ghostfolio/mapper/activity_mapper.go`
-- [ ] T019 [P] [US1] Implement chronological normalization, duplicate hashing, and available-year derivation in `internal/sync/normalize/activity_history.go`
-- [ ] T020 [P] [US1] Implement supported-history validation for `BUY` and `SELL` activity rules in `internal/sync/validate/activity_history.go`
-- [ ] T021 [P] [US1] Implement protected snapshot encryption, decryption, and atomic persistence in `internal/snapshot/store/encrypted_store.go`
-- [ ] T022 [US1] Implement full sync orchestration from auth through protected write in `internal/app/runtime/sync_service.go`
-- [ ] T023 [US1] Update sync flow busy-state lifecycle and result routing for full-history storage in `internal/tui/flow/sync_flow.go`
-- [ ] T024 [US1] Replace validation-only sync entry and result screens with storage-focused wording in `internal/tui/screen/sync_validation_screen.go` and `internal/tui/screen/validation_result_screen.go`
+- [X] T017 [P] [US1] Implement paginated Ghostfolio activities retrieval with `skip`, `take`, and ascending date order in `internal/ghostfolio/client/client.go`
+- [X] T018 [P] [US1] Implement Ghostfolio activity-to-normalized-record mapping in `internal/ghostfolio/mapper/activity_mapper.go`
+- [X] T019 [P] [US1] Implement chronological normalization, duplicate hashing, and available-year derivation in `internal/sync/normalize/activity_history.go`
+- [X] T020 [P] [US1] Implement supported-history validation for `BUY` and `SELL` activity rules in `internal/sync/validate/activity_history.go`
+- [X] T021 [P] [US1] Implement protected snapshot encryption, decryption, and atomic persistence in `internal/snapshot/store/encrypted_store.go`
+- [X] T022 [US1] Implement full sync orchestration from auth through protected write in `internal/app/runtime/sync_service.go`
+- [X] T023 [US1] Update sync flow busy-state lifecycle and result routing for full-history storage in `internal/tui/flow/sync_flow.go`
+- [X] T024 [US1] Replace validation-only sync entry and result screens with storage-focused wording in `internal/tui/screen/sync_validation_screen.go` and `internal/tui/screen/validation_result_screen.go`
 
 **Checkpoint**: User Story 1 is independently functional. The app can fetch full history and store a protected snapshot without exposing reporting workflows.
 
@@ -92,17 +92,17 @@ description: "Task list for Store Activity Data implementation"
 
 ### Tests for User Story 2
 
-- [ ] T025 [P] [US2] Add protected-snapshot discovery and compatibility contract coverage in `tests/contract/protected_snapshot_contract_test.go`
-- [ ] T026 [P] [US2] Add integration coverage for same-token refresh, wrong-token denial, different-valid-token isolation, and invalid-token no-change behavior in `tests/integration/snapshot_reuse_flow_test.go`
-- [ ] T027 [P] [US2] Add integration coverage for unsupported envelope version, unsupported payload version, and incompatible new sync data retention in `tests/integration/snapshot_compatibility_flow_test.go`
-- [ ] T028 [P] [US2] Add unit coverage for server-scoped candidate filtering and payload version checks in `tests/unit/snapshot_discovery_test.go` and `tests/unit/stored_data_version_test.go`
+- [X] T025 [P] [US2] Add protected-snapshot discovery and compatibility contract coverage in `tests/contract/protected_snapshot_contract_test.go`
+- [X] T026 [P] [US2] Add integration coverage for same-token refresh, wrong-token denial, different-valid-token isolation, and invalid-token no-change behavior in `tests/integration/snapshot_reuse_flow_test.go`
+- [X] T027 [P] [US2] Add integration coverage for unsupported envelope version, unsupported payload version, and incompatible new sync data retention in `tests/integration/snapshot_compatibility_flow_test.go`
+- [X] T028 [P] [US2] Add unit coverage for server-scoped candidate filtering and payload version checks in `tests/unit/snapshot_discovery_test.go` and `tests/unit/stored_data_version_test.go`
 
 ### Implementation for User Story 2
 
-- [ ] T029 [P] [US2] Implement server-scoped snapshot header discovery and candidate filtering in `internal/snapshot/store/discovery.go`
-- [ ] T030 [P] [US2] Implement stored-data version compatibility checks for envelope and payload models in `internal/snapshot/model/version.go` and `internal/snapshot/store/compatibility.go`
-- [ ] T031 [P] [US2] Implement protected snapshot unlock, active readable snapshot tracking, and isolated snapshot creation for new valid tokens in `internal/app/runtime/sync_service.go`
-- [ ] T032 [US2] Implement failure and success result handling for rejected token, unsupported stored-data version, and incompatible new sync data in `internal/tui/flow/sync_flow.go` and `internal/tui/screen/validation_result_screen.go`
+- [X] T029 [P] [US2] Implement server-scoped snapshot header discovery and candidate filtering in `internal/snapshot/store/discovery.go`
+- [X] T030 [P] [US2] Implement stored-data version compatibility checks for envelope and payload models in `internal/snapshot/model/version.go` and `internal/snapshot/store/compatibility.go`
+- [X] T031 [P] [US2] Implement protected snapshot unlock, active readable snapshot tracking, and isolated snapshot creation for new valid tokens in `internal/app/runtime/sync_service.go`
+- [X] T032 [US2] Implement failure and success result handling for rejected token, unsupported stored-data version, and incompatible new sync data in `internal/tui/flow/sync_flow.go` and `internal/tui/screen/validation_result_screen.go`
 
 **Checkpoint**: User Story 2 is independently functional. Snapshot reuse, token isolation, and compatibility failures behave safely without modifying protected data incorrectly.
 
@@ -116,19 +116,19 @@ description: "Task list for Store Activity Data implementation"
 
 ### Tests for User Story 3
 
-- [ ] T033 [P] [US3] Add normalization and defensibility contract coverage for supported activity rules, below-zero holdings rejection, and scope-reliability outcome categories in `tests/contract/activity_validation_contract_test.go`
-- [ ] T034 [P] [US3] Add server-mismatch confirmation workflow contract coverage in `tests/contract/server_replacement_workflow_contract_test.go`
-- [ ] T035 [P] [US3] Add integration coverage for unsupported activity history, duplicate removal, deterministic ordering, below-zero holdings rejection, and zero-price rule handling in `tests/integration/activity_validation_flow_test.go`
-- [ ] T036 [P] [US3] Add integration coverage for server replacement confirm, cancel, success, and failed-replacement retention in `tests/integration/server_replacement_flow_test.go`
-- [ ] T037 [P] [US3] Add unit coverage for duplicate hashing, tie-break ordering, running-quantity defensibility checks, and scope-reliability derivation in `tests/unit/activity_normalization_test.go` and `tests/unit/scope_reliability_test.go`
+- [X] T033 [P] [US3] Add normalization and defensibility contract coverage for supported activity rules, below-zero holdings rejection, and scope-reliability outcome categories in `tests/contract/activity_validation_contract_test.go`
+- [X] T034 [P] [US3] Add server-mismatch confirmation workflow contract coverage in `tests/contract/server_replacement_workflow_contract_test.go`
+- [X] T035 [P] [US3] Add integration coverage for unsupported activity history, duplicate removal, deterministic ordering, below-zero holdings rejection, and zero-price rule handling in `tests/integration/activity_validation_flow_test.go`
+- [X] T036 [P] [US3] Add integration coverage for server replacement confirm, cancel, success, and failed-replacement retention in `tests/integration/server_replacement_flow_test.go`
+- [X] T037 [P] [US3] Add unit coverage for duplicate hashing, tie-break ordering, running-quantity defensibility checks, and scope-reliability derivation in `tests/unit/activity_normalization_test.go` and `tests/unit/scope_reliability_test.go`
 
 ### Implementation for User Story 3
 
-- [ ] T038 [P] [US3] Implement duplicate hashing, deterministic same-timestamp ordering, running-quantity replay support, and source-scope reliability derivation in `internal/sync/normalize/activity_history.go`
-- [ ] T039 [P] [US3] Implement defensibility checks for missing or contradictory normalized fields, below-zero holdings, zero-priced `SELL` comment rules, and unsupported-history rejection in `internal/sync/validate/activity_history.go`
-- [ ] T040 [P] [US3] Implement server-mismatch detection and replacement gating against the active readable snapshot in `internal/app/runtime/sync_service.go`
-- [ ] T041 [US3] Implement server replacement confirmation screen and navigation in `internal/tui/screen/server_replacement_screen.go` and `internal/tui/flow/sync_flow.go`
-- [ ] T042 [US3] Update the main menu and sync entry screens to surface protected-data-exists state without exposing cached activity details in `internal/tui/screen/main_menu_screen.go` and `internal/tui/screen/sync_validation_screen.go`
+- [X] T038 [P] [US3] Implement duplicate hashing, deterministic same-timestamp ordering, running-quantity replay support, and source-scope reliability derivation in `internal/sync/normalize/activity_history.go`
+- [X] T039 [P] [US3] Implement defensibility checks for missing or contradictory normalized fields, below-zero holdings, zero-priced `SELL` comment rules, and unsupported-history rejection in `internal/sync/validate/activity_history.go`
+- [X] T040 [P] [US3] Implement server-mismatch detection and replacement gating against the active readable snapshot in `internal/app/runtime/sync_service.go`
+- [X] T041 [US3] Implement server replacement confirmation screen and navigation in `internal/tui/screen/server_replacement_screen.go` and `internal/tui/flow/sync_flow.go`
+- [X] T042 [US3] Update the main menu and sync entry screens to surface protected-data-exists state without exposing cached activity details in `internal/tui/screen/main_menu_screen.go` and `internal/tui/screen/sync_validation_screen.go`
 
 **Checkpoint**: User Story 3 is independently functional. Invalid histories and server-boundary changes cannot silently replace or contaminate protected data.
 

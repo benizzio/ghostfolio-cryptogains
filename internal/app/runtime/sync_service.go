@@ -4,122 +4,49 @@ package runtime
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	ghostfolioclient "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/client"
+	ghostfoliodto "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/dto"
+	ghostfoliomapper "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/mapper"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/validator"
+	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
+	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
+	syncnormalize "github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
+	syncvalidate "github.com/benizzio/ghostfolio-cryptogains/internal/sync/validate"
 )
-
-// ValidationFailureReason identifies the supported structured failure outcome
-// for a communication-validation attempt.
-//
-// Authored by: OpenCode
-type ValidationFailureReason string
-
-// Validation failure reasons define the supported user-visible failure taxonomy
-// for one communication-validation attempt.
-// Authored by: OpenCode
-const (
-	// ValidationFailureNone indicates that validation completed successfully.
-	ValidationFailureNone ValidationFailureReason = ""
-
-	// ValidationFailureRejectedToken indicates that Ghostfolio rejected the
-	// supplied access token.
-	ValidationFailureRejectedToken ValidationFailureReason = "rejected token"
-
-	// ValidationFailureTimeout indicates that the validation request exceeded the
-	// allowed runtime deadline.
-	ValidationFailureTimeout ValidationFailureReason = "timeout"
-
-	// ValidationFailureConnectivityProblem indicates a transport-level reachability
-	// problem before a supported success response could be confirmed.
-	ValidationFailureConnectivityProblem ValidationFailureReason = "connectivity problem"
-
-	// ValidationFailureUnsuccessfulServerResponse indicates that the server was
-	// reachable but returned an unsuccessful HTTP response.
-	ValidationFailureUnsuccessfulServerResponse ValidationFailureReason = "unsuccessful server response"
-
-	// ValidationFailureIncompatibleServerContract indicates that the server
-	// response shape or behavior does not satisfy this slice's supported contract.
-	ValidationFailureIncompatibleServerContract ValidationFailureReason = "incompatible server contract"
-)
-
-// AttemptStatus identifies the current phase of a validation attempt.
-//
-// Authored by: OpenCode
-type AttemptStatus string
-
-// Attempt statuses define the observable lifecycle phases for one validation
-// attempt.
-// Authored by: OpenCode
-const (
-	// AttemptStatusIdle indicates that no validation attempt is running.
-	AttemptStatusIdle AttemptStatus = "idle"
-
-	// AttemptStatusAuthenticating indicates that anonymous auth is in flight.
-	AttemptStatusAuthenticating AttemptStatus = "authenticating"
-
-	// AttemptStatusRequestingActivities indicates that the activities request is in flight.
-	AttemptStatusRequestingActivities AttemptStatus = "requesting_activities"
-
-	// AttemptStatusValidatingPayload indicates that payload validation is running.
-	AttemptStatusValidatingPayload AttemptStatus = "validating_payload"
-
-	// AttemptStatusSuccess indicates a completed successful validation attempt.
-	AttemptStatusSuccess AttemptStatus = "success"
-
-	// AttemptStatusFailure indicates a completed failed validation attempt.
-	AttemptStatusFailure AttemptStatus = "failure"
-)
-
-// GhostfolioSession is the transient authenticated runtime state for one
-// validation attempt.
-//
-// Authored by: OpenCode
-type GhostfolioSession struct {
-	ServerOrigin    string
-	SecurityToken   string
-	AuthToken       string
-	StartedAt       time.Time
-	AuthenticatedAt time.Time
-}
-
-// SyncValidationAttempt is the transient workflow state for one sync-data
-// validation run.
-//
-// Authored by: OpenCode
-type SyncValidationAttempt struct {
-	AttemptID     string
-	Status        AttemptStatus
-	FailureReason ValidationFailureReason
-	StartedAt     time.Time
-	CompletedAt   time.Time
-}
-
-// ValidationOutcome is the structured result of a completed validation
-// attempt.
-//
-// The application layer returns outcome semantics only. Presentation layers are
-// expected to convert the result into final user-facing wording.
-//
-// Authored by: OpenCode
-type ValidationOutcome struct {
-	Success       bool
-	DetailReason  string
-	FailureReason ValidationFailureReason
-	Attempt       SyncValidationAttempt
-}
 
 // ValidateRequest contains the bootstrap configuration and runtime-only token
 // needed for a single Ghostfolio communication check.
 //
 // Authored by: OpenCode
 type ValidateRequest struct {
-	Config        configmodel.AppSetupConfig
-	SecurityToken string
+	Config                   configmodel.AppSetupConfig
+	SecurityToken            string
+	ConfirmServerReplacement bool
+}
+
+// ProtectedDataState summarizes whether readable protected data is active in memory for this run.
+// Authored by: OpenCode
+type ProtectedDataState struct {
+	HasReadableSnapshot bool
+	ServerOrigin        string
+}
+
+// ServerReplacementCheck reports whether the selected server would replace the active readable snapshot.
+// Authored by: OpenCode
+type ServerReplacementCheck struct {
+	Required             bool
+	ActiveServerOrigin   string
+	SelectedServerOrigin string
 }
 
 // SyncService validates Ghostfolio communication for the currently selected
@@ -135,6 +62,14 @@ type SyncService interface {
 	//
 	// Authored by: OpenCode
 	Validate(context.Context, ValidateRequest) ValidationOutcome
+
+	// ProtectedDataState reports whether a readable protected snapshot is active for this run.
+	// Authored by: OpenCode
+	ProtectedDataState() ProtectedDataState
+
+	// CheckServerReplacement compares the selected setup server with the active readable snapshot.
+	// Authored by: OpenCode
+	CheckServerReplacement(configmodel.AppSetupConfig) ServerReplacementCheck
 }
 
 // syncService coordinates one validation attempt across the Ghostfolio client
@@ -143,20 +78,62 @@ type SyncService interface {
 type syncService struct {
 	client         *ghostfolioclient.Client
 	requestTimeout time.Duration
+	decimalService decimalsupport.Service
+	normalizer     syncnormalize.Normalizer
+	validator      syncvalidate.Validator
+	snapshotStore  snapshotstore.Store
+	activeMutex    sync.Mutex
+	activeSnapshot activeReadableSnapshot
+}
+
+// activeReadableSnapshot stores the current run's successfully unlocked local
+// protected snapshot.
+// Authored by: OpenCode
+type activeReadableSnapshot struct {
+	Candidate snapshotstore.Candidate
+	Payload   snapshotmodel.Payload
+	Present   bool
 }
 
 // NewSyncService creates the runtime sync-validation service.
 //
 // Example:
 //
-//	service := runtime.NewSyncService(ghostfolioclient.New(nil), 30*time.Second)
+//	service := runtime.NewSyncService(ghostfolioclient.New(nil), 30*time.Second, decimal.NewService(), normalize.NewNormalizer(), validate.NewValidator(), snapshots)
 //	_ = service
 //
 // The returned service depends on the Ghostfolio HTTP client boundary and
 // enforces a per-attempt timeout for the full validation workflow.
 // Authored by: OpenCode
-func NewSyncService(client *ghostfolioclient.Client, requestTimeout time.Duration) SyncService {
-	return &syncService{client: client, requestTimeout: requestTimeout}
+func NewSyncService(
+	client *ghostfolioclient.Client,
+	requestTimeout time.Duration,
+	decimalService decimalsupport.Service,
+	normalizer syncnormalize.Normalizer,
+	validatorService syncvalidate.Validator,
+	snapshots snapshotstore.Store,
+) SyncService {
+	if client == nil {
+		client = ghostfolioclient.New(nil)
+	}
+	if decimalService == nil {
+		decimalService = decimalsupport.NewService()
+	}
+	if normalizer == nil {
+		normalizer = syncnormalize.NewNormalizer()
+	}
+	if validatorService == nil {
+		validatorService = syncvalidate.NewValidator()
+	}
+
+	return &syncService{
+		client:         client,
+		requestTimeout: requestTimeout,
+		decimalService: decimalService,
+		normalizer:     normalizer,
+		validator:      validatorService,
+		snapshotStore:  snapshots,
+	}
 }
 
 // Validate executes one full Ghostfolio communication-validation attempt.
@@ -166,9 +143,9 @@ func NewSyncService(client *ghostfolioclient.Client, requestTimeout time.Duratio
 //	outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token"})
 //	_ = outcome.Success
 //
-// Validate authenticates anonymously against the configured origin, performs
-// the one-page activities probe, validates both response contracts, and maps
-// any failure into a structured application-facing result.
+// Validate authenticates anonymously against the configured origin, retrieves
+// the full activity history, normalizes and validates the supported data, and
+// stores it as a protected snapshot.
 // Authored by: OpenCode
 func (s *syncService) Validate(ctx context.Context, request ValidateRequest) ValidationOutcome {
 	var timedContext, cancel = context.WithTimeout(ctx, s.requestTimeout)
@@ -182,11 +159,62 @@ func (s *syncService) Validate(ctx context.Context, request ValidateRequest) Val
 	}
 	var attempt = SyncValidationAttempt{
 		AttemptID: fmt.Sprintf("attempt-%d", now.UnixNano()),
-		Status:    AttemptStatusAuthenticating,
+		Status:    AttemptStatusDiscoveringSnapshot,
 		StartedAt: now,
 	}
 
-	var authResponse, err = s.client.Authenticate(timedContext, session.ServerOrigin, session.SecurityToken)
+	var unlockedCandidate snapshotstore.Candidate
+	var unlockedPayload snapshotmodel.Payload
+	var unlocked bool
+	var err error
+
+	if s.snapshotStore == nil {
+		return finalizeSyncFailure(&session, &attempt, SyncFailureIncompatibleNewSyncData)
+	}
+
+	var replacementCheck = s.CheckServerReplacement(request.Config)
+	if replacementCheck.Required && !request.ConfirmServerReplacement {
+		attempt.Status = AttemptStatusAborted
+		return finalizeSyncFailure(&session, &attempt, SyncFailureServerReplacementCancelled)
+	}
+	if replacementCheck.Required {
+		attempt.ServerMismatchConfirmed = true
+	}
+
+	var candidates []snapshotstore.Candidate
+	candidates, err = snapshotstore.DiscoverServerCandidates(timedContext, s.snapshotStore, request.Config.ServerOrigin)
+	if err != nil {
+		return finalizeSyncFailure(&session, &attempt, SyncFailureIncompatibleNewSyncData)
+	}
+	for _, candidate := range candidates {
+		if err := snapshotstore.ValidateEnvelopeCompatibility(candidate.Header); err != nil {
+			if errors.Is(err, snapshotstore.ErrUnsupportedStoredDataVersion) {
+				return finalizeSyncFailure(&session, &attempt, SyncFailureUnsupportedStoredDataVersion)
+			}
+			return finalizeSyncFailure(&session, &attempt, SyncFailureIncompatibleNewSyncData)
+		}
+	}
+
+	attempt.Status = AttemptStatusUnlockingSnapshot
+	for _, candidate := range candidates {
+		unlockedPayload, err = s.snapshotStore.Read(timedContext, snapshotstore.ReadRequest{
+			Candidate:     candidate,
+			SecurityToken: request.SecurityToken,
+		})
+		if err == nil {
+			unlockedCandidate = candidate
+			unlocked = true
+			break
+		}
+		if errors.Is(err, snapshotstore.ErrUnsupportedStoredDataVersion) {
+			return finalizeSyncFailure(&session, &attempt, SyncFailureUnsupportedStoredDataVersion)
+		}
+	}
+
+	attempt.Status = AttemptStatusAuthenticating
+
+	var authResponse = ghostfoliodto.AuthResponse{}
+	authResponse, err = s.client.Authenticate(timedContext, session.ServerOrigin, session.SecurityToken)
 	if err != nil {
 		return finalizeFailure(&session, &attempt, err)
 	}
@@ -196,17 +224,50 @@ func (s *syncService) Validate(ctx context.Context, request ValidateRequest) Val
 
 	session.AuthToken = authResponse.AuthToken
 	session.AuthenticatedAt = time.Now().UTC()
-	attempt.Status = AttemptStatusRequestingActivities
+	attempt.Status = AttemptStatusRetrievingHistory
 
-	var probeResponse, errProbe = s.client.FetchActivitiesProbe(timedContext, session.ServerOrigin, session.AuthToken)
-	if errProbe != nil {
-		return finalizeFailure(&session, &attempt, errProbe)
+	historyResponse, err := s.client.FetchActivitiesHistory(timedContext, session.ServerOrigin, session.AuthToken)
+	if err != nil {
+		return finalizeFailure(&session, &attempt, err)
 	}
 
-	attempt.Status = AttemptStatusValidatingPayload
-	if err := validator.ValidateActivitiesProbeResponse(probeResponse); err != nil {
+	if err := validator.ValidateActivityPageResponse(historyResponse); err != nil {
 		return finalizeValidationFailure(&session, &attempt, err)
 	}
+
+	attempt.Status = AttemptStatusNormalizing
+	records, err := ghostfoliomapper.MapActivities(historyResponse.Activities, s.decimalService)
+	if err != nil {
+		return finalizeSyncFailure(&session, &attempt, SyncFailureUnsupportedActivityHistory)
+	}
+
+	cache, err := s.normalizer.Normalize(records)
+	if err != nil {
+		return finalizeSyncFailure(&session, &attempt, SyncFailureUnsupportedActivityHistory)
+	}
+	cache.SyncedAt = time.Now().UTC()
+
+	attempt.Status = AttemptStatusValidating
+	if err := s.validator.Validate(cache); err != nil {
+		return finalizeSyncFailure(&session, &attempt, SyncFailureUnsupportedActivityHistory)
+	}
+
+	attempt.Status = AttemptStatusPersisting
+	var payload = newSnapshotPayload(request.Config, cache, unlockedPayload, unlocked)
+	var persistedCandidate snapshotstore.Candidate
+	persistedCandidate, err = s.snapshotStore.Write(timedContext, snapshotstore.WriteRequest{
+		SnapshotID:    unlockedCandidate.SnapshotID,
+		SecurityToken: request.SecurityToken,
+		ServerOrigin:  request.Config.ServerOrigin,
+		Payload:       payload,
+	})
+	if err != nil {
+		if errors.Is(err, snapshotstore.ErrIncompatibleStoredData) || errors.Is(err, snapshotstore.ErrUnsupportedStoredDataVersion) {
+			return finalizeSyncFailure(&session, &attempt, SyncFailureIncompatibleNewSyncData)
+		}
+		return finalizeSyncFailure(&session, &attempt, SyncFailureIncompatibleNewSyncData)
+	}
+	s.setActiveSnapshot(persistedCandidate, payload)
 
 	attempt.Status = AttemptStatusSuccess
 	attempt.CompletedAt = time.Now().UTC()
@@ -214,8 +275,8 @@ func (s *syncService) Validate(ctx context.Context, request ValidateRequest) Val
 
 	return ValidationOutcome{
 		Success:      true,
-		DetailReason: "communication_ok",
-		Attempt:      attempt,
+		DetailReason: "activity_data_stored",
+		Attempt:      SyncAttempt(attempt),
 	}
 }
 
@@ -237,7 +298,7 @@ func finalizeFailure(session *GhostfolioSession, attempt *SyncValidationAttempt,
 		Success:       false,
 		DetailReason:  string(category),
 		FailureReason: category,
-		Attempt:       *attempt,
+		Attempt:       SyncAttempt(*attempt),
 	}
 }
 
@@ -258,7 +319,27 @@ func finalizeValidationFailure(
 		Success:       false,
 		DetailReason:  string(ValidationFailureIncompatibleServerContract),
 		FailureReason: ValidationFailureIncompatibleServerContract,
-		Attempt:       *attempt,
+		Attempt:       SyncAttempt(*attempt),
+	}
+}
+
+// finalizeSyncFailure converts an internal sync failure into one supported user-visible category.
+// Authored by: OpenCode
+func finalizeSyncFailure(
+	session *GhostfolioSession,
+	attempt *SyncValidationAttempt,
+	reason SyncFailureReason,
+) ValidationOutcome {
+	attempt.Status = AttemptStatusFailure
+	attempt.CompletedAt = time.Now().UTC()
+	attempt.FailureReason = reason
+	clearSessionSecrets(session)
+
+	return ValidationOutcome{
+		Success:       false,
+		DetailReason:  string(reason),
+		FailureReason: reason,
+		Attempt:       SyncAttempt(*attempt),
 	}
 }
 
@@ -287,4 +368,95 @@ func validationFailureReasonFromBoundary(category ghostfolioclient.FailureCatego
 func clearSessionSecrets(session *GhostfolioSession) {
 	session.SecurityToken = ""
 	session.AuthToken = ""
+}
+
+// newSnapshotPayload builds the phase-3 protected snapshot payload.
+// Authored by: OpenCode
+func newSnapshotPayload(
+	config configmodel.AppSetupConfig,
+	cache syncmodel.ProtectedActivityCache,
+	existing snapshotmodel.Payload,
+	hasExisting bool,
+) snapshotmodel.Payload {
+	var now = cache.SyncedAt.UTC()
+	var registeredLocalUser snapshotmodel.RegisteredLocalUser
+	if hasExisting {
+		registeredLocalUser = existing.RegisteredLocalUser
+		registeredLocalUser.UpdatedAt = now
+		registeredLocalUser.LastSuccessfulSyncAt = now
+	} else {
+		var localUserID, err = randomIdentifier(16)
+		if err != nil {
+			localUserID = ""
+		}
+		registeredLocalUser = snapshotmodel.RegisteredLocalUser{
+			LocalUserID:          localUserID,
+			CreatedAt:            now,
+			UpdatedAt:            now,
+			LastSuccessfulSyncAt: now,
+		}
+	}
+
+	return snapshotmodel.Payload{
+		StoredDataVersion:   snapshotmodel.DefaultStoredDataVersion(""),
+		RegisteredLocalUser: registeredLocalUser,
+		SetupProfile: snapshotmodel.SetupProfile{
+			ServerOrigin:      config.ServerOrigin,
+			ServerMode:        config.ServerMode,
+			AllowDevHTTP:      config.AllowDevHTTP,
+			LastValidatedAt:   now,
+			SourceAPIBasePath: "api/v1",
+		},
+		ProtectedActivityCache: cache,
+	}
+}
+
+// setActiveSnapshot stores the readable protected snapshot for the current run.
+// Authored by: OpenCode
+func (s *syncService) setActiveSnapshot(candidate snapshotstore.Candidate, payload snapshotmodel.Payload) {
+	s.activeMutex.Lock()
+	defer s.activeMutex.Unlock()
+	s.activeSnapshot = activeReadableSnapshot{Candidate: candidate, Payload: payload, Present: true}
+}
+
+// ProtectedDataState reports whether a readable protected snapshot is active for this run.
+// Authored by: OpenCode
+func (s *syncService) ProtectedDataState() ProtectedDataState {
+	s.activeMutex.Lock()
+	defer s.activeMutex.Unlock()
+
+	if !s.activeSnapshot.Present {
+		return ProtectedDataState{}
+	}
+
+	return ProtectedDataState{
+		HasReadableSnapshot: true,
+		ServerOrigin:        s.activeSnapshot.Payload.SetupProfile.ServerOrigin,
+	}
+}
+
+// CheckServerReplacement compares the selected server against the active readable snapshot.
+// Authored by: OpenCode
+func (s *syncService) CheckServerReplacement(config configmodel.AppSetupConfig) ServerReplacementCheck {
+	var state = s.ProtectedDataState()
+	if !state.HasReadableSnapshot || state.ServerOrigin == "" || state.ServerOrigin == config.ServerOrigin {
+		return ServerReplacementCheck{}
+	}
+
+	return ServerReplacementCheck{
+		Required:             true,
+		ActiveServerOrigin:   state.ServerOrigin,
+		SelectedServerOrigin: config.ServerOrigin,
+	}
+}
+
+// randomIdentifier creates one opaque hexadecimal identifier.
+// Authored by: OpenCode
+func randomIdentifier(byteLength int) (string, error) {
+	var rawValue = make([]byte, byteLength)
+	if _, err := rand.Read(rawValue); err != nil {
+		return "", fmt.Errorf("read secure random bytes: %w", err)
+	}
+
+	return hex.EncodeToString(rawValue), nil
 }

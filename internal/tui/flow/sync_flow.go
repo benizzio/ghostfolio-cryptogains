@@ -15,7 +15,7 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 )
 
-const busyStatusText = "Validating Ghostfolio communication..."
+const busyStatusText = "Syncing and storing activity history..."
 
 // updateSyncValidation handles sync-entry navigation, token input, busy-state
 // spinner updates, and validation completion routing.
@@ -195,10 +195,23 @@ func (m *Model) startSyncValidation() (tea.Model, tea.Cmd) {
 
 	var token = strings.TrimSpace(m.sync.TokenInput.Value())
 	if token == "" {
-		m.sync.ValidationMessage = "Enter the Ghostfolio security token before validating communication."
+		m.sync.ValidationMessage = "Enter the Ghostfolio security token before starting sync."
 		return m, nil
 	}
 
+	var config = *m.currentConfig
+	var replacementCheck = m.deps.SyncService.CheckServerReplacement(config)
+	if replacementCheck.Required {
+		m.enterServerReplacement(replacementCheck, token)
+		return m, nil
+	}
+
+	return m.startSyncAttempt(token, false)
+}
+
+// startSyncAttempt starts one async sync request.
+// Authored by: OpenCode
+func (m *Model) startSyncAttempt(token string, confirmServerReplacement bool) (tea.Model, tea.Cmd) {
 	var validationContext, cancel = context.WithCancel(context.Background())
 	m.sync.Cancel = cancel
 	m.sync.Busy = true
@@ -207,7 +220,14 @@ func (m *Model) startSyncValidation() (tea.Model, tea.Cmd) {
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.Line))
 
 	var config = *m.currentConfig
-	return m, tea.Batch(m.spinner.Tick, m.validationCmd(validationContext, m.sync.AttemptID, runtime.ValidateRequest{Config: config, SecurityToken: token}))
+	m.active = syncValidationScreenKey
+	return m, tea.Batch(m.spinner.Tick, m.validationCmd(validationContext, m.sync.AttemptID, runtime.ValidateRequest{Config: config, SecurityToken: token, ConfirmServerReplacement: confirmServerReplacement}))
+}
+
+// startConfirmedServerReplacement resumes sync after explicit server-replacement confirmation.
+// Authored by: OpenCode
+func (m *Model) startConfirmedServerReplacement() (tea.Model, tea.Cmd) {
+	return m.startSyncAttempt(m.replacement.PendingToken, true)
 }
 
 // leaveSyncValidation clears transient token state and returns to the main

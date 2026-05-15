@@ -15,13 +15,13 @@ func TestSyncEntryWorkflowContract(t *testing.T) {
 		Width:      100,
 		Height:     32,
 		TokenInput: "******",
-		MenuItems:  []component.MenuItem{{Label: "Validate Communication", Enabled: true}, {Label: "Back", Enabled: true}},
+		MenuItems:  []component.MenuItem{{Label: "Start Sync", Enabled: true}, {Label: "Back", Enabled: true}},
 	})
 
 	assertContains(t, content, "Ghostfolio Security Token")
-	assertContains(t, content, "Validate Communication")
+	assertContains(t, content, "Start Sync")
 	assertContains(t, content, "Back")
-	assertContains(t, content, "communication only")
+	assertContains(t, content, "securely for future use only")
 	assertContains(t, content, "ghostfolio-cryptogains")
 	assertContains(t, content, "[Ghostfolio]")
 }

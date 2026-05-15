@@ -1,23 +1,14 @@
-// Package dto defines the minimal Ghostfolio transport models required by this
-// validation-only slice.
+// Package dto defines the Ghostfolio transport models required by the sync and
+// protected-storage slices.
 // Authored by: OpenCode
 package dto
 
-// ActivitiesProbeResponse is the minimal successful activities probe response
-// required by this slice.
-//
+// ActivitiesProbeResponse preserves the existing one-page validation response
+// alias while the full-history page model becomes the shared transport type.
 // Authored by: OpenCode
-type ActivitiesProbeResponse struct {
-	Activities []ActivityProbeEntry `json:"activities"`
-	Count      int                  `json:"count"`
-}
+type ActivitiesProbeResponse = ActivityPageResponse
 
-// ActivityProbeEntry is the minimal activity shape required by the one-page
-// validation probe in this slice.
-//
+// ActivityProbeEntry preserves the existing one-page validation entry alias
+// while the full-history page model becomes the shared transport type.
 // Authored by: OpenCode
-type ActivityProbeEntry struct {
-	ID   string `json:"id"`
-	Date string `json:"date"`
-	Type string `json:"type"`
-}
+type ActivityProbeEntry = ActivityPageEntry

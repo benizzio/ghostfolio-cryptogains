@@ -28,10 +28,11 @@ type activeScreen string
 // Screen keys identify the workflow views that the root model can render.
 // Authored by: OpenCode
 const (
-	setupScreenKey            activeScreen = "setup"
-	mainMenuScreenKey         activeScreen = "main_menu"
-	syncValidationScreenKey   activeScreen = "sync_validation"
-	validationResultScreenKey activeScreen = "validation_result"
+	setupScreenKey             activeScreen = "setup"
+	mainMenuScreenKey          activeScreen = "main_menu"
+	syncValidationScreenKey    activeScreen = "sync_validation"
+	serverReplacementScreenKey activeScreen = "server_replacement"
+	validationResultScreenKey  activeScreen = "validation_result"
 
 	setupMenuGhostfolioCloudIndex = 0
 	setupMenuCustomOriginIndex    = 1
@@ -87,6 +88,15 @@ type syncState struct {
 	Cancel            context.CancelFunc
 }
 
+// serverReplacementState holds transient UI state for server-mismatch confirmation.
+// Authored by: OpenCode
+type serverReplacementState struct {
+	MenuIndex     int
+	PendingToken  string
+	CurrentServer string
+	NewServer     string
+}
+
 // resultState holds transient UI state for the validation-result screen.
 // Authored by: OpenCode
 type resultState struct {
@@ -106,6 +116,7 @@ type Model struct {
 	currentConfig *configmodel.AppSetupConfig
 	setup         setupState
 	sync          syncState
+	replacement   serverReplacementState
 	result        resultState
 	spinner       spinner.Model
 }
@@ -181,6 +192,8 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateMainMenu(message)
 	case syncValidationScreenKey:
 		return m.updateSyncValidation(message)
+	case serverReplacementScreenKey:
+		return m.updateServerReplacement(message)
 	case validationResultScreenKey:
 		return m.updateValidationResult(message)
 	default:
@@ -218,29 +231,44 @@ func (m *Model) View() tea.View {
 	case mainMenuScreenKey:
 		rendered = screen.MainMenuScreenView(
 			screen.MainMenuScreenParams{
-				Theme:         m.theme,
-				Width:         m.width,
-				Height:        m.height,
-				MenuItems:     m.mainMenuItems(),
-				SelectedIndex: 0,
-				ServerOrigin:  m.currentServerOrigin(),
-				HelpText:      m.mainMenuHelpText(),
+				Theme:               m.theme,
+				Width:               m.width,
+				Height:              m.height,
+				MenuItems:           m.mainMenuItems(),
+				SelectedIndex:       0,
+				ServerOrigin:        m.currentServerOrigin(),
+				ProtectedDataExists: m.deps.SyncService.ProtectedDataState().HasReadableSnapshot,
+				HelpText:            m.mainMenuHelpText(),
 			},
 		)
 	case syncValidationScreenKey:
 		rendered = screen.SyncValidationScreenView(
 			screen.SyncValidationScreenParams{
-				Theme:             m.theme,
-				Width:             m.width,
-				Height:            m.height,
-				MenuItems:         m.syncMenuItems(),
-				SelectedIndex:     m.sync.MenuIndex,
-				TokenInput:        m.sync.TokenInput.View(),
-				ValidationMessage: m.sync.ValidationMessage,
-				HelpText:          m.syncHelpText(),
-				Busy:              m.sync.Busy,
-				BusyText:          m.sync.BusyText,
-				SpinnerFrame:      m.spinner.View(),
+				Theme:               m.theme,
+				Width:               m.width,
+				Height:              m.height,
+				MenuItems:           m.syncMenuItems(),
+				SelectedIndex:       m.sync.MenuIndex,
+				TokenInput:          m.sync.TokenInput.View(),
+				ValidationMessage:   m.sync.ValidationMessage,
+				HelpText:            m.syncHelpText(),
+				Busy:                m.sync.Busy,
+				BusyText:            m.sync.BusyText,
+				SpinnerFrame:        m.spinner.View(),
+				ProtectedDataExists: m.deps.SyncService.ProtectedDataState().HasReadableSnapshot,
+			},
+		)
+	case serverReplacementScreenKey:
+		rendered = screen.ServerReplacementScreenView(
+			screen.ServerReplacementScreenParams{
+				Theme:         m.theme,
+				Width:         m.width,
+				Height:        m.height,
+				MenuItems:     m.serverReplacementMenuItems(),
+				SelectedIndex: m.replacement.MenuIndex,
+				CurrentServer: m.replacement.CurrentServer,
+				NewServer:     m.replacement.NewServer,
+				HelpText:      m.serverReplacementHelpText(),
 			},
 		)
 	case validationResultScreenKey:
@@ -318,7 +346,7 @@ func (m *Model) syncMenuItems() []component.MenuItem {
 		return nil
 	}
 	return []component.MenuItem{
-		{Label: "Validate Communication", Enabled: true},
+		{Label: "Start Sync", Enabled: true},
 		{Label: "Back", Enabled: true},
 	}
 }
@@ -327,9 +355,15 @@ func (m *Model) syncMenuItems() []component.MenuItem {
 // Authored by: OpenCode
 func (m *Model) resultMenuItems() []component.MenuItem {
 	return []component.MenuItem{
-		{Label: "Validate Again", Enabled: true},
+		{Label: "Sync Again", Enabled: true},
 		{Label: "Back To Main Menu", Enabled: true},
 	}
+}
+
+// serverReplacementMenuItems builds the primary server-replacement confirmation actions.
+// Authored by: OpenCode
+func (m *Model) serverReplacementMenuItems() []component.MenuItem {
+	return []component.MenuItem{{Label: "Continue And Replace", Enabled: true}, {Label: "Cancel", Enabled: true}}
 }
 
 // setupHelpText renders the visible hotkeys for the setup screen.
@@ -367,6 +401,15 @@ func (m *Model) syncHelpText() string {
 				quitBinding(),
 			},
 		},
+	)
+}
+
+// serverReplacementHelpText renders the visible hotkeys for the server-replacement screen.
+// Authored by: OpenCode
+func (m *Model) serverReplacementHelpText() string {
+	return component.RenderHelp(
+		component.ContentWidthForScreen(m.width),
+		component.Bindings{Short: []key.Binding{upBinding(), downBinding(), enterBinding(), quitBinding()}},
 	)
 }
 
@@ -453,6 +496,17 @@ func (m *Model) enterSyncValidation() tea.Cmd {
 	m.active = syncValidationScreenKey
 	m.sync = newSyncState()
 	return m.sync.TokenInput.Focus()
+}
+
+// enterServerReplacement routes the application to the server-mismatch confirmation screen.
+// Authored by: OpenCode
+func (m *Model) enterServerReplacement(check runtime.ServerReplacementCheck, pendingToken string) {
+	m.active = serverReplacementScreenKey
+	m.replacement = serverReplacementState{
+		PendingToken:  pendingToken,
+		CurrentServer: check.ActiveServerOrigin,
+		NewServer:     check.SelectedServerOrigin,
+	}
 }
 
 // enterValidationResult routes the application to the validation result screen.

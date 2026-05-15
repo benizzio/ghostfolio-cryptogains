@@ -12,6 +12,7 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -21,6 +22,8 @@ import (
 const apiBasePath = "/api/v1"
 
 const defaultHTTPClientTimeout = 30 * time.Second
+
+const defaultActivitiesPageSize = 250
 
 // FailureCategory identifies the single user-visible failure category produced
 // by the Ghostfolio boundary in this slice.
@@ -147,8 +150,61 @@ func (c *Client) Authenticate(ctx context.Context, origin string, accessToken st
 	)
 }
 
-// FetchActivitiesProbe executes the one-page activities validation boundary for
-// this slice.
+// FetchActivitiesHistory executes the paginated activities retrieval boundary
+// for this slice.
+//
+// Example:
+//
+//	response, err := transportClient.FetchActivitiesHistory(ctx, "https://ghostfol.io", "jwt")
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = len(response.Activities)
+//
+// Authored by: OpenCode
+func (c *Client) FetchActivitiesHistory(
+	ctx context.Context,
+	origin string,
+	authToken string,
+) (dto.ActivityPageResponse, error) {
+	var allActivities = []dto.ActivityPageEntry{}
+	var expectedCount = -1
+
+	for skip := 0; ; skip = len(allActivities) {
+		page, err := c.fetchActivitiesPage(ctx, origin, authToken, skip, defaultActivitiesPageSize)
+		if err != nil {
+			return dto.ActivityPageResponse{}, err
+		}
+
+		if expectedCount == -1 {
+			expectedCount = page.Count
+		} else if page.Count != expectedCount {
+			return dto.ActivityPageResponse{}, incompatibleServerFailure("activities pagination count changed during retrieval", nil)
+		}
+
+		if expectedCount == 0 {
+			if len(page.Activities) != 0 {
+				return dto.ActivityPageResponse{}, incompatibleServerFailure("activities must be empty when count is zero", nil)
+			}
+			return dto.ActivityPageResponse{Activities: []dto.ActivityPageEntry{}, Count: 0}, nil
+		}
+
+		if len(page.Activities) == 0 {
+			return dto.ActivityPageResponse{}, incompatibleServerFailure("activities pagination ended before the reported count was retrieved", nil)
+		}
+
+		allActivities = append(allActivities, page.Activities...)
+		if len(allActivities) > expectedCount {
+			return dto.ActivityPageResponse{}, incompatibleServerFailure("activities pagination exceeded the reported count", nil)
+		}
+		if len(allActivities) >= expectedCount {
+			return dto.ActivityPageResponse{Activities: allActivities, Count: expectedCount}, nil
+		}
+	}
+}
+
+// FetchActivitiesProbe preserves the one-page activities probe used by the
+// earlier validation slice.
 //
 // Example:
 //
@@ -164,12 +220,24 @@ func (c *Client) FetchActivitiesProbe(
 	origin string,
 	authToken string,
 ) (dto.ActivitiesProbeResponse, error) {
-	var endpoint = strings.TrimRight(
-		origin,
-		"/",
-	) + apiBasePath + "/activities?skip=0&take=1&sortColumn=date&sortDirection=asc"
+	return c.fetchActivitiesPage(ctx, origin, authToken, 0, 1)
+}
 
-	return executeJSONRequest[dto.ActivitiesProbeResponse](
+// fetchActivitiesPage executes one paginated activities request.
+// Authored by: OpenCode
+func (c *Client) fetchActivitiesPage(
+	ctx context.Context,
+	origin string,
+	authToken string,
+	skip int,
+	take int,
+) (dto.ActivityPageResponse, error) {
+	var endpoint, err = activitiesEndpoint(origin, skip, take)
+	if err != nil {
+		return dto.ActivityPageResponse{}, err
+	}
+
+	return executeJSONRequest[dto.ActivityPageResponse](
 		c.httpClient, ctx, requestSpec{
 			Method:             http.MethodGet,
 			Endpoint:           endpoint,
@@ -179,6 +247,24 @@ func (c *Client) FetchActivitiesProbe(
 			StatusClassifier:   classifyActivitiesStatus,
 		},
 	)
+}
+
+// activitiesEndpoint builds the Ghostfolio paginated activities URL.
+// Authored by: OpenCode
+func activitiesEndpoint(origin string, skip int, take int) (string, error) {
+	var endpoint, err = url.Parse(strings.TrimRight(origin, "/") + apiBasePath + "/activities")
+	if err != nil {
+		return "", fmt.Errorf("build activities request: %w", err)
+	}
+
+	var query = endpoint.Query()
+	query.Set("skip", fmt.Sprintf("%d", skip))
+	query.Set("take", fmt.Sprintf("%d", take))
+	query.Set("sortColumn", "date")
+	query.Set("sortDirection", "asc")
+	endpoint.RawQuery = query.Encode()
+
+	return endpoint.String(), nil
 }
 
 // executeJSONRequest runs one JSON-based Ghostfolio boundary request through the
@@ -214,6 +300,7 @@ func executeJSONRequest[T any](httpClient *http.Client, ctx context.Context, spe
 
 	var payload T
 	var decoder = json.NewDecoder(response.Body)
+	decoder.UseNumber()
 	err = decoder.Decode(&payload)
 	if err != nil {
 		return zero, incompatibleServerFailure(spec.DecodeErrorMessage, err)

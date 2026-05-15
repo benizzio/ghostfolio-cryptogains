@@ -29,18 +29,15 @@ type ValidationResultScreenParams struct {
 	HelpText      string
 }
 
-// ValidationResultScreenView renders the result of a completed validation
-// attempt.
+// ValidationResultScreenView renders the result of a completed sync attempt.
 //
 // Example:
 //
 //	view := screen.ValidationResultScreenView(params)
 //	_ = view
 //
-// `ValidationResultScreenView` formats the completed communication outcome,
-// follow-up guidance, and available next actions into the shared full-screen
-// layout. Use it after a validation attempt finishes so the user can retry or
-// return to the main menu without persisting any remote data.
+// `ValidationResultScreenView` formats the completed sync outcome, follow-up
+// guidance, and available next actions into the shared full-screen layout.
 //
 // Authored by: OpenCode
 func ValidationResultScreenView(params ValidationResultScreenParams) string {
@@ -66,36 +63,46 @@ func ValidationResultScreenView(params ValidationResultScreenParams) string {
 		params.Theme,
 		params.Width,
 		params.Height,
-		"Validation Result",
-		"Review the communication outcome and choose the next step.",
+		"Sync Result",
+		"Review the protected-storage outcome and choose the next step.",
 		body,
 		"Results are transient and are not shown again after restart.",
 		params.HelpText,
 	)
 }
 
-// validationSummaryText converts the structured validation outcome into the
+// validationSummaryText converts the structured sync outcome into the
 // primary result text shown on the TUI result screen.
 // Authored by: OpenCode
 func validationSummaryText(outcome runtime.ValidationOutcome) string {
 	if outcome.Success {
-		return "Communication with the selected Ghostfolio server is working."
+		return "Activity data was stored securely for future use."
 	}
-	return "Communication validation did not succeed."
+	return "Sync and secure storage did not succeed."
 }
 
-// validationFollowUpText converts the structured validation outcome into the
+// validationFollowUpText converts the structured sync outcome into the
 // secondary guidance shown on the TUI result screen.
 // Authored by: OpenCode
 func validationFollowUpText(outcome runtime.ValidationOutcome) string {
 	if outcome.Success {
-		return "No Ghostfolio data was stored locally, and reporting is not available in this slice."
+		return "No report-generation, report-preview, or cached-data browsing workflow is available in this slice."
 	}
 
 	switch outcome.FailureReason {
+	case runtime.SyncFailureServerReplacementCancelled:
+		return "The existing protected data was left unchanged because server replacement was cancelled before retrieval started."
+	case runtime.ValidationFailureRejectedToken:
+		return "The supplied token was rejected. Try again with a valid Ghostfolio security token. Local protected data was left unchanged."
 	case runtime.ValidationFailureIncompatibleServerContract:
 		return "The selected server responded, but it did not satisfy the supported contract for this slice."
+	case runtime.SyncFailureUnsupportedStoredDataVersion:
+		return "Existing protected data uses an unsupported stored-data version, so it was not loaded or overwritten."
+	case runtime.SyncFailureIncompatibleNewSyncData:
+		return "The newly retrieved data could not be stored safely, so it was discarded and any previously readable protected data was left unchanged."
+	case runtime.SyncFailureUnsupportedActivityHistory:
+		return "The retrieved activity history is not supported safely by this slice, so no protected data was stored."
 	default:
-		return "Validate again or return to the main menu. No Ghostfolio data was stored locally."
+		return "Sync again or return to the main menu. No protected activity data was stored."
 	}
 }

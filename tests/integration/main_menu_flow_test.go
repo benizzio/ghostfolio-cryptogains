@@ -59,13 +59,13 @@ func TestFocusedTokenInputEnterReturnsToValidationMenuPath(t *testing.T) {
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*flow.Model)
 
-	if got := model.View().Content; !strings.Contains(got, "> Validate Communication") {
-		t.Fatalf("expected sync menu focus to return to Validate Communication, got %q", got)
+	if got := model.View().Content; !strings.Contains(got, "> Start Sync") {
+		t.Fatalf("expected sync menu focus to return to Start Sync, got %q", got)
 	}
 
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*flow.Model)
-	if got := model.View().Content; !strings.Contains(got, "Validating Ghostfolio communication") {
+	if got := model.View().Content; !strings.Contains(got, "Syncing and storing activity history") {
 		t.Fatalf("expected validation path to remain reachable, got %q", got)
 	}
 	_ = testutil.RunCmd(cmd)
@@ -95,7 +95,7 @@ func TestFocusedTokenInputPasteDoesNotTriggerWorkflowNavigation(t *testing.T) {
 	if got := model.View().Content; !strings.Contains(got, "*********") {
 		t.Fatalf("expected pasted token to remain masked, got %q", got)
 	}
-	if got := model.View().Content; !strings.Contains(got, "Validate Communication") {
+	if got := model.View().Content; !strings.Contains(got, "Start Sync") {
 		t.Fatalf("expected sync workflow to remain active after paste, got %q", got)
 	}
 }

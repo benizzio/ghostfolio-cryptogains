@@ -15,18 +15,18 @@ func TestValidationResultWorkflowContract(t *testing.T) {
 		Theme:     component.DefaultTheme(),
 		Width:     100,
 		Height:    32,
-		MenuItems: []component.MenuItem{{Label: "Validate Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
-		Outcome:   runtime.ValidationOutcome{Success: true, DetailReason: "communication_ok"},
+		MenuItems: []component.MenuItem{{Label: "Sync Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
+		Outcome:   runtime.ValidationOutcome{Success: true, DetailReason: "activity_data_stored"},
 	})
-	assertContains(t, success, "Validate Again")
+	assertContains(t, success, "Sync Again")
 	assertContains(t, success, "Back To Main Menu")
-	assertContains(t, success, "No Ghostfolio data was stored locally")
+	assertContains(t, success, "stored securely for future use")
 
 	var failure = screen.ValidationResultScreenView(screen.ValidationResultScreenParams{
 		Theme:     component.DefaultTheme(),
 		Width:     100,
 		Height:    32,
-		MenuItems: []component.MenuItem{{Label: "Validate Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
+		MenuItems: []component.MenuItem{{Label: "Sync Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
 		Outcome:   runtime.ValidationOutcome{Success: false, FailureReason: runtime.ValidationFailureTimeout, DetailReason: string(runtime.ValidationFailureTimeout)},
 	})
 	assertContains(t, failure, "Failure Category: timeout")
