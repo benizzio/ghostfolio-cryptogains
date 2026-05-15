@@ -3,7 +3,11 @@
 // Authored by: OpenCode
 package runtime
 
-import "time"
+import (
+	"time"
+
+	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
+)
 
 // SyncFailureReason identifies one supported user-visible sync outcome category.
 // Authored by: OpenCode
@@ -151,8 +155,30 @@ type SyncOutcome struct {
 	DetailReason  string
 	FailureReason SyncFailureReason
 	Attempt       SyncAttempt
+	Diagnostic    DiagnosticReportState
 }
 
 // ValidationOutcome preserves the existing validation-only outcome type name.
 // Authored by: OpenCode
 type ValidationOutcome = SyncOutcome
+
+// DiagnosticReportRequest stores the structured data needed to write one local
+// synced-data diagnostic report.
+// Authored by: OpenCode
+type DiagnosticReportRequest struct {
+	FailureReason           SyncFailureReason
+	ServerOrigin            string
+	Attempt                 SyncAttempt
+	Context                 syncmodel.DiagnosticContext
+	RedactFinancialValues   bool
+	ExplicitDevelopmentMode bool
+}
+
+// DiagnosticReportState tracks whether a local synced-data diagnostic report is
+// available for the current failure outcome and where it was written.
+// Authored by: OpenCode
+type DiagnosticReportState struct {
+	Eligible bool
+	Path     string
+	Request  DiagnosticReportRequest
+}

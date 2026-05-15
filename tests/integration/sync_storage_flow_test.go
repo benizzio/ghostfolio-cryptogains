@@ -132,6 +132,8 @@ func newSyncStorageFixture(t *testing.T, tempDir string, client *http.Client, or
 	service := runtime.NewSyncService(
 		ghostfolioclient.New(client),
 		requestTimeout,
+		tempDir,
+		true,
 		decimalsupport.NewService(),
 		syncnormalize.NewNormalizer(),
 		syncvalidate.NewValidator(),

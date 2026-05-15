@@ -134,6 +134,40 @@ func TestValidationResultScreenViewCoversFailureBranch(t *testing.T) {
 	}
 }
 
+func TestValidationResultScreenViewCoversDiagnosticBranches(t *testing.T) {
+	t.Parallel()
+
+	var promptContent = ValidationResultScreenView(ValidationResultScreenParams{
+		Theme:     component.DefaultTheme(),
+		Width:     80,
+		Height:    24,
+		MenuItems: []component.MenuItem{{Label: "Generate Diagnostic Report", Enabled: true}, {Label: "Sync Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
+		Outcome: runtime.ValidationOutcome{
+			Success:       false,
+			FailureReason: runtime.SyncFailureUnsupportedActivityHistory,
+			Diagnostic:    runtime.DiagnosticReportState{Eligible: true},
+		},
+	})
+	if !strings.Contains(promptContent, "Generate Diagnostic Report") || !strings.Contains(promptContent, "You can generate a synced-data diagnostic report") {
+		t.Fatalf("expected diagnostic prompt branch, got %q", promptContent)
+	}
+
+	var writtenContent = ValidationResultScreenView(ValidationResultScreenParams{
+		Theme:     component.DefaultTheme(),
+		Width:     80,
+		Height:    24,
+		MenuItems: []component.MenuItem{{Label: "Sync Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
+		Outcome: runtime.ValidationOutcome{
+			Success:       false,
+			FailureReason: runtime.SyncFailureIncompatibleNewSyncData,
+			Diagnostic:    runtime.DiagnosticReportState{Eligible: true, Path: "/tmp/report.diagnostic.json"},
+		},
+	})
+	if !strings.Contains(writtenContent, "/tmp/report.diagnostic.json") {
+		t.Fatalf("expected generated-report path disclosure, got %q", writtenContent)
+	}
+}
+
 // TestValidationResultScreenViewCoversSuccessBranch exercises the successful
 // validation render path.
 // Authored by: OpenCode

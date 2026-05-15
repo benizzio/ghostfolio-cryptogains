@@ -28,7 +28,7 @@ Run:
 make run
 ```
 
-Use `make run ARGS="--dev-mode"` only when intentionally testing a custom `http://` origin.
+Use `make run-dev` only when intentionally testing a custom `http://` origin.
 
 Verification commands:
 

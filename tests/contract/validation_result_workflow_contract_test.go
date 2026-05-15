@@ -30,4 +30,18 @@ func TestValidationResultWorkflowContract(t *testing.T) {
 		Outcome:   runtime.ValidationOutcome{Success: false, FailureReason: runtime.ValidationFailureTimeout, DetailReason: string(runtime.ValidationFailureTimeout)},
 	})
 	assertContains(t, failure, "Failure Category: timeout")
+
+	var diagnosticWritten = screen.ValidationResultScreenView(screen.ValidationResultScreenParams{
+		Theme:     component.DefaultTheme(),
+		Width:     100,
+		Height:    32,
+		MenuItems: []component.MenuItem{{Label: "Sync Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
+		Outcome: runtime.ValidationOutcome{
+			Success:       false,
+			FailureReason: runtime.SyncFailureIncompatibleNewSyncData,
+			DetailReason:  string(runtime.SyncFailureIncompatibleNewSyncData),
+			Diagnostic:    runtime.DiagnosticReportState{Eligible: true, Path: "/tmp/example.diagnostic.json"},
+		},
+	})
+	assertContains(t, diagnosticWritten, "/tmp/example.diagnostic.json")
 }

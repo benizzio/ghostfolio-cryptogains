@@ -27,6 +27,10 @@ func (s testSyncService) Validate(context.Context, runtime.ValidateRequest) runt
 	return s.outcome
 }
 
+func (s testSyncService) GenerateDiagnosticReport(context.Context, runtime.DiagnosticReportRequest) (string, error) {
+	return "/tmp/report.diagnostic.json", nil
+}
+
 func (s testSyncService) ProtectedDataState() runtime.ProtectedDataState {
 	return s.protectedDataState
 }
@@ -45,6 +49,10 @@ func (s *cancellingSyncService) Validate(ctx context.Context, _ runtime.Validate
 	<-ctx.Done()
 	s.ctxErr = ctx.Err()
 	return runtime.ValidationOutcome{Success: false, DetailReason: string(runtime.ValidationFailureTimeout), FailureReason: runtime.ValidationFailureTimeout}
+}
+
+func (*cancellingSyncService) GenerateDiagnosticReport(context.Context, runtime.DiagnosticReportRequest) (string, error) {
+	return "", nil
 }
 
 func (*cancellingSyncService) ProtectedDataState() runtime.ProtectedDataState {
@@ -648,6 +656,29 @@ func TestUpdateValidationResultCoversNavigation(t *testing.T) {
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyUp}))
 	if updated.(*Model).result.MenuIndex != 0 {
 		t.Fatalf("expected up at top to stay in place")
+	}
+
+	model.active = validationResultScreenKey
+	model.result = resultState{Outcome: runtime.ValidationOutcome{Success: false, FailureReason: runtime.SyncFailureUnsupportedActivityHistory, Diagnostic: runtime.DiagnosticReportState{Eligible: true}}}
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = updated.(*Model)
+	if model.result.Outcome.Diagnostic.Path == "" {
+		t.Fatalf("expected diagnostic report generation to populate the written path")
+	}
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	model = updated.(*Model)
+	if model.result.MenuIndex != 1 {
+		t.Fatalf("expected diagnostic result menu to move to Sync Again")
+	}
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyUp}))
+	model = updated.(*Model)
+	if model.result.MenuIndex != 0 {
+		t.Fatalf("expected updated diagnostic result menu to return to Sync Again after report generation")
+	}
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = updated.(*Model)
+	if model.active != syncValidationScreenKey {
+		t.Fatalf("expected diagnostic result Sync Again to reopen sync validation")
 	}
 
 	model.active = validationResultScreenKey

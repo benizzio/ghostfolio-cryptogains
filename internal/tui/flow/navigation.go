@@ -4,6 +4,8 @@
 package flow
 
 import (
+	"context"
+
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
@@ -89,22 +91,55 @@ func (m *Model) updateValidationResult(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	var menuItems = m.resultMenuItems()
+
 	switch {
 	case key.Matches(keyMessage, upBinding()):
 		if m.result.MenuIndex > 0 {
 			m.result.MenuIndex--
 		}
 	case key.Matches(keyMessage, downBinding()):
-		if m.result.MenuIndex < len(m.resultMenuItems())-1 {
+		if m.result.MenuIndex < len(menuItems)-1 {
 			m.result.MenuIndex++
 		}
 	case key.Matches(keyMessage, enterBinding()):
+		if m.result.Outcome.Diagnostic.Eligible && m.result.Outcome.Diagnostic.Path == "" {
+			switch m.result.MenuIndex {
+			case 0:
+				return m.generateDiagnosticReport()
+			case 1:
+				return m, m.enterSyncValidation()
+			default:
+				m.enterMainMenu()
+				return m, nil
+			}
+		}
 		if m.result.MenuIndex == 0 {
 			return m, m.enterSyncValidation()
 		}
 		m.enterMainMenu()
 	}
 
+	return m, nil
+}
+
+// generateDiagnosticReport writes one local synced-data diagnostic report from the current result screen.
+// Authored by: OpenCode
+func (m *Model) generateDiagnosticReport() (tea.Model, tea.Cmd) {
+	var request = m.result.Outcome.Diagnostic.Request
+	if request.ServerOrigin == "" && m.currentConfig != nil {
+		request.ServerOrigin = m.currentConfig.ServerOrigin
+	}
+	if request.Attempt.AttemptID == "" {
+		request.Attempt = m.result.Outcome.Attempt
+	}
+	path, err := m.deps.SyncService.GenerateDiagnosticReport(context.Background(), request)
+	if err != nil {
+		return m, nil
+	}
+
+	m.result.Outcome.Diagnostic.Path = path
+	m.result.Outcome.Diagnostic.Request = request
 	return m, nil
 }
 

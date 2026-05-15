@@ -13,6 +13,31 @@ import (
 	"github.com/cockroachdb/apd/v3"
 )
 
+// MappingError stores offending-record context for synced-data mapping failures.
+// Authored by: OpenCode
+type MappingError struct {
+	message string
+	context syncmodel.DiagnosticContext
+}
+
+// Error returns the non-secret mapping failure detail.
+// Authored by: OpenCode
+func (e *MappingError) Error() string {
+	if e == nil {
+		return ""
+	}
+	return e.message
+}
+
+// DiagnosticContext returns the offending-record context for one mapping failure.
+// Authored by: OpenCode
+func (e *MappingError) DiagnosticContext() syncmodel.DiagnosticContext {
+	if e == nil {
+		return syncmodel.DiagnosticContext{}
+	}
+	return e.context
+}
+
 // MapActivities converts a page of Ghostfolio activity entries into normalized
 // activity records for the sync pipeline.
 //
@@ -30,12 +55,101 @@ func MapActivities(entries []dto.ActivityPageEntry, decimalService decimalsuppor
 	for _, entry := range entries {
 		record, err := MapActivity(entry, decimalService)
 		if err != nil {
-			return nil, err
+			return nil, wrapMappingError(entry, err)
 		}
 		records = append(records, record)
 	}
 
 	return records, nil
+}
+
+// wrapMappingError converts a raw mapping failure into diagnostic-capable context.
+// Authored by: OpenCode
+func wrapMappingError(entry dto.ActivityPageEntry, err error) error {
+	var carrier interface {
+		DiagnosticContext() syncmodel.DiagnosticContext
+	}
+	if ok := errorAsDiagnosticCarrier(err, &carrier); ok {
+		var context = carrier.DiagnosticContext()
+		if len(context.Records) == 0 {
+			context.Records = []syncmodel.DiagnosticRecord{diagnosticRecordFromActivityEntry(entry)}
+		}
+		if context.FailureStage == "" {
+			context.FailureStage = syncmodel.DiagnosticFailureStageMapping
+		}
+		if context.FailureDetail == "" {
+			context.FailureDetail = err.Error()
+		}
+		return &MappingError{message: err.Error(), context: context}
+	}
+
+	return &MappingError{
+		message: err.Error(),
+		context: syncmodel.DiagnosticContext{
+			FailureStage:  syncmodel.DiagnosticFailureStageMapping,
+			FailureDetail: err.Error(),
+			Records:       []syncmodel.DiagnosticRecord{diagnosticRecordFromActivityEntry(entry)},
+		},
+	}
+}
+
+// diagnosticRecordFromActivityEntry captures the non-secret transport context for one offending source activity.
+// Authored by: OpenCode
+func diagnosticRecordFromActivityEntry(entry dto.ActivityPageEntry) syncmodel.DiagnosticRecord {
+	var record = syncmodel.DiagnosticRecord{
+		SourceID:     strings.TrimSpace(entry.ID),
+		OccurredAt:   strings.TrimSpace(entry.Date),
+		ActivityType: strings.ToUpper(strings.TrimSpace(entry.Type)),
+		AssetSymbol:  strings.TrimSpace(entry.SymbolProfile.Symbol),
+		AssetName:    strings.TrimSpace(entry.SymbolProfile.Name),
+		BaseCurrency: strings.TrimSpace(entry.BaseCurrency),
+		Quantity:     strings.TrimSpace(entry.Quantity.String()),
+		UnitPrice:    strings.TrimSpace(entry.UnitPriceInAssetProfileCurrency.String()),
+		GrossValue:   diagnosticGrossValue(entry),
+		FeeAmount:    strings.TrimSpace(entry.FeeInBaseCurrency.String()),
+		Comment:      strings.TrimSpace(entry.Comment),
+		DataSource:   strings.TrimSpace(entry.DataSource),
+	}
+	if entry.Account != nil {
+		record.SourceScopeID = strings.TrimSpace(entry.Account.ID)
+		record.SourceScopeName = strings.TrimSpace(entry.Account.Name)
+		record.SourceScopeKind = string(syncmodel.SourceScopeKindAccount)
+		record.SourceScopeReliability = string(syncmodel.ScopeReliabilityReliable)
+	}
+
+	return record
+}
+
+// diagnosticGrossValue selects the transport gross-value field visible in diagnostic context.
+// Authored by: OpenCode
+func diagnosticGrossValue(entry dto.ActivityPageEntry) string {
+	if strings.TrimSpace(entry.ValueInBaseCurrency.String()) != "" {
+		return strings.TrimSpace(entry.ValueInBaseCurrency.String())
+	}
+
+	return strings.TrimSpace(entry.Value.String())
+}
+
+// errorAsDiagnosticCarrier keeps compile-time compatibility local to this package.
+// Authored by: OpenCode
+func errorAsDiagnosticCarrier(err error, target *interface {
+	DiagnosticContext() syncmodel.DiagnosticContext
+}) bool {
+	if err == nil {
+		return false
+	}
+	var carrier interface {
+		DiagnosticContext() syncmodel.DiagnosticContext
+	}
+	typed, ok := err.(interface {
+		DiagnosticContext() syncmodel.DiagnosticContext
+	})
+	if !ok {
+		return false
+	}
+	carrier = typed
+	*target = carrier
+	return true
 }
 
 // MapActivity converts one Ghostfolio activity entry into a normalized activity

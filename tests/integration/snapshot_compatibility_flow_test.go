@@ -100,6 +100,8 @@ func TestSnapshotCompatibilityFlowRetainsReadableSnapshotWhenNewWriteIsIncompati
 	service := runtime.NewSyncService(
 		ghostfolioclient.New(server.Client()),
 		time.Second,
+		baseDir,
+		true,
 		decimalsupport.NewService(),
 		syncnormalize.NewNormalizer(),
 		syncvalidate.NewValidator(),

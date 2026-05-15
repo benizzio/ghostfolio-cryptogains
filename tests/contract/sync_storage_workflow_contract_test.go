@@ -37,12 +37,15 @@ func TestSyncStorageWorkflowContract(t *testing.T) {
 		Theme:     component.DefaultTheme(),
 		Width:     100,
 		Height:    32,
-		MenuItems: []component.MenuItem{{Label: "Sync Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
+		MenuItems: []component.MenuItem{{Label: "Generate Diagnostic Report", Enabled: true}, {Label: "Sync Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
 		Outcome: runtime.ValidationOutcome{
 			Success:       false,
 			FailureReason: runtime.SyncFailureUnsupportedActivityHistory,
 			DetailReason:  string(runtime.SyncFailureUnsupportedActivityHistory),
+			Diagnostic:    runtime.DiagnosticReportState{Eligible: true},
 		},
 	})
 	assertContains(t, failure, "Failure Category: unsupported activity history")
+	assertContains(t, failure, "Generate Diagnostic Report")
+	assertContains(t, failure, "You can generate a synced-data diagnostic report")
 }

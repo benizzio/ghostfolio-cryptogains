@@ -64,6 +64,8 @@ func TestSyncValidationSuccessUsesProductionRuntimePath(t *testing.T) {
 		service: runtime.NewSyncService(
 			ghostfolioclient.New(server.Client()),
 			time.Second,
+			tempDir,
+			true,
 			decimalsupport.NewService(),
 			syncnormalize.NewNormalizer(),
 			syncvalidate.NewValidator(),
@@ -277,6 +279,8 @@ func TestSyncValidationNoPersistenceBeyondSetup(t *testing.T) {
 		service: runtime.NewSyncService(
 			ghostfolioclient.New(server.Client()),
 			time.Second,
+			tempDir,
+			true,
 			decimalsupport.NewService(),
 			syncnormalize.NewNormalizer(),
 			syncvalidate.NewValidator(),
@@ -378,8 +382,11 @@ func newSyncValidationFixture(t *testing.T, client *http.Client, origin string, 
 	t.Helper()
 
 	return syncValidationFixture{
-		config:  mustCustomSetupConfig(t, origin),
-		service: runtime.NewSyncService(ghostfolioclient.New(client), requestTimeout, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(t.TempDir(), nil)),
+		config: mustCustomSetupConfig(t, origin),
+		service: func() runtime.SyncService {
+			var tempDir = t.TempDir()
+			return runtime.NewSyncService(ghostfolioclient.New(client), requestTimeout, tempDir, true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(tempDir, nil))
+		}(),
 	}
 }
 

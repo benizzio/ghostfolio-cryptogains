@@ -129,7 +129,8 @@ func TestValidateCoversInvalidAuthPayload(t *testing.T) {
 	}))
 	defer server.Close()
 
-	var service = NewSyncService(ghostfolioclient.New(server.Client()), time.Second, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(t.TempDir(), nil))
+	var tempDir = t.TempDir()
+	var service = NewSyncService(ghostfolioclient.New(server.Client()), time.Second, tempDir, true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(tempDir, nil))
 	var config, err = configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, server.URL, true, time.Now())
 	if err != nil {
 		t.Fatalf("new setup config: %v", err)
@@ -191,7 +192,8 @@ func TestValidateHandlesActivitiesTransportFailure(t *testing.T) {
 	}))
 	defer server.Close()
 
-	var service = NewSyncService(ghostfolioclient.New(server.Client()), time.Second, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(t.TempDir(), nil))
+	var tempDir = t.TempDir()
+	var service = NewSyncService(ghostfolioclient.New(server.Client()), time.Second, tempDir, true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(tempDir, nil))
 	var config, err = configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, server.URL, true, time.Now())
 	if err != nil {
 		t.Fatalf("new setup config: %v", err)
@@ -219,7 +221,8 @@ func TestValidateHandlesActivitiesPayloadValidationFailure(t *testing.T) {
 	}))
 	defer server.Close()
 
-	var service = NewSyncService(ghostfolioclient.New(server.Client()), time.Second, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(t.TempDir(), nil))
+	var tempDir = t.TempDir()
+	var service = NewSyncService(ghostfolioclient.New(server.Client()), time.Second, tempDir, true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(tempDir, nil))
 	var config, err = configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, server.URL, true, time.Now())
 	if err != nil {
 		t.Fatalf("new setup config: %v", err)
@@ -247,7 +250,8 @@ func TestValidateSuccessOutcomeIncludesAttemptAndMessages(t *testing.T) {
 	}))
 	defer server.Close()
 
-	var service = NewSyncService(ghostfolioclient.New(server.Client()), time.Second, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(t.TempDir(), nil))
+	var tempDir = t.TempDir()
+	var service = NewSyncService(ghostfolioclient.New(server.Client()), time.Second, tempDir, true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(tempDir, nil))
 	var config, err = configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, server.URL, true, time.Now())
 	if err != nil {
 		t.Fatalf("new setup config: %v", err)
@@ -265,7 +269,8 @@ func TestValidateHandlesAuthTransportFailure(t *testing.T) {
 	var client = ghostfolioclient.New(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 		return nil, context.DeadlineExceeded
 	})})
-	var service = NewSyncService(client, time.Second, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(t.TempDir(), nil))
+	var tempDir = t.TempDir()
+	var service = NewSyncService(client, time.Second, tempDir, false, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(tempDir, nil))
 	var config, err = configmodel.NewSetupConfig(configmodel.ServerModeGhostfolioCloud, configmodel.GhostfolioCloudOrigin, false, time.Now())
 	if err != nil {
 		t.Fatalf("new setup config: %v", err)

@@ -89,6 +89,13 @@ func validationFollowUpText(outcome runtime.ValidationOutcome) string {
 		return "No report-generation, report-preview, or cached-data browsing workflow is available in this slice."
 	}
 
+	if outcome.Diagnostic.Path != "" {
+		return fmt.Sprintf("A synced-data diagnostic report was generated at %s.", outcome.Diagnostic.Path)
+	}
+	if outcome.Diagnostic.Eligible {
+		return "You can generate a synced-data diagnostic report for this failure from this screen."
+	}
+
 	switch outcome.FailureReason {
 	case runtime.SyncFailureServerReplacementCancelled:
 		return "The existing protected data was left unchanged because server replacement was cancelled before retrieval started."

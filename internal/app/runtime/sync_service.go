@@ -19,6 +19,7 @@ import (
 	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	syncnormalize "github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
 	syncvalidate "github.com/benizzio/ghostfolio-cryptogains/internal/sync/validate"
@@ -63,6 +64,10 @@ type SyncService interface {
 	// Authored by: OpenCode
 	Validate(context.Context, ValidateRequest) ValidationOutcome
 
+	// GenerateDiagnosticReport writes one local synced-data diagnostic report for an eligible failure.
+	// Authored by: OpenCode
+	GenerateDiagnosticReport(context.Context, DiagnosticReportRequest) (string, error)
+
 	// ProtectedDataState reports whether a readable protected snapshot is active for this run.
 	// Authored by: OpenCode
 	ProtectedDataState() ProtectedDataState
@@ -78,6 +83,8 @@ type SyncService interface {
 type syncService struct {
 	client         *ghostfolioclient.Client
 	requestTimeout time.Duration
+	baseConfigDir  string
+	allowDevHTTP   bool
 	decimalService decimalsupport.Service
 	normalizer     syncnormalize.Normalizer
 	validator      syncvalidate.Validator
@@ -108,6 +115,8 @@ type activeReadableSnapshot struct {
 func NewSyncService(
 	client *ghostfolioclient.Client,
 	requestTimeout time.Duration,
+	baseConfigDir string,
+	allowDevHTTP bool,
 	decimalService decimalsupport.Service,
 	normalizer syncnormalize.Normalizer,
 	validatorService syncvalidate.Validator,
@@ -129,6 +138,8 @@ func NewSyncService(
 	return &syncService{
 		client:         client,
 		requestTimeout: requestTimeout,
+		baseConfigDir:  baseConfigDir,
+		allowDevHTTP:   allowDevHTTP,
 		decimalService: decimalService,
 		normalizer:     normalizer,
 		validator:      validatorService,
@@ -167,15 +178,19 @@ func (s *syncService) Validate(ctx context.Context, request ValidateRequest) Val
 	var unlockedPayload snapshotmodel.Payload
 	var unlocked bool
 	var err error
+	var diagnosticContext syncmodel.DiagnosticContext
 
 	if s.snapshotStore == nil {
-		return finalizeSyncFailure(&session, &attempt, SyncFailureIncompatibleNewSyncData)
+		return s.finalizeSyncFailure(&session, &attempt, SyncFailureIncompatibleNewSyncData, syncmodel.DiagnosticContext{
+			FailureStage:  syncmodel.DiagnosticFailureStageProtectedPersistence,
+			FailureDetail: "protected snapshot store is unavailable",
+		})
 	}
 
 	var replacementCheck = s.CheckServerReplacement(request.Config)
 	if replacementCheck.Required && !request.ConfirmServerReplacement {
 		attempt.Status = AttemptStatusAborted
-		return finalizeSyncFailure(&session, &attempt, SyncFailureServerReplacementCancelled)
+		return s.finalizeSyncFailure(&session, &attempt, SyncFailureServerReplacementCancelled, syncmodel.DiagnosticContext{})
 	}
 	if replacementCheck.Required {
 		attempt.ServerMismatchConfirmed = true
@@ -184,14 +199,23 @@ func (s *syncService) Validate(ctx context.Context, request ValidateRequest) Val
 	var candidates []snapshotstore.Candidate
 	candidates, err = snapshotstore.DiscoverServerCandidates(timedContext, s.snapshotStore, request.Config.ServerOrigin)
 	if err != nil {
-		return finalizeSyncFailure(&session, &attempt, SyncFailureIncompatibleNewSyncData)
+		return s.finalizeSyncFailure(&session, &attempt, SyncFailureIncompatibleNewSyncData, syncmodel.DiagnosticContext{
+			FailureStage:  syncmodel.DiagnosticFailureStageStoredDataCompatibility,
+			FailureDetail: redact.ErrorText(err, request.SecurityToken),
+		})
 	}
 	for _, candidate := range candidates {
 		if err := snapshotstore.ValidateEnvelopeCompatibility(candidate.Header); err != nil {
 			if errors.Is(err, snapshotstore.ErrUnsupportedStoredDataVersion) {
-				return finalizeSyncFailure(&session, &attempt, SyncFailureUnsupportedStoredDataVersion)
+				return s.finalizeSyncFailure(&session, &attempt, SyncFailureUnsupportedStoredDataVersion, syncmodel.DiagnosticContext{
+					FailureStage:  syncmodel.DiagnosticFailureStageStoredDataCompatibility,
+					FailureDetail: redact.ErrorText(err, request.SecurityToken),
+				})
 			}
-			return finalizeSyncFailure(&session, &attempt, SyncFailureIncompatibleNewSyncData)
+			return s.finalizeSyncFailure(&session, &attempt, SyncFailureIncompatibleNewSyncData, syncmodel.DiagnosticContext{
+				FailureStage:  syncmodel.DiagnosticFailureStageStoredDataCompatibility,
+				FailureDetail: redact.ErrorText(err, request.SecurityToken),
+			})
 		}
 	}
 
@@ -207,7 +231,10 @@ func (s *syncService) Validate(ctx context.Context, request ValidateRequest) Val
 			break
 		}
 		if errors.Is(err, snapshotstore.ErrUnsupportedStoredDataVersion) {
-			return finalizeSyncFailure(&session, &attempt, SyncFailureUnsupportedStoredDataVersion)
+			return s.finalizeSyncFailure(&session, &attempt, SyncFailureUnsupportedStoredDataVersion, syncmodel.DiagnosticContext{
+				FailureStage:  syncmodel.DiagnosticFailureStageStoredDataCompatibility,
+				FailureDetail: redact.ErrorText(err, request.SecurityToken),
+			})
 		}
 	}
 
@@ -238,18 +265,21 @@ func (s *syncService) Validate(ctx context.Context, request ValidateRequest) Val
 	attempt.Status = AttemptStatusNormalizing
 	records, err := ghostfoliomapper.MapActivities(historyResponse.Activities, s.decimalService)
 	if err != nil {
-		return finalizeSyncFailure(&session, &attempt, SyncFailureUnsupportedActivityHistory)
+		diagnosticContext = diagnosticContextFromError(err, syncmodel.DiagnosticFailureStageMapping, request.SecurityToken)
+		return s.finalizeSyncFailure(&session, &attempt, SyncFailureUnsupportedActivityHistory, diagnosticContext)
 	}
 
 	cache, err := s.normalizer.Normalize(records)
 	if err != nil {
-		return finalizeSyncFailure(&session, &attempt, SyncFailureUnsupportedActivityHistory)
+		diagnosticContext = diagnosticContextFromError(err, syncmodel.DiagnosticFailureStageNormalization, request.SecurityToken)
+		return s.finalizeSyncFailure(&session, &attempt, SyncFailureUnsupportedActivityHistory, diagnosticContext)
 	}
 	cache.SyncedAt = time.Now().UTC()
 
 	attempt.Status = AttemptStatusValidating
 	if err := s.validator.Validate(cache); err != nil {
-		return finalizeSyncFailure(&session, &attempt, SyncFailureUnsupportedActivityHistory)
+		diagnosticContext = diagnosticContextFromError(err, syncmodel.DiagnosticFailureStageValidation, request.SecurityToken)
+		return s.finalizeSyncFailure(&session, &attempt, SyncFailureUnsupportedActivityHistory, diagnosticContext)
 	}
 
 	attempt.Status = AttemptStatusPersisting
@@ -263,9 +293,17 @@ func (s *syncService) Validate(ctx context.Context, request ValidateRequest) Val
 	})
 	if err != nil {
 		if errors.Is(err, snapshotstore.ErrIncompatibleStoredData) || errors.Is(err, snapshotstore.ErrUnsupportedStoredDataVersion) {
-			return finalizeSyncFailure(&session, &attempt, SyncFailureIncompatibleNewSyncData)
+			return s.finalizeSyncFailure(&session, &attempt, SyncFailureIncompatibleNewSyncData, syncmodel.DiagnosticContext{
+				FailureStage:  syncmodel.DiagnosticFailureStageProtectedPersistence,
+				FailureDetail: redact.ErrorText(err, request.SecurityToken),
+				Records:       diagnosticContext.Records,
+			})
 		}
-		return finalizeSyncFailure(&session, &attempt, SyncFailureIncompatibleNewSyncData)
+		return s.finalizeSyncFailure(&session, &attempt, SyncFailureIncompatibleNewSyncData, syncmodel.DiagnosticContext{
+			FailureStage:  syncmodel.DiagnosticFailureStageProtectedPersistence,
+			FailureDetail: redact.ErrorText(err, request.SecurityToken),
+			Records:       diagnosticContext.Records,
+		})
 	}
 	s.setActiveSnapshot(persistedCandidate, payload)
 
@@ -278,6 +316,17 @@ func (s *syncService) Validate(ctx context.Context, request ValidateRequest) Val
 		DetailReason: "activity_data_stored",
 		Attempt:      SyncAttempt(attempt),
 	}
+}
+
+// GenerateDiagnosticReport writes one local synced-data diagnostic report for an eligible failure.
+// Authored by: OpenCode
+func (s *syncService) GenerateDiagnosticReport(ctx context.Context, request DiagnosticReportRequest) (string, error) {
+	var baseConfigDir, err = resolveBaseConfigDir(s.baseConfigDir)
+	if err != nil {
+		return "", err
+	}
+
+	return writeDiagnosticReport(ctx, baseConfigDir, request)
 }
 
 // finalizeFailure converts a boundary failure into a user-visible validation outcome.
@@ -325,22 +374,47 @@ func finalizeValidationFailure(
 
 // finalizeSyncFailure converts an internal sync failure into one supported user-visible category.
 // Authored by: OpenCode
-func finalizeSyncFailure(
+func (s *syncService) finalizeSyncFailure(
 	session *GhostfolioSession,
 	attempt *SyncValidationAttempt,
 	reason SyncFailureReason,
+	diagnosticContext syncmodel.DiagnosticContext,
 ) ValidationOutcome {
 	attempt.Status = AttemptStatusFailure
 	attempt.CompletedAt = time.Now().UTC()
 	attempt.FailureReason = reason
 	clearSessionSecrets(session)
 
-	return ValidationOutcome{
+	var outcome = ValidationOutcome{
 		Success:       false,
 		DetailReason:  string(reason),
 		FailureReason: reason,
 		Attempt:       SyncAttempt(*attempt),
 	}
+	if !diagnosticEligible(reason) {
+		return outcome
+	}
+
+	var request = DiagnosticReportRequest{
+		FailureReason:           reason,
+		ServerOrigin:            session.ServerOrigin,
+		Attempt:                 SyncAttempt(*attempt),
+		Context:                 diagnosticContext,
+		RedactFinancialValues:   !s.allowDevHTTP,
+		ExplicitDevelopmentMode: s.allowDevHTTP,
+	}
+	outcome.Diagnostic = DiagnosticReportState{
+		Eligible: true,
+		Request:  request,
+	}
+	if s.allowDevHTTP {
+		path, err := s.GenerateDiagnosticReport(context.Background(), request)
+		if err == nil {
+			outcome.Diagnostic.Path = path
+		}
+	}
+
+	return outcome
 }
 
 // validationFailureReasonFromBoundary maps transport-boundary failures into the
@@ -361,6 +435,50 @@ func validationFailureReasonFromBoundary(category ghostfolioclient.FailureCatego
 	default:
 		return ValidationFailureConnectivityProblem
 	}
+}
+
+// diagnosticEligible reports whether the failure reason supports synced-data diagnostic reports.
+// Authored by: OpenCode
+func diagnosticEligible(reason SyncFailureReason) bool {
+	switch reason {
+	case SyncFailureUnsupportedActivityHistory, SyncFailureUnsupportedStoredDataVersion, SyncFailureIncompatibleNewSyncData:
+		return true
+	default:
+		return false
+	}
+}
+
+// diagnosticContextFromError extracts structured troubleshooting context while keeping secrets redacted.
+// Authored by: OpenCode
+func diagnosticContextFromError(
+	err error,
+	defaultStage syncmodel.DiagnosticFailureStage,
+	secrets ...string,
+) syncmodel.DiagnosticContext {
+	var context = syncmodel.DiagnosticContext{
+		FailureStage:  defaultStage,
+		FailureDetail: redact.ErrorText(err, secrets...),
+	}
+	if err == nil {
+		return context
+	}
+
+	var carrier interface {
+		DiagnosticContext() syncmodel.DiagnosticContext
+	}
+	if typed, ok := err.(interface {
+		DiagnosticContext() syncmodel.DiagnosticContext
+	}); ok {
+		carrier = typed
+		context = carrier.DiagnosticContext()
+		if context.FailureStage == "" {
+			context.FailureStage = defaultStage
+		}
+		context.FailureDetail = redact.Text(context.FailureDetail, secrets...)
+		return context
+	}
+
+	return context
 }
 
 // clearSessionSecrets removes transient secret material from the active session.

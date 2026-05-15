@@ -11,6 +11,32 @@ import (
 	"github.com/cockroachdb/apd/v3"
 )
 
+// ValidationError stores offending-record context for synced-data validation
+// failures.
+// Authored by: OpenCode
+type ValidationError struct {
+	message string
+	context syncmodel.DiagnosticContext
+}
+
+// Error returns the non-secret validation failure detail.
+// Authored by: OpenCode
+func (e *ValidationError) Error() string {
+	if e == nil {
+		return ""
+	}
+	return e.message
+}
+
+// DiagnosticContext returns the structured troubleshooting context for one validation failure.
+// Authored by: OpenCode
+func (e *ValidationError) DiagnosticContext() syncmodel.DiagnosticContext {
+	if e == nil {
+		return syncmodel.DiagnosticContext{}
+	}
+	return e.context
+}
+
 // Validator defines the normalized activity-history validation contract used by
 // the sync workflow.
 //
@@ -48,7 +74,7 @@ func NewValidator() Validator {
 
 func (defaultValidator) Validate(cache syncmodel.ProtectedActivityCache) error {
 	if cache.ActivityCount != len(cache.Activities) {
-		return fmt.Errorf("activity_count does not match the normalized activity list")
+		return newValidationError("activity_count does not match the normalized activity list")
 	}
 
 	var zero apd.Decimal
@@ -59,44 +85,44 @@ func (defaultValidator) Validate(cache syncmodel.ProtectedActivityCache) error {
 	for index, record := range cache.Activities {
 		occurredAt, err := time.Parse(time.RFC3339Nano, record.OccurredAt)
 		if err != nil {
-			return fmt.Errorf("activity %q has an unreadable timestamp: %w", record.SourceID, err)
+			return newValidationError(fmt.Sprintf("activity %q has an unreadable timestamp: %v", record.SourceID, err), record)
 		}
 		if index > 0 {
 			if occurredAt.Before(previousOccurredAt) || (occurredAt.Equal(previousOccurredAt) && record.SourceID < previousSourceID) {
-				return fmt.Errorf("normalized activities are not ordered chronologically")
+				return newValidationError("normalized activities are not ordered chronologically", cache.Activities[index-1], record)
 			}
 		}
 
 		if strings.TrimSpace(record.SourceID) == "" || strings.TrimSpace(record.AssetSymbol) == "" {
-			return fmt.Errorf("normalized activity identity is incomplete")
+			return newValidationError("normalized activity identity is incomplete", record)
 		}
 		if strings.TrimSpace(record.OccurredAt) == "" {
-			return fmt.Errorf("normalized activity timestamp is incomplete")
+			return newValidationError("normalized activity timestamp is incomplete", record)
 		}
 		if record.Quantity.Cmp(&zero) <= 0 {
-			return fmt.Errorf("activity %q quantity must be greater than zero", record.SourceID)
+			return newValidationError(fmt.Sprintf("activity %q quantity must be greater than zero", record.SourceID), record)
 		}
 		if record.GrossValue.Cmp(&zero) < 0 {
-			return fmt.Errorf("activity %q gross value cannot be negative", record.SourceID)
+			return newValidationError(fmt.Sprintf("activity %q gross value cannot be negative", record.SourceID), record)
 		}
 		if record.FeeAmount != nil && record.FeeAmount.Cmp(&zero) < 0 {
-			return fmt.Errorf("activity %q fee amount cannot be negative", record.SourceID)
+			return newValidationError(fmt.Sprintf("activity %q fee amount cannot be negative", record.SourceID), record)
 		}
 
 		switch record.ActivityType {
 		case syncmodel.ActivityTypeBuy:
 			if record.UnitPrice.Cmp(&zero) <= 0 {
-				return fmt.Errorf("BUY activity %q must have a unit price greater than zero", record.SourceID)
+				return newValidationError(fmt.Sprintf("BUY activity %q must have a unit price greater than zero", record.SourceID), record)
 			}
 		case syncmodel.ActivityTypeSell:
 			if record.UnitPrice.Cmp(&zero) < 0 {
-				return fmt.Errorf("SELL activity %q cannot have a negative unit price", record.SourceID)
+				return newValidationError(fmt.Sprintf("SELL activity %q cannot have a negative unit price", record.SourceID), record)
 			}
 			if record.UnitPrice.Cmp(&zero) == 0 && strings.TrimSpace(record.Comment) == "" {
-				return fmt.Errorf("SELL activity %q requires a comment when unit price is zero", record.SourceID)
+				return newValidationError(fmt.Sprintf("SELL activity %q requires a comment when unit price is zero", record.SourceID), record)
 			}
 		default:
-			return fmt.Errorf("activity %q uses unsupported type %q", record.SourceID, record.ActivityType)
+			return newValidationError(fmt.Sprintf("activity %q uses unsupported type %q", record.SourceID, record.ActivityType), record)
 		}
 
 		var runningQuantity = runningQuantityByAsset[record.AssetSymbol]
@@ -106,7 +132,7 @@ func (defaultValidator) Validate(cache syncmodel.ProtectedActivityCache) error {
 		case syncmodel.ActivityTypeSell:
 			_, _ = apd.BaseContext.Sub(&runningQuantity, &runningQuantity, &record.Quantity)
 			if runningQuantity.Cmp(&zero) < 0 {
-				return fmt.Errorf("activity %q would drive holdings below zero", record.SourceID)
+				return newValidationError(fmt.Sprintf("activity %q would drive holdings below zero", record.SourceID), record)
 			}
 		}
 		runningQuantityByAsset[record.AssetSymbol] = runningQuantity
@@ -116,4 +142,22 @@ func (defaultValidator) Validate(cache syncmodel.ProtectedActivityCache) error {
 	}
 
 	return nil
+}
+
+// newValidationError captures the offending normalized records for one validation failure.
+// Authored by: OpenCode
+func newValidationError(message string, records ...syncmodel.ActivityRecord) error {
+	var diagnosticRecords = make([]syncmodel.DiagnosticRecord, 0, len(records))
+	for _, record := range records {
+		diagnosticRecords = append(diagnosticRecords, syncmodel.DiagnosticRecordFromActivityRecord(record))
+	}
+
+	return &ValidationError{
+		message: message,
+		context: syncmodel.DiagnosticContext{
+			FailureStage:  syncmodel.DiagnosticFailureStageValidation,
+			FailureDetail: message,
+			Records:       diagnosticRecords,
+		},
+	}
 }

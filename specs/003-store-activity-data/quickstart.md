@@ -53,7 +53,7 @@ Run:
 make run
 ```
 
-Use `make run ARGS="--dev-mode"` only when intentionally testing a self-hosted `http://` origin.
+Use `make run-dev` only when intentionally testing a self-hosted `http://` origin.
 
 Expected result:
 

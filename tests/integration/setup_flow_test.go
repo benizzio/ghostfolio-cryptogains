@@ -30,6 +30,10 @@ func (integrationSyncService) Validate(context.Context, runtime.ValidateRequest)
 	return runtime.ValidationOutcome{Success: true, DetailReason: "activity_data_stored"}
 }
 
+func (integrationSyncService) GenerateDiagnosticReport(context.Context, runtime.DiagnosticReportRequest) (string, error) {
+	return "", nil
+}
+
 func (integrationSyncService) ProtectedDataState() runtime.ProtectedDataState {
 	return runtime.ProtectedDataState{}
 }

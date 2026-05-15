@@ -354,6 +354,14 @@ func (m *Model) syncMenuItems() []component.MenuItem {
 // resultMenuItems builds the primary validation-result actions for the current render.
 // Authored by: OpenCode
 func (m *Model) resultMenuItems() []component.MenuItem {
+	if m.result.Outcome.Diagnostic.Eligible && m.result.Outcome.Diagnostic.Path == "" {
+		return []component.MenuItem{
+			{Label: "Generate Diagnostic Report", Enabled: true},
+			{Label: "Sync Again", Enabled: true},
+			{Label: "Back To Main Menu", Enabled: true},
+		}
+	}
+
 	return []component.MenuItem{
 		{Label: "Sync Again", Enabled: true},
 		{Label: "Back To Main Menu", Enabled: true},

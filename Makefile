@@ -3,10 +3,13 @@ GOCOVERAGEPLUS ?= $(GO) run github.com/Fabianexe/gocoverageplus@v1.2.0
 ARGS ?=
 PRODUCTION_PACKAGES = $(shell $(GO) run ./tools/coverpkg -go $(GO) ./cmd/... ./internal/...)
 
-.PHONY: run test coverage
+.PHONY: run run-dev test coverage
 
 run:
 	$(GO) run ./cmd/ghostfolio-cryptogains $(ARGS)
+
+run-dev:
+	$(GO) run ./cmd/ghostfolio-cryptogains --dev-mode $(ARGS)
 
 test:
 	$(GO) test ./...

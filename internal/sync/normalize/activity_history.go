@@ -15,6 +15,32 @@ import (
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
 
+// NormalizationError stores offending-record context for synced-data
+// normalization failures.
+// Authored by: OpenCode
+type NormalizationError struct {
+	message string
+	context syncmodel.DiagnosticContext
+}
+
+// Error returns the non-secret normalization failure detail.
+// Authored by: OpenCode
+func (e *NormalizationError) Error() string {
+	if e == nil {
+		return ""
+	}
+	return e.message
+}
+
+// DiagnosticContext returns the structured troubleshooting context for one normalization failure.
+// Authored by: OpenCode
+func (e *NormalizationError) DiagnosticContext() syncmodel.DiagnosticContext {
+	if e == nil {
+		return syncmodel.DiagnosticContext{}
+	}
+	return e.context
+}
+
 // Normalizer defines the full-history normalization contract used by the sync
 // workflow.
 //
@@ -57,12 +83,12 @@ func (defaultNormalizer) Normalize(records []syncmodel.ActivityRecord) (syncmode
 	for _, record := range records {
 		occurredAt, err := time.Parse(time.RFC3339Nano, record.OccurredAt)
 		if err != nil {
-			return syncmodel.ProtectedActivityCache{}, fmt.Errorf("normalize occurred_at: %w", err)
+			return syncmodel.ProtectedActivityCache{}, newNormalizationError(fmt.Sprintf("normalize occurred_at: %v", err), record)
 		}
 
 		rawHash, err := recordHash(record)
 		if err != nil {
-			return syncmodel.ProtectedActivityCache{}, err
+			return syncmodel.ProtectedActivityCache{}, newNormalizationError(err.Error(), record)
 		}
 
 		typedRecords = append(typedRecords, normalizedRecord{
@@ -109,11 +135,33 @@ func ensureStableOrdering(records []normalizedRecord) error {
 		var previous = records[index-1]
 		var current = records[index]
 		if previous.OccurredAt.Equal(current.OccurredAt) && previous.Record.SourceID == current.Record.SourceID && previous.RawHash != current.RawHash {
-			return fmt.Errorf("supported activity ordering is ambiguous for source %q", current.Record.SourceID)
+			return newNormalizationError(
+				fmt.Sprintf("supported activity ordering is ambiguous for source %q", current.Record.SourceID),
+				previous.Record,
+				current.Record,
+			)
 		}
 	}
 
 	return nil
+}
+
+// newNormalizationError captures the offending normalized records for one normalization failure.
+// Authored by: OpenCode
+func newNormalizationError(message string, records ...syncmodel.ActivityRecord) error {
+	var diagnosticRecords = make([]syncmodel.DiagnosticRecord, 0, len(records))
+	for _, record := range records {
+		diagnosticRecords = append(diagnosticRecords, syncmodel.DiagnosticRecordFromActivityRecord(record))
+	}
+
+	return &NormalizationError{
+		message: message,
+		context: syncmodel.DiagnosticContext{
+			FailureStage:  syncmodel.DiagnosticFailureStageNormalization,
+			FailureDetail: message,
+			Records:       diagnosticRecords,
+		},
+	}
 }
 
 // deduplicateAndDeriveYears keeps the first activity for each exact duplicate hash and derives distinct years.

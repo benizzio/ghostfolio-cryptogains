@@ -8,7 +8,7 @@ Terminal UI for the first runnable Ghostfolio integration slice. The current rel
 make run
 ```
 
-Use `make run ARGS="--dev-mode"` only when intentionally testing a custom `http://` origin.
+Use `make run-dev` only when intentionally testing a custom `http://` origin.
 
 Supported runtime flags:
 
@@ -63,7 +63,7 @@ If the file is removed after startup, the current run keeps its in-memory server
 
 ## Development Mode
 
-Start the app with `--dev-mode` to allow custom `http://` origins during setup.
+Start the app with `make run-dev` to allow custom `http://` origins during setup.
 
 - Without `--dev-mode`, custom origins must use `https://`.
 - The default Ghostfolio Cloud origin remains `https://ghostfol.io`.

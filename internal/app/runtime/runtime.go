@@ -69,6 +69,8 @@ func New(options bootstrap.Options) (*App, error) {
 	var syncService = NewSyncService(
 		ghostfolioclient.New(&http.Client{Timeout: options.RequestTimeout}),
 		options.RequestTimeout,
+		baseConfigDir,
+		options.AllowDevHTTP,
 		decimalService,
 		syncNormalizer,
 		syncValidator,
