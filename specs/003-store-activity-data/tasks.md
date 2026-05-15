@@ -76,7 +76,7 @@ description: "Task list for Store Activity Data implementation"
 
 - [X] T017 [P] [US1] Implement paginated Ghostfolio activities retrieval with `skip`, `take`, and ascending date order in `internal/ghostfolio/client/client.go`
 - [X] T018 [P] [US1] Implement Ghostfolio activity-to-normalized-record mapping in `internal/ghostfolio/mapper/activity_mapper.go`
-- [ ] T019 [P] [US1] ⚠️ Reopened Implement chronological normalization, duplicate hashing, and available-year derivation in `internal/sync/normalize/activity_history.go` (reopened — BUG-002: preserve original timestamps but ignore Ghostfolio time-of-day precision for same-asset ordering by using source calendar date, then `activity_type` with `BUY` before `SELL`, then `source_id`)
+- [ ] T019 [P] [US1] ⚠️ Reopened Implement chronological normalization, same-asset source-calendar-date ordering, duplicate hashing, and available-year derivation in `internal/sync/normalize/activity_history.go` (reopened — BUG-002: preserve original timestamps in stored records while establishing the normalized same-asset ordering rule)
 - [X] T020 [P] [US1] Implement supported-history validation for `BUY` and `SELL` activity rules in `internal/sync/validate/activity_history.go`
 - [X] T021 [P] [US1] Implement protected snapshot encryption, decryption, and atomic persistence in `internal/snapshot/store/encrypted_store.go`
 - [X] T022 [US1] Implement full sync orchestration from auth through protected write in `internal/app/runtime/sync_service.go`
@@ -109,7 +109,7 @@ description: "Task list for Store Activity Data implementation"
 - [X] T032 [US2] Implement failure and success result handling for rejected token, unsupported stored-data version, and incompatible new sync data in `internal/tui/flow/sync_flow.go` and `internal/tui/screen/validation_result_screen.go`
 - [X] T052 [US2] Implement synced-data diagnostic-report policy using the existing explicit-development-mode runtime option, local artifact writes, and result-screen report-location messaging in `internal/app/runtime/sync_service.go`, `internal/tui/flow/sync_flow.go`, and `internal/tui/screen/validation_result_screen.go`
 
-**Checkpoint**: User Story 2 remains functionally complete for snapshot reuse, token isolation, and compatibility failures. The diagnostic-report bugfix tasks `T051` and `T052` still need to finish before this story is fully complete for release.
+**Checkpoint**: User Story 2 remains functionally complete for snapshot reuse, token isolation, compatibility failures, and diagnostic-report behavior.
 
 ---
 
@@ -129,14 +129,14 @@ description: "Task list for Store Activity Data implementation"
 
 ### Implementation for User Story 3
 
-- [ ] T038 [P] [US3] ⚠️ Reopened Implement duplicate hashing, deterministic same-timestamp ordering, running-quantity replay support, and source-scope reliability derivation in `internal/sync/normalize/activity_history.go` (reopened — BUG-002: same-asset ordering must ignore Ghostfolio time-of-day precision and prefer `BUY` before `SELL` before `source_id`)
+- [ ] T038 [P] [US3] ⚠️ Reopened Implement running-quantity replay support and source-scope reliability derivation in `internal/sync/normalize/activity_history.go` so they consume the same-asset source-calendar-date ordering established in `T019` (reopened — BUG-002: replay must use source calendar date, `activity_type`, then `source_id`)
 - [ ] T039 [P] [US3] ⚠️ Reopened Implement defensibility checks for missing or contradictory normalized fields, below-zero holdings, zero-priced `SELL` comment rules, and unsupported-history rejection in `internal/sync/validate/activity_history.go` (reopened — BUG-002: defensibility must evaluate same-asset ordering after source calendar date, `activity_type`, and `source_id` tie-breaking)
 - [X] T053 [US3] Extend mapping, normalization, and validation failures to surface offending-record diagnostic context and production/dev redaction inputs in `internal/ghostfolio/mapper/activity_mapper.go`, `internal/sync/normalize/activity_history.go`, `internal/sync/validate/activity_history.go`, and `internal/app/runtime/sync_service.go`
 - [X] T040 [P] [US3] Implement server-mismatch detection and replacement gating against the active readable snapshot in `internal/app/runtime/sync_service.go`
 - [X] T041 [US3] Implement server replacement confirmation screen and navigation in `internal/tui/screen/server_replacement_screen.go` and `internal/tui/flow/sync_flow.go`
 - [X] T042 [US3] Update the main menu and sync entry screens to surface protected-data-exists state without exposing cached activity details in `internal/tui/screen/main_menu_screen.go` and `internal/tui/screen/sync_validation_screen.go`
 
-**Checkpoint**: User Story 3 remains functionally complete for invalid-history rejection and server-boundary protection. The diagnostic-context bugfix task `T053` still needs to finish before this story is fully complete for release. The deterministic-ordering bugfix tasks `T033`, `T035`, `T037`, `T038`, and `T039` also need to finish before this story is fully complete for release.
+**Checkpoint**: User Story 3 still needs the deterministic-ordering bugfix tasks `T033`, `T035`, `T037`, `T038`, and `T039` before it is fully complete for release.
 
 ---
 
