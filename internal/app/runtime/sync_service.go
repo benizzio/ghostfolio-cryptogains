@@ -13,7 +13,6 @@ import (
 	ghostfoliodto "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/dto"
 	ghostfoliomapper "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/mapper"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/validator"
-	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
@@ -503,16 +502,6 @@ func diagnosticContextFromError(
 func clearSessionSecrets(session *GhostfolioSession) {
 	session.SecurityToken = ""
 	session.AuthToken = ""
-}
-
-// setActiveSnapshot stores the readable protected snapshot for the current run.
-// Authored by: OpenCode
-func (s *syncService) setActiveSnapshot(candidate snapshotstore.Candidate, payload snapshotmodel.Payload) {
-	if s.snapshots == nil {
-		return
-	}
-
-	s.snapshots.SetActiveSnapshot(candidate, payload)
 }
 
 // ProtectedDataState reports whether a readable protected snapshot is active for this run.
