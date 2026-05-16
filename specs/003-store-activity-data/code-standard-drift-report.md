@@ -40,7 +40,7 @@
 
 **Description**:
 
-The feature already has a shared `syncmodel.NewActivityOrderingKey` constructor, but both normalization and validation still rebuild the same ordering tuple inline. That keeps the same same-asset ordering rule in three locations. This slice already reopened ordering work for `BUG-002`, so retaining that duplication creates a concrete risk of divergence the next time the ordering rule changes.
+The feature already has a shared `syncmodel.NewActivityOrderingKey` constructor, but both normalization and validation still rebuild the same ordering tuple inline. That keeps the same-asset ordering rule in three locations. This slice already reopened ordering work for `BUG-002`, so retaining that duplication creates a concrete risk of divergence the next time the ordering rule changes.
 
 ### DRIFT-003: Validation-Only Terminology Still Obscures The Sync-And-Storage Workflow
 

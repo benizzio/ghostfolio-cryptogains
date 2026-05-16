@@ -245,7 +245,7 @@ The payload contains:
 - Successful sync writes one complete replacement payload.
 - Use temp-file write, `fsync`, and atomic rename.
 - The previous readable snapshot remains untouched until the replacement write succeeds.
-- A failed, canceled, or incompatible replacement must not leave a partially readable replacement snapshot behind.
+- A failed, cancelled, or incompatible replacement must not leave a partially readable replacement snapshot behind.
 
 ## Unlock, Isolation, And Compatibility Rules
 

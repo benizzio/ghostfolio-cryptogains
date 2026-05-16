@@ -105,7 +105,7 @@ tests/
 - Define `server_discovery_key = SHA-256(canonical_server_origin)` so snapshot discovery can stay server-scoped without writing the plaintext origin or any token-derived verifier into the snapshot header.
 - Authenticate the serialized cleartext header as AEAD additional authenticated data so header tampering fails decryption even though the header itself remains readable.
 - Keep a versioned encrypted payload that contains stored-data version markers, protected setup profile, registered local user metadata, and a normalized activity cache with derived available report years and sync metadata.
-- Write every successful protected update through a temp file, `fsync`, and atomic rename. A failed write, validation failure, or canceled replacement must leave the previously readable snapshot untouched.
+- Write every successful protected update through a temp file, `fsync`, and atomic rename. A failed write, validation failure, or cancelled replacement must leave the previously readable snapshot untouched.
 - Document removal paths clearly: deleting `setup.json` resets bootstrap setup, while deleting protected snapshot files removes token-locked synced data. Neither operation persists or reveals the Ghostfolio security token.
 
 ## Full-History Sync Rules
