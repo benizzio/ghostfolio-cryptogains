@@ -7,6 +7,8 @@ require (
 	charm.land/bubbletea/v2 v2.0.6
 	charm.land/lipgloss/v2 v2.0.3
 	github.com/Fabianexe/gocoverageplus v1.2.0
+	github.com/cockroachdb/apd/v3 v3.2.3
+	golang.org/x/crypto v0.51.0
 )
 
 require (
@@ -29,6 +31,6 @@ require (
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/mod v0.21.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/tools v0.26.0 // indirect
 )

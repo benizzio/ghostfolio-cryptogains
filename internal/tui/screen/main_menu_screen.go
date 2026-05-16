@@ -18,13 +18,14 @@ import (
 //
 // Authored by: OpenCode
 type MainMenuScreenParams struct {
-	Theme         component.Theme
-	Width         int
-	Height        int
-	MenuItems     []component.MenuItem
-	SelectedIndex int
-	ServerOrigin  string
-	HelpText      string
+	Theme               component.Theme
+	Width               int
+	Height              int
+	MenuItems           []component.MenuItem
+	SelectedIndex       int
+	ServerOrigin        string
+	ProtectedDataExists bool
+	HelpText            string
 }
 
 // MainMenuScreenView renders the main menu for the current slice.
@@ -42,8 +43,9 @@ type MainMenuScreenParams struct {
 // Authored by: OpenCode
 func MainMenuScreenView(params MainMenuScreenParams) string {
 	var body = fmt.Sprintf(
-		"Selected Server: %s\nSetup Status: complete\n\n%s",
+		"Selected Server: %s\nSetup Status: complete\nProtected Data: %s\n\n%s",
 		params.ServerOrigin,
+		protectedDataStatusLabel(params.ProtectedDataExists),
 		component.RenderMenu(params.Theme, params.MenuItems, params.SelectedIndex),
 	)
 
@@ -54,7 +56,16 @@ func MainMenuScreenView(params MainMenuScreenParams) string {
 		"Main Menu",
 		"Sync Data is the only business workflow available in this release.",
 		body,
-		"Choose Sync Data to validate Ghostfolio communication. Persistence and report generation are not available in this slice.",
+		"Choose Sync Data to authenticate, retrieve, validate, and store protected activity history. Protected-data presence may be shown, but no cached activity details are exposed in this slice.",
 		params.HelpText,
 	)
+}
+
+// protectedDataStatusLabel formats the active readable-protected-data summary without exposing activity details.
+// Authored by: OpenCode
+func protectedDataStatusLabel(present bool) string {
+	if present {
+		return "readable snapshot loaded for this run"
+	}
+	return "none loaded for this run"
 }

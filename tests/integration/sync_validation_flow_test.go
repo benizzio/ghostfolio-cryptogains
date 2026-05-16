@@ -22,6 +22,10 @@ import (
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	ghostfolioclient "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/client"
+	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	syncnormalize "github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
+	syncvalidate "github.com/benizzio/ghostfolio-cryptogains/internal/sync/validate"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 )
@@ -51,10 +55,23 @@ type syncValidationFixture struct {
 func TestSyncValidationSuccessUsesProductionRuntimePath(t *testing.T) {
 	t.Parallel()
 
+	var tempDir = t.TempDir()
 	var server = newGhostfolioScenarioServer(t, ghostfolioScenario{
-		activitiesBody: `{"activities":[{"id":"activity-1","date":"2026-01-31T10:00:00Z","type":"BUY"}],"count":1}`,
+		activitiesBody: `{"activities":[{"id":"activity-1","date":"2026-01-31T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":10,"unitPriceInAssetProfileCurrency":10,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}],"count":1}`,
 	})
-	var fixture = newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
+	var fixture = syncValidationFixture{
+		config: mustCustomSetupConfig(t, server.URL),
+		service: runtime.NewSyncService(
+			ghostfolioclient.New(server.Client()),
+			time.Second,
+			tempDir,
+			true,
+			decimalsupport.NewService(),
+			syncnormalize.NewNormalizer(),
+			syncvalidate.NewValidator(),
+			snapshotstore.NewEncryptedStore(tempDir, nil),
+		),
+	}
 	var model = newSyncValidationModel(t, fixture)
 
 	model = openSyncValidation(t, model)
@@ -64,15 +81,15 @@ func TestSyncValidationSuccessUsesProductionRuntimePath(t *testing.T) {
 	model, cmd := startSyncValidationAttempt(t, model)
 	model = applyValidationBatch(t, model, cmd)
 
-	if model.ActiveScreen() != "validation_result" {
-		t.Fatalf("expected validation result screen, got %s", model.ActiveScreen())
+	if model.ActiveScreen() != "sync_result" {
+		t.Fatalf("expected sync result screen, got %s", model.ActiveScreen())
 	}
 
 	var content = model.View().Content
-	if !strings.Contains(content, "Communication with the selected Ghostfolio server is working.") {
-		t.Fatalf("expected successful validation summary, got %q", content)
+	if !strings.Contains(content, "Activity data was stored securely for future use.") {
+		t.Fatalf("expected successful sync summary, got %q", content)
 	}
-	if !strings.Contains(content, "No Ghostfolio data was stored locally, and reporting is not available in this slice.") {
+	if !strings.Contains(content, "No report-generation") || !strings.Contains(content, "cached-data browsing workflow") {
 		t.Fatalf("expected success follow-up text, got %q", content)
 	}
 	if strings.Contains(content, "abc123") || strings.Contains(content, "jwt") {
@@ -86,7 +103,7 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 	var testCases = []struct {
 		name           string
 		buildFixture   func(*testing.T) syncValidationFixture
-		wantCategory   runtime.ValidationFailureReason
+		wantCategory   runtime.SyncFailureReason
 		wantFollowUp   string
 		wantSecretSafe bool
 	}{
@@ -97,8 +114,8 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 				var server = newGhostfolioScenarioServer(t, ghostfolioScenario{authStatus: http.StatusForbidden})
 				return newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
 			},
-			wantCategory:   runtime.ValidationFailureRejectedToken,
-			wantFollowUp:   "Validate again or return to the main menu. No Ghostfolio data was stored locally.",
+			wantCategory:   runtime.SyncFailureRejectedToken,
+			wantFollowUp:   "The supplied token was rejected. Try again with a valid Ghostfolio security token.",
 			wantSecretSafe: true,
 		},
 		{
@@ -108,8 +125,8 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 				var server = newGhostfolioScenarioServer(t, ghostfolioScenario{activitiesDelay: 200 * time.Millisecond})
 				return newSyncValidationFixture(t, server.Client(), server.URL, 20*time.Millisecond)
 			},
-			wantCategory:   runtime.ValidationFailureTimeout,
-			wantFollowUp:   "Validate again or return to the main menu. No Ghostfolio data was stored locally.",
+			wantCategory:   runtime.SyncFailureTimeout,
+			wantFollowUp:   "Sync again or return to the main menu. No protected activity data was stored.",
 			wantSecretSafe: true,
 		},
 		{
@@ -122,8 +139,8 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 				server.Close()
 				return newSyncValidationFixture(t, client, origin, time.Second)
 			},
-			wantCategory:   runtime.ValidationFailureConnectivityProblem,
-			wantFollowUp:   "Validate again or return to the main menu. No Ghostfolio data was stored locally.",
+			wantCategory:   runtime.SyncFailureConnectivityProblem,
+			wantFollowUp:   "Sync again or return to the main menu. No protected activity data was stored.",
 			wantSecretSafe: true,
 		},
 		{
@@ -133,8 +150,8 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 				var server = newGhostfolioScenarioServer(t, ghostfolioScenario{activitiesStatus: http.StatusUnauthorized})
 				return newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
 			},
-			wantCategory:   runtime.ValidationFailureUnsuccessfulServerResponse,
-			wantFollowUp:   "Validate again or return to the main menu. No Ghostfolio data was stored locally.",
+			wantCategory:   runtime.SyncFailureUnsuccessfulServerResponse,
+			wantFollowUp:   "Sync again or return to the main menu. No protected activity data was stored.",
 			wantSecretSafe: true,
 		},
 		{
@@ -144,7 +161,7 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 				var server = newGhostfolioScenarioServer(t, ghostfolioScenario{activitiesStatus: http.StatusBadRequest})
 				return newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
 			},
-			wantCategory:   runtime.ValidationFailureIncompatibleServerContract,
+			wantCategory:   runtime.SyncFailureIncompatibleServerContract,
 			wantFollowUp:   "The selected server responded, but it did not satisfy the supported contract",
 			wantSecretSafe: true,
 		},
@@ -164,8 +181,8 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 			model, cmd := startSyncValidationAttempt(t, model)
 			model = applyValidationBatch(t, model, cmd)
 
-			if model.ActiveScreen() != "validation_result" {
-				t.Fatalf("expected validation result screen, got %s", model.ActiveScreen())
+			if model.ActiveScreen() != "sync_result" {
+				t.Fatalf("expected sync result screen, got %s", model.ActiveScreen())
 			}
 
 			var content = model.View().Content
@@ -200,12 +217,12 @@ func TestFailedValidationDefaultActionRetriesValidation(t *testing.T) {
 	_ = testutil.RunCmd(focusCmd)
 	model = assertFlowModel(t, updated)
 
-	if model.ActiveScreen() != "sync_validation" {
-		t.Fatalf("expected Validate Again to reopen sync validation, got %s", model.ActiveScreen())
+	if model.ActiveScreen() != "sync" {
+		t.Fatalf("expected Sync Again to reopen sync, got %s", model.ActiveScreen())
 	}
 }
 
-func TestSuccessfulValidationDefaultActionReturnsToMainMenu(t *testing.T) {
+func TestSuccessfulSyncDefaultActionReturnsToMainMenu(t *testing.T) {
 	t.Parallel()
 
 	var server = newGhostfolioScenarioServer(t, ghostfolioScenario{})
@@ -222,7 +239,7 @@ func TestSuccessfulValidationDefaultActionReturnsToMainMenu(t *testing.T) {
 	model = assertFlowModel(t, updated)
 
 	if model.ActiveScreen() != "main_menu" {
-		t.Fatalf("expected successful validation to return to the main menu by default, got %s", model.ActiveScreen())
+		t.Fatalf("expected successful sync to return to the main menu by default, got %s", model.ActiveScreen())
 	}
 }
 
@@ -246,8 +263,8 @@ func TestSyncValidationBusyStateStillHandlesResizeBeforeCompletion(t *testing.T)
 	}
 
 	model = applyValidationBatch(t, model, cmd)
-	if model.ActiveScreen() != "validation_result" {
-		t.Fatalf("expected validation result screen after the delayed batch completed, got %s", model.ActiveScreen())
+	if model.ActiveScreen() != "sync_result" {
+		t.Fatalf("expected sync result screen after the delayed batch completed, got %s", model.ActiveScreen())
 	}
 }
 
@@ -257,7 +274,19 @@ func TestSyncValidationNoPersistenceBeyondSetup(t *testing.T) {
 	var tempDir = t.TempDir()
 	var store = configstore.NewJSONStore(tempDir)
 	var server = newGhostfolioScenarioServer(t, ghostfolioScenario{})
-	var fixture = newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
+	var fixture = syncValidationFixture{
+		config: mustCustomSetupConfig(t, server.URL),
+		service: runtime.NewSyncService(
+			ghostfolioclient.New(server.Client()),
+			time.Second,
+			tempDir,
+			true,
+			decimalsupport.NewService(),
+			syncnormalize.NewNormalizer(),
+			syncvalidate.NewValidator(),
+			snapshotstore.NewEncryptedStore(tempDir, nil),
+		),
+	}
 	if err := store.Save(context.Background(), fixture.config); err != nil {
 		t.Fatalf("save config: %v", err)
 	}
@@ -272,12 +301,20 @@ func TestSyncValidationNoPersistenceBeyondSetup(t *testing.T) {
 
 	var entries []os.DirEntry
 	var err error
-	entries, err = os.ReadDir(filepath.Dir(store.Path()))
+	entries, err = os.ReadDir(tempDir)
 	if err != nil {
 		t.Fatalf("read config directory: %v", err)
 	}
-	if len(entries) != 1 || entries[0].Name() != "setup.json" {
+	if len(entries) != 1 || entries[0].Name() != "ghostfolio-cryptogains" {
 		t.Fatalf("unexpected persisted files: %#v", entries)
+	}
+
+	var appEntries, readErr = os.ReadDir(filepath.Join(tempDir, "ghostfolio-cryptogains"))
+	if readErr != nil {
+		t.Fatalf("read app directory: %v", readErr)
+	}
+	if len(appEntries) != 2 {
+		t.Fatalf("expected setup plus snapshots directory, got %#v", appEntries)
 	}
 	if got := model.View().Content; strings.Contains(got, "abc123") || strings.Contains(got, "jwt") {
 		t.Fatalf("expected result screen to remain secret-safe, got %q", got)
@@ -345,8 +382,11 @@ func newSyncValidationFixture(t *testing.T, client *http.Client, origin string, 
 	t.Helper()
 
 	return syncValidationFixture{
-		config:  mustCustomSetupConfig(t, origin),
-		service: runtime.NewSyncService(ghostfolioclient.New(client), requestTimeout),
+		config: mustCustomSetupConfig(t, origin),
+		service: func() runtime.SyncService {
+			var tempDir = t.TempDir()
+			return runtime.NewSyncService(ghostfolioclient.New(client), requestTimeout, tempDir, true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(tempDir, nil))
+		}(),
 	}
 }
 
@@ -360,7 +400,7 @@ func newSyncValidationModel(t *testing.T, fixture syncValidationFixture) *flow.M
 }
 
 // startSyncValidationAttempt submits the current token value and returns the
-// batch command that will deliver the async validation messages.
+// batch command that will deliver the async sync messages.
 // Authored by: OpenCode
 func startSyncValidationAttempt(t *testing.T, model *flow.Model) (*flow.Model, tea.Cmd) {
 	t.Helper()
@@ -368,16 +408,16 @@ func startSyncValidationAttempt(t *testing.T, model *flow.Model) (*flow.Model, t
 	var updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = assertFlowModel(t, updated)
 	if cmd == nil {
-		t.Fatalf("expected validation batch command")
+		t.Fatalf("expected sync batch command")
 	}
-	if got := model.View().Content; !strings.Contains(got, "Validating Ghostfolio communication") {
+	if got := model.View().Content; !strings.Contains(got, "Syncing and storing activity history") {
 		t.Fatalf("expected busy state after submit, got %q", got)
 	}
 
 	return model, cmd
 }
 
-// applyValidationBatch runs the asynchronous validation batch to completion and
+// applyValidationBatch runs the asynchronous sync batch to completion and
 // applies each resulting message to the flow model.
 // Authored by: OpenCode
 func applyValidationBatch(t *testing.T, model *flow.Model, cmd tea.Cmd) *flow.Model {
@@ -386,7 +426,7 @@ func applyValidationBatch(t *testing.T, model *flow.Model, cmd tea.Cmd) *flow.Mo
 	var message = testutil.RunCmd(cmd)
 	var batch, ok = message.(tea.BatchMsg)
 	if !ok {
-		t.Fatalf("expected validation command to return tea.BatchMsg, got %T", message)
+		t.Fatalf("expected sync command to return tea.BatchMsg, got %T", message)
 	}
 
 	for _, batchCmd := range batch {

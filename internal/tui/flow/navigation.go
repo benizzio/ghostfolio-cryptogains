@@ -1,13 +1,16 @@
 // Package flow owns the Bubble Tea root model and workflow routing for this
-// validation-only slice.
+// sync-and-storage slice.
 // Authored by: OpenCode
 package flow
 
 import (
+	"context"
+
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 )
 
 var (
@@ -74,19 +77,21 @@ func (m *Model) updateMainMenu(message tea.Msg) (tea.Model, tea.Cmd) {
 	case key.Matches(keyMessage, editSetupBinding()):
 		return m, m.enterSetup("", bootstrap.SetupRequirementNone)
 	case key.Matches(keyMessage, enterBinding()):
-		return m, m.enterSyncValidation()
+		return m, m.enterSync()
 	default:
 		return m, nil
 	}
 }
 
-// updateValidationResult handles validation-result navigation.
+// updateSyncResult handles sync-result navigation.
 // Authored by: OpenCode
-func (m *Model) updateValidationResult(message tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) updateSyncResult(message tea.Msg) (tea.Model, tea.Cmd) {
 	var keyMessage, ok = message.(tea.KeyPressMsg)
 	if !ok {
 		return m, nil
 	}
+
+	var menuItems = m.resultMenuItems()
 
 	switch {
 	case key.Matches(keyMessage, upBinding()):
@@ -94,14 +99,73 @@ func (m *Model) updateValidationResult(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.result.MenuIndex--
 		}
 	case key.Matches(keyMessage, downBinding()):
-		if m.result.MenuIndex < len(m.resultMenuItems())-1 {
+		if m.result.MenuIndex < len(menuItems)-1 {
 			m.result.MenuIndex++
 		}
 	case key.Matches(keyMessage, enterBinding()):
+		if m.result.Outcome.Diagnostic.Eligible && m.result.Outcome.Diagnostic.Path == "" {
+			switch m.result.MenuIndex {
+			case 0:
+				return m.generateDiagnosticReport()
+			case 1:
+				return m, m.enterSync()
+			default:
+				m.enterMainMenu()
+				return m, nil
+			}
+		}
 		if m.result.MenuIndex == 0 {
-			return m, m.enterSyncValidation()
+			return m, m.enterSync()
 		}
 		m.enterMainMenu()
+	}
+
+	return m, nil
+}
+
+// generateDiagnosticReport writes one local synced-data diagnostic report from the current result screen.
+// Authored by: OpenCode
+func (m *Model) generateDiagnosticReport() (tea.Model, tea.Cmd) {
+	var request = m.result.Outcome.Diagnostic.Request
+	if request.ServerOrigin == "" && m.currentConfig != nil {
+		request.ServerOrigin = m.currentConfig.ServerOrigin
+	}
+	if request.Attempt.AttemptID == "" {
+		request.Attempt = m.result.Outcome.Attempt
+	}
+	path, err := m.deps.SyncService.GenerateDiagnosticReport(context.Background(), request)
+	if err != nil {
+		return m, nil
+	}
+
+	m.result.Outcome.Diagnostic.Path = path
+	m.result.Outcome.Diagnostic.Request = request
+	return m, nil
+}
+
+// updateServerReplacement handles server-mismatch confirmation navigation.
+// Authored by: OpenCode
+func (m *Model) updateServerReplacement(message tea.Msg) (tea.Model, tea.Cmd) {
+	var keyMessage, ok = message.(tea.KeyPressMsg)
+	if !ok {
+		return m, nil
+	}
+
+	switch {
+	case key.Matches(keyMessage, upBinding()):
+		if m.replacement.MenuIndex > 0 {
+			m.replacement.MenuIndex--
+		}
+	case key.Matches(keyMessage, downBinding()):
+		if m.replacement.MenuIndex < len(m.serverReplacementMenuItems())-1 {
+			m.replacement.MenuIndex++
+		}
+	case key.Matches(keyMessage, enterBinding()):
+		if m.replacement.MenuIndex == 0 {
+			return m.startConfirmedServerReplacement()
+		}
+		m.sync.TokenInput.Reset()
+		m.enterSyncResult(runtime.SyncOutcome{Success: false, FailureReason: runtime.SyncFailureServerReplacementCancelled, DetailReason: string(runtime.SyncFailureServerReplacementCancelled)})
 	}
 
 	return m, nil

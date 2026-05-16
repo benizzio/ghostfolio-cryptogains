@@ -11,23 +11,37 @@ import (
 func TestValidationResultWorkflowContract(t *testing.T) {
 	t.Parallel()
 
-	var success = screen.ValidationResultScreenView(screen.ValidationResultScreenParams{
+	var success = screen.SyncResultScreenView(screen.SyncResultScreenParams{
 		Theme:     component.DefaultTheme(),
 		Width:     100,
 		Height:    32,
-		MenuItems: []component.MenuItem{{Label: "Validate Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
-		Outcome:   runtime.ValidationOutcome{Success: true, DetailReason: "communication_ok"},
+		MenuItems: []component.MenuItem{{Label: "Sync Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
+		Outcome:   runtime.SyncOutcome{Success: true, DetailReason: "activity_data_stored"},
 	})
-	assertContains(t, success, "Validate Again")
+	assertContains(t, success, "Sync Again")
 	assertContains(t, success, "Back To Main Menu")
-	assertContains(t, success, "No Ghostfolio data was stored locally")
+	assertContains(t, success, "stored securely for future use")
 
-	var failure = screen.ValidationResultScreenView(screen.ValidationResultScreenParams{
+	var failure = screen.SyncResultScreenView(screen.SyncResultScreenParams{
 		Theme:     component.DefaultTheme(),
 		Width:     100,
 		Height:    32,
-		MenuItems: []component.MenuItem{{Label: "Validate Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
-		Outcome:   runtime.ValidationOutcome{Success: false, FailureReason: runtime.ValidationFailureTimeout, DetailReason: string(runtime.ValidationFailureTimeout)},
+		MenuItems: []component.MenuItem{{Label: "Sync Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
+		Outcome:   runtime.SyncOutcome{Success: false, FailureReason: runtime.SyncFailureTimeout, DetailReason: string(runtime.SyncFailureTimeout)},
 	})
 	assertContains(t, failure, "Failure Category: timeout")
+
+	var diagnosticWritten = screen.SyncResultScreenView(screen.SyncResultScreenParams{
+		Theme:     component.DefaultTheme(),
+		Width:     100,
+		Height:    32,
+		MenuItems: []component.MenuItem{{Label: "Sync Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
+		Outcome: runtime.SyncOutcome{
+			Success:       false,
+			FailureReason: runtime.SyncFailureIncompatibleNewSyncData,
+			DetailReason:  string(runtime.SyncFailureIncompatibleNewSyncData),
+			Diagnostic:    runtime.DiagnosticReportState{Eligible: true, Path: "/tmp/example.diagnostic.json"},
+		},
+	})
+	assertContains(t, diagnosticWritten, "/tmp/example.diagnostic.json")
 }

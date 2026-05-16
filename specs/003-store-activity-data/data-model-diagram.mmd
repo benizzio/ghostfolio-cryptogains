@@ -1,0 +1,131 @@
+erDiagram
+    AppSetupConfig {
+        integer schema_version
+        boolean setup_complete
+        enum server_mode
+        string server_origin
+        boolean allow_dev_http
+        timestamp updated_at
+    }
+
+    EncryptedSnapshotEnvelope {
+        UUID_string file_id
+        integer format_version
+        hex_string server_discovery_key
+        enum kdf_name
+        integer kdf_memory_kib
+        integer kdf_iterations
+        integer kdf_parallelism
+        bytes salt
+        bytes nonce
+        bytes ciphertext
+        SnapshotPayload snapshot_payload
+    }
+
+    StoredDataVersion {
+        integer envelope_format_version
+        integer payload_schema_version
+        integer activity_model_version
+        string written_by_app_version
+        SnapshotPayload snapshot_payload
+    }
+
+    SnapshotPayload {
+        StoredDataVersion stored_data_version
+        RegisteredLocalUser registered_local_user
+        SetupProfile setup_profile
+        ProtectedActivityCache protected_activity_cache
+    }
+
+    RegisteredLocalUser {
+        UUID_string local_user_id
+        timestamp created_at
+        timestamp updated_at
+        timestamp last_successful_sync_at
+        SetupProfile setup_profile
+        ProtectedActivityCache protected_activity_cache
+    }
+
+    SetupProfile {
+        string server_origin
+        enum server_mode
+        timestamp last_validated_at
+        string source_api_base_path
+        RegisteredLocalUser registered_local_user
+    }
+
+    ProtectedActivityCache {
+        timestamp synced_at
+        integer retrieved_count
+        integer activity_count
+        integer_array available_report_years
+        enum scope_reliability
+        ActivityRecord_array activities
+        RegisteredLocalUser registered_local_user
+    }
+
+    ActivityRecord {
+        string source_id
+        RFC3339_timestamp_string occurred_at
+        enum activity_type
+        string asset_symbol
+        string_nullable asset_name
+        string_nullable base_currency
+        decimal_string quantity
+        decimal_string unit_price
+        decimal_string gross_value
+        decimal_string fee_amount
+        string_nullable comment
+        string_nullable data_source
+        SourceHoldingScope_nullable source_scope
+        string raw_hash
+    }
+
+    SourceHoldingScope {
+        string scope_id
+        string_nullable scope_name
+        enum scope_kind
+        enum reliability
+        ActivityRecord_array activity_records
+    }
+
+    GhostfolioSession {
+        string server_origin
+        secret_string security_token
+        secret_string auth_token
+        timestamp started_at
+        timestamp_nullable authenticated_at
+        AppSetupConfig app_setup_config
+        EncryptedSnapshotEnvelope_nullable encrypted_snapshot_envelope
+        SyncAttempt sync_attempt
+    }
+
+    SyncAttempt {
+        string attempt_id
+        enum status
+        enum_nullable failure_reason
+        timestamp started_at
+        timestamp_nullable completed_at
+        boolean server_mismatch_confirmed
+        GhostfolioSession ghostfolio_session
+        SnapshotPayload_nullable active_snapshot_payload
+        SnapshotPayload_nullable replacement_snapshot_payload
+    }
+
+    EncryptedSnapshotEnvelope ||--|| SnapshotPayload : wraps
+    SnapshotPayload ||--|| StoredDataVersion : contains
+    SnapshotPayload ||--|| RegisteredLocalUser : contains
+    SnapshotPayload ||--|| SetupProfile : contains
+    SnapshotPayload ||--|| ProtectedActivityCache : contains
+
+    RegisteredLocalUser ||--|| SetupProfile : owns
+    RegisteredLocalUser ||--|| ProtectedActivityCache : owns
+
+    ProtectedActivityCache ||--o{ ActivityRecord : contains
+    ActivityRecord }o--o| SourceHoldingScope : references
+
+    AppSetupConfig ||--o{ GhostfolioSession : used_by
+    GhostfolioSession }o--o| EncryptedSnapshotEnvelope : unlocks_or_creates
+    GhostfolioSession ||--|| SyncAttempt : used_by
+    SyncAttempt }o--o| SnapshotPayload : reads_active
+    SyncAttempt o|--o| SnapshotPayload : produces_replacement

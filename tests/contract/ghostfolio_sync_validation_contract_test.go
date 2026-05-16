@@ -14,10 +14,10 @@ func TestGhostfolioSyncValidationContract(t *testing.T) {
 		t.Fatalf("expected auth response to satisfy contract: %v", err)
 	}
 
-	if err := validator.ValidateActivitiesProbeResponse(dto.ActivitiesProbeResponse{
+	if err := validator.ValidateSingleActivityPageResponse(dto.ActivityPageResponse{
 		Count:      1,
-		Activities: []dto.ActivityProbeEntry{{ID: "activity-id", Date: "2026-01-31T10:00:00Z", Type: "BUY"}},
+		Activities: []dto.ActivityPageEntry{{ID: "activity-id", Date: "2026-01-31T10:00:00Z", Type: "BUY"}},
 	}); err != nil {
-		t.Fatalf("expected activities probe response to satisfy contract: %v", err)
+		t.Fatalf("expected single-page activities response to satisfy contract: %v", err)
 	}
 }
