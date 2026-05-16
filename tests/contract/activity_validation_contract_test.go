@@ -90,6 +90,9 @@ func TestActivityValidationContractDerivesScopeReliabilityOutcomes(t *testing.T)
 			if err != nil {
 				t.Fatalf("normalize: %v", err)
 			}
+			if err := syncvalidate.NewValidator().Validate(cache); err != nil {
+				t.Fatalf("validate: %v", err)
+			}
 			if cache.ScopeReliability != testCase.want {
 				t.Fatalf("scope reliability mismatch: got %q want %q", cache.ScopeReliability, testCase.want)
 			}
