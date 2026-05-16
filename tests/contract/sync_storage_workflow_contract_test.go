@@ -31,6 +31,7 @@ func TestSyncStorageWorkflowContract(t *testing.T) {
 		Outcome:   runtime.SyncOutcome{Success: true, DetailReason: "activity_data_stored"},
 	})
 	assertContains(t, success, "stored securely for future use")
+	assertContains(t, success, "No report-generation, report-preview")
 	assertContains(t, success, "cached-data browsing workflow")
 
 	var failure = screen.SyncResultScreenView(screen.SyncResultScreenParams{
