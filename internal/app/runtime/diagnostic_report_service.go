@@ -40,7 +40,7 @@ func (s diagnosticReportService) PrepareState(request DiagnosticReportRequest) D
 		return state
 	}
 
-	path, err := s.Write(context.Background(), request)
+	var path, err = s.Write(context.Background(), request)
 	if err == nil {
 		state.Path = path
 	}
