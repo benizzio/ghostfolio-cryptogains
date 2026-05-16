@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -86,7 +87,11 @@ func TestSyncDiagnosticReportFlowPromptsInProductionAndWritesOnExplicitChoice(t 
 	if strings.Contains(reportText, "abc123") || strings.Contains(reportText, "jwt") {
 		t.Fatalf("expected report to stay secret-safe, got %q", reportText)
 	}
-	if strings.Contains(reportText, `"quantity": "1"`) || strings.Contains(reportText, `"unit_price": "100"`) || strings.Contains(reportText, `"gross_value": "100"`) {
+	records := mustDiagnosticReportRecords(t, reportBytes)
+	if len(records) == 0 {
+		t.Fatalf("expected production diagnostic report records")
+	}
+	if records[0].Quantity == "1" || records[0].UnitPrice == "100" || records[0].GrossValue == "100" {
 		t.Fatalf("expected production report to redact financial values, got %q", reportText)
 	}
 }
@@ -141,7 +146,11 @@ func TestSyncDiagnosticReportFlowGeneratesAutomaticallyInExplicitDevelopmentMode
 	if strings.Contains(reportText, "abc123") || strings.Contains(reportText, "jwt") {
 		t.Fatalf("expected development report to stay secret-safe, got %q", reportText)
 	}
-	if !strings.Contains(reportText, `"quantity": "1"`) || !strings.Contains(reportText, `"unit_price": "100"`) || !strings.Contains(reportText, `"gross_value": "100"`) {
+	records := mustDiagnosticReportRecords(t, reportBytes)
+	if len(records) == 0 {
+		t.Fatalf("expected development diagnostic report records")
+	}
+	if records[0].Quantity != "1" || records[0].UnitPrice != "100" || records[0].GrossValue != "100" {
 		t.Fatalf("expected development report to retain allowed financial context, got %q", reportText)
 	}
 }
@@ -188,4 +197,31 @@ func mustDiagnosticFiles(t *testing.T, baseDir string) []string {
 		paths = append(paths, filepath.Join(baseDir, "ghostfolio-cryptogains", "diagnostics", entry.Name()))
 	}
 	return paths
+}
+
+type diagnosticReportRecord struct {
+	Quantity   string `json:"quantity"`
+	UnitPrice  string `json:"unit_price"`
+	GrossValue string `json:"gross_value"`
+}
+
+type diagnosticReportPayload struct {
+	Records []diagnosticReportRecord `json:"records"`
+}
+
+func mustDiagnosticReportRecords(t *testing.T, reportBytes []byte) []diagnosticReportRecord {
+	t.Helper()
+
+	var payload diagnosticReportPayload
+	if err := json.Unmarshal(reportBytes, &payload); err == nil && len(payload.Records) > 0 {
+		return payload.Records
+	}
+
+	var nested struct {
+		Context diagnosticReportPayload `json:"context"`
+	}
+	if err := json.Unmarshal(reportBytes, &nested); err != nil {
+		t.Fatalf("unmarshal diagnostic report: %v", err)
+	}
+	return nested.Context.Records
 }
