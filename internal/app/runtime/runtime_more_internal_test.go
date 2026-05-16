@@ -287,13 +287,19 @@ func TestNewSyncServiceAndHelperFunctionsCoverBranches(t *testing.T) {
 	var cache = runtimeCacheFixture()
 	var config = runtimeSetupConfigFixture(t, "https://ghostfol.io", true)
 
-	payload := (protectedPayloadBuilder{}).Build(protectedPayloadBuildRequest{Config: config, Cache: cache})
+	payload, err := (protectedPayloadBuilder{}).Build(protectedPayloadBuildRequest{Config: config, Cache: cache})
+	if err != nil {
+		t.Fatalf("build protected payload: %v", err)
+	}
 	if payload.RegisteredLocalUser.LocalUserID == "" {
 		t.Fatalf("expected generated local user id")
 	}
 
 	existing := snapshotmodel.Payload{RegisteredLocalUser: snapshotmodel.RegisteredLocalUser{LocalUserID: "user-1", CreatedAt: time.Unix(1, 0).UTC()}}
-	payload = (protectedPayloadBuilder{}).Build(protectedPayloadBuildRequest{Config: config, Cache: cache, ExistingPayload: existing, HasExisting: true})
+	payload, err = (protectedPayloadBuilder{}).Build(protectedPayloadBuildRequest{Config: config, Cache: cache, ExistingPayload: existing, HasExisting: true})
+	if err != nil {
+		t.Fatalf("build existing protected payload: %v", err)
+	}
 	if payload.RegisteredLocalUser.LocalUserID != "user-1" || payload.RegisteredLocalUser.LastSuccessfulSyncAt != cache.SyncedAt.UTC() {
 		t.Fatalf("expected existing local-user identity to be reused, got %#v", payload.RegisteredLocalUser)
 	}
@@ -306,9 +312,8 @@ func TestNewSyncServiceAndHelperFunctionsCoverBranches(t *testing.T) {
 		readRandom = originalReadRandom
 	}()
 
-	payload = (protectedPayloadBuilder{}).Build(protectedPayloadBuildRequest{Config: config, Cache: cache})
-	if payload.RegisteredLocalUser.LocalUserID != "" {
-		t.Fatalf("expected empty local-user id when identifier generation fails, got %#v", payload.RegisteredLocalUser)
+	if _, err := (protectedPayloadBuilder{}).Build(protectedPayloadBuildRequest{Config: config, Cache: cache}); err == nil {
+		t.Fatalf("expected protected payload build failure when identifier generation fails")
 	}
 	if _, err := randomIdentifier(8); err == nil {
 		t.Fatalf("expected random identifier failure")
@@ -580,8 +585,8 @@ func TestRunCoversMappingNormalizationAndValidationFailures(t *testing.T) {
 		}}
 		service, config := runtimeServiceWithHistoryServer(t, store, true, `{"activities":[],"count":0}`)
 		outcome := service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
-		if outcome.FailureReason != SyncFailureIncompatibleNewSyncData {
-			t.Fatalf("expected incompatible-new-sync-data outcome, got %#v", outcome)
+		if outcome.FailureReason != SyncFailureUnsupportedStoredDataVersion {
+			t.Fatalf("expected unsupported stored-data version persistence outcome, got %#v", outcome)
 		}
 	})
 }

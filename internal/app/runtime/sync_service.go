@@ -337,7 +337,12 @@ func (s *syncService) finalizePersistenceFailure(
 	err error,
 	securityToken string,
 ) SyncOutcome {
-	return s.finalizeSyncFailure(session, attempt, SyncFailureIncompatibleNewSyncData, syncmodel.DiagnosticContext{
+	var reason = SyncFailureIncompatibleNewSyncData
+	if errors.Is(err, snapshotstore.ErrUnsupportedStoredDataVersion) {
+		reason = SyncFailureUnsupportedStoredDataVersion
+	}
+
+	return s.finalizeSyncFailure(session, attempt, reason, syncmodel.DiagnosticContext{
 		FailureStage:  syncmodel.DiagnosticFailureStageProtectedPersistence,
 		FailureDetail: redact.ErrorText(err, securityToken),
 	})

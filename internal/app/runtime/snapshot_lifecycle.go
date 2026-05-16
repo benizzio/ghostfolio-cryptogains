@@ -136,12 +136,15 @@ func (s *snapshotLifecycle) Persist(ctx context.Context, request snapshotPersist
 		return errSnapshotStoreUnavailable
 	}
 
-	var payload = s.payloads.Build(protectedPayloadBuildRequest{
+	payload, err := s.payloads.Build(protectedPayloadBuildRequest{
 		Config:          request.Config,
 		Cache:           request.Cache,
 		ExistingPayload: request.Existing.Payload,
 		HasExisting:     request.Existing.Unlocked,
 	})
+	if err != nil {
+		return err
+	}
 	persistedCandidate, err := s.store.Write(ctx, snapshotstore.WriteRequest{
 		SnapshotID:    request.Existing.Candidate.SnapshotID,
 		SecurityToken: request.SecurityToken,

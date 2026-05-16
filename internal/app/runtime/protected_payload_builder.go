@@ -3,6 +3,8 @@
 package runtime
 
 import (
+	"fmt"
+
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
@@ -24,7 +26,7 @@ type protectedPayloadBuilder struct{}
 
 // Build constructs the protected payload stored after a successful sync.
 // Authored by: OpenCode
-func (protectedPayloadBuilder) Build(request protectedPayloadBuildRequest) snapshotmodel.Payload {
+func (protectedPayloadBuilder) Build(request protectedPayloadBuildRequest) (snapshotmodel.Payload, error) {
 	var now = request.Cache.SyncedAt.UTC()
 	var registeredLocalUser snapshotmodel.RegisteredLocalUser
 	if request.HasExisting {
@@ -32,9 +34,9 @@ func (protectedPayloadBuilder) Build(request protectedPayloadBuildRequest) snaps
 		registeredLocalUser.UpdatedAt = now
 		registeredLocalUser.LastSuccessfulSyncAt = now
 	} else {
-		var localUserID string
-		if generatedID, err := randomIdentifier(16); err == nil {
-			localUserID = generatedID
+		var localUserID, err = randomIdentifier(16)
+		if err != nil {
+			return snapshotmodel.Payload{}, fmt.Errorf("build protected payload local user id: %w", err)
 		}
 		registeredLocalUser = snapshotmodel.RegisteredLocalUser{
 			LocalUserID:          localUserID,
@@ -55,5 +57,5 @@ func (protectedPayloadBuilder) Build(request protectedPayloadBuildRequest) snaps
 			SourceAPIBasePath: "api/v1",
 		},
 		ProtectedActivityCache: request.Cache,
-	}
+	}, nil
 }
