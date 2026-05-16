@@ -183,6 +183,23 @@ func TestSyncResultScreenViewCoversDiagnosticBranches(t *testing.T) {
 	if !strings.Contains(writtenContent, "/tmp/report.diagnostic.json") {
 		t.Fatalf("expected generated-report path disclosure, got %q", writtenContent)
 	}
+
+	var busyContent = SyncResultScreenView(SyncResultScreenParams{
+		Theme:         component.DefaultTheme(),
+		Width:         80,
+		Height:        24,
+		Busy:          true,
+		StatusMessage: "Generating diagnostic report...",
+		MenuItems:     []component.MenuItem{{Label: "Generate Diagnostic Report", Enabled: false}, {Label: "Sync Again", Enabled: false}, {Label: "Back To Main Menu", Enabled: false}},
+		Outcome: runtime.SyncOutcome{
+			Success:       false,
+			FailureReason: runtime.SyncFailureUnsupportedActivityHistory,
+			Diagnostic:    runtime.DiagnosticReportState{Eligible: true},
+		},
+	})
+	if !strings.Contains(busyContent, "Generating a local synced-data diagnostic report") || !strings.Contains(busyContent, "Generating diagnostic report...") {
+		t.Fatalf("expected busy diagnostic-report branch, got %q", busyContent)
+	}
 }
 
 // TestSyncFollowUpTextCoversRemainingFailureBranches verifies the
@@ -206,7 +223,7 @@ func TestSyncFollowUpTextCoversRemainingFailureBranches(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if got := syncFollowUpText(testCase.outcome); !strings.Contains(got, testCase.want) {
+			if got := syncFollowUpText(testCase.outcome, false); !strings.Contains(got, testCase.want) {
 				t.Fatalf("expected follow-up text %q to contain %q", got, testCase.want)
 			}
 		})

@@ -21,6 +21,7 @@ import (
 	syncnormalize "github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
 	syncvalidate "github.com/benizzio/ghostfolio-cryptogains/internal/sync/validate"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 )
 
 func TestSyncDiagnosticReportFlowPromptsInProductionAndWritesOnExplicitChoice(t *testing.T) {
@@ -61,7 +62,12 @@ func TestSyncDiagnosticReportFlowPromptsInProductionAndWritesOnExplicitChoice(t 
 		t.Fatalf("expected no written path before explicit choice, got %q", content)
 	}
 
-	updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = assertFlowModel(t, updated)
+	if !strings.Contains(model.View().Content, "Generating diagnostic report...") {
+		t.Fatalf("expected visible diagnostic-report busy status, got %q", model.View().Content)
+	}
+	updated, _ = model.Update(testutil.RunCmd(cmd))
 	model = assertFlowModel(t, updated)
 	content = model.View().Content
 	if !strings.Contains(content, ".diagnostic.json") {

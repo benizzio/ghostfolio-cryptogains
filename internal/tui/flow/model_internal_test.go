@@ -143,7 +143,9 @@ func TestModelInitAndHelpers(t *testing.T) {
 	model.active = syncResultScreenKey
 	_ = model.View()
 	model.active = activeScreen("unknown")
-	updated, cmd := model.Update(struct{}{})
+	var updated tea.Model
+	var cmd tea.Cmd
+	updated, cmd = model.Update(struct{}{})
 	if cmd != nil || assertUpdatedModel(t, updated).active != activeScreen("unknown") {
 		t.Fatalf("expected unknown active screen to ignore messages")
 	}
@@ -687,7 +689,12 @@ func TestUpdateSyncResultCoversNavigation(t *testing.T) {
 
 	model.active = syncResultScreenKey
 	model.result = resultState{Outcome: runtime.SyncOutcome{Success: false, FailureReason: runtime.SyncFailureUnsupportedActivityHistory, Diagnostic: runtime.DiagnosticReportState{Eligible: true}}}
-	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = updated.(*Model)
+	if !model.result.Busy {
+		t.Fatalf("expected diagnostic report generation to enter busy state")
+	}
+	updated, _ = model.Update(runCmdFlow(cmd))
 	model = updated.(*Model)
 	if model.result.Outcome.Diagnostic.Path == "" {
 		t.Fatalf("expected diagnostic report generation to populate the written path")
@@ -749,20 +756,33 @@ func TestGenerateDiagnosticReportAndServerReplacementIgnoreBranches(t *testing.T
 	model.result = resultState{Outcome: runtime.SyncOutcome{Success: false, FailureReason: runtime.SyncFailureUnsupportedActivityHistory, Diagnostic: runtime.DiagnosticReportState{Eligible: true, Request: runtime.DiagnosticReportRequest{}}}}
 	model.currentConfig = &config
 
-	updated, _ := model.generateDiagnosticReport()
+	updated, cmd := model.generateDiagnosticReport()
+	model = updated.(*Model)
+	if !model.result.Busy || model.result.StatusMessage == "" {
+		t.Fatalf("expected diagnostic generation to enter busy status, got %#v", model.result)
+	}
+	updated, _ = model.Update(runCmdFlow(cmd))
 	model = updated.(*Model)
 	if model.result.Outcome.Diagnostic.Path != "" {
 		t.Fatalf("expected diagnostic path to stay empty on write error, got %#v", model.result.Outcome.Diagnostic)
 	}
+	if model.result.StatusMessage == "" {
+		t.Fatalf("expected diagnostic write error to surface on result screen")
+	}
 
 	model.deps.SyncService = testSyncService{}
-	updated, _ = model.generateDiagnosticReport()
+	updated, cmd = model.generateDiagnosticReport()
 	model = updated.(*Model)
 	if model.result.Outcome.Diagnostic.Request.ServerOrigin != config.ServerOrigin || model.result.Outcome.Diagnostic.Request.Attempt.AttemptID != model.result.Outcome.Attempt.AttemptID {
 		t.Fatalf("expected diagnostic request defaults to be filled, got %#v", model.result.Outcome.Diagnostic.Request)
 	}
+	updated, _ = model.Update(runCmdFlow(cmd))
+	model = updated.(*Model)
+	if model.result.Outcome.Diagnostic.Path == "" {
+		t.Fatalf("expected diagnostic path after successful write, got %#v", model.result.Outcome.Diagnostic)
+	}
 
-	updated, cmd := model.Update(struct{}{})
+	updated, cmd = model.Update(struct{}{})
 	if cmd != nil || updated.(*Model).active != syncResultScreenKey {
 		t.Fatalf("expected non-key sync-result message to be ignored")
 	}

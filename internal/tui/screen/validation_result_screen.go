@@ -25,6 +25,8 @@ type SyncResultScreenParams struct {
 	MenuItems     []component.MenuItem
 	SelectedIndex int
 	Outcome       runtime.SyncOutcome
+	Busy          bool
+	StatusMessage string
 	HelpText      string
 }
 
@@ -54,9 +56,11 @@ func SyncResultScreenView(params SyncResultScreenParams) string {
 		"%s\n\n%s\n\n%s\n\n%s",
 		resultLine,
 		syncSummaryText(params.Outcome),
-		syncFollowUpText(params.Outcome),
+		syncFollowUpText(params.Outcome, params.Busy),
 		component.RenderMenu(params.Theme, params.MenuItems, params.SelectedIndex),
 	)
+
+	var status = resultStatusText(params.Outcome, params.StatusMessage)
 
 	return component.RenderScreen(
 		params.Theme,
@@ -65,7 +69,7 @@ func SyncResultScreenView(params SyncResultScreenParams) string {
 		"Sync Result",
 		"Review the protected-storage outcome and choose the next step.",
 		body,
-		"Results are transient and are not shown again after restart.",
+		status,
 		params.HelpText,
 	)
 }
@@ -83,9 +87,12 @@ func syncSummaryText(outcome runtime.SyncOutcome) string {
 // syncFollowUpText converts the structured sync outcome into the
 // secondary guidance shown on the TUI result screen.
 // Authored by: OpenCode
-func syncFollowUpText(outcome runtime.SyncOutcome) string {
+func syncFollowUpText(outcome runtime.SyncOutcome, busy bool) string {
 	if outcome.Success {
 		return "No report-generation, report-preview, or cached-data browsing workflow is available in this slice."
+	}
+	if busy {
+		return "Generating a local synced-data diagnostic report for this failure."
 	}
 
 	if outcome.Diagnostic.Path != "" {
@@ -111,4 +118,16 @@ func syncFollowUpText(outcome runtime.SyncOutcome) string {
 	default:
 		return "Sync again or return to the main menu. No protected activity data was stored."
 	}
+}
+
+// resultStatusText renders transient result-screen status feedback.
+// Authored by: OpenCode
+func resultStatusText(outcome runtime.SyncOutcome, statusMessage string) string {
+	if statusMessage != "" {
+		return statusMessage
+	}
+	if outcome.Diagnostic.Path != "" {
+		return "Results are transient and are not shown again after restart."
+	}
+	return "Results are transient and are not shown again after restart."
 }

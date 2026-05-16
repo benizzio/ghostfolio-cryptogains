@@ -4,8 +4,6 @@
 package flow
 
 import (
-	"context"
-
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
@@ -86,8 +84,16 @@ func (m *Model) updateMainMenu(message tea.Msg) (tea.Model, tea.Cmd) {
 // updateSyncResult handles sync-result navigation.
 // Authored by: OpenCode
 func (m *Model) updateSyncResult(message tea.Msg) (tea.Model, tea.Cmd) {
+	switch typedMessage := message.(type) {
+	case diagnosticReportFinishedMsg:
+		return m.handleDiagnosticReportFinished(typedMessage)
+	}
+
 	var keyMessage, ok = message.(tea.KeyPressMsg)
 	if !ok {
+		return m, nil
+	}
+	if m.result.Busy {
 		return m, nil
 	}
 
@@ -133,13 +139,24 @@ func (m *Model) generateDiagnosticReport() (tea.Model, tea.Cmd) {
 	if request.Attempt.AttemptID == "" {
 		request.Attempt = m.result.Outcome.Attempt
 	}
-	path, err := m.deps.SyncService.GenerateDiagnosticReport(context.Background(), request)
-	if err != nil {
+	m.result.Outcome.Diagnostic.Request = request
+	m.result.Busy = true
+	m.result.StatusMessage = "Generating diagnostic report..."
+	return m, m.generateDiagnosticReportCmd(request)
+}
+
+// handleDiagnosticReportFinished applies the result of one async
+// diagnostic-report write request.
+// Authored by: OpenCode
+func (m *Model) handleDiagnosticReportFinished(message diagnosticReportFinishedMsg) (tea.Model, tea.Cmd) {
+	m.result.Busy = false
+	if message.Err != nil {
+		m.result.StatusMessage = "Diagnostic report generation failed. Try again."
 		return m, nil
 	}
 
-	m.result.Outcome.Diagnostic.Path = path
-	m.result.Outcome.Diagnostic.Request = request
+	m.result.Outcome.Diagnostic.Path = message.Path
+	m.result.StatusMessage = "Diagnostic report generated successfully."
 	return m, nil
 }
 

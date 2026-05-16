@@ -53,6 +53,14 @@ type syncFinishedMsg struct {
 	Attempt string
 }
 
+// diagnosticReportFinishedMsg reports the result of an asynchronous
+// diagnostic-report write request.
+// Authored by: OpenCode
+type diagnosticReportFinishedMsg struct {
+	Path string
+	Err  error
+}
+
 // Dependencies contains the runtime services required by the root Bubble Tea
 // model.
 //
@@ -100,8 +108,10 @@ type serverReplacementState struct {
 // resultState holds transient UI state for the sync-result screen.
 // Authored by: OpenCode
 type resultState struct {
-	MenuIndex int
-	Outcome   runtime.SyncOutcome
+	MenuIndex     int
+	Outcome       runtime.SyncOutcome
+	Busy          bool
+	StatusMessage string
 }
 
 // Model is the root Bubble Tea model for the application workflow.
@@ -280,6 +290,8 @@ func (m *Model) View() tea.View {
 				MenuItems:     m.resultMenuItems(),
 				SelectedIndex: m.result.MenuIndex,
 				Outcome:       m.result.Outcome,
+				Busy:          m.result.Busy,
+				StatusMessage: m.result.StatusMessage,
 				HelpText:      m.resultHelpText(),
 			},
 		)
@@ -354,6 +366,13 @@ func (m *Model) syncMenuItems() []component.MenuItem {
 // resultMenuItems builds the primary sync-result actions for the current render.
 // Authored by: OpenCode
 func (m *Model) resultMenuItems() []component.MenuItem {
+	if m.result.Busy {
+		return []component.MenuItem{
+			{Label: "Generate Diagnostic Report", Enabled: false},
+			{Label: "Sync Again", Enabled: false},
+			{Label: "Back To Main Menu", Enabled: false},
+		}
+	}
 	if m.result.Outcome.Diagnostic.Eligible && m.result.Outcome.Diagnostic.Path == "" {
 		return []component.MenuItem{
 			{Label: "Generate Diagnostic Report", Enabled: true},
@@ -491,7 +510,7 @@ func (m *Model) enterSetup(message string, startupReason bootstrap.SetupRequirem
 // Authored by: OpenCode
 func (m *Model) enterMainMenu() {
 	m.active = mainMenuScreenKey
-	m.result.MenuIndex = 0
+	m.result = resultState{}
 	m.sync = newSyncState()
 	m.sync.InputFocused = false
 	m.setup.ValidationMessage = ""
@@ -524,6 +543,16 @@ func (m *Model) enterSyncResult(outcome runtime.SyncOutcome) {
 	m.result = resultState{Outcome: outcome}
 	if outcome.Success {
 		m.result.MenuIndex = 1
+	}
+}
+
+// generateDiagnosticReportCmd delegates one result-screen diagnostic-report
+// write request to the runtime service.
+// Authored by: OpenCode
+func (m *Model) generateDiagnosticReportCmd(request runtime.DiagnosticReportRequest) tea.Cmd {
+	return func() tea.Msg {
+		path, err := m.deps.SyncService.GenerateDiagnosticReport(context.Background(), request)
+		return diagnosticReportFinishedMsg{Path: path, Err: err}
 	}
 }
 
