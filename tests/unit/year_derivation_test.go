@@ -11,9 +11,18 @@ import (
 func TestYearDerivationUsesSourceTimestampOffset(t *testing.T) {
 	t.Parallel()
 
-	quantity, _, _ := decimalsupport.ParseString("1")
-	unitPrice, _, _ := decimalsupport.ParseString("10")
-	grossValue, _, _ := decimalsupport.ParseString("10")
+	quantity, _, err := decimalsupport.ParseString("1")
+	if err != nil {
+		t.Fatalf("parse quantity: %v", err)
+	}
+	unitPrice, _, err := decimalsupport.ParseString("10")
+	if err != nil {
+		t.Fatalf("parse unit price: %v", err)
+	}
+	grossValue, _, err := decimalsupport.ParseString("10")
+	if err != nil {
+		t.Fatalf("parse gross value: %v", err)
+	}
 
 	cache, err := syncnormalize.NewNormalizer().Normalize([]syncmodel.ActivityRecord{
 		{SourceID: "activity-1", OccurredAt: "2024-12-31T23:30:00-02:00", ActivityType: syncmodel.ActivityTypeBuy, AssetSymbol: "BTC", Quantity: quantity, UnitPrice: unitPrice, GrossValue: grossValue},
