@@ -166,12 +166,12 @@ func MapActivity(entry dto.ActivityPageEntry, decimalService decimalsupport.Serv
 		return syncmodel.ActivityRecord{}, fmt.Errorf("map activity quantity: %w", err)
 	}
 
-	unitPrice, _, err := decimalService.ParseNumber(entry.UnitPriceInAssetProfileCurrency)
+	grossValue, err := parseGrossValue(entry, decimalService)
 	if err != nil {
-		return syncmodel.ActivityRecord{}, fmt.Errorf("map activity unit price: %w", err)
+		return syncmodel.ActivityRecord{}, err
 	}
 
-	grossValue, err := parseGrossValue(entry, decimalService)
+	unitPrice, err := parseUnitPrice(entry, quantity, grossValue, decimalService)
 	if err != nil {
 		return syncmodel.ActivityRecord{}, err
 	}
@@ -196,6 +196,44 @@ func MapActivity(entry dto.ActivityPageEntry, decimalService decimalsupport.Serv
 		DataSource:   strings.TrimSpace(entry.DataSource),
 		SourceScope:  mapSourceScope(entry),
 	}, nil
+}
+
+// parseUnitPrice selects the explicit unit price when present and otherwise
+// derives it from the supported gross-value field and quantity.
+// Authored by: OpenCode
+func parseUnitPrice(
+	entry dto.ActivityPageEntry,
+	quantity apd.Decimal,
+	grossValue apd.Decimal,
+	decimalService decimalsupport.Service,
+) (apd.Decimal, error) {
+	if strings.TrimSpace(entry.UnitPriceInAssetProfileCurrency.String()) != "" {
+		unitPrice, _, err := decimalService.ParseNumber(entry.UnitPriceInAssetProfileCurrency)
+		if err != nil {
+			return apd.Decimal{}, fmt.Errorf("map activity unit price: %w", err)
+		}
+
+		return unitPrice, nil
+	}
+
+	unitPrice, err := deriveUnitPrice(quantity, grossValue)
+	if err != nil {
+		return apd.Decimal{}, fmt.Errorf("map activity unit price: %w", err)
+	}
+
+	return unitPrice, nil
+}
+
+// deriveUnitPrice preserves exact-decimal precision when a supported activity
+// omits the explicit unit-price field.
+// Authored by: OpenCode
+func deriveUnitPrice(quantity apd.Decimal, grossValue apd.Decimal) (apd.Decimal, error) {
+	unitPrice, _, err := decimalsupport.DivideExact(grossValue, quantity)
+	if err != nil {
+		return apd.Decimal{}, fmt.Errorf("derive unit price from gross value and quantity: %w", err)
+	}
+
+	return unitPrice, nil
 }
 
 // parseGrossValue selects the supported gross-value field for one activity.

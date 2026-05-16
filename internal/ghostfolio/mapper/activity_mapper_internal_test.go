@@ -60,6 +60,7 @@ func TestMapActivityHandlesOptionalValuesAndScopeBranches(t *testing.T) {
 
 	entry := validActivityPageEntry()
 	entry.ValueInBaseCurrency = json.Number("")
+	entry.UnitPriceInAssetProfileCurrency = json.Number("")
 	entry.FeeInBaseCurrency = json.Number("")
 	entry.Account = nil
 	record, err = MapActivity(entry, decimalsupport.NewService())
@@ -72,6 +73,13 @@ func TestMapActivityHandlesOptionalValuesAndScopeBranches(t *testing.T) {
 	}
 	if grossValue != "120" {
 		t.Fatalf("expected fallback gross value from activity value, got %s", grossValue)
+	}
+	unitPrice, err := decimalsupport.CanonicalString(record.UnitPrice)
+	if err != nil {
+		t.Fatalf("canonical derived unit price: %v", err)
+	}
+	if unitPrice != "80" {
+		t.Fatalf("expected derived unit price from gross value and quantity, got %s", unitPrice)
 	}
 	if record.FeeAmount != nil {
 		t.Fatalf("expected nil fee amount when absent, got %#v", record.FeeAmount)
@@ -148,6 +156,15 @@ func TestMappingErrorAndParseHelpersCoverRemainingBranches(t *testing.T) {
 	fallbackGrossInvalid.Value = json.Number("bad")
 	if _, err := parseGrossValue(fallbackGrossInvalid, decimalsupport.NewService()); err == nil {
 		t.Fatalf("expected fallback gross-value parse failure")
+	}
+
+	derivedUnitPriceInvalid := validActivityPageEntry()
+	derivedUnitPriceInvalid.UnitPriceInAssetProfileCurrency = json.Number("")
+	derivedUnitPriceInvalid.ValueInBaseCurrency = json.Number("")
+	derivedUnitPriceInvalid.Value = json.Number("1")
+	derivedUnitPriceInvalid.Quantity = json.Number("3")
+	if _, err := MapActivity(derivedUnitPriceInvalid, decimalsupport.NewService()); err == nil {
+		t.Fatalf("expected derived unit-price failure")
 	}
 
 	if _, err := parseOptionalNumber(json.Number("bad"), decimalsupport.NewService()); err == nil {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/dto"
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 )
 
 // ValidateAuthResponse verifies that the anonymous-auth response satisfies the
@@ -173,8 +174,43 @@ func requireBasisInput(entry dto.ActivityPageEntry) error {
 		strings.TrimSpace(entry.ValueInBaseCurrency.String()) == "" {
 		return fmt.Errorf("activity basis input is required")
 	}
+	if strings.TrimSpace(entry.UnitPriceInAssetProfileCurrency.String()) == "" {
+		if err := requireDerivableUnitPrice(entry); err != nil {
+			return err
+		}
+	}
 
 	return nil
+}
+
+// requireDerivableUnitPrice ensures that gross-value-only inputs can still be
+// normalized into an exact unit price.
+// Authored by: OpenCode
+func requireDerivableUnitPrice(entry dto.ActivityPageEntry) error {
+	quantity, _, err := decimalsupport.ParseNumber(entry.Quantity)
+	if err != nil {
+		return fmt.Errorf("activity quantity must remain readable for basis derivation: %w", err)
+	}
+	grossValue, _, err := decimalsupport.ParseNumber(selectGrossValue(entry))
+	if err != nil {
+		return fmt.Errorf("activity basis input must support exact unit-price derivation: %w", err)
+	}
+	if _, _, err := decimalsupport.DivideExact(grossValue, quantity); err != nil {
+		return fmt.Errorf("activity basis input must support exact unit-price derivation: %w", err)
+	}
+
+	return nil
+}
+
+// selectGrossValue applies the shared DTO gross-value fallback rule for
+// contract validation.
+// Authored by: OpenCode
+func selectGrossValue(entry dto.ActivityPageEntry) json.Number {
+	if strings.TrimSpace(entry.ValueInBaseCurrency.String()) != "" {
+		return entry.ValueInBaseCurrency
+	}
+
+	return entry.Value
 }
 
 // requireJSONNumber verifies that one required JSON number is present and

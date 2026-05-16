@@ -6,6 +6,7 @@ package decimal
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strings"
 
 	"github.com/cockroachdb/apd/v3"
@@ -122,6 +123,44 @@ func ParseNumber(raw json.Number) (apd.Decimal, string, error) {
 	return ParseString(raw.String())
 }
 
+// DivideExact divides one finite decimal by another and returns the exact
+// quotient and its canonical persisted representation.
+//
+// Example:
+//
+//	dividend, _, _ := decimal.ParseString("120")
+//	divisor, _, _ := decimal.ParseString("1.5")
+//	quotient, canonical, err := decimal.DivideExact(dividend, divisor)
+//	if err != nil {
+//		panic(err)
+//	}
+//	_, _ = quotient, canonical
+//
+// Authored by: OpenCode
+func DivideExact(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, string, error) {
+	dividendRat, err := finiteDecimalToRat(dividend)
+	if err != nil {
+		return apd.Decimal{}, "", fmt.Errorf("prepare dividend for exact division: %w", err)
+	}
+	divisorRat, err := finiteDecimalToRat(divisor)
+	if err != nil {
+		return apd.Decimal{}, "", fmt.Errorf("prepare divisor for exact division: %w", err)
+	}
+	if divisorRat.Sign() == 0 {
+		return apd.Decimal{}, "", fmt.Errorf("exact division requires a non-zero divisor")
+	}
+
+	var quotientRat big.Rat
+	quotientRat.Quo(dividendRat, divisorRat)
+
+	canonical, err := exactDecimalString(&quotientRat)
+	if err != nil {
+		return apd.Decimal{}, "", fmt.Errorf("exact decimal division: %w", err)
+	}
+
+	return ParseString(canonical)
+}
+
 // CanonicalString converts one exact decimal into its canonical persisted
 // string form.
 //
@@ -182,4 +221,76 @@ func normalizeFiniteDecimal(value *apd.Decimal) (apd.Decimal, string, error) {
 	reduced.Reduce(value)
 
 	return reduced, reduced.Text('f'), nil
+}
+
+// finiteDecimalToRat converts one finite decimal into an exact rational value.
+// Authored by: OpenCode
+func finiteDecimalToRat(value apd.Decimal) (*big.Rat, error) {
+	normalized, _, err := normalizeFiniteDecimal(&value)
+	if err != nil {
+		return nil, err
+	}
+
+	var numerator = new(big.Int).Set(normalized.Coeff.MathBigInt())
+	if normalized.Negative {
+		numerator.Neg(numerator)
+	}
+	if normalized.Exponent >= 0 {
+		numerator.Mul(numerator, powerOfTen(int64(normalized.Exponent)))
+		return new(big.Rat).SetInt(numerator), nil
+	}
+
+	var denominator = powerOfTen(int64(-normalized.Exponent))
+	return new(big.Rat).SetFrac(numerator, denominator), nil
+}
+
+// exactDecimalString verifies that one rational value has a terminating decimal
+// expansion and returns it in fixed-point form.
+// Authored by: OpenCode
+func exactDecimalString(value *big.Rat) (string, error) {
+	if value == nil {
+		return "", fmt.Errorf("decimal value is required")
+	}
+
+	var denominator = new(big.Int).Set(value.Denom())
+	var twos int
+	var fives int
+	twos, denominator = countPrimeFactor(denominator, 2)
+	fives, denominator = countPrimeFactor(denominator, 5)
+	if denominator.Cmp(big.NewInt(1)) != 0 {
+		return "", fmt.Errorf("division is inexact")
+	}
+
+	var scale = twos
+	if fives > scale {
+		scale = fives
+	}
+
+	return value.FloatString(scale), nil
+}
+
+// countPrimeFactor removes repeated factors from one positive integer.
+// Authored by: OpenCode
+func countPrimeFactor(value *big.Int, factor int64) (int, *big.Int) {
+	var remaining = new(big.Int).Set(value)
+	var divisor = big.NewInt(factor)
+	var remainder big.Int
+	var count int
+
+	for remaining.Sign() != 0 {
+		remainder.Mod(remaining, divisor)
+		if remainder.Sign() != 0 {
+			break
+		}
+		remaining.Quo(remaining, divisor)
+		count++
+	}
+
+	return count, remaining
+}
+
+// powerOfTen returns 10 raised to one non-negative integer exponent.
+// Authored by: OpenCode
+func powerOfTen(power int64) *big.Int {
+	return new(big.Int).Exp(big.NewInt(10), big.NewInt(power), nil)
 }

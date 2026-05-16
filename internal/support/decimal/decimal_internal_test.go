@@ -7,6 +7,9 @@ import (
 	"github.com/cockroachdb/apd/v3"
 )
 
+// TestExactServiceAndPackageHelpersCoverSuccessAndErrorBranches verifies the
+// package helper coverage for parsing, canonicalization, and exact division.
+// Authored by: OpenCode
 func TestExactServiceAndPackageHelpersCoverSuccessAndErrorBranches(t *testing.T) {
 	t.Parallel()
 
@@ -52,6 +55,25 @@ func TestExactServiceAndPackageHelpersCoverSuccessAndErrorBranches(t *testing.T)
 		t.Fatalf("unexpected trimmed canonical string: %q", canonical)
 	}
 
+	dividend, _, err := ParseString("120")
+	if err != nil {
+		t.Fatalf("parse exact-division dividend: %v", err)
+	}
+	divisor, _, err := ParseString("1.5")
+	if err != nil {
+		t.Fatalf("parse exact-division divisor: %v", err)
+	}
+	quotient, canonical, err := DivideExact(dividend, divisor)
+	if err != nil {
+		t.Fatalf("exact division: %v", err)
+	}
+	if canonical != "80" {
+		t.Fatalf("unexpected exact-division canonical string: %q", canonical)
+	}
+	if got, err := CanonicalString(quotient); err != nil || got != "80" {
+		t.Fatalf("unexpected exact-division quotient: %q err=%v", got, err)
+	}
+
 	if _, _, err := ParseString(""); err == nil {
 		t.Fatalf("expected empty decimal string to fail")
 	}
@@ -63,6 +85,20 @@ func TestExactServiceAndPackageHelpersCoverSuccessAndErrorBranches(t *testing.T)
 	}
 	if _, _, err := ParseNumber(json.Number("not-a-number")); err == nil {
 		t.Fatalf("expected invalid json number to fail")
+	}
+	if _, _, err := DivideExact(dividend, apd.Decimal{}); err == nil {
+		t.Fatalf("expected zero-divisor exact division to fail")
+	}
+	inexactDivisor, _, err := ParseString("3")
+	if err != nil {
+		t.Fatalf("parse inexact divisor: %v", err)
+	}
+	inexactDividend, _, err := ParseString("1")
+	if err != nil {
+		t.Fatalf("parse inexact dividend: %v", err)
+	}
+	if _, _, err := DivideExact(inexactDividend, inexactDivisor); err == nil {
+		t.Fatalf("expected inexact exact division to fail")
 	}
 	if got, err := CanonicalStringPointer(nil); err != nil || got != "" {
 		t.Fatalf("expected nil pointer canonicalization to return empty string, got %q err=%v", got, err)
