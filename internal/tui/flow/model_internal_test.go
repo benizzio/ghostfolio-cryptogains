@@ -560,6 +560,9 @@ func TestUpdateSyncRoutesToServerReplacementWhenRequired(t *testing.T) {
 	if model.active != syncResultScreenKey {
 		t.Fatalf("expected cancellation to route to result screen")
 	}
+	if model.replacement.PendingToken != "" {
+		t.Fatalf("expected cancellation to scrub pending token")
+	}
 	if model.result.Outcome.FailureReason != runtime.SyncFailureServerReplacementCancelled {
 		t.Fatalf("expected cancellation outcome, got %#v", model.result.Outcome)
 	}
@@ -576,6 +579,9 @@ func TestUpdateSyncRoutesToServerReplacementWhenRequired(t *testing.T) {
 		t.Fatalf("expected confirmed replacement to start async sync")
 	}
 	model = updated.(*Model)
+	if model.replacement.PendingToken != "" {
+		t.Fatalf("expected confirmed replacement to scrub pending token")
+	}
 	if model.active != syncScreenKey || !model.sync.Busy {
 		t.Fatalf("expected confirmed replacement to resume sync busy state")
 	}

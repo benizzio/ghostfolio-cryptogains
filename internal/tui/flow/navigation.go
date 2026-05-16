@@ -181,6 +181,7 @@ func (m *Model) updateServerReplacement(message tea.Msg) (tea.Model, tea.Cmd) {
 		if m.replacement.MenuIndex == 0 {
 			return m.startConfirmedServerReplacement()
 		}
+		m.replacement.PendingToken = ""
 		m.sync.TokenInput.Reset()
 		m.enterSyncResult(runtime.SyncOutcome{Success: false, FailureReason: runtime.SyncFailureServerReplacementCancelled, DetailReason: string(runtime.SyncFailureServerReplacementCancelled)})
 	}

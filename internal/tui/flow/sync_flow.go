@@ -237,7 +237,9 @@ func (m *Model) startSyncAttempt(token string, confirmServerReplacement bool) (t
 // startConfirmedServerReplacement resumes sync after explicit server-replacement confirmation.
 // Authored by: OpenCode
 func (m *Model) startConfirmedServerReplacement() (tea.Model, tea.Cmd) {
-	return m.startSyncAttempt(m.replacement.PendingToken, true)
+	var token = m.replacement.PendingToken
+	m.replacement.PendingToken = ""
+	return m.startSyncAttempt(token, true)
 }
 
 // leaveSync clears transient token state and returns to the main
