@@ -84,6 +84,10 @@ func (defaultValidator) Validate(cache syncmodel.ProtectedActivityCache) error {
 	var runningQuantityByAsset = map[string]apd.Decimal{}
 
 	for _, record := range cache.Activities {
+		if strings.TrimSpace(record.OccurredAt) == "" {
+			return newValidationError("normalized activity timestamp is incomplete", record)
+		}
+
 		occurredAt, err := time.Parse(time.RFC3339Nano, record.OccurredAt)
 		if err != nil {
 			return newValidationError(fmt.Sprintf("activity %q has an unreadable timestamp: %v", record.SourceID, err), record)
@@ -115,9 +119,6 @@ func (defaultValidator) Validate(cache syncmodel.ProtectedActivityCache) error {
 
 		if strings.TrimSpace(record.SourceID) == "" || strings.TrimSpace(record.AssetSymbol) == "" {
 			return newValidationError("normalized activity identity is incomplete", record)
-		}
-		if strings.TrimSpace(record.OccurredAt) == "" {
-			return newValidationError("normalized activity timestamp is incomplete", record)
 		}
 		if record.Quantity.Cmp(&zero) <= 0 {
 			return newValidationError(fmt.Sprintf("activity %q quantity must be greater than zero", record.SourceID), record)
