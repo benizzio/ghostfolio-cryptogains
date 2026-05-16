@@ -11,6 +11,17 @@ import (
 
 // DiscoverServerCandidates filters discovered snapshot headers to the currently
 // selected Ghostfolio server.
+//
+// Example:
+//
+//	candidates, err := store.DiscoverServerCandidates(context.Background(), snapshots, "https://ghostfol.io")
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = len(candidates)
+//
+// Use this helper before token unlock attempts so the runtime only tries
+// selected-server snapshot candidates.
 // Authored by: OpenCode
 func DiscoverServerCandidates(ctx context.Context, snapshots Store, serverOrigin string) ([]Candidate, error) {
 	if snapshots == nil {

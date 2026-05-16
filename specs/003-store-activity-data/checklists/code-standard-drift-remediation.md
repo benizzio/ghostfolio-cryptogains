@@ -12,6 +12,12 @@
 ## Medium Priority
 
 - [x] DRIFT-003 Rename or update validation-only and probe-oriented types, aliases, and AI-authored comments so runtime, Ghostfolio client, DTO, and TUI workflow names describe the full-history protected-storage flow accurately.
+- [x] DRIFT-004 Move user-facing failure taxonomy and English outcome text out of `internal/ghostfolio/client/client.go` so the transport boundary returns boundary-focused failures and the application layer owns user-visible sync outcomes.
+- [x] DRIFT-005 Extract shared `dto.ActivityPageEntry` normalization helpers in `internal/ghostfolio/mapper/activity_mapper.go` so `ActivityRecord` and `DiagnosticRecord` mapping reuse the same gross-value and source-scope rules.
+
+## Low Priority
+
+- [x] DRIFT-006 Expand the exported snapshot envelope and store API comments in `internal/snapshot/envelope/codec.go` and `internal/snapshot/store/*.go` to include the detailed AI-authored usage guidance and examples required by the repository baseline.
 
 ## Closure Criteria
 

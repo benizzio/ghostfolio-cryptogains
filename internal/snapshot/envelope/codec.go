@@ -55,14 +55,35 @@ type JSONCodec struct{}
 // Example:
 //
 //	codec := envelope.NewJSONCodec()
-//	_, _ = codec.Encode(snapshotmodel.Envelope{})
+//	rawEnvelope, err := codec.Encode(snapshotmodel.Envelope{Header: header, Ciphertext: ciphertext})
+//	if err != nil {
+//		panic(err)
+//	}
+//	decodedEnvelope, err := codec.Decode(rawEnvelope)
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = decodedEnvelope.Header.FormatVersion
 //
+// Use this constructor when snapshot code needs the repository-standard JSON
+// envelope format with a readable authenticated header and opaque ciphertext.
 // Authored by: OpenCode
 func NewJSONCodec() Codec {
 	return JSONCodec{}
 }
 
 // Encode serializes one protected snapshot envelope.
+//
+// Example:
+//
+//	rawEnvelope, err := envelope.NewJSONCodec().Encode(snapshotmodel.Envelope{Header: header, Ciphertext: ciphertext})
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = rawEnvelope
+//
+// Encode is intended for snapshot stores that already prepared a validated
+// header and encrypted payload and now need one on-disk document.
 // Authored by: OpenCode
 func (JSONCodec) Encode(envelope snapshotmodel.Envelope) ([]byte, error) {
 	if err := validateEnvelopeHeader(envelope.Header); err != nil {
@@ -81,6 +102,17 @@ func (JSONCodec) Encode(envelope snapshotmodel.Envelope) ([]byte, error) {
 }
 
 // Decode deserializes one protected snapshot envelope.
+//
+// Example:
+//
+//	envelopeDocument, err := envelope.NewJSONCodec().Decode(rawEnvelope)
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = envelopeDocument.Ciphertext
+//
+// Decode is intended for snapshot discovery and read paths that must inspect a
+// cleartext header before any decryption attempt.
 // Authored by: OpenCode
 func (JSONCodec) Decode(raw []byte) (snapshotmodel.Envelope, error) {
 	var envelope snapshotmodel.Envelope
@@ -142,6 +174,17 @@ func AuthenticatedHeaderBytes(header snapshotmodel.EnvelopeHeader) ([]byte, erro
 // DeriveEncryptionKey derives the AES-256 encryption key for one protected
 // snapshot header and supplied runtime token.
 //
+// Example:
+//
+//	key, err := envelope.DeriveEncryptionKey(header, "token")
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = len(key)
+//
+// Use this helper only for snapshot cryptography. It binds the runtime token to
+// the persisted Argon2id settings and random salt stored in the cleartext
+// header.
 // Authored by: OpenCode
 func DeriveEncryptionKey(header snapshotmodel.EnvelopeHeader, securityToken string) ([]byte, error) {
 	if strings.TrimSpace(securityToken) == "" {
@@ -166,6 +209,16 @@ func DeriveEncryptionKey(header snapshotmodel.EnvelopeHeader, securityToken stri
 // SealCiphertext encrypts one payload and authenticates the cleartext header as
 // AEAD additional authenticated data.
 //
+// Example:
+//
+//	ciphertext, err := envelope.SealCiphertext(header, "token", payloadBytes)
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = ciphertext
+//
+// SealCiphertext should be used by snapshot writes after the caller has built a
+// complete header and serialized the protected payload bytes.
 // Authored by: OpenCode
 func SealCiphertext(header snapshotmodel.EnvelopeHeader, securityToken string, plaintext []byte) ([]byte, error) {
 	var aead, authenticatedHeader, err = prepareAEAD(header, securityToken)
@@ -179,6 +232,16 @@ func SealCiphertext(header snapshotmodel.EnvelopeHeader, securityToken string, p
 // OpenCiphertext decrypts one payload and authenticates the cleartext header as
 // AEAD additional authenticated data.
 //
+// Example:
+//
+//	plaintext, err := envelope.OpenCiphertext(header, "token", ciphertext)
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = plaintext
+//
+// OpenCiphertext should be used by snapshot read paths after discovery and
+// compatibility checks accept the cleartext header.
 // Authored by: OpenCode
 func OpenCiphertext(header snapshotmodel.EnvelopeHeader, securityToken string, ciphertext []byte) ([]byte, error) {
 	if len(ciphertext) == 0 {

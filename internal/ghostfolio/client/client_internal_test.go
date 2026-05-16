@@ -17,16 +17,19 @@ func (timeoutError) Temporary() bool { return false }
 func TestRequestFailureHelpers(t *testing.T) {
 	t.Parallel()
 
-	var err = &RequestFailure{Category: FailureTimeout, Message: "timeout", Err: context.DeadlineExceeded}
-	if err.Error() != "timeout" {
+	var err = &RequestFailure{Category: FailureTimeout, Detail: "ghostfolio request deadline exceeded", Err: context.DeadlineExceeded}
+	if err.Error() != "ghostfolio request deadline exceeded" {
 		t.Fatalf("unexpected error text: %q", err.Error())
 	}
 	if !errors.Is(err.Unwrap(), context.DeadlineExceeded) {
 		t.Fatalf("unexpected unwrap value")
 	}
 
-	if got := (&RequestFailure{Category: FailureRejectedToken}).Error(); got != string(FailureRejectedToken) {
+	if got := (&RequestFailure{Category: FailureRejectedToken, Operation: "anonymous auth", StatusCode: http.StatusForbidden}).Error(); got != "anonymous auth returned HTTP 403" {
 		t.Fatalf("unexpected default error text: %q", got)
+	}
+	if got := (*RequestFailure)(nil).Error(); got != "" {
+		t.Fatalf("unexpected nil error text: %q", got)
 	}
 }
 

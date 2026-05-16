@@ -153,6 +153,9 @@ type FilesystemStore struct {
 //	snapshots := store.NewFilesystemStore("/tmp/config", codec)
 //	_ = snapshots.Directory()
 //
+// Use this constructor when code needs snapshot path resolution, cleartext
+// header discovery, or atomic replacement helpers without owning payload
+// encryption and decryption itself.
 // Authored by: OpenCode
 func NewFilesystemStore(baseConfigDir string, codec snapshotenvelope.Codec) *FilesystemStore {
 	if codec == nil {
@@ -167,6 +170,13 @@ func NewFilesystemStore(baseConfigDir string, codec snapshotenvelope.Codec) *Fil
 
 // Directory returns the protected snapshot directory path.
 //
+// Example:
+//
+//	directory := store.NewFilesystemStore("/tmp/config", nil).Directory()
+//	_ = directory
+//
+// The returned path is where protected snapshot files are discovered and
+// written for the provided base config directory.
 // Authored by: OpenCode
 func (s *FilesystemStore) Directory() string {
 	return s.directory
@@ -174,6 +184,13 @@ func (s *FilesystemStore) Directory() string {
 
 // SnapshotPath resolves the full protected snapshot file path for one opaque snapshot identifier.
 //
+// Example:
+//
+//	path := store.NewFilesystemStore("/tmp/config", nil).SnapshotPath("snapshot-1")
+//	_ = path
+//
+// Snapshot identifiers stay opaque. Callers should not derive user-readable or
+// server-derived names before writing files through this helper.
 // Authored by: OpenCode
 func (s *FilesystemStore) SnapshotPath(snapshotID string) string {
 	return filepath.Join(s.directory, snapshotID+SnapshotFileExtension)
@@ -181,6 +198,16 @@ func (s *FilesystemStore) SnapshotPath(snapshotID string) string {
 
 // Candidates enumerates protected snapshot files and decodes their cleartext headers.
 //
+// Example:
+//
+//	candidates, err := snapshots.Candidates(context.Background())
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = len(candidates)
+//
+// Candidates is intended for discovery flows that need server-scoped filtering
+// before any token-derived decrypt attempt.
 // Authored by: OpenCode
 func (s *FilesystemStore) Candidates(ctx context.Context) ([]Candidate, error) {
 	if err := ctx.Err(); err != nil {
@@ -256,6 +283,9 @@ func (s *FilesystemStore) Write(_ context.Context, _ WriteRequest) (Candidate, e
 //		panic(err)
 //	}
 //
+// Use this helper for protected snapshot artifacts only. It preserves the
+// previous readable file until the replacement bytes are fully written and the
+// rename succeeds.
 // Authored by: OpenCode
 func ReplaceFileAtomically(path string, contents []byte) error {
 	var parentDirectory = filepath.Dir(path)

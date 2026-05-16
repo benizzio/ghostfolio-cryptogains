@@ -43,6 +43,9 @@ type EncryptedStore struct {
 //	store := store.NewEncryptedStore("/tmp/config", envelope.NewJSONCodec())
 //	_, _ = store.Candidates(context.Background())
 //
+// Use this constructor for the runtime sync workflow when discovery, decrypt,
+// compatibility validation, encryption, and atomic replacement should stay
+// behind one snapshot-store boundary.
 // Authored by: OpenCode
 func NewEncryptedStore(baseConfigDir string, codec snapshotenvelope.Codec) Store {
 	var filesystem = NewFilesystemStore(baseConfigDir, codec)
@@ -50,12 +53,36 @@ func NewEncryptedStore(baseConfigDir string, codec snapshotenvelope.Codec) Store
 }
 
 // Candidates enumerates protected snapshot headers before decrypt.
+//
+// Example:
+//
+//	candidates, err := store.Candidates(context.Background())
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = len(candidates)
+//
+// This method is intended for discovery flows that need to inspect cleartext
+// headers and filter candidate snapshots before spending effort on unlock
+// attempts.
 // Authored by: OpenCode
 func (s *EncryptedStore) Candidates(ctx context.Context) ([]Candidate, error) {
 	return s.filesystem.Candidates(ctx)
 }
 
 // Read decrypts and decodes one protected snapshot payload.
+//
+// Example:
+//
+//	payload, err := store.Read(context.Background(), store.ReadRequest{Candidate: candidate, SecurityToken: "token"})
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = payload.StoredDataVersion.PayloadSchemaVersion
+//
+// Read expects a candidate discovered from the same store and the runtime token
+// supplied for the current session. It validates the envelope header before
+// decrypt and validates stored-data compatibility immediately after decode.
 // Authored by: OpenCode
 func (s *EncryptedStore) Read(ctx context.Context, request ReadRequest) (snapshotmodel.Payload, error) {
 	if err := ctx.Err(); err != nil {
@@ -95,6 +122,18 @@ func (s *EncryptedStore) Read(ctx context.Context, request ReadRequest) (snapsho
 }
 
 // Write encrypts and atomically persists one protected snapshot payload.
+//
+// Example:
+//
+//	candidate, err := store.Write(context.Background(), store.WriteRequest{SnapshotID: "snapshot-1", SecurityToken: "token", ServerOrigin: "https://ghostfol.io", Payload: payload})
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = candidate.Path
+//
+// Write is intended for successful sync results only. It creates a fresh
+// authenticated header, encrypts the serialized payload with the runtime token,
+// and replaces the target snapshot file atomically.
 // Authored by: OpenCode
 func (s *EncryptedStore) Write(ctx context.Context, request WriteRequest) (Candidate, error) {
 	if err := ctx.Err(); err != nil {

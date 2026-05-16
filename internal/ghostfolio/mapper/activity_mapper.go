@@ -4,6 +4,7 @@
 package mapper
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -96,6 +97,7 @@ func wrapMappingError(entry dto.ActivityPageEntry, err error) error {
 // diagnosticRecordFromActivityEntry captures the non-secret transport context for one offending source activity.
 // Authored by: OpenCode
 func diagnosticRecordFromActivityEntry(entry dto.ActivityPageEntry) syncmodel.DiagnosticRecord {
+	var sourceScope = mapSourceScope(entry)
 	var record = syncmodel.DiagnosticRecord{
 		SourceID:     strings.TrimSpace(entry.ID),
 		OccurredAt:   strings.TrimSpace(entry.Date),
@@ -105,29 +107,19 @@ func diagnosticRecordFromActivityEntry(entry dto.ActivityPageEntry) syncmodel.Di
 		BaseCurrency: strings.TrimSpace(entry.BaseCurrency),
 		Quantity:     strings.TrimSpace(entry.Quantity.String()),
 		UnitPrice:    strings.TrimSpace(entry.UnitPriceInAssetProfileCurrency.String()),
-		GrossValue:   diagnosticGrossValue(entry),
+		GrossValue:   strings.TrimSpace(selectGrossValue(entry).String()),
 		FeeAmount:    strings.TrimSpace(entry.FeeInBaseCurrency.String()),
 		Comment:      strings.TrimSpace(entry.Comment),
 		DataSource:   strings.TrimSpace(entry.DataSource),
 	}
-	if entry.Account != nil {
-		record.SourceScopeID = strings.TrimSpace(entry.Account.ID)
-		record.SourceScopeName = strings.TrimSpace(entry.Account.Name)
-		record.SourceScopeKind = string(syncmodel.SourceScopeKindAccount)
-		record.SourceScopeReliability = string(syncmodel.ScopeReliabilityReliable)
+	if sourceScope != nil {
+		record.SourceScopeID = sourceScope.ID
+		record.SourceScopeName = sourceScope.Name
+		record.SourceScopeKind = string(sourceScope.Kind)
+		record.SourceScopeReliability = string(sourceScope.Reliability)
 	}
 
 	return record
-}
-
-// diagnosticGrossValue selects the transport gross-value field visible in diagnostic context.
-// Authored by: OpenCode
-func diagnosticGrossValue(entry dto.ActivityPageEntry) string {
-	if strings.TrimSpace(entry.ValueInBaseCurrency.String()) != "" {
-		return strings.TrimSpace(entry.ValueInBaseCurrency.String())
-	}
-
-	return strings.TrimSpace(entry.Value.String())
 }
 
 // errorAsDiagnosticCarrier keeps compile-time compatibility local to this package.
@@ -209,20 +201,23 @@ func MapActivity(entry dto.ActivityPageEntry, decimalService decimalsupport.Serv
 // parseGrossValue selects the supported gross-value field for one activity.
 // Authored by: OpenCode
 func parseGrossValue(entry dto.ActivityPageEntry, decimalService decimalsupport.Service) (apd.Decimal, error) {
-	if strings.TrimSpace(entry.ValueInBaseCurrency.String()) != "" {
-		value, _, err := decimalService.ParseNumber(entry.ValueInBaseCurrency)
-		if err != nil {
-			return apd.Decimal{}, fmt.Errorf("map activity gross value: %w", err)
-		}
-		return value, nil
-	}
-
-	value, _, err := decimalService.ParseNumber(entry.Value)
+	value, _, err := decimalService.ParseNumber(selectGrossValue(entry))
 	if err != nil {
 		return apd.Decimal{}, fmt.Errorf("map activity gross value: %w", err)
 	}
 
 	return value, nil
+}
+
+// selectGrossValue applies the shared DTO gross-value fallback rule used by
+// both activity and diagnostic mapping.
+// Authored by: OpenCode
+func selectGrossValue(entry dto.ActivityPageEntry) json.Number {
+	if strings.TrimSpace(entry.ValueInBaseCurrency.String()) != "" {
+		return entry.ValueInBaseCurrency
+	}
+
+	return entry.Value
 }
 
 // parseOptionalNumber parses one optional decimal number when it is present.

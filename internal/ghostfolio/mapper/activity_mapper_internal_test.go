@@ -213,6 +213,13 @@ func TestDiagnosticRecordFromActivityEntryCoversGrossValueBranches(t *testing.T)
 	if record.GrossValue != "120" {
 		t.Fatalf("expected fallback activity value gross value, got %q", record.GrossValue)
 	}
+
+	entry = validActivityPageEntry()
+	entry.Account.ID = ""
+	record = diagnosticRecordFromActivityEntry(entry)
+	if record.SourceScopeID != "" || record.SourceScopeKind != "" || record.SourceScopeReliability != "" {
+		t.Fatalf("expected diagnostic scope to follow shared scope mapping, got %#v", record)
+	}
 }
 
 func validActivityPageEntry() dto.ActivityPageEntry {

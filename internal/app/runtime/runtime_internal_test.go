@@ -164,7 +164,7 @@ func TestSyncFailureReasonFromBoundaryCoversAllCategories(t *testing.T) {
 		{name: "connectivity", category: ghostfolioclient.FailureConnectivityProblem, want: SyncFailureConnectivityProblem},
 		{name: "unsuccessful response", category: ghostfolioclient.FailureUnsuccessfulServerResponse, want: SyncFailureUnsuccessfulServerResponse},
 		{name: "incompatible contract", category: ghostfolioclient.FailureIncompatibleServerContract, want: SyncFailureIncompatibleServerContract},
-		{name: "unknown", category: ghostfolioclient.FailureCategory("unknown"), want: SyncFailureConnectivityProblem},
+		{name: "unknown", category: ghostfolioclient.FailureCategory("boundary_unknown"), want: SyncFailureConnectivityProblem},
 	}
 
 	for _, testCase := range testCases {
@@ -288,7 +288,7 @@ func TestFinalizeFailureUsesCategorizedRequestFailure(t *testing.T) {
 	var outcome = finalizeBoundaryFailure(
 		&GhostfolioSession{SecurityToken: "token", AuthToken: "jwt"},
 		&SyncAttempt{},
-		&ghostfolioclient.RequestFailure{Category: ghostfolioclient.FailureTimeout, Message: "timeout"},
+		&ghostfolioclient.RequestFailure{Category: ghostfolioclient.FailureTimeout, Detail: "ghostfolio request deadline exceeded"},
 	)
 	if outcome.FailureReason != SyncFailureTimeout {
 		t.Fatalf("expected timeout category, got %#v", outcome)

@@ -21,6 +21,16 @@ var (
 
 // ValidateEnvelopeCompatibility verifies that one cleartext header uses a
 // supported envelope format version.
+//
+// Example:
+//
+//	err := store.ValidateEnvelopeCompatibility(candidate.Header)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+// Run this check after discovery and before decrypt so unsupported envelope
+// versions fail without attempting token-derived unlock.
 // Authored by: OpenCode
 func ValidateEnvelopeCompatibility(header snapshotmodel.EnvelopeHeader) error {
 	if !snapshotmodel.SupportsEnvelopeFormatVersion(header.FormatVersion) {
@@ -31,6 +41,16 @@ func ValidateEnvelopeCompatibility(header snapshotmodel.EnvelopeHeader) error {
 
 // ValidatePayloadCompatibility verifies that one decrypted payload uses a
 // supported stored-data version set.
+//
+// Example:
+//
+//	err := store.ValidatePayloadCompatibility(payload)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+// Run this check immediately after decrypt and decode so unsupported stored-data
+// versions fail before the runtime loads protected activity data.
 // Authored by: OpenCode
 func ValidatePayloadCompatibility(payload snapshotmodel.Payload) error {
 	if !snapshotmodel.SupportsStoredDataVersion(payload.StoredDataVersion) {

@@ -25,52 +25,66 @@ const defaultHTTPClientTimeout = 30 * time.Second
 
 const defaultActivitiesPageSize = 250
 
-// FailureCategory identifies the single user-visible failure category produced
-// by the Ghostfolio boundary in this slice.
+// FailureCategory identifies one Ghostfolio boundary failure class without
+// embedding application outcome wording.
 //
 // Authored by: OpenCode
 type FailureCategory string
 
 const (
-	// FailureRejectedToken indicates that Ghostfolio rejected the supplied token.
-	FailureRejectedToken FailureCategory = "rejected token"
+	// FailureRejectedToken indicates that the anonymous-auth boundary rejected the
+	// supplied token.
+	FailureRejectedToken FailureCategory = "auth_rejected"
 
-	// FailureTimeout indicates that the request exceeded the allowed wait time.
-	FailureTimeout FailureCategory = "timeout"
+	// FailureTimeout indicates that the Ghostfolio request exceeded its runtime
+	// deadline before a boundary response was available.
+	FailureTimeout FailureCategory = "deadline_exceeded"
 
-	// FailureConnectivityProblem indicates a transport-level reachability failure.
-	FailureConnectivityProblem FailureCategory = "connectivity problem"
+	// FailureConnectivityProblem indicates that a transport-level reachability
+	// problem prevented the request from completing.
+	FailureConnectivityProblem FailureCategory = "transport_error"
 
-	// FailureUnsuccessfulServerResponse indicates a non-success HTTP response that
-	// does not prove contract incompatibility.
-	FailureUnsuccessfulServerResponse FailureCategory = "unsuccessful server response"
+	// FailureUnsuccessfulServerResponse indicates a reachable server returned a
+	// non-success HTTP response that does not prove contract incompatibility.
+	FailureUnsuccessfulServerResponse FailureCategory = "unexpected_http_status"
 
-	// FailureIncompatibleServerContract indicates a reachable server whose
-	// behavior does not match this slice's supported contract.
-	FailureIncompatibleServerContract FailureCategory = "incompatible server contract"
+	// FailureIncompatibleServerContract indicates that a reachable server returned
+	// unsupported or contradictory contract behavior.
+	FailureIncompatibleServerContract FailureCategory = "contract_incompatible"
 )
 
-// RequestFailure captures a categorized boundary failure without exposing
-// secrets or raw payload details.
+// RequestFailure captures structured Ghostfolio boundary failure data without
+// exposing secrets or raw payload details.
 //
 // Authored by: OpenCode
 type RequestFailure struct {
-	Category FailureCategory
-	Message  string
-	Err      error
+	Category   FailureCategory
+	Operation  string
+	StatusCode int
+	Detail     string
+	Err        error
 }
 
 // Error returns the safe error string for the categorized request failure.
 //
 // Example:
 //
-//	err := &client.RequestFailure{Category: client.FailureTimeout, Message: "request timed out"}
+//	err := &client.RequestFailure{Category: client.FailureTimeout, Detail: "ghostfolio request deadline exceeded"}
 //	_ = err.Error()
 //
 // Authored by: OpenCode
 func (e *RequestFailure) Error() string {
-	if e.Message != "" {
-		return e.Message
+	if e == nil {
+		return ""
+	}
+	if e.Detail != "" {
+		return e.Detail
+	}
+	if e.Operation != "" && e.StatusCode > 0 {
+		return fmt.Sprintf("%s returned HTTP %d", e.Operation, e.StatusCode)
+	}
+	if e.Operation != "" {
+		return fmt.Sprintf("%s failed", e.Operation)
 	}
 	return string(e.Category)
 }
@@ -297,11 +311,11 @@ func applyHeaders(request *http.Request, headers map[string]string) {
 	}
 }
 
-// classifyAuthStatus maps auth response codes to the supported failure taxonomy.
+// classifyAuthStatus maps auth response codes to Ghostfolio boundary failures.
 // Authored by: OpenCode
 func classifyAuthStatus(response *http.Response) error {
 	if response.StatusCode == http.StatusForbidden {
-		return &RequestFailure{Category: FailureRejectedToken, Message: "the supplied Ghostfolio token was rejected"}
+		return newStatusFailure(FailureRejectedToken, "anonymous auth", response.StatusCode)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return unsuccessfulResponseFailure("auth request", response.StatusCode)
@@ -309,14 +323,16 @@ func classifyAuthStatus(response *http.Response) error {
 	return nil
 }
 
-// classifyActivitiesStatus maps activities response codes to the supported failure taxonomy.
+// classifyActivitiesStatus maps activities response codes to Ghostfolio boundary failures.
 // Authored by: OpenCode
 func classifyActivitiesStatus(response *http.Response) error {
 	switch response.StatusCode {
 	case http.StatusBadRequest:
 		return &RequestFailure{
-			Category: FailureIncompatibleServerContract,
-			Message:  "activities request did not match the supported server contract",
+			Category:   FailureIncompatibleServerContract,
+			Operation:  "activities request",
+			StatusCode: response.StatusCode,
+			Detail:     "activities request did not match the supported server contract",
 		}
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return unsuccessfulResponseFailure("activities request", response.StatusCode)
@@ -327,36 +343,39 @@ func classifyActivitiesStatus(response *http.Response) error {
 	return nil
 }
 
-// unsuccessfulResponseFailure builds a categorized non-success HTTP response error.
+// newStatusFailure builds one HTTP-status Ghostfolio boundary failure.
+// Authored by: OpenCode
+func newStatusFailure(category FailureCategory, operation string, statusCode int) error {
+	return &RequestFailure{Category: category, Operation: operation, StatusCode: statusCode}
+}
+
+// unsuccessfulResponseFailure builds one non-success HTTP-status boundary error.
 // Authored by: OpenCode
 func unsuccessfulResponseFailure(requestName string, statusCode int) error {
-	return &RequestFailure{
-		Category: FailureUnsuccessfulServerResponse,
-		Message:  fmt.Sprintf("%s returned HTTP %d", requestName, statusCode),
-	}
+	return newStatusFailure(FailureUnsuccessfulServerResponse, requestName, statusCode)
 }
 
-// incompatibleServerFailure builds a categorized incompatible-contract error.
+// incompatibleServerFailure builds one boundary error for unsupported contract behavior.
 // Authored by: OpenCode
 func incompatibleServerFailure(message string, err error) error {
-	return &RequestFailure{Category: FailureIncompatibleServerContract, Message: message, Err: err}
+	return &RequestFailure{Category: FailureIncompatibleServerContract, Detail: message, Err: err}
 }
 
-// classifyTransportFailure maps a transport-level error to a supported user-visible category.
+// classifyTransportFailure maps a transport-level error to a Ghostfolio boundary failure.
 // Authored by: OpenCode
 func classifyTransportFailure(err error) error {
 	if errors.Is(err, context.DeadlineExceeded) {
-		return &RequestFailure{Category: FailureTimeout, Message: "request timed out", Err: err}
+		return &RequestFailure{Category: FailureTimeout, Detail: "ghostfolio request deadline exceeded", Err: err}
 	}
 
 	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {
-		return &RequestFailure{Category: FailureTimeout, Message: "request timed out", Err: err}
+		return &RequestFailure{Category: FailureTimeout, Detail: "ghostfolio request deadline exceeded", Err: err}
 	}
 
 	return &RequestFailure{
 		Category: FailureConnectivityProblem,
-		Message:  "could not reach the selected Ghostfolio server",
+		Detail:   "ghostfolio request transport failed",
 		Err:      err,
 	}
 }
