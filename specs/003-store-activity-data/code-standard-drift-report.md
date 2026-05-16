@@ -11,38 +11,20 @@
 - This report does not cover feature-scope correctness, contract compliance, constitution-gate evidence, or domain-spec validation.
 - Evidence references below are a point-in-time snapshot from the current implementation tree.
 - Reviewed feature artifacts: `spec.md`, `plan.md`, `tasks.md`, `research.md`, `data-model.md`, and `quickstart.md`.
-- This snapshot consolidates delegated per-module reviews for `internal/app/runtime`, `internal/ghostfolio/{client,dto,mapper,validator}`, `internal/snapshot/{envelope,model,store}`, `internal/sync/{model,normalize,validate}`, `internal/tui/{flow,screen}`, and `internal/support/{decimal,redact}`.
+- Reviewed implementation scope: `internal/app/runtime`, `internal/ghostfolio/{client,mapper}`, `internal/snapshot/{envelope,store}`, `internal/sync/{model,normalize,validate}`, `internal/tui/{flow,screen}`, and directly related support code under `internal/support`.
+- Cognitive-complexity verification in this snapshot was limited to non-test implementation files because `AGENTS.md` now explicitly exempts test code from that rule.
 
 ## Standards Baseline
 
 - `AGENTS.md`: `Coding standards > LiteratureAndIndustryReferences` requires descriptive and unambiguous names, SRP, decomposition into smaller functions tied to a single responsibility, DRY, and consistency.
-- `AGENTS.md`: `Coding standards > CustomCodeDocs` requires AI-touched code documentation to describe the real purpose of modules and functions accurately, include authoring information, and provide detailed usage instructions for public APIs.
-- `.specify/memory/constitution.md`: `V. Clean Architecture and Domain Clarity` requires descriptive and unambiguous names, cohesive modules, minimal duplication, SOLID boundaries, and separation of domain rules from IO and infrastructure concerns.
+- `AGENTS.md`: `Coding standards > LiteratureAndIndustryReferences` requires cognitive complexity under 15 for Go functions, measured with `github.com/uudashr/gocognit`, and explicitly exempts test code.
+- `AGENTS.md`: `Coding standards > CustomCodeDocs` requires AI-generated public methods and functions to include detailed purpose documentation and example usage, and AI-generated structs or interfaces to include detailed purpose documentation.
+- `.specify/memory/constitution.md`: `V. Clean Architecture and Domain Clarity` requires descriptive names, cohesive modules and functions, minimal duplication, and separation of domain rules from IO and infrastructure concerns.
 - No additional proprietary agent-instruction files were present in the repository or active feature scope at review time.
 
 ## Findings
 
-### DRIFT-001: Runtime Sync Service Mixes Multiple Architectural Responsibilities
-
-**Severity**: High
-**Diverges from**:
-
-- `AGENTS.md` `Coding standards > LiteratureAndIndustryReferences`: descriptive and unambiguous names, SRP, decomposition into smaller functions tied to a single responsibility
-- `.specify/memory/constitution.md` `V. Clean Architecture and Domain Clarity`: modules and functions must remain cohesive, minimize duplication, and separate domain rules from IO and infrastructure concerns
-
-**Evidence**:
-
-- `internal/app/runtime/sync_service.go:54-72`
-- `internal/app/runtime/sync_service.go:145-259`
-- `internal/app/runtime/sync_service.go:272-275`
-- `internal/app/runtime/sync_service.go:324-355`
-- `internal/app/runtime/sync_service.go:439-457`
-
-**Description**:
-
-`SyncService` still owns full-history orchestration, diagnostic-report preparation and writing entry points, active readable-snapshot queries, and server-replacement checks behind one runtime boundary. Even with helper collaborators, the service surface combines workflow execution, troubleshooting artifact policy, and protected-snapshot lifecycle concerns, which weakens cohesion and keeps storage and UI-state rules coupled to the same application service.
-
-### DRIFT-002: Deterministic Ordering Rules Are Reimplemented In Multiple Layers
+### DRIFT-002: Deterministic Ordering Rules Remain Reimplemented Across Normalization And Validation
 
 **Severity**: High
 **Diverges from**:
@@ -52,98 +34,81 @@
 
 **Evidence**:
 
-- `internal/sync/model/activity_ordering.go:20-31`
-- `internal/sync/normalize/activity_history.go:95-106`
+- `internal/sync/model/activity_ordering.go:20-32`
+- `internal/sync/normalize/activity_history.go:95-107`
 - `internal/sync/validate/activity_history.go:94-101`
 
 **Description**:
 
-The codebase now has a shared `NewActivityOrderingKey` constructor, but normalization and validation each still rebuild the deterministic ordering tuple inline instead of using it. That keeps the same domain invariant encoded in multiple places and requires parallel edits whenever the same-asset ordering contract changes.
+The feature already has a shared `syncmodel.NewActivityOrderingKey` constructor, but both normalization and validation still rebuild the same ordering tuple inline. That keeps the same same-asset ordering rule in three locations. This slice already reopened ordering work for `BUG-002`, so retaining that duplication creates a concrete risk of divergence the next time the ordering rule changes.
 
-### DRIFT-003: Stale Validation Terminology Obscures The Storage Workflow
+### DRIFT-003: Validation-Only Terminology Still Obscures The Sync-And-Storage Workflow
 
 **Severity**: Medium
 **Diverges from**:
 
 - `AGENTS.md` `Coding standards > LiteratureAndIndustryReferences`: choose descriptive and unambiguous names, be consistent
-- `AGENTS.md` `Coding standards > CustomCodeDocs`: AI-touched code documentation must describe the purpose of modules and functions accurately
+- `AGENTS.md` `Coding standards > CustomCodeDocs`: AI-touched code documentation must describe the real purpose accurately
 - `.specify/memory/constitution.md` `V. Clean Architecture and Domain Clarity`: names must be descriptive and unambiguous, and consistency is mandatory
 
 **Evidence**:
 
-- `internal/app/runtime/runtime.go:20-25`
-- `internal/tui/flow/model.go:354-355`
-- `internal/tui/flow/model.go:424-440`
+- `internal/app/runtime/runtime.go:20-24`
+- `internal/tui/flow/model.go:354-359`
+- `internal/tui/flow/model.go:434-440`
 - `internal/tui/flow/model.go:556-560`
 - `internal/tui/flow/sync_flow.go:65-67`
 - `internal/tui/flow/sync_flow.go:134-146`
-- `internal/tui/flow/sync_flow.go:214-223`
-- `internal/tui/screen/validation_result_screen.go:15-18`
 - `internal/tui/screen/validation_result_screen.go:56-57`
 - `internal/tui/screen/validation_result_screen.go:73-86`
-- `internal/tui/screen/sync_validation_screen.go:15-18`
+- `internal/tui/screen/sync_validation_screen.go:13-18`
 - `internal/tui/screen/main_menu_screen.go:57-60`
 
 **Description**:
 
-AI-authored comments, helper names, variables, and menu or status text still describe the slice as validation-only even though the implemented workflow now retrieves and securely stores full activity history. That leaves the active code and UI copy inconsistent with the feature's actual responsibility and makes the storage workflow harder to read and maintain.
+Comments, helper names, parameter names, and user-facing text still describe this slice as validation-only even though the implemented workflow now authenticates, retrieves, normalizes, validates, and stores protected snapshots. Examples include `cancelActiveValidation`, `releaseSyncInputToValidationMenu`, `validationSummaryText`, and main-menu copy that still says `Sync Data` is used to validate Ghostfolio communication. That leaves the active code and UI language inconsistent with the implemented responsibility.
 
-### DRIFT-004: Ghostfolio Transport Client Encodes User-Facing Failure Taxonomy
-
-**Severity**: Medium
-**Diverges from**:
-
-- `AGENTS.md` `Coding standards > LiteratureAndIndustryReferences`: SRP, decomposition into smaller functions tied to a single responsibility, consistency
-- `.specify/memory/constitution.md` `V. Clean Architecture and Domain Clarity`: modules and functions must remain cohesive and separate domain rules from IO and infrastructure concerns
-
-**Evidence**:
-
-- `internal/ghostfolio/client/client.go:28-60`
-- `internal/ghostfolio/client/client.go:300-360`
-- `internal/app/runtime/sync_service.go:358-375`
-
-**Description**:
-
-The Ghostfolio HTTP client defines failure categories as the slice's "single user-visible" taxonomy and builds English error messages such as rejected-token, timeout, and connectivity text directly in the transport layer. The runtime then maps those categories almost verbatim into application outcomes. This couples infrastructure code to presentation-facing wording instead of keeping the client focused on boundary semantics and exposing boundary-neutral failures upward.
-
-### DRIFT-005: Activity Mapper Duplicates DTO Normalization Rules Across Mapping Paths
-
-**Severity**: Medium
-**Diverges from**:
-
-- `AGENTS.md` `Coding standards > LiteratureAndIndustryReferences`: avoid code duplication, be consistent
-- `.specify/memory/constitution.md` `V. Clean Architecture and Domain Clarity`: modules and functions must remain cohesive, minimize duplication, and keep domain concepts explicit
-
-**Evidence**:
-
-- `internal/ghostfolio/mapper/activity_mapper.go:96-130`
-- `internal/ghostfolio/mapper/activity_mapper.go:167-206`
-- `internal/ghostfolio/mapper/activity_mapper.go:209-256`
-
-**Description**:
-
-`activity_mapper.go` converts the same `dto.ActivityPageEntry` into both `DiagnosticRecord` and `ActivityRecord` using separate field-normalization paths. The gross-value fallback rule is duplicated, and the two paths already diverge on source-scope handling because the diagnostic path emits account scope whenever `entry.Account != nil`, while the stored-record path drops scope unless `Account.ID` is non-empty. This duplicates a domain translation rule instead of keeping one local source of truth.
-
-### DRIFT-006: Snapshot Exported APIs Miss Required AI-Authored Usage Documentation
+### DRIFT-006: AI-Authored Exported APIs Still Miss The Required Detailed Usage Documentation
 
 **Severity**: Low
 **Diverges from**:
 
-- `AGENTS.md` `Coding standards > CustomCodeDocs`: AI-generated public methods and functions must include detailed purpose documentation and example usage
+- `AGENTS.md` `Coding standards > CustomCodeDocs`: AI-generated public methods and functions must include detailed purpose documentation and example usage, and AI-generated structs or interfaces must include detailed purpose documentation
 
 **Evidence**:
 
-- `internal/snapshot/envelope/codec.go:65-85`
-- `internal/snapshot/envelope/codec.go:142-183`
-- `internal/snapshot/store/store.go:168-245`
-- `internal/snapshot/store/discovery.go:12-33`
-- `internal/snapshot/store/compatibility.go:22-39`
+- `internal/app/runtime/sync_service.go:25-72`
+- `internal/app/runtime/sync_types.go:90-140`
+- `internal/tui/screen/server_replacement_screen.go:12-23`
+- `internal/tui/screen/server_replacement_screen.go:25-45`
 
 **Description**:
 
-Several exported snapshot APIs are AI-authored but only carry brief summary comments and no detailed usage guidance or examples. This is below the repository's explicit documentation baseline for public AI-generated code and makes the snapshot boundary less self-describing than the local policy requires.
+These exported AI-authored types and functions carry only summary-level comments, and `ServerReplacementScreenView` has no example usage block at all. The local documentation baseline is stricter than normal Go conventions for public, cross-package AI-authored code. The current comments do not meet that repository-specific requirement.
+
+### DRIFT-007: Core Non-Test Functions Exceed The Repository Cognitive-Complexity Limit
+
+**Severity**: High
+**Diverges from**:
+
+- `AGENTS.md` `Coding standards > LiteratureAndIndustryReferences`: cognitive complexity in functions should be kept under 15, and higher values should trigger SRP and decomposition analysis
+- `AGENTS.md` `Coding standards > LiteratureAndIndustryReferences`: decomposition into smaller functions tied to a single responsibility
+- `.specify/memory/constitution.md` `V. Clean Architecture and Domain Clarity`: modules and functions must remain cohesive and respect SOLID boundaries where those boundaries improve clarity and change safety
+
+**Evidence**:
+
+- `internal/sync/validate/activity_history.go:74-162`
+- `internal/app/runtime/sync_service.go:145-270`
+- `internal/ghostfolio/client/client.go:179-218`
+- `internal/sync/normalize/activity_history.go:231-265`
+
+**Description**:
+
+Measured with `gocognit` on non-test files only, several implementation functions exceed the explicit limit from `AGENTS.md`: `defaultValidator.Validate` scores 41, `(*syncService).Run` scores 18, `(*Client).FetchActivitiesHistory` scores 17, and `deriveTimelineScopeReliability` scores 17. Each function now carries multiple branches and rule clusters that should have been split after the threshold was exceeded. The validator is the clearest example: it combines cache-shape checks, timestamp parsing, ordering enforcement, price rules, quantity replay, and failure shaping in one function.
 
 ## Notes
 
-- Existing `DRIFT-001` through `DRIFT-003` identifiers were preserved because the underlying findings remain substantively the same in the current implementation.
+- Existing `DRIFT-002`, `DRIFT-003`, and `DRIFT-006` identifiers were preserved because the underlying findings remain substantively the same in the current implementation.
+- `DRIFT-007` is new in this snapshot and records the non-test cognitive-complexity violations introduced by the updated `AGENTS.md` baseline.
+- Prior drift IDs not listed in this snapshot were not reissued as substantively unchanged findings in the reviewed scope.
 - `checklists/code-standard-drift-remediation.md` exists at review time, so the correction-tracking link resolves in this snapshot.

@@ -185,10 +185,10 @@ func TestSyncResultScreenViewCoversDiagnosticBranches(t *testing.T) {
 	}
 }
 
-// TestValidationFollowUpTextCoversRemainingFailureBranches verifies the
+// TestSyncFollowUpTextCoversRemainingFailureBranches verifies the
 // explicit follow-up guidance branches that are not covered by the render tests.
 // Authored by: OpenCode
-func TestValidationFollowUpTextCoversRemainingFailureBranches(t *testing.T) {
+func TestSyncFollowUpTextCoversRemainingFailureBranches(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -206,7 +206,7 @@ func TestValidationFollowUpTextCoversRemainingFailureBranches(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if got := validationFollowUpText(testCase.outcome); !strings.Contains(got, testCase.want) {
+			if got := syncFollowUpText(testCase.outcome); !strings.Contains(got, testCase.want) {
 				t.Fatalf("expected follow-up text %q to contain %q", got, testCase.want)
 			}
 		})

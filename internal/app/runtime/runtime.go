@@ -21,7 +21,7 @@ import (
 //
 // App keeps the bootstrap store available for startup loading and exposes the
 // application services that the TUI uses for setup persistence and sync
-// validation.
+// storage.
 //
 // Authored by: OpenCode
 type App struct {

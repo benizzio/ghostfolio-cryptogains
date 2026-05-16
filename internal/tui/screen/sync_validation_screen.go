@@ -13,7 +13,7 @@ import (
 // SyncEntryScreenParams contains the render state for the sync entry screen.
 //
 // Supply the current token input rendering, the primary menu state, any
-// validation message, and busy-state details when a communication check is in
+// status message, and busy-state details when a sync attempt is in
 // flight. The renderer uses these fields to switch between the idle entry view
 // and the busy progress view without mutating workflow state.
 //

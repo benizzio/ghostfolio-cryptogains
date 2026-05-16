@@ -12,7 +12,7 @@ import (
 
 // SyncResultScreenParams contains the render state for the sync result screen.
 //
-// Populate this value with the final validation outcome, the result-menu state,
+// Populate this value with the final sync outcome, the result-menu state,
 // and footer help text for the result workflow. The renderer converts the
 // structured outcome into user-facing summary and follow-up text without owning
 // any retry or navigation behavior.
@@ -53,8 +53,8 @@ func SyncResultScreenView(params SyncResultScreenParams) string {
 	var body = fmt.Sprintf(
 		"%s\n\n%s\n\n%s\n\n%s",
 		resultLine,
-		validationSummaryText(params.Outcome),
-		validationFollowUpText(params.Outcome),
+		syncSummaryText(params.Outcome),
+		syncFollowUpText(params.Outcome),
 		component.RenderMenu(params.Theme, params.MenuItems, params.SelectedIndex),
 	)
 
@@ -70,20 +70,20 @@ func SyncResultScreenView(params SyncResultScreenParams) string {
 	)
 }
 
-// validationSummaryText converts the structured sync outcome into the
+// syncSummaryText converts the structured sync outcome into the
 // primary result text shown on the TUI result screen.
 // Authored by: OpenCode
-func validationSummaryText(outcome runtime.SyncOutcome) string {
+func syncSummaryText(outcome runtime.SyncOutcome) string {
 	if outcome.Success {
 		return "Activity data was stored securely for future use."
 	}
 	return "Sync and secure storage did not succeed."
 }
 
-// validationFollowUpText converts the structured sync outcome into the
+// syncFollowUpText converts the structured sync outcome into the
 // secondary guidance shown on the TUI result screen.
 // Authored by: OpenCode
-func validationFollowUpText(outcome runtime.SyncOutcome) string {
+func syncFollowUpText(outcome runtime.SyncOutcome) string {
 	if outcome.Success {
 		return "No report-generation, report-preview, or cached-data browsing workflow is available in this slice."
 	}

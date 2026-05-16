@@ -222,7 +222,7 @@ func TestFailedValidationDefaultActionRetriesValidation(t *testing.T) {
 	}
 }
 
-func TestSuccessfulValidationDefaultActionReturnsToMainMenu(t *testing.T) {
+func TestSuccessfulSyncDefaultActionReturnsToMainMenu(t *testing.T) {
 	t.Parallel()
 
 	var server = newGhostfolioScenarioServer(t, ghostfolioScenario{})
@@ -239,7 +239,7 @@ func TestSuccessfulValidationDefaultActionReturnsToMainMenu(t *testing.T) {
 	model = assertFlowModel(t, updated)
 
 	if model.ActiveScreen() != "main_menu" {
-		t.Fatalf("expected successful validation to return to the main menu by default, got %s", model.ActiveScreen())
+		t.Fatalf("expected successful sync to return to the main menu by default, got %s", model.ActiveScreen())
 	}
 }
 
@@ -408,7 +408,7 @@ func startSyncValidationAttempt(t *testing.T, model *flow.Model) (*flow.Model, t
 	var updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = assertFlowModel(t, updated)
 	if cmd == nil {
-		t.Fatalf("expected validation batch command")
+		t.Fatalf("expected sync batch command")
 	}
 	if got := model.View().Content; !strings.Contains(got, "Syncing and storing activity history") {
 		t.Fatalf("expected busy state after submit, got %q", got)
@@ -426,7 +426,7 @@ func applyValidationBatch(t *testing.T, model *flow.Model, cmd tea.Cmd) *flow.Mo
 	var message = testutil.RunCmd(cmd)
 	var batch, ok = message.(tea.BatchMsg)
 	if !ok {
-		t.Fatalf("expected validation command to return tea.BatchMsg, got %T", message)
+		t.Fatalf("expected sync command to return tea.BatchMsg, got %T", message)
 	}
 
 	for _, batchCmd := range batch {

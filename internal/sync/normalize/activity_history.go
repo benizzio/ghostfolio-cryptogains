@@ -80,31 +80,9 @@ func NewNormalizer() Normalizer {
 // years, and records duplicate hashes.
 // Authored by: OpenCode
 func (defaultNormalizer) Normalize(records []syncmodel.ActivityRecord) (syncmodel.ProtectedActivityCache, error) {
-	typedRecords := make([]normalizedRecord, 0, len(records))
-	for _, record := range records {
-		occurredAt, err := time.Parse(time.RFC3339Nano, record.OccurredAt)
-		if err != nil {
-			return syncmodel.ProtectedActivityCache{}, newNormalizationError(fmt.Sprintf("normalize occurred_at: %v", err), record)
-		}
-
-		rawHash, err := recordHash(record)
-		if err != nil {
-			return syncmodel.ProtectedActivityCache{}, newNormalizationError(err.Error(), record)
-		}
-
-		typedRecords = append(typedRecords, normalizedRecord{
-			OccurredAt: occurredAt,
-			RawHash:    rawHash,
-			Record:     record,
-			OrderKey: syncmodel.ActivityOrderingKey{
-				SourceDate:   occurredAt.Format("2006-01-02"),
-				AssetSymbol:  record.AssetSymbol,
-				ActivityType: record.ActivityType,
-				SourceID:     record.SourceID,
-				OccurredAt:   record.OccurredAt,
-				RawHash:      rawHash,
-			},
-		})
+	typedRecords, err := normalizeRecords(records)
+	if err != nil {
+		return syncmodel.ProtectedActivityCache{}, err
 	}
 
 	sort.SliceStable(typedRecords, func(left int, right int) bool {
@@ -123,6 +101,44 @@ func (defaultNormalizer) Normalize(records []syncmodel.ActivityRecord) (syncmode
 		AvailableReportYears: years,
 		ScopeReliability:     deriveScopeReliability(activities),
 		Activities:           activities,
+	}, nil
+}
+
+// normalizeRecords parses ordering timestamps, computes duplicate hashes, and prepares sortable records.
+// Authored by: OpenCode
+func normalizeRecords(records []syncmodel.ActivityRecord) ([]normalizedRecord, error) {
+	var typedRecords = make([]normalizedRecord, 0, len(records))
+	for _, record := range records {
+		var typedRecord, err = newNormalizedRecord(record)
+		if err != nil {
+			return nil, err
+		}
+		typedRecords = append(typedRecords, typedRecord)
+	}
+
+	return typedRecords, nil
+}
+
+// newNormalizedRecord parses one normalized activity timestamp and prepares its duplicate hash and ordering tuple.
+// Authored by: OpenCode
+func newNormalizedRecord(record syncmodel.ActivityRecord) (normalizedRecord, error) {
+	var orderKey, occurredAt, err = syncmodel.NewActivityOrderingKeyFromRecord(record)
+	if err != nil {
+		return normalizedRecord{}, newNormalizationError(fmt.Sprintf("normalize occurred_at: %v", err), record)
+	}
+
+	var rawHash string
+	rawHash, err = recordHash(record)
+	if err != nil {
+		return normalizedRecord{}, newNormalizationError(err.Error(), record)
+	}
+	orderKey.RawHash = rawHash
+
+	return normalizedRecord{
+		OccurredAt: occurredAt,
+		RawHash:    rawHash,
+		Record:     record,
+		OrderKey:   orderKey,
 	}, nil
 }
 
@@ -230,24 +246,27 @@ func deriveScopeReliability(records []syncmodel.ActivityRecord) syncmodel.ScopeR
 // Authored by: OpenCode
 func deriveTimelineScopeReliability(records []syncmodel.ActivityRecord) syncmodel.ScopeReliability {
 	var sawUsableScope = false
+	var sawMissingScope = false
 	var expectedScopeID string
 	var expectedScopeKind syncmodel.SourceScopeKind
 
 	for _, record := range records {
-		if record.SourceScope == nil || strings.TrimSpace(record.SourceScope.ID) == "" || record.SourceScope.Kind == "" {
+		var scopeID, scopeKind, usable = usableSourceScope(record)
+		if !usable {
 			if sawUsableScope {
 				return syncmodel.ScopeReliabilityPartial
 			}
+			sawMissingScope = true
 			continue
 		}
 
 		if !sawUsableScope {
 			sawUsableScope = true
-			expectedScopeID = strings.TrimSpace(record.SourceScope.ID)
-			expectedScopeKind = record.SourceScope.Kind
+			expectedScopeID = scopeID
+			expectedScopeKind = scopeKind
 			continue
 		}
-		if strings.TrimSpace(record.SourceScope.ID) != expectedScopeID || record.SourceScope.Kind != expectedScopeKind {
+		if scopeID != expectedScopeID || scopeKind != expectedScopeKind {
 			return syncmodel.ScopeReliabilityPartial
 		}
 	}
@@ -255,13 +274,26 @@ func deriveTimelineScopeReliability(records []syncmodel.ActivityRecord) syncmode
 	if !sawUsableScope {
 		return syncmodel.ScopeReliabilityUnavailable
 	}
-	for _, record := range records {
-		if record.SourceScope == nil || strings.TrimSpace(record.SourceScope.ID) == "" || record.SourceScope.Kind == "" {
-			return syncmodel.ScopeReliabilityPartial
-		}
+	if sawMissingScope {
+		return syncmodel.ScopeReliabilityPartial
 	}
 
 	return syncmodel.ScopeReliabilityReliable
+}
+
+// usableSourceScope returns the canonical source-scope identity for one record when scope data is usable.
+// Authored by: OpenCode
+func usableSourceScope(record syncmodel.ActivityRecord) (string, syncmodel.SourceScopeKind, bool) {
+	if record.SourceScope == nil {
+		return "", "", false
+	}
+
+	var scopeID = strings.TrimSpace(record.SourceScope.ID)
+	if scopeID == "" || record.SourceScope.Kind == "" {
+		return "", "", false
+	}
+
+	return scopeID, record.SourceScope.Kind, true
 }
 
 // recordHash computes the exact duplicate-removal hash from normalized source fields.

@@ -72,6 +72,10 @@ TO BE DEFINED
 - Follow the general principles of "Domain-Driven Design: Tackling Complexity in the Heart of Software" by Eric Evans
 - Follow the general principles of "Clean Architecture: A Craftsman's Guide to Software Structure and Design" by Robert
   C. Martin
+- Cognitive complexity in functions SHOULD be kept under 15. When it exceeds 15 an analysis of SRP and decomposition
+  should be made to split it
+  - for Go code, use `github.com/uudashr/gocognit` to measure it
+  - test code does not need to follow this rule
 
 </LiteratureAndIndustryReferences>
 

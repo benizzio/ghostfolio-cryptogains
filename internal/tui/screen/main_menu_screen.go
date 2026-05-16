@@ -56,7 +56,7 @@ func MainMenuScreenView(params MainMenuScreenParams) string {
 		"Main Menu",
 		"Sync Data is the only business workflow available in this release.",
 		body,
-		"Choose Sync Data to validate Ghostfolio communication. Protected-data presence may be shown, but no cached activity details are exposed in this slice.",
+		"Choose Sync Data to authenticate, retrieve, validate, and store protected activity history. Protected-data presence may be shown, but no cached activity details are exposed in this slice.",
 		params.HelpText,
 	)
 }

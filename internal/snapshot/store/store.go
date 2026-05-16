@@ -95,6 +95,11 @@ var isWindowsPlatform = func() bool {
 }
 
 // Candidate identifies one protected snapshot file discovered before decrypt.
+//
+// This value carries the opaque snapshot identifier, filesystem path, and the
+// decoded cleartext header that callers can inspect before deciding whether to
+// spend effort on token-derived decrypt attempts.
+//
 // Authored by: OpenCode
 type Candidate struct {
 	SnapshotID string
@@ -104,6 +109,10 @@ type Candidate struct {
 
 // ReadRequest contains the token-aware inputs required to decrypt one
 // protected snapshot payload.
+//
+// Pass a `Candidate` returned by the same store instance together with the
+// runtime-only Ghostfolio security token that should unlock that snapshot.
+//
 // Authored by: OpenCode
 type ReadRequest struct {
 	Candidate     Candidate
@@ -112,6 +121,11 @@ type ReadRequest struct {
 
 // WriteRequest contains the token-aware inputs required to encrypt and persist
 // one protected snapshot payload.
+//
+// The caller provides the runtime-only security token, the canonical selected
+// server origin used for discovery-key derivation, the protected payload bytes
+// to persist, and optionally an existing opaque snapshot identifier to replace.
+//
 // Authored by: OpenCode
 type WriteRequest struct {
 	SnapshotID    string
@@ -138,6 +152,10 @@ type Store interface {
 
 // FilesystemStore resolves protected snapshot paths, enumerates snapshot
 // headers, and provides atomic file-replacement helpers.
+//
+// This helper deliberately stops at the filesystem and cleartext-header layer.
+// It does not own token-derived encrypt or decrypt work, which stays in the
+// encrypted store implementation.
 // Authored by: OpenCode
 type FilesystemStore struct {
 	directory string
@@ -243,16 +261,20 @@ func (s *FilesystemStore) Candidates(ctx context.Context) ([]Candidate, error) {
 			return nil, fmt.Errorf("decode snapshot header %q: %w", entry.Name(), decodeErr)
 		}
 
-		candidates = append(candidates, Candidate{
-			SnapshotID: snapshotID,
-			Path:       path,
-			Header:     envelope.Header,
-		})
+		candidates = append(
+			candidates, Candidate{
+				SnapshotID: snapshotID,
+				Path:       path,
+				Header:     envelope.Header,
+			},
+		)
 	}
 
-	sort.Slice(candidates, func(left int, right int) bool {
-		return candidates[left].SnapshotID < candidates[right].SnapshotID
-	})
+	sort.Slice(
+		candidates, func(left int, right int) bool {
+			return candidates[left].SnapshotID < candidates[right].SnapshotID
+		},
+	)
 
 	return candidates, nil
 }

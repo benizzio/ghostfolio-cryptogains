@@ -37,7 +37,9 @@ var newGCM = cipher.NewGCM
 //	_, _ = codec.Encode(snapshotmodel.Envelope{})
 //
 // Implementations are expected to serialize and validate the cleartext header
-// and ciphertext container without owning filesystem persistence concerns.
+// and ciphertext container without owning filesystem persistence concerns. Use
+// this interface when snapshot code must interchange raw envelope bytes while
+// keeping JSON structure and header validation behind one boundary.
 // Authored by: OpenCode
 type Codec interface {
 	Encode(snapshotmodel.Envelope) ([]byte, error)
@@ -46,6 +48,9 @@ type Codec interface {
 
 // JSONCodec serializes protected snapshot envelopes as a JSON document with a
 // cleartext authenticated header and opaque ciphertext bytes.
+//
+// The cleartext header remains readable for discovery and compatibility checks,
+// while the payload bytes stay opaque until token-derived decryption succeeds.
 // Authored by: OpenCode
 type JSONCodec struct{}
 
@@ -137,6 +142,8 @@ func (JSONCodec) Decode(raw []byte) (snapshotmodel.Envelope, error) {
 //	key := envelope.DeriveServerDiscoveryKey("https://ghostfol.io")
 //	_ = key
 //
+// Use this helper when snapshot discovery must remain scoped to one selected
+// server without persisting the plaintext server origin in the cleartext header.
 // Authored by: OpenCode
 func DeriveServerDiscoveryKey(serverOrigin string) []byte {
 	var sum = sha256.Sum256([]byte(strings.TrimSpace(serverOrigin)))
@@ -157,6 +164,8 @@ func DeriveServerDiscoveryKey(serverOrigin string) []byte {
 //	}
 //	_ = encoded
 //
+// Callers should pass the exact header that will be persisted alongside the
+// ciphertext so any tampering with cleartext metadata fails later decrypt.
 // Authored by: OpenCode
 func AuthenticatedHeaderBytes(header snapshotmodel.EnvelopeHeader) ([]byte, error) {
 	if err := validateEnvelopeHeader(header); err != nil {

@@ -5,7 +5,6 @@ package validate
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/cockroachdb/apd/v3"
@@ -77,86 +76,120 @@ func (defaultValidator) Validate(cache syncmodel.ProtectedActivityCache) error {
 	}
 
 	var zero apd.Decimal
-	var previousKey syncmodel.ActivityOrderingKey
-	var previousRecord syncmodel.ActivityRecord
-	var havePrevious bool
-	var runningQuantityByAsset = map[string]apd.Decimal{}
+	var state = validationState{runningQuantityByAsset: map[string]apd.Decimal{}}
 
 	for _, record := range cache.Activities {
-		if strings.TrimSpace(record.OccurredAt) == "" {
-			return newValidationError("normalized activity timestamp is incomplete", record)
-		}
-
-		occurredAt, err := time.Parse(time.RFC3339Nano, record.OccurredAt)
+		var currentKey, err = validateActivityOrdering(record, state)
 		if err != nil {
-			return newValidationError(fmt.Sprintf("activity %q has an unreadable timestamp: %v", record.SourceID, err), record)
+			return err
 		}
-		var currentKey = syncmodel.ActivityOrderingKey{
-			SourceDate:   occurredAt.Format("2006-01-02"),
-			AssetSymbol:  record.AssetSymbol,
-			ActivityType: record.ActivityType,
-			SourceID:     record.SourceID,
-			OccurredAt:   record.OccurredAt,
-			RawHash:      record.RawHash,
+		if err := validateActivityFields(record, &zero); err != nil {
+			return err
 		}
-		if havePrevious {
-			if syncmodel.CompareActivityOrdering(currentKey, previousKey) < 0 {
-				return newValidationError("normalized activities are not ordered chronologically", previousRecord, record)
-			}
-			if syncmodel.HasAmbiguousActivityOrdering(previousKey, currentKey) {
-				return newValidationError(
-					fmt.Sprintf("supported activity ordering is ambiguous for source %q", record.SourceID),
-					previousRecord,
-					record,
-				)
-			}
+		if err := applyRunningQuantity(record, state.runningQuantityByAsset, &zero); err != nil {
+			return err
 		}
 
-		if strings.TrimSpace(record.SourceID) == "" || strings.TrimSpace(record.AssetSymbol) == "" {
-			return newValidationError("normalized activity identity is incomplete", record)
-		}
-		if record.Quantity.Cmp(&zero) <= 0 {
-			return newValidationError(fmt.Sprintf("activity %q quantity must be greater than zero", record.SourceID), record)
-		}
-		if record.GrossValue.Cmp(&zero) < 0 {
-			return newValidationError(fmt.Sprintf("activity %q gross value cannot be negative", record.SourceID), record)
-		}
-		if record.FeeAmount != nil && record.FeeAmount.Cmp(&zero) < 0 {
-			return newValidationError(fmt.Sprintf("activity %q fee amount cannot be negative", record.SourceID), record)
-		}
-
-		switch record.ActivityType {
-		case syncmodel.ActivityTypeBuy:
-			if record.UnitPrice.Cmp(&zero) <= 0 {
-				return newValidationError(fmt.Sprintf("BUY activity %q must have a unit price greater than zero", record.SourceID), record)
-			}
-		case syncmodel.ActivityTypeSell:
-			if record.UnitPrice.Cmp(&zero) < 0 {
-				return newValidationError(fmt.Sprintf("SELL activity %q cannot have a negative unit price", record.SourceID), record)
-			}
-			if record.UnitPrice.Cmp(&zero) == 0 && strings.TrimSpace(record.Comment) == "" {
-				return newValidationError(fmt.Sprintf("SELL activity %q requires a comment when unit price is zero", record.SourceID), record)
-			}
-		default:
-			return newValidationError(fmt.Sprintf("activity %q uses unsupported type %q", record.SourceID, record.ActivityType), record)
-		}
-
-		var runningQuantity = runningQuantityByAsset[record.AssetSymbol]
-		switch record.ActivityType {
-		case syncmodel.ActivityTypeBuy:
-			_, _ = apd.BaseContext.Add(&runningQuantity, &runningQuantity, &record.Quantity)
-		case syncmodel.ActivityTypeSell:
-			_, _ = apd.BaseContext.Sub(&runningQuantity, &runningQuantity, &record.Quantity)
-			if runningQuantity.Cmp(&zero) < 0 {
-				return newValidationError(fmt.Sprintf("activity %q would drive holdings below zero", record.SourceID), record)
-			}
-		}
-		runningQuantityByAsset[record.AssetSymbol] = runningQuantity
-
-		previousKey = currentKey
-		previousRecord = record
-		havePrevious = true
+		state.previousKey = currentKey
+		state.previousRecord = record
+		state.havePrevious = true
 	}
+
+	return nil
+}
+
+// validationState keeps the rolling ordering and holdings state needed while validating one normalized cache.
+// Authored by: OpenCode
+type validationState struct {
+	previousKey            syncmodel.ActivityOrderingKey
+	previousRecord         syncmodel.ActivityRecord
+	havePrevious           bool
+	runningQuantityByAsset map[string]apd.Decimal
+}
+
+// validateActivityOrdering parses the ordering key for one record and rejects chronology or ambiguity violations.
+// Authored by: OpenCode
+func validateActivityOrdering(record syncmodel.ActivityRecord, state validationState) (syncmodel.ActivityOrderingKey, error) {
+	if strings.TrimSpace(record.OccurredAt) == "" {
+		return syncmodel.ActivityOrderingKey{}, newValidationError("normalized activity timestamp is incomplete", record)
+	}
+
+	var currentKey, _, err = syncmodel.NewActivityOrderingKeyFromRecord(record)
+	if err != nil {
+		return syncmodel.ActivityOrderingKey{}, newValidationError(fmt.Sprintf("activity %q has an unreadable timestamp: %v", record.SourceID, err), record)
+	}
+	if !state.havePrevious {
+		return currentKey, nil
+	}
+	if syncmodel.CompareActivityOrdering(currentKey, state.previousKey) < 0 {
+		return syncmodel.ActivityOrderingKey{}, newValidationError("normalized activities are not ordered chronologically", state.previousRecord, record)
+	}
+	if syncmodel.HasAmbiguousActivityOrdering(state.previousKey, currentKey) {
+		return syncmodel.ActivityOrderingKey{}, newValidationError(
+			fmt.Sprintf("supported activity ordering is ambiguous for source %q", record.SourceID),
+			state.previousRecord,
+			record,
+		)
+	}
+
+	return currentKey, nil
+}
+
+// validateActivityFields enforces identity, amount, and supported-activity rules for one normalized record.
+// Authored by: OpenCode
+func validateActivityFields(record syncmodel.ActivityRecord, zero *apd.Decimal) error {
+	if strings.TrimSpace(record.SourceID) == "" || strings.TrimSpace(record.AssetSymbol) == "" {
+		return newValidationError("normalized activity identity is incomplete", record)
+	}
+	if record.Quantity.Cmp(zero) <= 0 {
+		return newValidationError(fmt.Sprintf("activity %q quantity must be greater than zero", record.SourceID), record)
+	}
+	if record.GrossValue.Cmp(zero) < 0 {
+		return newValidationError(fmt.Sprintf("activity %q gross value cannot be negative", record.SourceID), record)
+	}
+	if record.FeeAmount != nil && record.FeeAmount.Cmp(zero) < 0 {
+		return newValidationError(fmt.Sprintf("activity %q fee amount cannot be negative", record.SourceID), record)
+	}
+
+	return validateActivityType(record, zero)
+}
+
+// validateActivityType enforces the supported BUY and SELL price rules for one normalized record.
+// Authored by: OpenCode
+func validateActivityType(record syncmodel.ActivityRecord, zero *apd.Decimal) error {
+	switch record.ActivityType {
+	case syncmodel.ActivityTypeBuy:
+		if record.UnitPrice.Cmp(zero) <= 0 {
+			return newValidationError(fmt.Sprintf("BUY activity %q must have a unit price greater than zero", record.SourceID), record)
+		}
+	case syncmodel.ActivityTypeSell:
+		if record.UnitPrice.Cmp(zero) < 0 {
+			return newValidationError(fmt.Sprintf("SELL activity %q cannot have a negative unit price", record.SourceID), record)
+		}
+		if record.UnitPrice.Cmp(zero) == 0 && strings.TrimSpace(record.Comment) == "" {
+			return newValidationError(fmt.Sprintf("SELL activity %q requires a comment when unit price is zero", record.SourceID), record)
+		}
+	default:
+		return newValidationError(fmt.Sprintf("activity %q uses unsupported type %q", record.SourceID, record.ActivityType), record)
+	}
+
+	return nil
+}
+
+// applyRunningQuantity replays one record into the per-asset holdings timeline and rejects negative holdings.
+// Authored by: OpenCode
+func applyRunningQuantity(record syncmodel.ActivityRecord, runningQuantityByAsset map[string]apd.Decimal, zero *apd.Decimal) error {
+	var runningQuantity = runningQuantityByAsset[record.AssetSymbol]
+	switch record.ActivityType {
+	case syncmodel.ActivityTypeBuy:
+		_, _ = apd.BaseContext.Add(&runningQuantity, &runningQuantity, &record.Quantity)
+	case syncmodel.ActivityTypeSell:
+		_, _ = apd.BaseContext.Sub(&runningQuantity, &runningQuantity, &record.Quantity)
+		if runningQuantity.Cmp(zero) < 0 {
+			return newValidationError(fmt.Sprintf("activity %q would drive holdings below zero", record.SourceID), record)
+		}
+	}
+	runningQuantityByAsset[record.AssetSymbol] = runningQuantity
 
 	return nil
 }

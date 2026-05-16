@@ -190,31 +190,59 @@ func (c *Client) FetchActivitiesHistory(
 			return dto.ActivityPageResponse{}, err
 		}
 
-		if expectedCount == -1 {
-			expectedCount = page.Count
-		} else if page.Count != expectedCount {
-			return dto.ActivityPageResponse{}, incompatibleServerFailure("activities pagination count changed during retrieval", nil)
+		expectedCount, err = updateExpectedActivityCount(expectedCount, page.Count)
+		if err != nil {
+			return dto.ActivityPageResponse{}, err
 		}
-
 		if expectedCount == 0 {
-			if len(page.Activities) != 0 {
-				return dto.ActivityPageResponse{}, incompatibleServerFailure("activities must be empty when count is zero", nil)
-			}
-			return dto.ActivityPageResponse{Activities: []dto.ActivityPageEntry{}, Count: 0}, nil
+			return finalizeEmptyActivityHistory(page)
 		}
-
-		if len(page.Activities) == 0 {
-			return dto.ActivityPageResponse{}, incompatibleServerFailure("activities pagination ended before the reported count was retrieved", nil)
-		}
-
-		allActivities = append(allActivities, page.Activities...)
-		if len(allActivities) > expectedCount {
-			return dto.ActivityPageResponse{}, incompatibleServerFailure("activities pagination exceeded the reported count", nil)
+		allActivities, err = appendActivityPage(allActivities, page.Activities, expectedCount)
+		if err != nil {
+			return dto.ActivityPageResponse{}, err
 		}
 		if len(allActivities) >= expectedCount {
 			return dto.ActivityPageResponse{Activities: allActivities, Count: expectedCount}, nil
 		}
 	}
+}
+
+// updateExpectedActivityCount captures the first reported count and rejects later pagination drift.
+// Authored by: OpenCode
+func updateExpectedActivityCount(expectedCount int, pageCount int) (int, error) {
+	if expectedCount == -1 {
+		return pageCount, nil
+	}
+	if pageCount != expectedCount {
+		return 0, incompatibleServerFailure("activities pagination count changed during retrieval", nil)
+	}
+
+	return expectedCount, nil
+}
+
+// finalizeEmptyActivityHistory enforces the supported zero-count pagination contract.
+// Authored by: OpenCode
+func finalizeEmptyActivityHistory(page dto.ActivityPageResponse) (dto.ActivityPageResponse, error) {
+	if len(page.Activities) != 0 {
+		return dto.ActivityPageResponse{}, incompatibleServerFailure("activities must be empty when count is zero", nil)
+	}
+
+	return dto.ActivityPageResponse{Activities: []dto.ActivityPageEntry{}, Count: 0}, nil
+}
+
+// appendActivityPage appends one activities page and rejects short or oversized pagination sequences.
+// Authored by: OpenCode
+func appendActivityPage(allActivities []dto.ActivityPageEntry, pageActivities []dto.ActivityPageEntry, expectedCount int) ([]dto.ActivityPageEntry, error) {
+	if len(pageActivities) == 0 {
+		return nil, incompatibleServerFailure("activities pagination ended before the reported count was retrieved", nil)
+	}
+
+	allActivities = append(allActivities, pageActivities...)
+	if len(allActivities) > expectedCount {
+		return nil, incompatibleServerFailure("activities pagination exceeded the reported count", nil)
+	}
+
+	return allActivities, nil
 }
 
 // fetchActivitiesPage executes one paginated activities request.

@@ -29,7 +29,13 @@ var readRandom = rand.Read
 // Authored by: OpenCode
 var sealEnvelopeCiphertext = snapshotenvelope.SealCiphertext
 
-// EncryptedStore implements token-derived protected snapshot read and write operations.
+// EncryptedStore implements token-derived protected snapshot read and write
+// operations.
+//
+// This store composes filesystem discovery, envelope compatibility checks,
+// payload decrypt, payload encrypt, and atomic replacement behind the repository
+// snapshot boundary used by the runtime sync workflow.
+//
 // Authored by: OpenCode
 type EncryptedStore struct {
 	filesystem *FilesystemStore
@@ -105,7 +111,11 @@ func (s *EncryptedStore) Read(ctx context.Context, request ReadRequest) (snapsho
 		return snapshotmodel.Payload{}, err
 	}
 
-	plaintext, err := snapshotenvelope.OpenCiphertext(envelopeDocument.Header, request.SecurityToken, envelopeDocument.Ciphertext)
+	plaintext, err := snapshotenvelope.OpenCiphertext(
+		envelopeDocument.Header,
+		request.SecurityToken,
+		envelopeDocument.Ciphertext,
+	)
 	if err != nil {
 		return snapshotmodel.Payload{}, err
 	}

@@ -43,7 +43,7 @@ func TestMainMenuEnterNavigatesToSync(t *testing.T) {
 	}
 }
 
-func TestFocusedTokenInputEnterReturnsToValidationMenuPath(t *testing.T) {
+func TestFocusedTokenInputEnterReturnsToSyncMenuPath(t *testing.T) {
 	t.Parallel()
 
 	var config = mustCloudSetupConfig(t)
@@ -66,7 +66,7 @@ func TestFocusedTokenInputEnterReturnsToValidationMenuPath(t *testing.T) {
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*flow.Model)
 	if got := model.View().Content; !strings.Contains(got, "Syncing and storing activity history") {
-		t.Fatalf("expected validation path to remain reachable, got %q", got)
+		t.Fatalf("expected sync path to remain reachable, got %q", got)
 	}
 	_ = testutil.RunCmd(cmd)
 }

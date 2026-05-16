@@ -1,5 +1,5 @@
 // Package flow tests the root Bubble Tea workflow model, including internal
-// helper behavior used to drive setup, sync validation, and result navigation.
+// helper behavior used to drive setup, sync, and result navigation.
 // Authored by: OpenCode
 package flow
 
@@ -117,7 +117,7 @@ func TestModelInitAndHelpers(t *testing.T) {
 	model.active = setupScreenKey
 	_ = nextAttemptID()
 	_ = quitCmd()
-	model.cancelActiveValidation()
+	model.cancelActiveSync()
 	if got := setupInvalidMessage(bootstrap.SetupRequirementInvalidRememberedSetup); got == "" {
 		t.Fatalf("expected invalid-remembered-setup message")
 	}
@@ -438,7 +438,7 @@ func TestFocusedInputEnterReturnsToPrimaryMenus(t *testing.T) {
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*Model)
 	if model.sync.InputFocused || model.sync.MenuIndex != 0 {
-		t.Fatalf("expected enter to return focused sync input to validation menu path")
+		t.Fatalf("expected enter to return focused sync input to sync menu path")
 	}
 }
 
@@ -579,7 +579,7 @@ func TestUpdateSyncRoutesToServerReplacementWhenRequired(t *testing.T) {
 	}
 }
 
-func TestCancelActiveValidationCancelsContextAndSyncCmdRuns(t *testing.T) {
+func TestCancelActiveSyncCancelsContextAndSyncCmdRuns(t *testing.T) {
 	t.Parallel()
 
 	var config = mustSetupConfig(t)
@@ -599,7 +599,7 @@ func TestCancelActiveValidationCancelsContextAndSyncCmdRuns(t *testing.T) {
 	if cmd == nil {
 		t.Fatalf("expected sync command")
 	}
-	model.cancelActiveValidation()
+	model.cancelActiveSync()
 	msg := runCmdFlow(cmd)
 	var batch, ok = msg.(tea.BatchMsg)
 	if !ok {

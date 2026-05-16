@@ -179,7 +179,7 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.KeyPressMsg:
 		if typedMessage.String() == "ctrl+c" {
-			m.cancelActiveValidation()
+			m.cancelActiveSync()
 			m.sync.TokenInput.Reset()
 			return m, quitCmd
 		}
@@ -351,7 +351,7 @@ func (m *Model) syncMenuItems() []component.MenuItem {
 	}
 }
 
-// resultMenuItems builds the primary validation-result actions for the current render.
+// resultMenuItems builds the primary sync-result actions for the current render.
 // Authored by: OpenCode
 func (m *Model) resultMenuItems() []component.MenuItem {
 	if m.result.Outcome.Diagnostic.Eligible && m.result.Outcome.Diagnostic.Path == "" {
@@ -421,7 +421,7 @@ func (m *Model) serverReplacementHelpText() string {
 	)
 }
 
-// resultHelpText renders the visible hotkeys for the validation-result screen.
+// resultHelpText renders the visible hotkeys for the sync-result screen.
 //
 // Authored by: OpenCode
 func (m *Model) resultHelpText() string {
@@ -431,9 +431,9 @@ func (m *Model) resultHelpText() string {
 	)
 }
 
-// cancelActiveValidation aborts the active validation request when one exists.
+// cancelActiveSync aborts the active sync request when one exists.
 // Authored by: OpenCode
-func (m *Model) cancelActiveValidation() {
+func (m *Model) cancelActiveSync() {
 	if m.sync.Cancel != nil {
 		m.sync.Cancel()
 		m.sync.Cancel = nil
@@ -553,7 +553,7 @@ func (m *Model) syncCmd(ctx context.Context, attemptID string, request runtime.S
 	}
 }
 
-// nextAttemptID returns a process-local identifier for the next validation attempt.
+// nextAttemptID returns a process-local identifier for the next sync attempt.
 // Authored by: OpenCode
 func nextAttemptID() string {
 	return fmt.Sprintf("attempt-%d", time.Now().UnixNano())
