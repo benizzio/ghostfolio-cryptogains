@@ -132,10 +132,6 @@ func TestServerReplacementFlowFailedReplacementRetainsPreviousSnapshot(t *testin
 	if err != nil {
 		t.Fatalf("discover initial candidates: %v", err)
 	}
-	beforeBytes, err := os.ReadFile(firstCandidates[0].Path)
-	if err != nil {
-		t.Fatalf("read original snapshot: %v", err)
-	}
 
 	secondServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
@@ -153,9 +149,9 @@ func TestServerReplacementFlowFailedReplacementRetainsPreviousSnapshot(t *testin
 	if preload := replacementService.Run(context.Background(), runtime.SyncRequest{Config: firstConfig, SecurityToken: "token-one"}); !preload.Success {
 		t.Fatalf("expected preload success to set active snapshot, got %#v", preload)
 	}
-	beforeBytes, err = os.ReadFile(firstCandidates[0].Path)
+	beforeBytes, err := os.ReadFile(firstCandidates[0].Path)
 	if err != nil {
-		t.Fatalf("read snapshot after preload: %v", err)
+		t.Fatalf("read snapshot for comparison: %v", err)
 	}
 
 	secondConfig, err := configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, secondServer.URL, true, time.Now())
