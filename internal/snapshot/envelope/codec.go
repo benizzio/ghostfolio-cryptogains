@@ -324,6 +324,9 @@ func validateEnvelopeHeader(header snapshotmodel.EnvelopeHeader) error {
 	if header.KDFParameters.MemoryKiB == 0 || header.KDFParameters.Iterations == 0 || header.KDFParameters.Parallelism == 0 || header.KDFParameters.KeyLength == 0 {
 		return fmt.Errorf("snapshot kdf parameters are incomplete")
 	}
+	if header.KDFParameters != snapshotmodel.DefaultKDFParameters() {
+		return fmt.Errorf("snapshot kdf parameters are unsupported")
+	}
 	if len(header.Salt) == 0 {
 		return fmt.Errorf("snapshot salt is required")
 	}

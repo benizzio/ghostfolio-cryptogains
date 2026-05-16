@@ -262,6 +262,26 @@ func TestValidateEnvelopeHeaderCoversValidationBranches(t *testing.T) {
 			header.KDFParameters.MemoryKiB = 0
 			return header
 		}()},
+		{name: "unsupported kdf memory", header: func() snapshotmodel.EnvelopeHeader {
+			header := snapshotEnvelopeHeaderFixture()
+			header.KDFParameters.MemoryKiB++
+			return header
+		}()},
+		{name: "unsupported kdf iterations", header: func() snapshotmodel.EnvelopeHeader {
+			header := snapshotEnvelopeHeaderFixture()
+			header.KDFParameters.Iterations++
+			return header
+		}()},
+		{name: "unsupported kdf parallelism", header: func() snapshotmodel.EnvelopeHeader {
+			header := snapshotEnvelopeHeaderFixture()
+			header.KDFParameters.Parallelism++
+			return header
+		}()},
+		{name: "unsupported kdf key length", header: func() snapshotmodel.EnvelopeHeader {
+			header := snapshotEnvelopeHeaderFixture()
+			header.KDFParameters.KeyLength++
+			return header
+		}()},
 		{name: "missing salt", header: func() snapshotmodel.EnvelopeHeader {
 			header := snapshotEnvelopeHeaderFixture()
 			header.Salt = nil
