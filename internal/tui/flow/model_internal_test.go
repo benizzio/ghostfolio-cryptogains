@@ -5,6 +5,7 @@ package flow
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -21,6 +22,8 @@ type testSyncService struct {
 	outcome            runtime.ValidationOutcome
 	protectedDataState runtime.ProtectedDataState
 	replacementCheck   runtime.ServerReplacementCheck
+	diagnosticPath     string
+	diagnosticErr      error
 }
 
 func (s testSyncService) Validate(context.Context, runtime.ValidateRequest) runtime.ValidationOutcome {
@@ -28,6 +31,12 @@ func (s testSyncService) Validate(context.Context, runtime.ValidateRequest) runt
 }
 
 func (s testSyncService) GenerateDiagnosticReport(context.Context, runtime.DiagnosticReportRequest) (string, error) {
+	if s.diagnosticErr != nil {
+		return "", s.diagnosticErr
+	}
+	if s.diagnosticPath != "" {
+		return s.diagnosticPath, nil
+	}
 	return "/tmp/report.diagnostic.json", nil
 }
 
@@ -100,6 +109,7 @@ func TestModelInitAndHelpers(t *testing.T) {
 	_ = model.setupHelpText()
 	_ = model.mainMenuHelpText()
 	_ = model.syncHelpText()
+	_ = model.serverReplacementHelpText()
 	_ = model.resultHelpText()
 	_ = model.View()
 	model.active = activeScreen("unknown")
@@ -127,6 +137,8 @@ func TestModelInitAndHelpers(t *testing.T) {
 	model.active = mainMenuScreenKey
 	_ = model.View()
 	model.active = syncValidationScreenKey
+	_ = model.View()
+	model.active = serverReplacementScreenKey
 	_ = model.View()
 	model.active = validationResultScreenKey
 	_ = model.View()
@@ -659,6 +671,21 @@ func TestUpdateValidationResultCoversNavigation(t *testing.T) {
 	}
 
 	model.active = validationResultScreenKey
+	model.result = resultState{MenuIndex: 1, Outcome: runtime.ValidationOutcome{Success: false, FailureReason: runtime.SyncFailureUnsupportedActivityHistory, Diagnostic: runtime.DiagnosticReportState{Eligible: true}}}
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	if updated.(*Model).active != syncValidationScreenKey {
+		t.Fatalf("expected diagnostic result second action to reopen sync validation")
+	}
+
+	model = newTestModel(t, &config)
+	model.active = validationResultScreenKey
+	model.result = resultState{MenuIndex: 2, Outcome: runtime.ValidationOutcome{Success: false, FailureReason: runtime.SyncFailureUnsupportedActivityHistory, Diagnostic: runtime.DiagnosticReportState{Eligible: true}}}
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	if updated.(*Model).active != mainMenuScreenKey {
+		t.Fatalf("expected diagnostic result default action to return main menu")
+	}
+
+	model.active = validationResultScreenKey
 	model.result = resultState{Outcome: runtime.ValidationOutcome{Success: false, FailureReason: runtime.SyncFailureUnsupportedActivityHistory, Diagnostic: runtime.DiagnosticReportState{Eligible: true}}}
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*Model)
@@ -706,6 +733,62 @@ func TestUpdateMainMenuCoversEnterAndDefaultKey(t *testing.T) {
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Text: "x", Code: 'x'}))
 	if cmd != nil || updated.(*Model).active != mainMenuScreenKey {
 		t.Fatalf("expected unrelated main-menu key to be ignored")
+	}
+}
+
+// TestGenerateDiagnosticReportAndServerReplacementIgnoreBranches verifies the
+// remaining result and replacement navigation ignore paths.
+// Authored by: OpenCode
+func TestGenerateDiagnosticReportAndServerReplacementIgnoreBranches(t *testing.T) {
+	t.Parallel()
+
+	var config = mustSetupConfig(t)
+	var model = newTestModel(t, &config)
+	model.deps.SyncService = testSyncService{diagnosticErr: errors.New("report boom")}
+	model.active = validationResultScreenKey
+	model.result = resultState{Outcome: runtime.ValidationOutcome{Success: false, FailureReason: runtime.SyncFailureUnsupportedActivityHistory, Diagnostic: runtime.DiagnosticReportState{Eligible: true, Request: runtime.DiagnosticReportRequest{}}}}
+	model.currentConfig = &config
+
+	updated, _ := model.generateDiagnosticReport()
+	model = updated.(*Model)
+	if model.result.Outcome.Diagnostic.Path != "" {
+		t.Fatalf("expected diagnostic path to stay empty on write error, got %#v", model.result.Outcome.Diagnostic)
+	}
+
+	model.deps.SyncService = testSyncService{}
+	updated, _ = model.generateDiagnosticReport()
+	model = updated.(*Model)
+	if model.result.Outcome.Diagnostic.Request.ServerOrigin != config.ServerOrigin || model.result.Outcome.Diagnostic.Request.Attempt.AttemptID != model.result.Outcome.Attempt.AttemptID {
+		t.Fatalf("expected diagnostic request defaults to be filled, got %#v", model.result.Outcome.Diagnostic.Request)
+	}
+
+	updated, cmd := model.Update(struct{}{})
+	if cmd != nil || updated.(*Model).active != validationResultScreenKey {
+		t.Fatalf("expected non-key validation-result message to be ignored")
+	}
+
+	model.active = serverReplacementScreenKey
+	updated, cmd = model.Update(struct{}{})
+	if cmd != nil || updated.(*Model).active != serverReplacementScreenKey {
+		t.Fatalf("expected non-key replacement message to be ignored")
+	}
+
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyUp}))
+	if updated.(*Model).replacement.MenuIndex != 0 {
+		t.Fatalf("expected replacement up at top to stay in place")
+	}
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	model = updated.(*Model)
+	if model.replacement.MenuIndex != 1 {
+		t.Fatalf("expected replacement down to move menu index")
+	}
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	if cmd != nil || updated.(*Model).replacement.MenuIndex != 1 {
+		t.Fatalf("expected replacement down at bottom to stay in place")
+	}
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyUp}))
+	if updated.(*Model).replacement.MenuIndex != 0 {
+		t.Fatalf("expected replacement up to move back to first option")
 	}
 }
 

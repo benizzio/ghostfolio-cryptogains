@@ -218,6 +218,141 @@ func TestFetchActivitiesProbeHandlesTransportAndBuildErrors(t *testing.T) {
 	})
 }
 
+// TestFetchActivitiesHistoryCoversPaginationBranches verifies paginated history
+// retrieval across success and incompatible-pagination branches.
+// Authored by: OpenCode
+func TestFetchActivitiesHistoryCoversPaginationBranches(t *testing.T) {
+	t.Parallel()
+
+	t.Run("multi page success", func(t *testing.T) {
+		var requestCount int
+		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			requestCount++
+			writer.Header().Set("Content-Type", "application/json")
+			if request.URL.Query().Get("take") != "250" || request.URL.Query().Get("sortColumn") != "date" || request.URL.Query().Get("sortDirection") != "asc" {
+				t.Fatalf("unexpected pagination query: %s", request.URL.RawQuery)
+			}
+			if request.Header.Get("Authorization") != "Bearer jwt" {
+				t.Fatalf("unexpected auth header: %q", request.Header.Get("Authorization"))
+			}
+
+			switch request.URL.Query().Get("skip") {
+			case "0":
+				_, _ = writer.Write([]byte(`{"activities":[{"id":"a"},{"id":"b"}],"count":3}`))
+			case "2":
+				_, _ = writer.Write([]byte(`{"activities":[{"id":"c"}],"count":3}`))
+			default:
+				writer.WriteHeader(http.StatusInternalServerError)
+			}
+		}))
+		defer server.Close()
+
+		var response, err = New(server.Client()).FetchActivitiesHistory(context.Background(), server.URL, "jwt")
+		if err != nil {
+			t.Fatalf("fetch activities history: %v", err)
+		}
+		if response.Count != 3 || len(response.Activities) != 3 {
+			t.Fatalf("unexpected paginated response: %#v", response)
+		}
+		if requestCount != 2 {
+			t.Fatalf("expected two paginated requests, got %d", requestCount)
+		}
+	})
+
+	t.Run("zero count success", func(t *testing.T) {
+		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			_, _ = writer.Write([]byte(`{"activities":[],"count":0}`))
+		}))
+		defer server.Close()
+
+		var response, err = New(server.Client()).FetchActivitiesHistory(context.Background(), server.URL, "jwt")
+		if err != nil {
+			t.Fatalf("fetch zero-count history: %v", err)
+		}
+		if response.Count != 0 || len(response.Activities) != 0 {
+			t.Fatalf("unexpected zero-count response: %#v", response)
+		}
+	})
+
+	t.Run("count changes during retrieval", func(t *testing.T) {
+		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			switch request.URL.Query().Get("skip") {
+			case "0":
+				_, _ = writer.Write([]byte(`{"activities":[{"id":"a"}],"count":2}`))
+			case "1":
+				_, _ = writer.Write([]byte(`{"activities":[{"id":"b"}],"count":3}`))
+			default:
+				writer.WriteHeader(http.StatusInternalServerError)
+			}
+		}))
+		defer server.Close()
+
+		_, err := New(server.Client()).FetchActivitiesHistory(context.Background(), server.URL, "jwt")
+		var failure *RequestFailure
+		if !errors.As(err, &failure) || failure.Category != FailureIncompatibleServerContract {
+			t.Fatalf("expected incompatible-contract failure, got %v", err)
+		}
+	})
+
+	t.Run("zero count with activities fails", func(t *testing.T) {
+		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			_, _ = writer.Write([]byte(`{"activities":[{"id":"a"}],"count":0}`))
+		}))
+		defer server.Close()
+
+		_, err := New(server.Client()).FetchActivitiesHistory(context.Background(), server.URL, "jwt")
+		var failure *RequestFailure
+		if !errors.As(err, &failure) || failure.Category != FailureIncompatibleServerContract {
+			t.Fatalf("expected incompatible-contract failure, got %v", err)
+		}
+	})
+
+	t.Run("pagination ends early", func(t *testing.T) {
+		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			switch request.URL.Query().Get("skip") {
+			case "0":
+				_, _ = writer.Write([]byte(`{"activities":[{"id":"a"}],"count":2}`))
+			case "1":
+				_, _ = writer.Write([]byte(`{"activities":[],"count":2}`))
+			default:
+				writer.WriteHeader(http.StatusInternalServerError)
+			}
+		}))
+		defer server.Close()
+
+		_, err := New(server.Client()).FetchActivitiesHistory(context.Background(), server.URL, "jwt")
+		var failure *RequestFailure
+		if !errors.As(err, &failure) || failure.Category != FailureIncompatibleServerContract {
+			t.Fatalf("expected incompatible-contract failure, got %v", err)
+		}
+	})
+
+	t.Run("pagination exceeds reported count", func(t *testing.T) {
+		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			_, _ = writer.Write([]byte(`{"activities":[{"id":"a"},{"id":"b"}],"count":1}`))
+		}))
+		defer server.Close()
+
+		_, err := New(server.Client()).FetchActivitiesHistory(context.Background(), server.URL, "jwt")
+		var failure *RequestFailure
+		if !errors.As(err, &failure) || failure.Category != FailureIncompatibleServerContract {
+			t.Fatalf("expected incompatible-contract failure, got %v", err)
+		}
+	})
+
+	t.Run("invalid origin", func(t *testing.T) {
+		_, err := New(nil).FetchActivitiesHistory(context.Background(), "://bad", "jwt")
+		if err == nil {
+			t.Fatalf("expected invalid origin to fail")
+		}
+	})
+}
+
 func TestClassifyTransportFailureDeadlineExceeded(t *testing.T) {
 	t.Parallel()
 

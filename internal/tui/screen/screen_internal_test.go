@@ -125,6 +125,23 @@ func TestSyncValidationScreenViewUsesValidationMessageOverride(t *testing.T) {
 	}
 }
 
+// TestSyncProtectedDataStatusLabelCoversBothBranches verifies the visible sync
+// protected-data status helper.
+// Authored by: OpenCode
+func TestSyncProtectedDataStatusLabelCoversBothBranches(t *testing.T) {
+	t.Parallel()
+
+	if got := syncProtectedDataStatusLabel(true); got != "yes" {
+		t.Fatalf("expected yes label, got %q", got)
+	}
+	if got := syncProtectedDataStatusLabel(false); got != "no" {
+		t.Fatalf("expected no label, got %q", got)
+	}
+	if got := protectedDataStatusLabel(false); got != "none loaded for this run" {
+		t.Fatalf("expected no protected-data label, got %q", got)
+	}
+}
+
 func TestValidationResultScreenViewCoversFailureBranch(t *testing.T) {
 	t.Parallel()
 
@@ -165,6 +182,34 @@ func TestValidationResultScreenViewCoversDiagnosticBranches(t *testing.T) {
 	})
 	if !strings.Contains(writtenContent, "/tmp/report.diagnostic.json") {
 		t.Fatalf("expected generated-report path disclosure, got %q", writtenContent)
+	}
+}
+
+// TestValidationFollowUpTextCoversRemainingFailureBranches verifies the
+// explicit follow-up guidance branches that are not covered by the render tests.
+// Authored by: OpenCode
+func TestValidationFollowUpTextCoversRemainingFailureBranches(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name    string
+		outcome runtime.ValidationOutcome
+		want    string
+	}{
+		{name: "replacement cancelled", outcome: runtime.ValidationOutcome{FailureReason: runtime.SyncFailureServerReplacementCancelled}, want: "server replacement was cancelled"},
+		{name: "rejected token", outcome: runtime.ValidationOutcome{FailureReason: runtime.ValidationFailureRejectedToken}, want: "token was rejected"},
+		{name: "unsupported stored-data version", outcome: runtime.ValidationOutcome{FailureReason: runtime.SyncFailureUnsupportedStoredDataVersion}, want: "unsupported stored-data version"},
+		{name: "incompatible new sync data", outcome: runtime.ValidationOutcome{FailureReason: runtime.SyncFailureIncompatibleNewSyncData}, want: "could not be stored safely"},
+		{name: "unsupported activity history", outcome: runtime.ValidationOutcome{FailureReason: runtime.SyncFailureUnsupportedActivityHistory}, want: "activity history is not supported safely"},
+		{name: "default failure", outcome: runtime.ValidationOutcome{FailureReason: runtime.ValidationFailureTimeout}, want: "Sync again or return to the main menu"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := validationFollowUpText(testCase.outcome); !strings.Contains(got, testCase.want) {
+				t.Fatalf("expected follow-up text %q to contain %q", got, testCase.want)
+			}
+		})
 	}
 }
 

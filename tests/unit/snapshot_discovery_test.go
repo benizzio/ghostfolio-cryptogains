@@ -3,6 +3,7 @@ package unit
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -29,6 +30,40 @@ func TestDiscoverServerCandidatesFiltersBySelectedServer(t *testing.T) {
 	}
 	if candidates[0].SnapshotID != "snapshot-a" {
 		t.Fatalf("unexpected candidate: %#v", candidates[0])
+	}
+}
+
+type discoveryStoreStub struct {
+	candidates    []snapshotstore.Candidate
+	candidatesErr error
+}
+
+func (s discoveryStoreStub) Candidates(context.Context) ([]snapshotstore.Candidate, error) {
+	if s.candidatesErr != nil {
+		return nil, s.candidatesErr
+	}
+	return s.candidates, nil
+}
+
+func (discoveryStoreStub) Read(context.Context, snapshotstore.ReadRequest) (snapshotmodel.Payload, error) {
+	return snapshotmodel.Payload{}, nil
+}
+
+func (discoveryStoreStub) Write(context.Context, snapshotstore.WriteRequest) (snapshotstore.Candidate, error) {
+	return snapshotstore.Candidate{}, nil
+}
+
+func TestDiscoverServerCandidatesCoversNilAndErrorBranches(t *testing.T) {
+	t.Parallel()
+
+	candidates, err := snapshotstore.DiscoverServerCandidates(context.Background(), nil, "https://server-a.example")
+	if err != nil || len(candidates) != 0 {
+		t.Fatalf("expected nil store to return empty result, got %#v err=%v", candidates, err)
+	}
+
+	_, err = snapshotstore.DiscoverServerCandidates(context.Background(), discoveryStoreStub{candidatesErr: errors.New("discover boom")}, "https://server-a.example")
+	if err == nil {
+		t.Fatalf("expected candidate discovery error")
 	}
 }
 

@@ -14,6 +14,16 @@ import (
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
 
+// Test seams wrap JSON encoding so runtime tests can inject diagnostic-report
+// encoding failures safely.
+// Authored by: OpenCode
+var marshalDiagnosticReport = json.MarshalIndent
+
+// Test seams wrap user-config-directory resolution so runtime tests can inject
+// OS lookup failures safely.
+// Authored by: OpenCode
+var resolveUserConfigDir = os.UserConfigDir
+
 const (
 	applicationDirectoryName = "ghostfolio-cryptogains"
 	diagnosticsDirectoryName = "diagnostics"
@@ -75,7 +85,7 @@ func writeDiagnosticReport(
 
 	var document = buildDiagnosticReportDocument(request, timestamp)
 	var contents []byte
-	contents, err = json.MarshalIndent(document, "", "  ")
+	contents, err = marshalDiagnosticReport(document, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("encode diagnostic report: %w", err)
 	}
@@ -145,7 +155,7 @@ func resolveBaseConfigDir(baseConfigDir string) (string, error) {
 		return baseConfigDir, nil
 	}
 
-	var userConfigDir, err = os.UserConfigDir()
+	var userConfigDir, err = resolveUserConfigDir()
 	if err != nil {
 		return "", fmt.Errorf("resolve user config directory: %w", err)
 	}

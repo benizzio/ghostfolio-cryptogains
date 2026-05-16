@@ -150,6 +150,8 @@ description: "Task list for Store Activity Data implementation"
 - [X] T049 [P] Add integration coverage that bootstrap files, protected snapshots, generated diagnostic reports, and persisted workflow artifacts never store Ghostfolio tokens, raw payload fragments, transient sync-failure messages, or production-disallowed financial-value fields in `tests/integration/persistence_security_flow_test.go`
 - [X] T050 [P] Add deterministic large-history performance verification coverage for authenticated retrieval, normalization, validation, and protected replacement in `tests/integration/sync_performance_flow_test.go`
 - [X] T046 Run `make test`, `make coverage`, and the documented large-history performance verification, then verify the generated artifacts in `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`
+- [X] T054 If coverage gates are not met, add targeted tests to address gaps and rerun verification until all gates are satisfied, following defined test approaches
+- [X] T055 Run `make test`, `make coverage` and certify coverage gates are met
 
 ---
 

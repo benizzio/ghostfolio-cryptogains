@@ -14,6 +14,21 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
+// Test seams wrap JSON encoding so envelope tests can inject codec failures
+// safely.
+// Authored by: OpenCode
+var marshalEnvelopeJSON = json.Marshal
+
+// Test seams wrap JSON decoding so envelope tests can inject codec failures
+// safely.
+// Authored by: OpenCode
+var unmarshalEnvelopeJSON = json.Unmarshal
+
+// Test seams wrap GCM construction so envelope tests can inject AEAD creation
+// failures safely.
+// Authored by: OpenCode
+var newGCM = cipher.NewGCM
+
 // Codec defines the serialization boundary for protected snapshot envelopes.
 //
 // Example:
@@ -57,7 +72,7 @@ func (JSONCodec) Encode(envelope snapshotmodel.Envelope) ([]byte, error) {
 		return nil, fmt.Errorf("ciphertext is required")
 	}
 
-	encoded, err := json.Marshal(envelope)
+	encoded, err := marshalEnvelopeJSON(envelope)
 	if err != nil {
 		return nil, fmt.Errorf("encode snapshot envelope: %w", err)
 	}
@@ -69,7 +84,7 @@ func (JSONCodec) Encode(envelope snapshotmodel.Envelope) ([]byte, error) {
 // Authored by: OpenCode
 func (JSONCodec) Decode(raw []byte) (snapshotmodel.Envelope, error) {
 	var envelope snapshotmodel.Envelope
-	if err := json.Unmarshal(raw, &envelope); err != nil {
+	if err := unmarshalEnvelopeJSON(raw, &envelope); err != nil {
 		return snapshotmodel.Envelope{}, fmt.Errorf("decode snapshot envelope: %w", err)
 	}
 	if err := validateEnvelopeHeader(envelope.Header); err != nil {
@@ -116,7 +131,7 @@ func AuthenticatedHeaderBytes(header snapshotmodel.EnvelopeHeader) ([]byte, erro
 		return nil, err
 	}
 
-	encoded, err := json.Marshal(header)
+	encoded, err := marshalEnvelopeJSON(header)
 	if err != nil {
 		return nil, fmt.Errorf("encode authenticated header: %w", err)
 	}
@@ -199,7 +214,7 @@ func prepareAEAD(header snapshotmodel.EnvelopeHeader, securityToken string) (cip
 	}
 
 	var aead cipher.AEAD
-	aead, err = cipher.NewGCM(block)
+	aead, err = newGCM(block)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create AES-GCM instance: %w", err)
 	}

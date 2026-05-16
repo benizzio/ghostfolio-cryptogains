@@ -8,12 +8,26 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	snapshotenvelope "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/envelope"
 	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
 )
+
+// Test seams wrap JSON encoding so encrypted-store tests can inject payload
+// encoding failures safely.
+// Authored by: OpenCode
+var marshalPayload = json.Marshal
+
+// Test seams wrap secure random reads so encrypted-store tests can exercise
+// random-identifier and nonce generation failures safely.
+// Authored by: OpenCode
+var readRandom = rand.Read
+
+// Test seams wrap payload sealing so encrypted-store tests can inject envelope
+// encryption failures safely.
+// Authored by: OpenCode
+var sealEnvelopeCiphertext = snapshotenvelope.SealCiphertext
 
 // EncryptedStore implements token-derived protected snapshot read and write operations.
 // Authored by: OpenCode
@@ -51,7 +65,7 @@ func (s *EncryptedStore) Read(ctx context.Context, request ReadRequest) (snapsho
 		return snapshotmodel.Payload{}, fmt.Errorf("security token is required")
 	}
 
-	rawEnvelope, err := os.ReadFile(request.Candidate.Path)
+	rawEnvelope, err := readFile(request.Candidate.Path)
 	if err != nil {
 		return snapshotmodel.Payload{}, fmt.Errorf("read snapshot file: %w", err)
 	}
@@ -93,7 +107,7 @@ func (s *EncryptedStore) Write(ctx context.Context, request WriteRequest) (Candi
 		return Candidate{}, fmt.Errorf("server origin is required")
 	}
 
-	payloadBytes, err := json.Marshal(request.Payload)
+	payloadBytes, err := marshalPayload(request.Payload)
 	if err != nil {
 		return Candidate{}, fmt.Errorf("encode protected snapshot payload: %w", err)
 	}
@@ -103,7 +117,7 @@ func (s *EncryptedStore) Write(ctx context.Context, request WriteRequest) (Candi
 		return Candidate{}, err
 	}
 
-	ciphertext, err := snapshotenvelope.SealCiphertext(header, request.SecurityToken, payloadBytes)
+	ciphertext, err := sealEnvelopeCiphertext(header, request.SecurityToken, payloadBytes)
 	if err != nil {
 		return Candidate{}, err
 	}
@@ -166,7 +180,7 @@ func randomIdentifier(byteLength int) (string, error) {
 // Authored by: OpenCode
 func randomBytes(length int) ([]byte, error) {
 	var buffer = make([]byte, length)
-	if _, err := rand.Read(buffer); err != nil {
+	if _, err := readRandom(buffer); err != nil {
 		return nil, fmt.Errorf("read secure random bytes: %w", err)
 	}
 	return buffer, nil

@@ -25,6 +25,16 @@ import (
 	syncvalidate "github.com/benizzio/ghostfolio-cryptogains/internal/sync/validate"
 )
 
+// Test seams wrap secure random reads so runtime tests can exercise identifier
+// generation failures safely.
+// Authored by: OpenCode
+var readRandom = rand.Read
+
+// Test seams wrap envelope compatibility checks so runtime tests can inject
+// stored-data validation failures safely.
+// Authored by: OpenCode
+var validateEnvelopeHeaderCompatibility = snapshotstore.ValidateEnvelopeCompatibility
+
 // ValidateRequest contains the bootstrap configuration and runtime-only token
 // needed for a single Ghostfolio communication check.
 //
@@ -205,7 +215,7 @@ func (s *syncService) Validate(ctx context.Context, request ValidateRequest) Val
 		})
 	}
 	for _, candidate := range candidates {
-		if err := snapshotstore.ValidateEnvelopeCompatibility(candidate.Header); err != nil {
+		if err := validateEnvelopeHeaderCompatibility(candidate.Header); err != nil {
 			if errors.Is(err, snapshotstore.ErrUnsupportedStoredDataVersion) {
 				return s.finalizeSyncFailure(&session, &attempt, SyncFailureUnsupportedStoredDataVersion, syncmodel.DiagnosticContext{
 					FailureStage:  syncmodel.DiagnosticFailureStageStoredDataCompatibility,
@@ -572,7 +582,7 @@ func (s *syncService) CheckServerReplacement(config configmodel.AppSetupConfig) 
 // Authored by: OpenCode
 func randomIdentifier(byteLength int) (string, error) {
 	var rawValue = make([]byte, byteLength)
-	if _, err := rand.Read(rawValue); err != nil {
+	if _, err := readRandom(rawValue); err != nil {
 		return "", fmt.Errorf("read secure random bytes: %w", err)
 	}
 

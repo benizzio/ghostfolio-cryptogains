@@ -38,6 +38,62 @@ var (
 	ErrWriteNotImplemented = errors.New("protected snapshot payload write is not implemented in the foundational store")
 )
 
+// temporaryFile defines the transient file contract used during atomic snapshot
+// replacement.
+// Authored by: OpenCode
+type temporaryFile interface {
+	Name() string
+	Chmod(os.FileMode) error
+	Write([]byte) (int, error)
+	Sync() error
+	Close() error
+}
+
+// Test seams wrap filesystem reads so store tests can inject failure paths.
+// Authored by: OpenCode
+var readDir = os.ReadDir
+
+// Test seams wrap snapshot file reads so store tests can inject failure paths.
+// Authored by: OpenCode
+var readFile = os.ReadFile
+
+// Test seams wrap directory creation so store tests can inject failure paths.
+// Authored by: OpenCode
+var mkdirAll = os.MkdirAll
+
+// Test seams wrap temporary-file creation so store tests can inject transient
+// file failures.
+// Authored by: OpenCode
+var createTempFile = func(dir string, pattern string) (temporaryFile, error) {
+	return os.CreateTemp(dir, pattern)
+}
+
+// Test seams wrap path renames so store tests can exercise atomic replacement
+// failures safely.
+// Authored by: OpenCode
+var renamePath = os.Rename
+
+// Test seams wrap chmod so store tests can exercise restrictive-permission
+// failures safely.
+// Authored by: OpenCode
+var chmodPath = os.Chmod
+
+// Test seams wrap file removal so store tests can verify cleanup behavior.
+// Authored by: OpenCode
+var removePath = os.Remove
+
+// Test seams wrap stat calls so Windows replacement tests can inject inspect
+// failures safely.
+// Authored by: OpenCode
+var statPath = os.Stat
+
+// Test seams wrap platform checks so Linux tests can exercise Windows-specific
+// replacement branches safely.
+// Authored by: OpenCode
+var isWindowsPlatform = func() bool {
+	return runtime.GOOS == "windows"
+}
+
 // Candidate identifies one protected snapshot file discovered before decrypt.
 // Authored by: OpenCode
 type Candidate struct {
@@ -131,7 +187,7 @@ func (s *FilesystemStore) Candidates(ctx context.Context) ([]Candidate, error) {
 		return nil, err
 	}
 
-	entries, err := os.ReadDir(s.directory)
+	entries, err := readDir(s.directory)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return []Candidate{}, nil
@@ -150,7 +206,7 @@ func (s *FilesystemStore) Candidates(ctx context.Context) ([]Candidate, error) {
 
 		var snapshotID = strings.TrimSuffix(entry.Name(), SnapshotFileExtension)
 		var path = s.SnapshotPath(snapshotID)
-		var raw, readErr = os.ReadFile(path)
+		var raw, readErr = readFile(path)
 		if readErr != nil {
 			return nil, fmt.Errorf("read snapshot file %q: %w", entry.Name(), readErr)
 		}
@@ -203,14 +259,14 @@ func (s *FilesystemStore) Write(_ context.Context, _ WriteRequest) (Candidate, e
 // Authored by: OpenCode
 func ReplaceFileAtomically(path string, contents []byte) error {
 	var parentDirectory = filepath.Dir(path)
-	if err := os.MkdirAll(parentDirectory, directoryFileMode); err != nil {
+	if err := mkdirAll(parentDirectory, directoryFileMode); err != nil {
 		return fmt.Errorf("create snapshot directory: %w", err)
 	}
 	if err := applyPathMode(parentDirectory, directoryFileMode); err != nil {
 		return err
 	}
 
-	var tempFile, err = os.CreateTemp(parentDirectory, ".snapshot-*.tmp")
+	var tempFile, err = createTempFile(parentDirectory, ".snapshot-*.tmp")
 	if err != nil {
 		return fmt.Errorf("create temporary snapshot file: %w", err)
 	}
@@ -233,11 +289,11 @@ func ReplaceFileAtomically(path string, contents []byte) error {
 		return fmt.Errorf("close temporary snapshot file: %w", err)
 	}
 
-	if runtime.GOOS == "windows" {
+	if isWindowsPlatform() {
 		if err := replaceFileWindows(path, tempPath); err != nil {
 			return err
 		}
-	} else if err := os.Rename(tempPath, path); err != nil {
+	} else if err := renamePath(tempPath, path); err != nil {
 		return fmt.Errorf("replace snapshot file atomically: %w", err)
 	}
 
@@ -256,21 +312,21 @@ func replaceFileWindows(path string, tempPath string) error {
 	cleanupTempFile(backupPath)
 
 	var existingFilePresent = false
-	if _, err := os.Stat(path); err == nil {
+	if _, err := statPath(path); err == nil {
 		existingFilePresent = true
 	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("inspect existing snapshot file: %w", err)
 	}
 
 	if existingFilePresent {
-		if err := os.Rename(path, backupPath); err != nil {
+		if err := renamePath(path, backupPath); err != nil {
 			return fmt.Errorf("move existing snapshot file aside: %w", err)
 		}
 	}
 
-	if err := os.Rename(tempPath, path); err != nil {
+	if err := renamePath(tempPath, path); err != nil {
 		if existingFilePresent {
-			_ = os.Rename(backupPath, path)
+			_ = renamePath(backupPath, path)
 		}
 		return fmt.Errorf("replace snapshot file atomically: %w", err)
 	}
@@ -285,7 +341,7 @@ func replaceFileWindows(path string, tempPath string) error {
 // applyPathMode reapplies a restrictive file mode when the platform honors permission bits.
 // Authored by: OpenCode
 func applyPathMode(path string, mode os.FileMode) error {
-	if err := os.Chmod(path, mode); err != nil && !ignoresPermissionBits() {
+	if err := chmodPath(path, mode); err != nil && !ignoresPermissionBits() {
 		return fmt.Errorf("chmod snapshot path: %w", err)
 	}
 	return nil
@@ -294,11 +350,11 @@ func applyPathMode(path string, mode os.FileMode) error {
 // cleanupTempFile removes a stale temporary or backup file after store operations.
 // Authored by: OpenCode
 func cleanupTempFile(path string) {
-	_ = os.Remove(path)
+	_ = removePath(path)
 }
 
 // ignoresPermissionBits reports whether the current platform does not expose Unix-style permission bits meaningfully.
 // Authored by: OpenCode
 func ignoresPermissionBits() bool {
-	return runtime.GOOS == "windows"
+	return isWindowsPlatform()
 }
