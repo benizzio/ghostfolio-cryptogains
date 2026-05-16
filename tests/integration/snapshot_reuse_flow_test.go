@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -260,18 +261,27 @@ func newTokenAwareStorageServer(t *testing.T) *tokenAwareStorageServer {
 			}
 			_, _ = writer.Write([]byte(`{"authToken":"jwt-` + payload.AccessToken + `"}`))
 		case "/api/v1/activities":
-			token := request.Header.Get("Authorization")
-			token = token[len("Bearer jwt-"):]
+			authorization := request.Header.Get("Authorization")
+			token, ok := strings.CutPrefix(authorization, "Bearer jwt-")
+			if !ok {
+				writer.WriteHeader(http.StatusForbidden)
+				return
+			}
 			server.mutex.Lock()
-			pages := server.tokenPages[token]
+			pages, known := server.tokenPages[token]
 			index := server.pageIndex[token]
+			if !known || len(pages) == 0 {
+				server.mutex.Unlock()
+				writer.WriteHeader(http.StatusForbidden)
+				return
+			}
 			if index >= len(pages) {
 				index = len(pages) - 1
 			}
 			page := pages[index]
 			server.pageIndex[token] = index + 1
 			server.mutex.Unlock()
-			_, _ = writer.Write([]byte(fmt.Sprintf(`{"activities":%s,"count":%d}`, page.ActivitiesJSON, page.Count)))
+			_, _ = fmt.Fprintf(writer, `{"activities":%s,"count":%d}`, page.ActivitiesJSON, page.Count)
 		default:
 			writer.WriteHeader(http.StatusNotFound)
 		}
