@@ -1,5 +1,5 @@
 // Package client implements the minimal Ghostfolio HTTP boundary used by this
-// validation-only slice.
+// sync-and-storage slice.
 // Authored by: OpenCode
 package client
 
@@ -87,8 +87,8 @@ func (e *RequestFailure) Unwrap() error {
 	return e.Err
 }
 
-// Client executes the minimal Ghostfolio auth and activities-probe requests for
-// this slice.
+// Client executes the Ghostfolio auth and activities-history requests for this
+// slice.
 //
 // Authored by: OpenCode
 type Client struct {
@@ -203,26 +203,6 @@ func (c *Client) FetchActivitiesHistory(
 	}
 }
 
-// FetchActivitiesProbe preserves the one-page activities probe used by the
-// earlier validation slice.
-//
-// Example:
-//
-//	response, err := transportClient.FetchActivitiesProbe(ctx, "https://ghostfol.io", "jwt")
-//	if err != nil {
-//		panic(err)
-//	}
-//	_ = response.Count
-//
-// Authored by: OpenCode
-func (c *Client) FetchActivitiesProbe(
-	ctx context.Context,
-	origin string,
-	authToken string,
-) (dto.ActivitiesProbeResponse, error) {
-	return c.fetchActivitiesPage(ctx, origin, authToken, 0, 1)
-}
-
 // fetchActivitiesPage executes one paginated activities request.
 // Authored by: OpenCode
 func (c *Client) fetchActivitiesPage(
@@ -329,7 +309,7 @@ func classifyAuthStatus(response *http.Response) error {
 	return nil
 }
 
-// classifyActivitiesStatus maps activities-probe response codes to the supported failure taxonomy.
+// classifyActivitiesStatus maps activities response codes to the supported failure taxonomy.
 // Authored by: OpenCode
 func classifyActivitiesStatus(response *http.Response) error {
 	switch response.StatusCode {

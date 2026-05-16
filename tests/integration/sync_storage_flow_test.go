@@ -45,8 +45,8 @@ func TestSyncStorageFlowCreatesProtectedSnapshotAfterSuccessfulMultiPageSync(t *
 	model, cmd := startSyncValidationAttempt(t, model)
 	model = applyValidationBatch(t, model, cmd)
 
-	if model.ActiveScreen() != "validation_result" {
-		t.Fatalf("expected validation result screen, got %s", model.ActiveScreen())
+	if model.ActiveScreen() != "sync_result" {
+		t.Fatalf("expected sync result screen, got %s", model.ActiveScreen())
 	}
 	content := model.View().Content
 	if !strings.Contains(content, "Activity data was stored securely for future use.") {

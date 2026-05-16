@@ -93,16 +93,22 @@ func (defaultNormalizer) Normalize(records []syncmodel.ActivityRecord) (syncmode
 		}
 
 		typedRecords = append(typedRecords, normalizedRecord{
-			OccurredAt:    occurredAt,
-			SourceDate:    occurredAt.Format("2006-01-02"),
-			ActivityOrder: normalizationActivityTypeOrder(record.ActivityType),
-			RawHash:       rawHash,
-			Record:        record,
+			OccurredAt: occurredAt,
+			RawHash:    rawHash,
+			Record:     record,
+			OrderKey: syncmodel.ActivityOrderingKey{
+				SourceDate:   occurredAt.Format("2006-01-02"),
+				AssetSymbol:  record.AssetSymbol,
+				ActivityType: record.ActivityType,
+				SourceID:     record.SourceID,
+				OccurredAt:   record.OccurredAt,
+				RawHash:      rawHash,
+			},
 		})
 	}
 
 	sort.SliceStable(typedRecords, func(left int, right int) bool {
-		return compareNormalizedRecords(typedRecords[left], typedRecords[right]) < 0
+		return syncmodel.CompareActivityOrdering(typedRecords[left].OrderKey, typedRecords[right].OrderKey) < 0
 	})
 
 	if err := ensureStableOrdering(typedRecords); err != nil {
@@ -123,49 +129,10 @@ func (defaultNormalizer) Normalize(records []syncmodel.ActivityRecord) (syncmode
 // normalizedRecord stores the parsed ordering key and duplicate hash for one activity.
 // Authored by: OpenCode
 type normalizedRecord struct {
-	OccurredAt    time.Time
-	SourceDate    string
-	ActivityOrder int
-	RawHash       string
-	Record        syncmodel.ActivityRecord
-}
-
-// compareNormalizedRecords applies the deterministic source-calendar-date ordering rule.
-// Authored by: OpenCode
-func compareNormalizedRecords(left normalizedRecord, right normalizedRecord) int {
-	if comparison := strings.Compare(left.SourceDate, right.SourceDate); comparison != 0 {
-		return comparison
-	}
-	if comparison := strings.Compare(left.Record.AssetSymbol, right.Record.AssetSymbol); comparison != 0 {
-		return comparison
-	}
-	if left.ActivityOrder != right.ActivityOrder {
-		if left.ActivityOrder < right.ActivityOrder {
-			return -1
-		}
-		return 1
-	}
-	if comparison := strings.Compare(left.Record.SourceID, right.Record.SourceID); comparison != 0 {
-		return comparison
-	}
-	if comparison := strings.Compare(left.Record.OccurredAt, right.Record.OccurredAt); comparison != 0 {
-		return comparison
-	}
-
-	return strings.Compare(left.RawHash, right.RawHash)
-}
-
-// normalizationActivityTypeOrder ranks activity types for same-asset same-day ordering.
-// Authored by: OpenCode
-func normalizationActivityTypeOrder(activityType syncmodel.ActivityType) int {
-	switch activityType {
-	case syncmodel.ActivityTypeBuy:
-		return 0
-	case syncmodel.ActivityTypeSell:
-		return 1
-	default:
-		return 2
-	}
+	OccurredAt time.Time
+	RawHash    string
+	Record     syncmodel.ActivityRecord
+	OrderKey   syncmodel.ActivityOrderingKey
 }
 
 // ensureStableOrdering rejects same-day same-asset same-type same-source collisions that are not exact duplicates.
@@ -174,11 +141,7 @@ func ensureStableOrdering(records []normalizedRecord) error {
 	for index := 1; index < len(records); index++ {
 		var previous = records[index-1]
 		var current = records[index]
-		if previous.SourceDate == current.SourceDate &&
-			previous.Record.AssetSymbol == current.Record.AssetSymbol &&
-			previous.Record.ActivityType == current.Record.ActivityType &&
-			previous.Record.SourceID == current.Record.SourceID &&
-			previous.RawHash != current.RawHash {
+		if syncmodel.HasAmbiguousActivityOrdering(previous.OrderKey, current.OrderKey) {
 			return newNormalizationError(
 				fmt.Sprintf("supported activity ordering is ambiguous for source %q", current.Record.SourceID),
 				previous.Record,

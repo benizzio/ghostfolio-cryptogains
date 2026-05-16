@@ -33,7 +33,7 @@ func TestSnapshotReuseFlowRefreshesExistingSnapshotWithSameToken(t *testing.T) {
 	config := mustSnapshotReuseConfig(t, server.URL())
 	inspector := snapshotstore.NewEncryptedStore(baseDir, nil)
 
-	firstOutcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token-one"})
+	firstOutcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
 	if !firstOutcome.Success {
 		t.Fatalf("expected first sync success, got %#v", firstOutcome)
 	}
@@ -53,7 +53,7 @@ func TestSnapshotReuseFlowRefreshesExistingSnapshotWithSameToken(t *testing.T) {
 		Count:          1,
 		ActivitiesJSON: `[{"id":"activity-2","date":"2025-01-01T10:00:00Z","type":"BUY","quantity":2,"valueInBaseCurrency":200,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`,
 	}})
-	secondOutcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token-one"})
+	secondOutcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
 	if !secondOutcome.Success {
 		t.Fatalf("expected refresh success, got %#v", secondOutcome)
 	}
@@ -96,10 +96,10 @@ func TestSnapshotReuseFlowCreatesIsolatedSnapshotForDifferentValidToken(t *testi
 	config := mustSnapshotReuseConfig(t, server.URL())
 	inspector := snapshotstore.NewEncryptedStore(baseDir, nil)
 
-	if outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token-one"}); !outcome.Success {
+	if outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"}); !outcome.Success {
 		t.Fatalf("expected first sync success, got %#v", outcome)
 	}
-	if outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token-two"}); !outcome.Success {
+	if outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-two"}); !outcome.Success {
 		t.Fatalf("expected second-token sync success, got %#v", outcome)
 	}
 
@@ -148,7 +148,7 @@ func TestSnapshotReuseFlowDeniesWrongTokenWithoutChangingExistingSnapshot(t *tes
 	config := mustSnapshotReuseConfig(t, server.URL())
 	inspector := snapshotstore.NewEncryptedStore(baseDir, nil)
 
-	if outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token-one"}); !outcome.Success {
+	if outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"}); !outcome.Success {
 		t.Fatalf("expected first sync success, got %#v", outcome)
 	}
 	candidates, err := snapshotstore.DiscoverServerCandidates(context.Background(), inspector, server.URL())
@@ -163,7 +163,7 @@ func TestSnapshotReuseFlowDeniesWrongTokenWithoutChangingExistingSnapshot(t *tes
 		t.Fatalf("expected wrong token to fail snapshot unlock")
 	}
 
-	outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "wrong-token"})
+	outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "wrong-token"})
 	if outcome.FailureReason != runtime.SyncFailureRejectedToken {
 		t.Fatalf("expected rejected token outcome, got %#v", outcome)
 	}
@@ -190,7 +190,7 @@ func TestSnapshotReuseFlowLeavesLocalDataUnchangedForInvalidToken(t *testing.T) 
 	config := mustSnapshotReuseConfig(t, server.URL())
 	inspector := snapshotstore.NewEncryptedStore(baseDir, nil)
 
-	if outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token-one"}); !outcome.Success {
+	if outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"}); !outcome.Success {
 		t.Fatalf("expected first sync success, got %#v", outcome)
 	}
 	beforeCandidates, err := snapshotstore.DiscoverServerCandidates(context.Background(), inspector, server.URL())
@@ -202,7 +202,7 @@ func TestSnapshotReuseFlowLeavesLocalDataUnchangedForInvalidToken(t *testing.T) 
 		t.Fatalf("read snapshot before invalid attempt: %v", err)
 	}
 
-	outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "invalid-token"})
+	outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "invalid-token"})
 	if outcome.FailureReason != runtime.SyncFailureRejectedToken {
 		t.Fatalf("expected rejected token outcome, got %#v", outcome)
 	}

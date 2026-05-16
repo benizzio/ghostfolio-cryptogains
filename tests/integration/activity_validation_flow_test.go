@@ -28,7 +28,7 @@ func TestActivityValidationFlowRejectsUnsupportedHistoryAndKeepsExistingSnapshot
 	config := mustActivityValidationConfig(t, server.URL())
 	inspector := snapshotstore.NewEncryptedStore(baseDir, nil)
 
-	if outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token-one"}); !outcome.Success {
+	if outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"}); !outcome.Success {
 		t.Fatalf("expected baseline sync success, got %#v", outcome)
 	}
 	candidates, err := snapshotstore.DiscoverServerCandidates(context.Background(), inspector, server.URL())
@@ -44,7 +44,7 @@ func TestActivityValidationFlowRejectsUnsupportedHistoryAndKeepsExistingSnapshot
 		Count:          1,
 		ActivitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`,
 	}})
-	outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token-one"})
+	outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
 	if outcome.FailureReason != runtime.SyncFailureUnsupportedActivityHistory {
 		t.Fatalf("expected unsupported activity history outcome, got %#v", outcome)
 	}
@@ -78,7 +78,7 @@ func TestActivityValidationFlowNormalizesDuplicatesAndSameAssetSameDayOrdering(t
 	config := mustActivityValidationConfig(t, server.URL())
 	inspector := snapshotstore.NewEncryptedStore(baseDir, nil)
 
-	outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token-one"})
+	outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
 	if !outcome.Success {
 		t.Fatalf("expected normalized sync success, got %#v", outcome)
 	}
@@ -119,7 +119,7 @@ func TestActivityValidationFlowRejectsBelowZeroHoldings(t *testing.T) {
 	service := newActivityValidationSyncService(baseDir, server)
 	config := mustActivityValidationConfig(t, server.URL())
 
-	outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token-one"})
+	outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
 	if outcome.FailureReason != runtime.SyncFailureUnsupportedActivityHistory {
 		t.Fatalf("expected below-zero holdings rejection, got %#v", outcome)
 	}
@@ -144,7 +144,7 @@ func TestActivityValidationFlowUsesSameDayReplayOrderingForArbitraryGhostfolioTi
 	config := mustActivityValidationConfig(t, server.URL())
 	inspector := snapshotstore.NewEncryptedStore(baseDir, nil)
 
-	outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token-one"})
+	outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
 	if !outcome.Success {
 		t.Fatalf("expected same-day replay ordering success, got %#v", outcome)
 	}
@@ -206,7 +206,7 @@ func TestActivityValidationFlowAppliesZeroPriceRules(t *testing.T) {
 			service := newActivityValidationSyncService(baseDir, server)
 			config := mustActivityValidationConfig(t, server.URL())
 
-			outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token-one"})
+			outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
 			if testCase.wantSuccess {
 				if !outcome.Success {
 					t.Fatalf("expected success, got %#v", outcome)

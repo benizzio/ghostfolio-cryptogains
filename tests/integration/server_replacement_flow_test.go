@@ -30,7 +30,7 @@ func TestServerReplacementFlowCancelKeepsReadableSnapshotUnchanged(t *testing.T)
 	firstServer := newGhostfolioStorageServer(t, []storagePageFixture{{Count: 1, ActivitiesJSON: `[{"id":"activity-old","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`}})
 	service := runtime.NewSyncService(ghostfolioclient.New(firstServer.Client()), time.Second, baseDir, true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(baseDir, nil))
 	firstConfig := mustCustomSetupConfig(t, firstServer.URL)
-	if outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: firstConfig, SecurityToken: "token-one"}); !outcome.Success {
+	if outcome := service.Run(context.Background(), runtime.SyncRequest{Config: firstConfig, SecurityToken: "token-one"}); !outcome.Success {
 		t.Fatalf("expected initial sync success, got %#v", outcome)
 	}
 
@@ -52,7 +52,7 @@ func TestServerReplacementFlowCancelKeepsReadableSnapshotUnchanged(t *testing.T)
 	model = assertFlowModel(t, updated)
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = assertFlowModel(t, updated)
-	if model.ActiveScreen() != "validation_result" {
+	if model.ActiveScreen() != "sync_result" {
 		t.Fatalf("expected cancel to route to sync result, got %s", model.ActiveScreen())
 	}
 	content := model.View().Content
@@ -68,14 +68,14 @@ func TestServerReplacementFlowConfirmSuccessReplacesSnapshot(t *testing.T) {
 	firstServer := newGhostfolioStorageServer(t, []storagePageFixture{{Count: 1, ActivitiesJSON: `[{"id":"activity-old","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`}})
 	sharedStore := snapshotstore.NewEncryptedStore(baseDir, nil)
 	service := runtime.NewSyncService(ghostfolioclient.New(firstServer.Client()), time.Second, baseDir, true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), sharedStore)
-	if outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: mustCustomSetupConfig(t, firstServer.URL), SecurityToken: "token-one"}); !outcome.Success {
+	if outcome := service.Run(context.Background(), runtime.SyncRequest{Config: mustCustomSetupConfig(t, firstServer.URL), SecurityToken: "token-one"}); !outcome.Success {
 		t.Fatalf("expected initial sync success, got %#v", outcome)
 	}
 
 	secondServer := newGhostfolioStorageServer(t, []storagePageFixture{{Count: 1, ActivitiesJSON: `[{"id":"activity-new","date":"2025-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"ETH","name":"Ether"}}]`}})
 	secondConfig := mustCustomSetupConfig(t, secondServer.URL)
 	replacementService := runtime.NewSyncService(ghostfolioclient.New(secondServer.Client()), time.Second, baseDir, true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), sharedStore)
-	if outcome := replacementService.Validate(context.Background(), runtime.ValidateRequest{Config: mustCustomSetupConfig(t, firstServer.URL), SecurityToken: "token-one"}); !outcome.Success {
+	if outcome := replacementService.Run(context.Background(), runtime.SyncRequest{Config: mustCustomSetupConfig(t, firstServer.URL), SecurityToken: "token-one"}); !outcome.Success {
 		t.Fatalf("expected preload success, got %#v", outcome)
 	}
 	model := flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &secondConfig}, true, replacementService))
@@ -92,7 +92,7 @@ func TestServerReplacementFlowConfirmSuccessReplacesSnapshot(t *testing.T) {
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = assertFlowModel(t, updated)
 	model = applyValidationBatch(t, model, cmd)
-	if model.ActiveScreen() != "validation_result" {
+	if model.ActiveScreen() != "sync_result" {
 		t.Fatalf("expected result screen after confirmed replacement, got %s", model.ActiveScreen())
 	}
 
@@ -124,7 +124,7 @@ func TestServerReplacementFlowFailedReplacementRetainsPreviousSnapshot(t *testin
 	baseStore := snapshotstore.NewEncryptedStore(baseDir, nil)
 	service := runtime.NewSyncService(ghostfolioclient.New(firstServer.Client()), time.Second, baseDir, true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), baseStore)
 	firstConfig := mustCustomSetupConfig(t, firstServer.URL)
-	if outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: firstConfig, SecurityToken: "token-one"}); !outcome.Success {
+	if outcome := service.Run(context.Background(), runtime.SyncRequest{Config: firstConfig, SecurityToken: "token-one"}); !outcome.Success {
 		t.Fatalf("expected initial sync success, got %#v", outcome)
 	}
 	inspector := snapshotstore.NewEncryptedStore(baseDir, nil)
@@ -150,7 +150,7 @@ func TestServerReplacementFlowFailedReplacementRetainsPreviousSnapshot(t *testin
 	}))
 	defer secondServer.Close()
 	replacementService := runtime.NewSyncService(ghostfolioclient.New(secondServer.Client()), time.Second, baseDir, true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), baseStore)
-	if preload := replacementService.Validate(context.Background(), runtime.ValidateRequest{Config: firstConfig, SecurityToken: "token-one"}); !preload.Success {
+	if preload := replacementService.Run(context.Background(), runtime.SyncRequest{Config: firstConfig, SecurityToken: "token-one"}); !preload.Success {
 		t.Fatalf("expected preload success to set active snapshot, got %#v", preload)
 	}
 	beforeBytes, err = os.ReadFile(firstCandidates[0].Path)
@@ -162,7 +162,7 @@ func TestServerReplacementFlowFailedReplacementRetainsPreviousSnapshot(t *testin
 	if err != nil {
 		t.Fatalf("new second config: %v", err)
 	}
-	outcome := replacementService.Validate(context.Background(), runtime.ValidateRequest{Config: secondConfig, SecurityToken: "token-one", ConfirmServerReplacement: true})
+	outcome := replacementService.Run(context.Background(), runtime.SyncRequest{Config: secondConfig, SecurityToken: "token-one", ConfirmServerReplacement: true})
 	if outcome.FailureReason != runtime.SyncFailureUnsupportedActivityHistory {
 		t.Fatalf("expected failed replacement to reject invalid new history, got %#v", outcome)
 	}

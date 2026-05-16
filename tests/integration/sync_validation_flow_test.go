@@ -81,8 +81,8 @@ func TestSyncValidationSuccessUsesProductionRuntimePath(t *testing.T) {
 	model, cmd := startSyncValidationAttempt(t, model)
 	model = applyValidationBatch(t, model, cmd)
 
-	if model.ActiveScreen() != "validation_result" {
-		t.Fatalf("expected validation result screen, got %s", model.ActiveScreen())
+	if model.ActiveScreen() != "sync_result" {
+		t.Fatalf("expected sync result screen, got %s", model.ActiveScreen())
 	}
 
 	var content = model.View().Content
@@ -103,7 +103,7 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 	var testCases = []struct {
 		name           string
 		buildFixture   func(*testing.T) syncValidationFixture
-		wantCategory   runtime.ValidationFailureReason
+		wantCategory   runtime.SyncFailureReason
 		wantFollowUp   string
 		wantSecretSafe bool
 	}{
@@ -114,7 +114,7 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 				var server = newGhostfolioScenarioServer(t, ghostfolioScenario{authStatus: http.StatusForbidden})
 				return newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
 			},
-			wantCategory:   runtime.ValidationFailureRejectedToken,
+			wantCategory:   runtime.SyncFailureRejectedToken,
 			wantFollowUp:   "The supplied token was rejected. Try again with a valid Ghostfolio security token.",
 			wantSecretSafe: true,
 		},
@@ -125,7 +125,7 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 				var server = newGhostfolioScenarioServer(t, ghostfolioScenario{activitiesDelay: 200 * time.Millisecond})
 				return newSyncValidationFixture(t, server.Client(), server.URL, 20*time.Millisecond)
 			},
-			wantCategory:   runtime.ValidationFailureTimeout,
+			wantCategory:   runtime.SyncFailureTimeout,
 			wantFollowUp:   "Sync again or return to the main menu. No protected activity data was stored.",
 			wantSecretSafe: true,
 		},
@@ -139,7 +139,7 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 				server.Close()
 				return newSyncValidationFixture(t, client, origin, time.Second)
 			},
-			wantCategory:   runtime.ValidationFailureConnectivityProblem,
+			wantCategory:   runtime.SyncFailureConnectivityProblem,
 			wantFollowUp:   "Sync again or return to the main menu. No protected activity data was stored.",
 			wantSecretSafe: true,
 		},
@@ -150,7 +150,7 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 				var server = newGhostfolioScenarioServer(t, ghostfolioScenario{activitiesStatus: http.StatusUnauthorized})
 				return newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
 			},
-			wantCategory:   runtime.ValidationFailureUnsuccessfulServerResponse,
+			wantCategory:   runtime.SyncFailureUnsuccessfulServerResponse,
 			wantFollowUp:   "Sync again or return to the main menu. No protected activity data was stored.",
 			wantSecretSafe: true,
 		},
@@ -161,7 +161,7 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 				var server = newGhostfolioScenarioServer(t, ghostfolioScenario{activitiesStatus: http.StatusBadRequest})
 				return newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
 			},
-			wantCategory:   runtime.ValidationFailureIncompatibleServerContract,
+			wantCategory:   runtime.SyncFailureIncompatibleServerContract,
 			wantFollowUp:   "The selected server responded, but it did not satisfy the supported contract",
 			wantSecretSafe: true,
 		},
@@ -181,8 +181,8 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 			model, cmd := startSyncValidationAttempt(t, model)
 			model = applyValidationBatch(t, model, cmd)
 
-			if model.ActiveScreen() != "validation_result" {
-				t.Fatalf("expected validation result screen, got %s", model.ActiveScreen())
+			if model.ActiveScreen() != "sync_result" {
+				t.Fatalf("expected sync result screen, got %s", model.ActiveScreen())
 			}
 
 			var content = model.View().Content
@@ -217,8 +217,8 @@ func TestFailedValidationDefaultActionRetriesValidation(t *testing.T) {
 	_ = testutil.RunCmd(focusCmd)
 	model = assertFlowModel(t, updated)
 
-	if model.ActiveScreen() != "sync_validation" {
-		t.Fatalf("expected Sync Again to reopen sync validation, got %s", model.ActiveScreen())
+	if model.ActiveScreen() != "sync" {
+		t.Fatalf("expected Sync Again to reopen sync, got %s", model.ActiveScreen())
 	}
 }
 
@@ -263,8 +263,8 @@ func TestSyncValidationBusyStateStillHandlesResizeBeforeCompletion(t *testing.T)
 	}
 
 	model = applyValidationBatch(t, model, cmd)
-	if model.ActiveScreen() != "validation_result" {
-		t.Fatalf("expected validation result screen after the delayed batch completed, got %s", model.ActiveScreen())
+	if model.ActiveScreen() != "sync_result" {
+		t.Fatalf("expected sync result screen after the delayed batch completed, got %s", model.ActiveScreen())
 	}
 }
 
@@ -400,7 +400,7 @@ func newSyncValidationModel(t *testing.T, fixture syncValidationFixture) *flow.M
 }
 
 // startSyncValidationAttempt submits the current token value and returns the
-// batch command that will deliver the async validation messages.
+// batch command that will deliver the async sync messages.
 // Authored by: OpenCode
 func startSyncValidationAttempt(t *testing.T, model *flow.Model) (*flow.Model, tea.Cmd) {
 	t.Helper()
@@ -417,7 +417,7 @@ func startSyncValidationAttempt(t *testing.T, model *flow.Model) (*flow.Model, t
 	return model, cmd
 }
 
-// applyValidationBatch runs the asynchronous validation batch to completion and
+// applyValidationBatch runs the asynchronous sync batch to completion and
 // applies each resulting message to the flow model.
 // Authored by: OpenCode
 func applyValidationBatch(t *testing.T, model *flow.Model, cmd tea.Cmd) *flow.Model {

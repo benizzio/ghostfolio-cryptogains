@@ -38,7 +38,7 @@ func TestSnapshotCompatibilityFlowRejectsUnsupportedEnvelopeVersion(t *testing.T
 		t.Fatalf("read snapshot before validate: %v", err)
 	}
 
-	outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token-one"})
+	outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
 	if outcome.FailureReason != runtime.SyncFailureUnsupportedStoredDataVersion {
 		t.Fatalf("expected unsupported stored-data version outcome, got %#v", outcome)
 	}
@@ -73,7 +73,7 @@ func TestSnapshotCompatibilityFlowRejectsUnsupportedPayloadVersion(t *testing.T)
 		t.Fatalf("read snapshot before validate: %v", err)
 	}
 
-	outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token-one"})
+	outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
 	if outcome.FailureReason != runtime.SyncFailureUnsupportedStoredDataVersion {
 		t.Fatalf("expected unsupported stored-data version outcome, got %#v", outcome)
 	}
@@ -109,7 +109,7 @@ func TestSnapshotCompatibilityFlowRetainsReadableSnapshotWhenNewWriteIsIncompati
 	)
 	config := mustSnapshotReuseConfig(t, server.URL())
 
-	if outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token-one"}); !outcome.Success {
+	if outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"}); !outcome.Success {
 		t.Fatalf("expected first sync success, got %#v", outcome)
 	}
 	inspector := snapshotstore.NewEncryptedStore(baseDir, nil)
@@ -131,7 +131,7 @@ func TestSnapshotCompatibilityFlowRetainsReadableSnapshotWhenNewWriteIsIncompati
 		Count:          1,
 		ActivitiesJSON: `[{"id":"activity-2","date":"2025-01-01T10:00:00Z","type":"BUY","quantity":2,"valueInBaseCurrency":200,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`,
 	}})
-	outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token-one"})
+	outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
 	if outcome.FailureReason != runtime.SyncFailureIncompatibleNewSyncData {
 		t.Fatalf("expected incompatible new sync data outcome, got %#v", outcome)
 	}

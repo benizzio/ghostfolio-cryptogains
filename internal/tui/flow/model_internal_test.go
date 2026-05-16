@@ -19,14 +19,14 @@ import (
 )
 
 type testSyncService struct {
-	outcome            runtime.ValidationOutcome
+	outcome            runtime.SyncOutcome
 	protectedDataState runtime.ProtectedDataState
 	replacementCheck   runtime.ServerReplacementCheck
 	diagnosticPath     string
 	diagnosticErr      error
 }
 
-func (s testSyncService) Validate(context.Context, runtime.ValidateRequest) runtime.ValidationOutcome {
+func (s testSyncService) Run(context.Context, runtime.SyncRequest) runtime.SyncOutcome {
 	return s.outcome
 }
 
@@ -53,11 +53,11 @@ type cancellingSyncService struct {
 	ctxErr error
 }
 
-func (s *cancellingSyncService) Validate(ctx context.Context, _ runtime.ValidateRequest) runtime.ValidationOutcome {
+func (s *cancellingSyncService) Run(ctx context.Context, _ runtime.SyncRequest) runtime.SyncOutcome {
 	s.called = true
 	<-ctx.Done()
 	s.ctxErr = ctx.Err()
-	return runtime.ValidationOutcome{Success: false, DetailReason: string(runtime.ValidationFailureTimeout), FailureReason: runtime.ValidationFailureTimeout}
+	return runtime.SyncOutcome{Success: false, DetailReason: string(runtime.SyncFailureTimeout), FailureReason: runtime.SyncFailureTimeout}
 }
 
 func (*cancellingSyncService) GenerateDiagnosticReport(context.Context, runtime.DiagnosticReportRequest) (string, error) {
@@ -136,11 +136,11 @@ func TestModelInitAndHelpers(t *testing.T) {
 	}
 	model.active = mainMenuScreenKey
 	_ = model.View()
-	model.active = syncValidationScreenKey
+	model.active = syncScreenKey
 	_ = model.View()
 	model.active = serverReplacementScreenKey
 	_ = model.View()
-	model.active = validationResultScreenKey
+	model.active = syncResultScreenKey
 	_ = model.View()
 	model.active = activeScreen("unknown")
 	updated, cmd := model.Update(struct{}{})
@@ -148,8 +148,8 @@ func TestModelInitAndHelpers(t *testing.T) {
 		t.Fatalf("expected unknown active screen to ignore messages")
 	}
 	model.active = setupScreenKey
-	model.enterValidationResult(runtime.ValidationOutcome{Success: false})
-	model.enterValidationResult(runtime.ValidationOutcome{Success: true})
+	model.enterSyncResult(runtime.SyncOutcome{Success: false})
+	model.enterSyncResult(runtime.SyncOutcome{Success: true})
 	if model.result.MenuIndex != 1 {
 		t.Fatalf("expected success result to default to main menu option")
 	}
@@ -158,7 +158,7 @@ func TestModelInitAndHelpers(t *testing.T) {
 		t.Fatalf("expected setup reason to clear on main menu entry")
 	}
 	_ = model.enterSetup("invalid", bootstrap.SetupRequirementNone)
-	_ = model.enterSyncValidation()
+	_ = model.enterSync()
 	_ = model.selectedSetupOrigin()
 	_ = model.setupCanSave()
 }
@@ -177,7 +177,7 @@ func TestUpdateHandlesWindowResizeAndQuit(t *testing.T) {
 		t.Fatalf("unexpected size: %dx%d", model.width, model.height)
 	}
 
-	model.active = syncValidationScreenKey
+	model.active = syncScreenKey
 	model.sync.TokenInput.SetValue("token")
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Mod: tea.ModCtrl, Code: 'c'}))
 	if _, ok := runCmdFlow(cmd).(tea.QuitMsg); !ok {
@@ -339,35 +339,35 @@ func TestUpdateSetupCoversNavigationAndInput(t *testing.T) {
 	}
 }
 
-func TestUpdateSyncValidationCoversResultAndBusyBranches(t *testing.T) {
+func TestUpdateSyncCoversResultAndBusyBranches(t *testing.T) {
 	t.Parallel()
 
 	var config = mustSetupConfig(t)
 	var model = newTestModel(t, &config)
-	model.active = syncValidationScreenKey
+	model.active = syncScreenKey
 	model.sync.Busy = true
 	model.sync.AttemptID = "current"
-	updated, _ := model.Update(validationFinishedMsg{Attempt: "other", Outcome: runtime.ValidationOutcome{Success: true}})
+	updated, _ := model.Update(syncFinishedMsg{Attempt: "other", Outcome: runtime.SyncOutcome{Success: true}})
 	model = updated.(*Model)
-	if model.active != syncValidationScreenKey {
+	if model.active != syncScreenKey {
 		t.Fatalf("expected mismatched attempt to be ignored")
 	}
 
 	updated, _ = model.Update(spinner.TickMsg{ID: model.spinner.ID()})
 	model = updated.(*Model)
-	updated, _ = model.Update(validationFinishedMsg{Attempt: "current", Outcome: runtime.ValidationOutcome{Success: true}})
+	updated, _ = model.Update(syncFinishedMsg{Attempt: "current", Outcome: runtime.SyncOutcome{Success: true}})
 	model = updated.(*Model)
-	if model.active != validationResultScreenKey {
-		t.Fatalf("expected validation result screen")
+	if model.active != syncResultScreenKey {
+		t.Fatalf("expected sync result screen")
 	}
 }
 
-func TestUpdateSyncValidationCoversInputValidationAndBack(t *testing.T) {
+func TestUpdateSyncCoversInputValidationAndBack(t *testing.T) {
 	t.Parallel()
 
 	var config = mustSetupConfig(t)
 	var model = newTestModel(t, &config)
-	model.active = syncValidationScreenKey
+	model.active = syncScreenKey
 	model.sync.InputFocused = true
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Text: "t", Code: 't'}))
 	_ = runCmdFlow(cmd)
@@ -379,8 +379,8 @@ func TestUpdateSyncValidationCoversInputValidationAndBack(t *testing.T) {
 	if model.sync.ValidationMessage != "" {
 		t.Fatalf("expected paste to clear sync validation message")
 	}
-	if model.active != syncValidationScreenKey {
-		t.Fatalf("expected sync paste to remain in sync validation workflow")
+	if model.active != syncScreenKey {
+		t.Fatalf("expected sync paste to remain in sync workflow")
 	}
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
 	model = updated.(*Model)
@@ -389,11 +389,11 @@ func TestUpdateSyncValidationCoversInputValidationAndBack(t *testing.T) {
 	}
 
 	updated, cmd = model.Update(tea.PasteStartMsg{})
-	if cmd != nil || updated.(*Model).active != syncValidationScreenKey {
+	if cmd != nil || updated.(*Model).active != syncScreenKey {
 		t.Fatalf("expected unfocused sync paste start to be ignored")
 	}
 	updated, cmd = model.Update(tea.PasteEndMsg{})
-	if cmd != nil || updated.(*Model).active != syncValidationScreenKey {
+	if cmd != nil || updated.(*Model).active != syncScreenKey {
 		t.Fatalf("expected unfocused sync paste end to be ignored")
 	}
 	model = updated.(*Model)
@@ -433,7 +433,7 @@ func TestFocusedInputEnterReturnsToPrimaryMenus(t *testing.T) {
 
 	var config = mustSetupConfig(t)
 	model = newTestModel(t, &config)
-	model.active = syncValidationScreenKey
+	model.active = syncScreenKey
 	model.sync.InputFocused = true
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*Model)
@@ -442,12 +442,12 @@ func TestFocusedInputEnterReturnsToPrimaryMenus(t *testing.T) {
 	}
 }
 
-func TestUpdateSyncValidationCoversBusyIgnoreAndSetupRedirect(t *testing.T) {
+func TestUpdateSyncCoversBusyIgnoreAndSetupRedirect(t *testing.T) {
 	t.Parallel()
 
 	var config = mustSetupConfig(t)
 	var model = newTestModel(t, &config)
-	model.active = syncValidationScreenKey
+	model.active = syncScreenKey
 	model.sync.Busy = true
 	updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*Model)
@@ -471,7 +471,7 @@ func TestUpdateSyncValidationCoversBusyIgnoreAndSetupRedirect(t *testing.T) {
 	}
 
 	model = newTestModel(t, &config)
-	model.active = syncValidationScreenKey
+	model.active = syncScreenKey
 	model.sync.InputFocused = false
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyUp}))
 	if cmd != nil || updated.(*Model).sync.MenuIndex != 0 {
@@ -520,25 +520,25 @@ func TestUpdateSyncValidationCoversBusyIgnoreAndSetupRedirect(t *testing.T) {
 	}
 
 	model = newTestModel(t, &config)
-	model.active = syncValidationScreenKey
+	model.active = syncScreenKey
 	updated, cmd = model.Update(spinner.TickMsg{ID: model.spinner.ID()})
 	if cmd != nil || updated.(*Model).sync.Busy {
 		t.Fatalf("expected idle spinner tick to be ignored")
 	}
 
 	updated, cmd = model.Update(struct{}{})
-	if cmd != nil || updated.(*Model).active != syncValidationScreenKey {
+	if cmd != nil || updated.(*Model).active != syncScreenKey {
 		t.Fatalf("expected unrelated sync message to be ignored")
 	}
 }
 
-func TestUpdateSyncValidationRoutesToServerReplacementWhenRequired(t *testing.T) {
+func TestUpdateSyncRoutesToServerReplacementWhenRequired(t *testing.T) {
 	t.Parallel()
 
 	var config = mustSetupConfig(t)
 	var model = newTestModel(t, &config)
 	model.deps.SyncService = testSyncService{replacementCheck: runtime.ServerReplacementCheck{Required: true, ActiveServerOrigin: "https://old.example", SelectedServerOrigin: config.ServerOrigin}}
-	model.active = syncValidationScreenKey
+	model.active = syncScreenKey
 	model.sync.InputFocused = false
 	model.sync.TokenInput.SetValue("token")
 
@@ -555,7 +555,7 @@ func TestUpdateSyncValidationRoutesToServerReplacementWhenRequired(t *testing.T)
 	model = updated.(*Model)
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*Model)
-	if model.active != validationResultScreenKey {
+	if model.active != syncResultScreenKey {
 		t.Fatalf("expected cancellation to route to result screen")
 	}
 	if model.result.Outcome.FailureReason != runtime.SyncFailureServerReplacementCancelled {
@@ -564,7 +564,7 @@ func TestUpdateSyncValidationRoutesToServerReplacementWhenRequired(t *testing.T)
 
 	model = newTestModel(t, &config)
 	model.deps.SyncService = testSyncService{replacementCheck: runtime.ServerReplacementCheck{Required: true, ActiveServerOrigin: "https://old.example", SelectedServerOrigin: config.ServerOrigin}}
-	model.active = syncValidationScreenKey
+	model.active = syncScreenKey
 	model.sync.InputFocused = false
 	model.sync.TokenInput.SetValue("token")
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
@@ -574,12 +574,12 @@ func TestUpdateSyncValidationRoutesToServerReplacementWhenRequired(t *testing.T)
 		t.Fatalf("expected confirmed replacement to start async sync")
 	}
 	model = updated.(*Model)
-	if model.active != syncValidationScreenKey || !model.sync.Busy {
+	if model.active != syncScreenKey || !model.sync.Busy {
 		t.Fatalf("expected confirmed replacement to resume sync busy state")
 	}
 }
 
-func TestCancelActiveValidationCancelsContextAndValidationCmdRuns(t *testing.T) {
+func TestCancelActiveValidationCancelsContextAndSyncCmdRuns(t *testing.T) {
 	t.Parallel()
 
 	var config = mustSetupConfig(t)
@@ -592,12 +592,12 @@ func TestCancelActiveValidationCancelsContextAndValidationCmdRuns(t *testing.T) 
 		SyncService:  service,
 	})
 
-	model.active = syncValidationScreenKey
+	model.active = syncScreenKey
 	model.sync.InputFocused = false
 	model.sync.TokenInput.SetValue("token")
 	_, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	if cmd == nil {
-		t.Fatalf("expected validation command")
+		t.Fatalf("expected sync command")
 	}
 	model.cancelActiveValidation()
 	msg := runCmdFlow(cmd)
@@ -606,33 +606,33 @@ func TestCancelActiveValidationCancelsContextAndValidationCmdRuns(t *testing.T) 
 		t.Fatalf("expected batch command message, got %T", msg)
 	}
 
-	var finished validationFinishedMsg
+	var finished syncFinishedMsg
 	var found bool
 	for _, batchCmd := range batch {
-		if candidate, ok := runCmdFlow(batchCmd).(validationFinishedMsg); ok {
+		if candidate, ok := runCmdFlow(batchCmd).(syncFinishedMsg); ok {
 			finished = candidate
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Fatalf("expected validation finished message in batch")
+		t.Fatalf("expected sync finished message in batch")
 	}
 	if finished.Attempt == "" {
-		t.Fatalf("expected validation attempt id")
+		t.Fatalf("expected sync attempt id")
 	}
 	if !service.called || service.ctxErr == nil {
-		t.Fatalf("expected cancelled validation context, called=%v err=%v", service.called, service.ctxErr)
+		t.Fatalf("expected cancelled sync context, called=%v err=%v", service.called, service.ctxErr)
 	}
 }
 
-func TestUpdateValidationResultCoversNavigation(t *testing.T) {
+func TestUpdateSyncResultCoversNavigation(t *testing.T) {
 	t.Parallel()
 
 	var config = mustSetupConfig(t)
 	var model = newTestModel(t, &config)
-	model.active = validationResultScreenKey
-	model.result = resultState{Outcome: runtime.ValidationOutcome{Success: false}}
+	model.active = syncResultScreenKey
+	model.result = resultState{Outcome: runtime.SyncOutcome{Success: false}}
 	updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 	model = updated.(*Model)
 	if model.result.MenuIndex != 1 {
@@ -646,12 +646,12 @@ func TestUpdateValidationResultCoversNavigation(t *testing.T) {
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	_ = runCmdFlow(cmd)
 	model = updated.(*Model)
-	if model.active != syncValidationScreenKey {
-		t.Fatalf("expected Validate Again to reopen sync validation")
+	if model.active != syncScreenKey {
+		t.Fatalf("expected Sync Again to reopen sync")
 	}
 
-	model.active = validationResultScreenKey
-	model.result = resultState{MenuIndex: 1, Outcome: runtime.ValidationOutcome{Success: false}}
+	model.active = syncResultScreenKey
+	model.result = resultState{MenuIndex: 1, Outcome: runtime.SyncOutcome{Success: false}}
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*Model)
 	if model.active != mainMenuScreenKey {
@@ -663,30 +663,30 @@ func TestUpdateValidationResultCoversNavigation(t *testing.T) {
 		t.Fatalf("expected unrelated result message to be ignored")
 	}
 
-	model.active = validationResultScreenKey
-	model.result = resultState{MenuIndex: 0, Outcome: runtime.ValidationOutcome{Success: false}}
+	model.active = syncResultScreenKey
+	model.result = resultState{MenuIndex: 0, Outcome: runtime.SyncOutcome{Success: false}}
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyUp}))
 	if updated.(*Model).result.MenuIndex != 0 {
 		t.Fatalf("expected up at top to stay in place")
 	}
 
-	model.active = validationResultScreenKey
-	model.result = resultState{MenuIndex: 1, Outcome: runtime.ValidationOutcome{Success: false, FailureReason: runtime.SyncFailureUnsupportedActivityHistory, Diagnostic: runtime.DiagnosticReportState{Eligible: true}}}
+	model.active = syncResultScreenKey
+	model.result = resultState{MenuIndex: 1, Outcome: runtime.SyncOutcome{Success: false, FailureReason: runtime.SyncFailureUnsupportedActivityHistory, Diagnostic: runtime.DiagnosticReportState{Eligible: true}}}
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	if updated.(*Model).active != syncValidationScreenKey {
-		t.Fatalf("expected diagnostic result second action to reopen sync validation")
+	if updated.(*Model).active != syncScreenKey {
+		t.Fatalf("expected diagnostic result second action to reopen sync")
 	}
 
 	model = newTestModel(t, &config)
-	model.active = validationResultScreenKey
-	model.result = resultState{MenuIndex: 2, Outcome: runtime.ValidationOutcome{Success: false, FailureReason: runtime.SyncFailureUnsupportedActivityHistory, Diagnostic: runtime.DiagnosticReportState{Eligible: true}}}
+	model.active = syncResultScreenKey
+	model.result = resultState{MenuIndex: 2, Outcome: runtime.SyncOutcome{Success: false, FailureReason: runtime.SyncFailureUnsupportedActivityHistory, Diagnostic: runtime.DiagnosticReportState{Eligible: true}}}
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	if updated.(*Model).active != mainMenuScreenKey {
 		t.Fatalf("expected diagnostic result default action to return main menu")
 	}
 
-	model.active = validationResultScreenKey
-	model.result = resultState{Outcome: runtime.ValidationOutcome{Success: false, FailureReason: runtime.SyncFailureUnsupportedActivityHistory, Diagnostic: runtime.DiagnosticReportState{Eligible: true}}}
+	model.active = syncResultScreenKey
+	model.result = resultState{Outcome: runtime.SyncOutcome{Success: false, FailureReason: runtime.SyncFailureUnsupportedActivityHistory, Diagnostic: runtime.DiagnosticReportState{Eligible: true}}}
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*Model)
 	if model.result.Outcome.Diagnostic.Path == "" {
@@ -704,14 +704,14 @@ func TestUpdateValidationResultCoversNavigation(t *testing.T) {
 	}
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*Model)
-	if model.active != syncValidationScreenKey {
-		t.Fatalf("expected diagnostic result Sync Again to reopen sync validation")
+	if model.active != syncScreenKey {
+		t.Fatalf("expected diagnostic result Sync Again to reopen sync")
 	}
 
-	model.active = validationResultScreenKey
+	model.active = syncResultScreenKey
 	updated, _ = model.Update(struct{}{})
-	if updated.(*Model).active != validationResultScreenKey {
-		t.Fatalf("expected non-key validation result message to be ignored")
+	if updated.(*Model).active != syncResultScreenKey {
+		t.Fatalf("expected non-key sync result message to be ignored")
 	}
 }
 
@@ -724,8 +724,8 @@ func TestUpdateMainMenuCoversEnterAndDefaultKey(t *testing.T) {
 
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	_ = runCmdFlow(cmd)
-	if updated.(*Model).active != syncValidationScreenKey {
-		t.Fatalf("expected enter to open sync validation")
+	if updated.(*Model).active != syncScreenKey {
+		t.Fatalf("expected enter to open sync")
 	}
 
 	model = newTestModel(t, &config)
@@ -745,8 +745,8 @@ func TestGenerateDiagnosticReportAndServerReplacementIgnoreBranches(t *testing.T
 	var config = mustSetupConfig(t)
 	var model = newTestModel(t, &config)
 	model.deps.SyncService = testSyncService{diagnosticErr: errors.New("report boom")}
-	model.active = validationResultScreenKey
-	model.result = resultState{Outcome: runtime.ValidationOutcome{Success: false, FailureReason: runtime.SyncFailureUnsupportedActivityHistory, Diagnostic: runtime.DiagnosticReportState{Eligible: true, Request: runtime.DiagnosticReportRequest{}}}}
+	model.active = syncResultScreenKey
+	model.result = resultState{Outcome: runtime.SyncOutcome{Success: false, FailureReason: runtime.SyncFailureUnsupportedActivityHistory, Diagnostic: runtime.DiagnosticReportState{Eligible: true, Request: runtime.DiagnosticReportRequest{}}}}
 	model.currentConfig = &config
 
 	updated, _ := model.generateDiagnosticReport()
@@ -763,8 +763,8 @@ func TestGenerateDiagnosticReportAndServerReplacementIgnoreBranches(t *testing.T
 	}
 
 	updated, cmd := model.Update(struct{}{})
-	if cmd != nil || updated.(*Model).active != validationResultScreenKey {
-		t.Fatalf("expected non-key validation-result message to be ignored")
+	if cmd != nil || updated.(*Model).active != syncResultScreenKey {
+		t.Fatalf("expected non-key sync-result message to be ignored")
 	}
 
 	model.active = serverReplacementScreenKey
@@ -808,7 +808,7 @@ func newTestModel(t *testing.T, config *configmodel.AppSetupConfig) *Model {
 		Options:      bootstrap.DefaultOptions(),
 		Startup:      startup,
 		SetupService: runtime.NewSetupService(store, false),
-		SyncService:  testSyncService{outcome: runtime.ValidationOutcome{Success: true, DetailReason: "activity_data_stored"}},
+		SyncService:  testSyncService{outcome: runtime.SyncOutcome{Success: true, DetailReason: "activity_data_stored"}},
 	})
 }
 

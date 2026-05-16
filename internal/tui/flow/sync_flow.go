@@ -1,5 +1,5 @@
 // Package flow owns the Bubble Tea root model and workflow routing for this
-// validation-only slice.
+// sync-and-storage slice.
 // Authored by: OpenCode
 package flow
 
@@ -17,13 +17,13 @@ import (
 
 const busyStatusText = "Syncing and storing activity history..."
 
-// updateSyncValidation handles sync-entry navigation, token input, busy-state
-// spinner updates, and validation completion routing.
+// updateSync handles sync-entry navigation, token input, busy-state spinner
+// updates, and sync completion routing.
 // Authored by: OpenCode
-func (m *Model) updateSyncValidation(message tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) updateSync(message tea.Msg) (tea.Model, tea.Cmd) {
 	switch typedMessage := message.(type) {
-	case validationFinishedMsg:
-		return m.handleValidationFinished(typedMessage)
+	case syncFinishedMsg:
+		return m.handleSyncFinished(typedMessage)
 	case tea.PasteMsg, tea.PasteStartMsg, tea.PasteEndMsg:
 		return m.handleSyncPaste(message)
 	case spinner.TickMsg:
@@ -35,9 +35,9 @@ func (m *Model) updateSyncValidation(message tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
-// handleValidationFinished applies a completed sync-validation attempt.
+// handleSyncFinished applies a completed sync attempt.
 // Authored by: OpenCode
-func (m *Model) handleValidationFinished(message validationFinishedMsg) (tea.Model, tea.Cmd) {
+func (m *Model) handleSyncFinished(message syncFinishedMsg) (tea.Model, tea.Cmd) {
 	if message.Attempt != m.sync.AttemptID {
 		return m, nil
 	}
@@ -47,7 +47,7 @@ func (m *Model) handleValidationFinished(message validationFinishedMsg) (tea.Mod
 	m.sync.AttemptID = ""
 	m.sync.Cancel = nil
 	m.sync.TokenInput.Reset()
-	m.enterValidationResult(message.Outcome)
+	m.enterSyncResult(message.Outcome)
 	return m, nil
 }
 
@@ -177,18 +177,17 @@ func (m *Model) focusSyncTokenInput() (tea.Model, tea.Cmd) {
 func (m *Model) activateSyncSelection() (tea.Model, tea.Cmd) {
 	switch m.sync.MenuIndex {
 	case 0:
-		return m.startSyncValidation()
+		return m.startSync()
 	case 1:
-		return m.leaveSyncValidation()
+		return m.leaveSync()
 	default:
 		return m, nil
 	}
 }
 
-// startSyncValidation validates token input and starts the async communication
-// probe.
+// startSync validates token input and starts one asynchronous sync run.
 // Authored by: OpenCode
-func (m *Model) startSyncValidation() (tea.Model, tea.Cmd) {
+func (m *Model) startSync() (tea.Model, tea.Cmd) {
 	if m.currentConfig == nil {
 		return m, m.enterSetup("Complete setup before Sync Data can run.", bootstrap.SetupRequirementNone)
 	}
@@ -220,8 +219,8 @@ func (m *Model) startSyncAttempt(token string, confirmServerReplacement bool) (t
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.Line))
 
 	var config = *m.currentConfig
-	m.active = syncValidationScreenKey
-	return m, tea.Batch(m.spinner.Tick, m.validationCmd(validationContext, m.sync.AttemptID, runtime.ValidateRequest{Config: config, SecurityToken: token, ConfirmServerReplacement: confirmServerReplacement}))
+	m.active = syncScreenKey
+	return m, tea.Batch(m.spinner.Tick, m.syncCmd(validationContext, m.sync.AttemptID, runtime.SyncRequest{Config: config, SecurityToken: token, ConfirmServerReplacement: confirmServerReplacement}))
 }
 
 // startConfirmedServerReplacement resumes sync after explicit server-replacement confirmation.
@@ -230,10 +229,10 @@ func (m *Model) startConfirmedServerReplacement() (tea.Model, tea.Cmd) {
 	return m.startSyncAttempt(m.replacement.PendingToken, true)
 }
 
-// leaveSyncValidation clears transient token state and returns to the main
+// leaveSync clears transient token state and returns to the main
 // menu.
 // Authored by: OpenCode
-func (m *Model) leaveSyncValidation() (tea.Model, tea.Cmd) {
+func (m *Model) leaveSync() (tea.Model, tea.Cmd) {
 	m.sync.TokenInput.Reset()
 	m.enterMainMenu()
 	return m, nil

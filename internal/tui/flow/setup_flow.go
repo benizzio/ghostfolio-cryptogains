@@ -1,5 +1,5 @@
 // Package flow owns the Bubble Tea root model and workflow routing for this
-// validation-only slice.
+// sync-and-storage slice.
 // Authored by: OpenCode
 package flow
 

@@ -110,25 +110,25 @@ func TestValidationErrorHelpersAndValidationBranches(t *testing.T) {
 		t.Fatalf("expected valid cache to pass, got %v", err)
 	}
 
-	if compareValidationOrderKeys(validationOrderKey{SourceDate: "2024-01-01"}, validationOrderKey{SourceDate: "2024-01-02"}) >= 0 {
+	if syncmodel.CompareActivityOrdering(syncmodel.ActivityOrderingKey{SourceDate: "2024-01-01"}, syncmodel.ActivityOrderingKey{SourceDate: "2024-01-02"}) >= 0 {
 		t.Fatalf("expected source date comparison branch")
 	}
-	if compareValidationOrderKeys(validationOrderKey{SourceDate: "2024-01-01", AssetSymbol: "BTC"}, validationOrderKey{SourceDate: "2024-01-01", AssetSymbol: "ETH"}) >= 0 {
+	if syncmodel.CompareActivityOrdering(syncmodel.ActivityOrderingKey{SourceDate: "2024-01-01", AssetSymbol: "BTC"}, syncmodel.ActivityOrderingKey{SourceDate: "2024-01-01", AssetSymbol: "ETH"}) >= 0 {
 		t.Fatalf("expected asset-symbol comparison branch")
 	}
-	if compareValidationOrderKeys(validationOrderKey{SourceDate: "2024-01-01", AssetSymbol: "BTC", ActivityOrder: 0}, validationOrderKey{SourceDate: "2024-01-01", AssetSymbol: "BTC", ActivityOrder: 1}) >= 0 {
+	if syncmodel.CompareActivityOrdering(syncmodel.ActivityOrderingKey{SourceDate: "2024-01-01", AssetSymbol: "BTC", ActivityType: syncmodel.ActivityTypeBuy}, syncmodel.ActivityOrderingKey{SourceDate: "2024-01-01", AssetSymbol: "BTC", ActivityType: syncmodel.ActivityTypeSell}) >= 0 {
 		t.Fatalf("expected activity-order comparison branch")
 	}
-	if compareValidationOrderKeys(validationOrderKey{SourceDate: "2024-01-01", AssetSymbol: "BTC", ActivityOrder: 0, SourceID: "a"}, validationOrderKey{SourceDate: "2024-01-01", AssetSymbol: "BTC", ActivityOrder: 0, SourceID: "b"}) >= 0 {
+	if syncmodel.CompareActivityOrdering(syncmodel.ActivityOrderingKey{SourceDate: "2024-01-01", AssetSymbol: "BTC", ActivityType: syncmodel.ActivityTypeBuy, SourceID: "a"}, syncmodel.ActivityOrderingKey{SourceDate: "2024-01-01", AssetSymbol: "BTC", ActivityType: syncmodel.ActivityTypeBuy, SourceID: "b"}) >= 0 {
 		t.Fatalf("expected source-id comparison branch")
 	}
-	if compareValidationOrderKeys(validationOrderKey{SourceDate: "2024-01-01", AssetSymbol: "BTC", ActivityOrder: 0, SourceID: "a", OccurredAt: "2024-01-01T10:00:00Z"}, validationOrderKey{SourceDate: "2024-01-01", AssetSymbol: "BTC", ActivityOrder: 0, SourceID: "a", OccurredAt: "2024-01-01T11:00:00Z"}) >= 0 {
+	if syncmodel.CompareActivityOrdering(syncmodel.ActivityOrderingKey{SourceDate: "2024-01-01", AssetSymbol: "BTC", ActivityType: syncmodel.ActivityTypeBuy, SourceID: "a", OccurredAt: "2024-01-01T10:00:00Z"}, syncmodel.ActivityOrderingKey{SourceDate: "2024-01-01", AssetSymbol: "BTC", ActivityType: syncmodel.ActivityTypeBuy, SourceID: "a", OccurredAt: "2024-01-01T11:00:00Z"}) >= 0 {
 		t.Fatalf("expected occurred-at comparison branch")
 	}
-	if compareValidationOrderKeys(validationOrderKey{SourceDate: "2024-01-01", AssetSymbol: "BTC", ActivityOrder: 0, SourceID: "a", OccurredAt: "2024-01-01T10:00:00Z", RawHash: "a"}, validationOrderKey{SourceDate: "2024-01-01", AssetSymbol: "BTC", ActivityOrder: 0, SourceID: "a", OccurredAt: "2024-01-01T10:00:00Z", RawHash: "b"}) >= 0 {
+	if syncmodel.CompareActivityOrdering(syncmodel.ActivityOrderingKey{SourceDate: "2024-01-01", AssetSymbol: "BTC", ActivityType: syncmodel.ActivityTypeBuy, SourceID: "a", OccurredAt: "2024-01-01T10:00:00Z", RawHash: "a"}, syncmodel.ActivityOrderingKey{SourceDate: "2024-01-01", AssetSymbol: "BTC", ActivityType: syncmodel.ActivityTypeBuy, SourceID: "a", OccurredAt: "2024-01-01T10:00:00Z", RawHash: "b"}) >= 0 {
 		t.Fatalf("expected raw-hash comparison branch")
 	}
-	if validationActivityTypeOrder(syncmodel.ActivityType("OTHER")) != 2 {
+	if syncmodel.CompareActivityOrdering(syncmodel.ActivityOrderingKey{ActivityType: syncmodel.ActivityType("OTHER")}, syncmodel.ActivityOrderingKey{ActivityType: syncmodel.ActivityTypeSell}) <= 0 {
 		t.Fatalf("expected default activity type order branch")
 	}
 

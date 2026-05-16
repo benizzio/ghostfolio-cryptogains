@@ -1,5 +1,5 @@
 // Package flow owns the Bubble Tea root model and workflow routing for this
-// validation-only slice.
+// sync-and-storage slice.
 // Authored by: OpenCode
 package flow
 
@@ -30,9 +30,9 @@ type activeScreen string
 const (
 	setupScreenKey             activeScreen = "setup"
 	mainMenuScreenKey          activeScreen = "main_menu"
-	syncValidationScreenKey    activeScreen = "sync_validation"
+	syncScreenKey              activeScreen = "sync"
 	serverReplacementScreenKey activeScreen = "server_replacement"
-	validationResultScreenKey  activeScreen = "validation_result"
+	syncResultScreenKey        activeScreen = "sync_result"
 
 	setupMenuGhostfolioCloudIndex = 0
 	setupMenuCustomOriginIndex    = 1
@@ -46,10 +46,10 @@ type setupSavedMsg struct {
 	Err    error
 }
 
-// validationFinishedMsg reports the result of an asynchronous validation run.
+// syncFinishedMsg reports the result of an asynchronous sync run.
 // Authored by: OpenCode
-type validationFinishedMsg struct {
-	Outcome runtime.ValidationOutcome
+type syncFinishedMsg struct {
+	Outcome runtime.SyncOutcome
 	Attempt string
 }
 
@@ -97,11 +97,11 @@ type serverReplacementState struct {
 	NewServer     string
 }
 
-// resultState holds transient UI state for the validation-result screen.
+// resultState holds transient UI state for the sync-result screen.
 // Authored by: OpenCode
 type resultState struct {
 	MenuIndex int
-	Outcome   runtime.ValidationOutcome
+	Outcome   runtime.SyncOutcome
 }
 
 // Model is the root Bubble Tea model for the application workflow.
@@ -190,12 +190,12 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateSetup(message)
 	case mainMenuScreenKey:
 		return m.updateMainMenu(message)
-	case syncValidationScreenKey:
-		return m.updateSyncValidation(message)
+	case syncScreenKey:
+		return m.updateSync(message)
 	case serverReplacementScreenKey:
 		return m.updateServerReplacement(message)
-	case validationResultScreenKey:
-		return m.updateValidationResult(message)
+	case syncResultScreenKey:
+		return m.updateSyncResult(message)
 	default:
 		return m, nil
 	}
@@ -241,9 +241,9 @@ func (m *Model) View() tea.View {
 				HelpText:            m.mainMenuHelpText(),
 			},
 		)
-	case syncValidationScreenKey:
-		rendered = screen.SyncValidationScreenView(
-			screen.SyncValidationScreenParams{
+	case syncScreenKey:
+		rendered = screen.SyncEntryScreenView(
+			screen.SyncEntryScreenParams{
 				Theme:               m.theme,
 				Width:               m.width,
 				Height:              m.height,
@@ -271,9 +271,9 @@ func (m *Model) View() tea.View {
 				HelpText:      m.serverReplacementHelpText(),
 			},
 		)
-	case validationResultScreenKey:
-		rendered = screen.ValidationResultScreenView(
-			screen.ValidationResultScreenParams{
+	case syncResultScreenKey:
+		rendered = screen.SyncResultScreenView(
+			screen.SyncResultScreenParams{
 				Theme:         m.theme,
 				Width:         m.width,
 				Height:        m.height,
@@ -318,7 +318,7 @@ func (m *Model) currentServerOrigin() string {
 // Authored by: OpenCode
 func setupInvalidMessage(reason bootstrap.SetupRequirementReason) string {
 	if reason == bootstrap.SetupRequirementInvalidRememberedSetup {
-		return "The saved server selection is no longer valid. Complete setup again before sync validation can run."
+		return "The saved server selection is no longer valid. Complete setup again before Sync Data can run."
 	}
 	return ""
 }
@@ -498,10 +498,10 @@ func (m *Model) enterMainMenu() {
 	m.setup.StartupReason = bootstrap.SetupRequirementNone
 }
 
-// enterSyncValidation routes the application to the sync-validation entry screen.
+// enterSync routes the application to the sync entry screen.
 // Authored by: OpenCode
-func (m *Model) enterSyncValidation() tea.Cmd {
-	m.active = syncValidationScreenKey
+func (m *Model) enterSync() tea.Cmd {
+	m.active = syncScreenKey
 	m.sync = newSyncState()
 	return m.sync.TokenInput.Focus()
 }
@@ -517,10 +517,10 @@ func (m *Model) enterServerReplacement(check runtime.ServerReplacementCheck, pen
 	}
 }
 
-// enterValidationResult routes the application to the validation result screen.
+// enterSyncResult routes the application to the sync result screen.
 // Authored by: OpenCode
-func (m *Model) enterValidationResult(outcome runtime.ValidationOutcome) {
-	m.active = validationResultScreenKey
+func (m *Model) enterSyncResult(outcome runtime.SyncOutcome) {
+	m.active = syncResultScreenKey
 	m.result = resultState{Outcome: outcome}
 	if outcome.Success {
 		m.result.MenuIndex = 1
@@ -542,12 +542,12 @@ func (m *Model) saveSetupCmd(request runtime.SaveSetupRequest) tea.Cmd {
 	}
 }
 
-// validationCmd delegates a single sync-validation attempt to the application service.
+// syncCmd delegates a single sync attempt to the application service.
 // Authored by: OpenCode
-func (m *Model) validationCmd(ctx context.Context, attemptID string, request runtime.ValidateRequest) tea.Cmd {
+func (m *Model) syncCmd(ctx context.Context, attemptID string, request runtime.SyncRequest) tea.Cmd {
 	return func() tea.Msg {
-		return validationFinishedMsg{
-			Outcome: m.deps.SyncService.Validate(ctx, request),
+		return syncFinishedMsg{
+			Outcome: m.deps.SyncService.Run(ctx, request),
 			Attempt: attemptID,
 		}
 	}

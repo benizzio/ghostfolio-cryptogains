@@ -10,8 +10,7 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/component"
 )
 
-// SyncValidationScreenParams contains the render state for the sync-validation
-// entry screen.
+// SyncEntryScreenParams contains the render state for the sync entry screen.
 //
 // Supply the current token input rendering, the primary menu state, any
 // validation message, and busy-state details when a communication check is in
@@ -19,7 +18,7 @@ import (
 // and the busy progress view without mutating workflow state.
 //
 // Authored by: OpenCode
-type SyncValidationScreenParams struct {
+type SyncEntryScreenParams struct {
 	Theme               component.Theme
 	Width               int
 	Height              int
@@ -34,19 +33,19 @@ type SyncValidationScreenParams struct {
 	ProtectedDataExists bool
 }
 
-// SyncValidationScreenView renders the sync-data entry screen.
+// SyncEntryScreenView renders the sync-data entry screen.
 //
 // Example:
 //
-//	view := screen.SyncValidationScreenView(params)
+//	view := screen.SyncEntryScreenView(params)
 //	_ = view
 //
-// `SyncValidationScreenView` renders the token-entry workflow for `Sync Data`.
+// `SyncEntryScreenView` renders the token-entry workflow for `Sync Data`.
 // It shows the runtime-only security-token field, the primary action menu when
 // idle, or the progress indicator when sync and protected storage are running.
 //
 // Authored by: OpenCode
-func SyncValidationScreenView(params SyncValidationScreenParams) string {
+func SyncEntryScreenView(params SyncEntryScreenParams) string {
 	var bodyParts = []string{
 		"The application will authenticate, retrieve activity history, validate it, and store it securely for future use only.",
 		fmt.Sprintf("Protected Data Loaded For This Run: %s", syncProtectedDataStatusLabel(params.ProtectedDataExists)),

@@ -116,7 +116,7 @@ func TestProtectedSnapshotContractFailsSafelyForUnsupportedStoredDataVersions(t 
 				snapshotstore.NewEncryptedStore(baseDir, snapshotenvelope.NewJSONCodec()),
 			)
 
-			outcome := service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: "token"})
+			outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token"})
 			if outcome.FailureReason != runtime.SyncFailureUnsupportedStoredDataVersion {
 				t.Fatalf("expected unsupported stored-data version outcome, got %#v", outcome)
 			}

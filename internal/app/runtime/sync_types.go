@@ -1,5 +1,5 @@
 // Package runtime defines the sync runtime models shared by the application
-// service and later workflow phases.
+// service and TUI workflow.
 // Authored by: OpenCode
 package runtime
 
@@ -12,11 +12,6 @@ import (
 // SyncFailureReason identifies one supported user-visible sync outcome category.
 // Authored by: OpenCode
 type SyncFailureReason string
-
-// ValidationFailureReason preserves the existing validation-only type name while
-// the sync slice expands the broader failure taxonomy.
-// Authored by: OpenCode
-type ValidationFailureReason = SyncFailureReason
 
 const (
 	// SyncFailureNone indicates that the sync completed successfully.
@@ -48,26 +43,6 @@ const (
 
 	// SyncFailureServerReplacementCancelled indicates that the user declined a server-replacement sync.
 	SyncFailureServerReplacementCancelled SyncFailureReason = "server replacement cancelled"
-)
-
-const (
-	// ValidationFailureNone preserves the existing validation-only success constant.
-	ValidationFailureNone ValidationFailureReason = SyncFailureNone
-
-	// ValidationFailureRejectedToken preserves the existing validation-only failure constant.
-	ValidationFailureRejectedToken ValidationFailureReason = SyncFailureRejectedToken
-
-	// ValidationFailureTimeout preserves the existing validation-only failure constant.
-	ValidationFailureTimeout ValidationFailureReason = SyncFailureTimeout
-
-	// ValidationFailureConnectivityProblem preserves the existing validation-only failure constant.
-	ValidationFailureConnectivityProblem ValidationFailureReason = SyncFailureConnectivityProblem
-
-	// ValidationFailureUnsuccessfulServerResponse preserves the existing validation-only failure constant.
-	ValidationFailureUnsuccessfulServerResponse ValidationFailureReason = SyncFailureUnsuccessfulServerResponse
-
-	// ValidationFailureIncompatibleServerContract preserves the existing validation-only failure constant.
-	ValidationFailureIncompatibleServerContract ValidationFailureReason = SyncFailureIncompatibleServerContract
 )
 
 // AttemptStatus identifies the current phase of one sync attempt.
@@ -112,17 +87,6 @@ const (
 	AttemptStatusAborted AttemptStatus = "aborted"
 )
 
-const (
-	// AttemptStatusRequestingActivities preserves the existing validation-only lifecycle label.
-	AttemptStatusRequestingActivities AttemptStatus = AttemptStatusRetrievingHistory
-
-	// AttemptStatusValidatingPayload preserves the existing validation-only lifecycle label.
-	AttemptStatusValidatingPayload AttemptStatus = AttemptStatusValidating
-
-	// AttemptStatusFailure preserves the existing validation-only lifecycle label.
-	AttemptStatusFailure AttemptStatus = AttemptStatusFailed
-)
-
 // GhostfolioSession is the transient authenticated runtime state for one sync attempt.
 // Authored by: OpenCode
 type GhostfolioSession struct {
@@ -144,10 +108,6 @@ type SyncAttempt struct {
 	ServerMismatchConfirmed bool
 }
 
-// SyncValidationAttempt preserves the existing validation-only attempt type name.
-// Authored by: OpenCode
-type SyncValidationAttempt = SyncAttempt
-
 // SyncOutcome is the structured result of a completed sync attempt.
 // Authored by: OpenCode
 type SyncOutcome struct {
@@ -157,10 +117,6 @@ type SyncOutcome struct {
 	Attempt       SyncAttempt
 	Diagnostic    DiagnosticReportState
 }
-
-// ValidationOutcome preserves the existing validation-only outcome type name.
-// Authored by: OpenCode
-type ValidationOutcome = SyncOutcome
 
 // DiagnosticReportRequest stores the structured data needed to write one local
 // synced-data diagnostic report.

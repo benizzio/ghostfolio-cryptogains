@@ -37,42 +37,49 @@ func TestNormalizationErrorHelpersAndUnreadableTimestamp(t *testing.T) {
 func TestCompareNormalizedRecordsAndHashBranches(t *testing.T) {
 	t.Parallel()
 
-	left := normalizedRecord{SourceDate: "2024-01-01", ActivityOrder: 0, Record: syncmodel.ActivityRecord{AssetSymbol: "BTC", SourceID: "a", OccurredAt: "2024-01-01T12:00:00Z"}, RawHash: "aaa"}
-	right := normalizedRecord{SourceDate: "2024-01-02", ActivityOrder: 0, Record: syncmodel.ActivityRecord{AssetSymbol: "BTC", SourceID: "a", OccurredAt: "2024-01-01T12:00:00Z"}, RawHash: "aaa"}
-	if compareNormalizedRecords(left, right) >= 0 {
+	left := normalizedRecord{OrderKey: syncmodel.ActivityOrderingKey{SourceDate: "2024-01-01", AssetSymbol: "BTC", ActivityType: syncmodel.ActivityTypeBuy, SourceID: "a", OccurredAt: "2024-01-01T12:00:00Z", RawHash: "aaa"}, Record: syncmodel.ActivityRecord{AssetSymbol: "BTC", SourceID: "a", OccurredAt: "2024-01-01T12:00:00Z"}, RawHash: "aaa"}
+	right := normalizedRecord{OrderKey: syncmodel.ActivityOrderingKey{SourceDate: "2024-01-02", AssetSymbol: "BTC", ActivityType: syncmodel.ActivityTypeBuy, SourceID: "a", OccurredAt: "2024-01-01T12:00:00Z", RawHash: "aaa"}, Record: syncmodel.ActivityRecord{AssetSymbol: "BTC", SourceID: "a", OccurredAt: "2024-01-01T12:00:00Z"}, RawHash: "aaa"}
+	if syncmodel.CompareActivityOrdering(left.OrderKey, right.OrderKey) >= 0 {
 		t.Fatalf("expected earlier source date to sort first")
 	}
 
-	right.SourceDate = left.SourceDate
+	right.OrderKey.SourceDate = left.OrderKey.SourceDate
 	right.Record.AssetSymbol = "ETH"
-	if compareNormalizedRecords(left, right) >= 0 {
+	right.OrderKey.AssetSymbol = "ETH"
+	if syncmodel.CompareActivityOrdering(left.OrderKey, right.OrderKey) >= 0 {
 		t.Fatalf("expected asset symbol tie-breaker")
 	}
 
 	right.Record.AssetSymbol = left.Record.AssetSymbol
-	right.ActivityOrder = 1
-	if compareNormalizedRecords(left, right) >= 0 {
+	right.OrderKey.AssetSymbol = left.OrderKey.AssetSymbol
+	right.OrderKey.ActivityType = syncmodel.ActivityTypeSell
+	if syncmodel.CompareActivityOrdering(left.OrderKey, right.OrderKey) >= 0 {
 		t.Fatalf("expected activity order tie-breaker")
 	}
-	if compareNormalizedRecords(right, left) <= 0 {
+	if syncmodel.CompareActivityOrdering(right.OrderKey, left.OrderKey) <= 0 {
 		t.Fatalf("expected reverse activity order tie-breaker")
 	}
 
-	right.ActivityOrder = left.ActivityOrder
+	right.OrderKey.ActivityType = left.OrderKey.ActivityType
 	right.Record.SourceID = "z"
-	if compareNormalizedRecords(left, right) >= 0 {
+	right.OrderKey.SourceID = "z"
+	if syncmodel.CompareActivityOrdering(left.OrderKey, right.OrderKey) >= 0 {
 		t.Fatalf("expected source id tie-breaker")
 	}
 
 	right.Record.SourceID = left.Record.SourceID
+	right.OrderKey.SourceID = left.OrderKey.SourceID
 	right.Record.OccurredAt = "2024-01-01T13:00:00Z"
-	if compareNormalizedRecords(left, right) >= 0 {
+	right.OrderKey.OccurredAt = "2024-01-01T13:00:00Z"
+	if syncmodel.CompareActivityOrdering(left.OrderKey, right.OrderKey) >= 0 {
 		t.Fatalf("expected occurred_at tie-breaker")
 	}
 
 	right.Record.OccurredAt = left.Record.OccurredAt
+	right.OrderKey.OccurredAt = left.OrderKey.OccurredAt
 	right.RawHash = "zzz"
-	if compareNormalizedRecords(left, right) >= 0 {
+	right.OrderKey.RawHash = "zzz"
+	if syncmodel.CompareActivityOrdering(left.OrderKey, right.OrderKey) >= 0 {
 		t.Fatalf("expected raw-hash tie-breaker")
 	}
 

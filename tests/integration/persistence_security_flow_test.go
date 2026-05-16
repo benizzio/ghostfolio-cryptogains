@@ -65,7 +65,7 @@ func TestPersistenceSecurityFlowArtifactsStayFreeOfSecretsAndTransientFailureTex
 	}
 
 	var successService = newProductionArtifactSyncService(baseDir, successServer.Client())
-	var outcome = successService.Validate(context.Background(), runtime.ValidateRequest{
+	var outcome = successService.Run(context.Background(), runtime.SyncRequest{
 		Config:        successConfig,
 		SecurityToken: persistedArtifactTokenSentinel,
 	})
@@ -85,7 +85,7 @@ func TestPersistenceSecurityFlowArtifactsStayFreeOfSecretsAndTransientFailureTex
 	}
 
 	var failureService = newProductionArtifactSyncService(baseDir, failureServer.Client())
-	outcome = failureService.Validate(context.Background(), runtime.ValidateRequest{
+	outcome = failureService.Run(context.Background(), runtime.SyncRequest{
 		Config:        failureConfig,
 		SecurityToken: persistedArtifactTokenSentinel,
 	})

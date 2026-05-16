@@ -10,7 +10,7 @@ import (
 func TestSyncEntryWorkflowContract(t *testing.T) {
 	t.Parallel()
 
-	var content = screen.SyncValidationScreenView(screen.SyncValidationScreenParams{
+	var content = screen.SyncEntryScreenView(screen.SyncEntryScreenParams{
 		Theme:      component.DefaultTheme(),
 		Width:      100,
 		Height:     32,

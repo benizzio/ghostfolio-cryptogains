@@ -11,7 +11,7 @@ import (
 func TestSyncStorageWorkflowContract(t *testing.T) {
 	t.Parallel()
 
-	var busy = screen.SyncValidationScreenView(screen.SyncValidationScreenParams{
+	var busy = screen.SyncEntryScreenView(screen.SyncEntryScreenParams{
 		Theme:        component.DefaultTheme(),
 		Width:        100,
 		Height:       32,
@@ -23,22 +23,22 @@ func TestSyncStorageWorkflowContract(t *testing.T) {
 	assertContains(t, busy, "securely for future use only")
 	assertContains(t, busy, "Syncing and storing activity history")
 
-	var success = screen.ValidationResultScreenView(screen.ValidationResultScreenParams{
+	var success = screen.SyncResultScreenView(screen.SyncResultScreenParams{
 		Theme:     component.DefaultTheme(),
 		Width:     100,
 		Height:    32,
 		MenuItems: []component.MenuItem{{Label: "Sync Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
-		Outcome:   runtime.ValidationOutcome{Success: true, DetailReason: "activity_data_stored"},
+		Outcome:   runtime.SyncOutcome{Success: true, DetailReason: "activity_data_stored"},
 	})
 	assertContains(t, success, "stored securely for future use")
 	assertContains(t, success, "cached-data browsing workflow")
 
-	var failure = screen.ValidationResultScreenView(screen.ValidationResultScreenParams{
+	var failure = screen.SyncResultScreenView(screen.SyncResultScreenParams{
 		Theme:     component.DefaultTheme(),
 		Width:     100,
 		Height:    32,
 		MenuItems: []component.MenuItem{{Label: "Generate Diagnostic Report", Enabled: true}, {Label: "Sync Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
-		Outcome: runtime.ValidationOutcome{
+		Outcome: runtime.SyncOutcome{
 			Success:       false,
 			FailureReason: runtime.SyncFailureUnsupportedActivityHistory,
 			DetailReason:  string(runtime.SyncFailureUnsupportedActivityHistory),

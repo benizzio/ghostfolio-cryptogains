@@ -28,12 +28,12 @@ func TestServerReplacementWorkflowContract(t *testing.T) {
 	assertContains(t, content, "https://old.example")
 	assertContains(t, content, "https://new.example")
 
-	resultContent := screen.ValidationResultScreenView(screen.ValidationResultScreenParams{
+	resultContent := screen.SyncResultScreenView(screen.SyncResultScreenParams{
 		Theme:     component.DefaultTheme(),
 		Width:     100,
 		Height:    32,
 		MenuItems: []component.MenuItem{{Label: "Sync Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
-		Outcome: runtime.ValidationOutcome{
+		Outcome: runtime.SyncOutcome{
 			Success:       false,
 			FailureReason: runtime.SyncFailureServerReplacementCancelled,
 		},

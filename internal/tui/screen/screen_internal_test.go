@@ -8,10 +8,10 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/component"
 )
 
-func TestSyncValidationScreenViewCoversBusyBranch(t *testing.T) {
+func TestSyncEntryScreenViewCoversBusyBranch(t *testing.T) {
 	t.Parallel()
 
-	var content = SyncValidationScreenView(SyncValidationScreenParams{Theme: component.DefaultTheme(), Width: 80, Height: 24, Busy: true, BusyText: "Working", SpinnerFrame: "*", TokenInput: "***"})
+	var content = SyncEntryScreenView(SyncEntryScreenParams{Theme: component.DefaultTheme(), Width: 80, Height: 24, Busy: true, BusyText: "Working", SpinnerFrame: "*", TokenInput: "***"})
 	if content == "" {
 		t.Fatalf("expected rendered content")
 	}
@@ -86,10 +86,10 @@ func TestServerReplacementScreenViewCoversRenderPath(t *testing.T) {
 	}
 }
 
-func TestSyncValidationScreenViewCoversIdleBranch(t *testing.T) {
+func TestSyncEntryScreenViewCoversIdleBranch(t *testing.T) {
 	t.Parallel()
 
-	var content = SyncValidationScreenView(SyncValidationScreenParams{
+	var content = SyncEntryScreenView(SyncEntryScreenParams{
 		Theme:         component.DefaultTheme(),
 		Width:         80,
 		Height:        24,
@@ -106,10 +106,10 @@ func TestSyncValidationScreenViewCoversIdleBranch(t *testing.T) {
 	}
 }
 
-func TestSyncValidationScreenViewUsesValidationMessageOverride(t *testing.T) {
+func TestSyncEntryScreenViewUsesValidationMessageOverride(t *testing.T) {
 	t.Parallel()
 
-	var content = SyncValidationScreenView(SyncValidationScreenParams{
+	var content = SyncEntryScreenView(SyncEntryScreenParams{
 		Theme:             component.DefaultTheme(),
 		Width:             80,
 		Height:            24,
@@ -142,24 +142,24 @@ func TestSyncProtectedDataStatusLabelCoversBothBranches(t *testing.T) {
 	}
 }
 
-func TestValidationResultScreenViewCoversFailureBranch(t *testing.T) {
+func TestSyncResultScreenViewCoversFailureBranch(t *testing.T) {
 	t.Parallel()
 
-	var content = ValidationResultScreenView(ValidationResultScreenParams{Theme: component.DefaultTheme(), Width: 80, Height: 24, Outcome: runtime.ValidationOutcome{Success: false, FailureReason: runtime.ValidationFailureTimeout}, MenuItems: []component.MenuItem{{Label: "Back", Enabled: true}}})
+	var content = SyncResultScreenView(SyncResultScreenParams{Theme: component.DefaultTheme(), Width: 80, Height: 24, Outcome: runtime.SyncOutcome{Success: false, FailureReason: runtime.SyncFailureTimeout}, MenuItems: []component.MenuItem{{Label: "Back", Enabled: true}}})
 	if content == "" {
 		t.Fatalf("expected rendered content")
 	}
 }
 
-func TestValidationResultScreenViewCoversDiagnosticBranches(t *testing.T) {
+func TestSyncResultScreenViewCoversDiagnosticBranches(t *testing.T) {
 	t.Parallel()
 
-	var promptContent = ValidationResultScreenView(ValidationResultScreenParams{
+	var promptContent = SyncResultScreenView(SyncResultScreenParams{
 		Theme:     component.DefaultTheme(),
 		Width:     80,
 		Height:    24,
 		MenuItems: []component.MenuItem{{Label: "Generate Diagnostic Report", Enabled: true}, {Label: "Sync Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
-		Outcome: runtime.ValidationOutcome{
+		Outcome: runtime.SyncOutcome{
 			Success:       false,
 			FailureReason: runtime.SyncFailureUnsupportedActivityHistory,
 			Diagnostic:    runtime.DiagnosticReportState{Eligible: true},
@@ -169,12 +169,12 @@ func TestValidationResultScreenViewCoversDiagnosticBranches(t *testing.T) {
 		t.Fatalf("expected diagnostic prompt branch, got %q", promptContent)
 	}
 
-	var writtenContent = ValidationResultScreenView(ValidationResultScreenParams{
+	var writtenContent = SyncResultScreenView(SyncResultScreenParams{
 		Theme:     component.DefaultTheme(),
 		Width:     80,
 		Height:    24,
 		MenuItems: []component.MenuItem{{Label: "Sync Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
-		Outcome: runtime.ValidationOutcome{
+		Outcome: runtime.SyncOutcome{
 			Success:       false,
 			FailureReason: runtime.SyncFailureIncompatibleNewSyncData,
 			Diagnostic:    runtime.DiagnosticReportState{Eligible: true, Path: "/tmp/report.diagnostic.json"},
@@ -193,15 +193,15 @@ func TestValidationFollowUpTextCoversRemainingFailureBranches(t *testing.T) {
 
 	testCases := []struct {
 		name    string
-		outcome runtime.ValidationOutcome
+		outcome runtime.SyncOutcome
 		want    string
 	}{
-		{name: "replacement cancelled", outcome: runtime.ValidationOutcome{FailureReason: runtime.SyncFailureServerReplacementCancelled}, want: "server replacement was cancelled"},
-		{name: "rejected token", outcome: runtime.ValidationOutcome{FailureReason: runtime.ValidationFailureRejectedToken}, want: "token was rejected"},
-		{name: "unsupported stored-data version", outcome: runtime.ValidationOutcome{FailureReason: runtime.SyncFailureUnsupportedStoredDataVersion}, want: "unsupported stored-data version"},
-		{name: "incompatible new sync data", outcome: runtime.ValidationOutcome{FailureReason: runtime.SyncFailureIncompatibleNewSyncData}, want: "could not be stored safely"},
-		{name: "unsupported activity history", outcome: runtime.ValidationOutcome{FailureReason: runtime.SyncFailureUnsupportedActivityHistory}, want: "activity history is not supported safely"},
-		{name: "default failure", outcome: runtime.ValidationOutcome{FailureReason: runtime.ValidationFailureTimeout}, want: "Sync again or return to the main menu"},
+		{name: "replacement cancelled", outcome: runtime.SyncOutcome{FailureReason: runtime.SyncFailureServerReplacementCancelled}, want: "server replacement was cancelled"},
+		{name: "rejected token", outcome: runtime.SyncOutcome{FailureReason: runtime.SyncFailureRejectedToken}, want: "token was rejected"},
+		{name: "unsupported stored-data version", outcome: runtime.SyncOutcome{FailureReason: runtime.SyncFailureUnsupportedStoredDataVersion}, want: "unsupported stored-data version"},
+		{name: "incompatible new sync data", outcome: runtime.SyncOutcome{FailureReason: runtime.SyncFailureIncompatibleNewSyncData}, want: "could not be stored safely"},
+		{name: "unsupported activity history", outcome: runtime.SyncOutcome{FailureReason: runtime.SyncFailureUnsupportedActivityHistory}, want: "activity history is not supported safely"},
+		{name: "default failure", outcome: runtime.SyncOutcome{FailureReason: runtime.SyncFailureTimeout}, want: "Sync again or return to the main menu"},
 	}
 
 	for _, testCase := range testCases {
@@ -213,19 +213,19 @@ func TestValidationFollowUpTextCoversRemainingFailureBranches(t *testing.T) {
 	}
 }
 
-// TestValidationResultScreenViewCoversSuccessBranch exercises the successful
-// validation render path.
+// TestSyncResultScreenViewCoversSuccessBranch exercises the successful
+// sync render path.
 // Authored by: OpenCode
-func TestValidationResultScreenViewCoversSuccessBranch(t *testing.T) {
+func TestSyncResultScreenViewCoversSuccessBranch(t *testing.T) {
 	t.Parallel()
 
-	var content = ValidationResultScreenView(ValidationResultScreenParams{
+	var content = SyncResultScreenView(SyncResultScreenParams{
 		Theme:         component.DefaultTheme(),
 		Width:         80,
 		Height:        24,
 		MenuItems:     []component.MenuItem{{Label: "Main Menu", Enabled: true}},
 		SelectedIndex: 0,
-		Outcome:       runtime.ValidationOutcome{Success: true},
+		Outcome:       runtime.SyncOutcome{Success: true},
 		HelpText:      "help",
 	})
 	if content == "" {
@@ -245,21 +245,21 @@ func TestValidationResultScreenViewCoversSuccessBranch(t *testing.T) {
 	}
 }
 
-// TestValidationResultScreenViewCoversIncompatibleContractBranch exercises the
+// TestSyncResultScreenViewCoversIncompatibleContractBranch exercises the
 // unsupported-server guidance branch.
 // Authored by: OpenCode
-func TestValidationResultScreenViewCoversIncompatibleContractBranch(t *testing.T) {
+func TestSyncResultScreenViewCoversIncompatibleContractBranch(t *testing.T) {
 	t.Parallel()
 
-	var content = ValidationResultScreenView(ValidationResultScreenParams{
+	var content = SyncResultScreenView(SyncResultScreenParams{
 		Theme:         component.DefaultTheme(),
 		Width:         80,
 		Height:        24,
-		MenuItems:     []component.MenuItem{{Label: "Validate Again", Enabled: true}, {Label: "Main Menu", Enabled: true}},
+		MenuItems:     []component.MenuItem{{Label: "Sync Again", Enabled: true}, {Label: "Back To Main Menu", Enabled: true}},
 		SelectedIndex: 0,
-		Outcome: runtime.ValidationOutcome{
+		Outcome: runtime.SyncOutcome{
 			Success:       false,
-			FailureReason: runtime.ValidationFailureIncompatibleServerContract,
+			FailureReason: runtime.SyncFailureIncompatibleServerContract,
 		},
 		HelpText: "help",
 	})

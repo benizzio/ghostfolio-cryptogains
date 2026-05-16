@@ -120,7 +120,7 @@ func TestNewFailsWithoutResolvableUserConfigDir(t *testing.T) {
 	}
 }
 
-func TestValidateCoversInvalidAuthPayload(t *testing.T) {
+func TestRunCoversInvalidAuthPayload(t *testing.T) {
 	t.Parallel()
 
 	var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -136,8 +136,8 @@ func TestValidateCoversInvalidAuthPayload(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var outcome = service.Validate(context.Background(), ValidateRequest{Config: config, SecurityToken: "token"})
-	if outcome.FailureReason != ValidationFailureIncompatibleServerContract {
+	var outcome = service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
+	if outcome.FailureReason != SyncFailureIncompatibleServerContract {
 		t.Fatalf("expected incompatible-server outcome, got %#v", outcome)
 	}
 }
@@ -145,38 +145,38 @@ func TestValidateCoversInvalidAuthPayload(t *testing.T) {
 func TestFinalizeFailureFallsBackToConnectivityCategory(t *testing.T) {
 	t.Parallel()
 
-	var outcome = finalizeFailure(&GhostfolioSession{}, &SyncValidationAttempt{}, errors.New("boom"))
-	if outcome.FailureReason != ValidationFailureConnectivityProblem {
+	var outcome = finalizeBoundaryFailure(&GhostfolioSession{}, &SyncAttempt{}, errors.New("boom"))
+	if outcome.FailureReason != SyncFailureConnectivityProblem {
 		t.Fatalf("expected connectivity fallback, got %#v", outcome)
 	}
 }
 
-func TestValidationFailureReasonFromBoundaryCoversAllCategories(t *testing.T) {
+func TestSyncFailureReasonFromBoundaryCoversAllCategories(t *testing.T) {
 	t.Parallel()
 
 	var testCases = []struct {
 		name     string
 		category ghostfolioclient.FailureCategory
-		want     ValidationFailureReason
+		want     SyncFailureReason
 	}{
-		{name: "rejected token", category: ghostfolioclient.FailureRejectedToken, want: ValidationFailureRejectedToken},
-		{name: "timeout", category: ghostfolioclient.FailureTimeout, want: ValidationFailureTimeout},
-		{name: "connectivity", category: ghostfolioclient.FailureConnectivityProblem, want: ValidationFailureConnectivityProblem},
-		{name: "unsuccessful response", category: ghostfolioclient.FailureUnsuccessfulServerResponse, want: ValidationFailureUnsuccessfulServerResponse},
-		{name: "incompatible contract", category: ghostfolioclient.FailureIncompatibleServerContract, want: ValidationFailureIncompatibleServerContract},
-		{name: "unknown", category: ghostfolioclient.FailureCategory("unknown"), want: ValidationFailureConnectivityProblem},
+		{name: "rejected token", category: ghostfolioclient.FailureRejectedToken, want: SyncFailureRejectedToken},
+		{name: "timeout", category: ghostfolioclient.FailureTimeout, want: SyncFailureTimeout},
+		{name: "connectivity", category: ghostfolioclient.FailureConnectivityProblem, want: SyncFailureConnectivityProblem},
+		{name: "unsuccessful response", category: ghostfolioclient.FailureUnsuccessfulServerResponse, want: SyncFailureUnsuccessfulServerResponse},
+		{name: "incompatible contract", category: ghostfolioclient.FailureIncompatibleServerContract, want: SyncFailureIncompatibleServerContract},
+		{name: "unknown", category: ghostfolioclient.FailureCategory("unknown"), want: SyncFailureConnectivityProblem},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			if got := validationFailureReasonFromBoundary(testCase.category); got != testCase.want {
-				t.Fatalf("validation failure reason mismatch: got %q want %q", got, testCase.want)
+			if got := syncFailureReasonFromBoundary(testCase.category); got != testCase.want {
+				t.Fatalf("sync failure reason mismatch: got %q want %q", got, testCase.want)
 			}
 		})
 	}
 }
 
-func TestValidateHandlesActivitiesTransportFailure(t *testing.T) {
+func TestRunHandlesActivitiesTransportFailure(t *testing.T) {
 	t.Parallel()
 
 	var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -199,13 +199,13 @@ func TestValidateHandlesActivitiesTransportFailure(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var outcome = service.Validate(context.Background(), ValidateRequest{Config: config, SecurityToken: "token"})
-	if outcome.FailureReason != ValidationFailureUnsuccessfulServerResponse {
+	var outcome = service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
+	if outcome.FailureReason != SyncFailureUnsuccessfulServerResponse {
 		t.Fatalf("expected unsuccessful-response outcome, got %#v", outcome)
 	}
 }
 
-func TestValidateHandlesActivitiesPayloadValidationFailure(t *testing.T) {
+func TestRunHandlesActivitiesPayloadValidationFailure(t *testing.T) {
 	t.Parallel()
 
 	var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -228,13 +228,13 @@ func TestValidateHandlesActivitiesPayloadValidationFailure(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var outcome = service.Validate(context.Background(), ValidateRequest{Config: config, SecurityToken: "token"})
-	if outcome.FailureReason != ValidationFailureIncompatibleServerContract {
+	var outcome = service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
+	if outcome.FailureReason != SyncFailureIncompatibleServerContract {
 		t.Fatalf("expected incompatible-contract outcome, got %#v", outcome)
 	}
 }
 
-func TestValidateSuccessOutcomeIncludesAttemptAndMessages(t *testing.T) {
+func TestRunSuccessOutcomeIncludesAttemptAndMessages(t *testing.T) {
 	t.Parallel()
 
 	var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -257,13 +257,13 @@ func TestValidateSuccessOutcomeIncludesAttemptAndMessages(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var outcome = service.Validate(context.Background(), ValidateRequest{Config: config, SecurityToken: "token"})
-	if !outcome.Success || outcome.Attempt.Status != AttemptStatusSuccess || outcome.Attempt.AttemptID == "" || outcome.DetailReason != "activity_data_stored" || outcome.FailureReason != ValidationFailureNone {
+	var outcome = service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
+	if !outcome.Success || outcome.Attempt.Status != AttemptStatusSuccess || outcome.Attempt.AttemptID == "" || outcome.DetailReason != "activity_data_stored" || outcome.FailureReason != SyncFailureNone {
 		t.Fatalf("unexpected success outcome: %#v", outcome)
 	}
 }
 
-func TestValidateHandlesAuthTransportFailure(t *testing.T) {
+func TestRunHandlesAuthTransportFailure(t *testing.T) {
 	t.Parallel()
 
 	var client = ghostfolioclient.New(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
@@ -276,8 +276,8 @@ func TestValidateHandlesAuthTransportFailure(t *testing.T) {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var outcome = service.Validate(context.Background(), ValidateRequest{Config: config, SecurityToken: "token"})
-	if outcome.FailureReason != ValidationFailureTimeout || outcome.Attempt.Status != AttemptStatusFailure {
+	var outcome = service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
+	if outcome.FailureReason != SyncFailureTimeout || outcome.Attempt.Status != AttemptStatusFailed {
 		t.Fatalf("unexpected auth failure outcome: %#v", outcome)
 	}
 }
@@ -285,12 +285,12 @@ func TestValidateHandlesAuthTransportFailure(t *testing.T) {
 func TestFinalizeFailureUsesCategorizedRequestFailure(t *testing.T) {
 	t.Parallel()
 
-	var outcome = finalizeFailure(
+	var outcome = finalizeBoundaryFailure(
 		&GhostfolioSession{SecurityToken: "token", AuthToken: "jwt"},
-		&SyncValidationAttempt{},
+		&SyncAttempt{},
 		&ghostfolioclient.RequestFailure{Category: ghostfolioclient.FailureTimeout, Message: "timeout"},
 	)
-	if outcome.FailureReason != ValidationFailureTimeout {
+	if outcome.FailureReason != SyncFailureTimeout {
 		t.Fatalf("expected timeout category, got %#v", outcome)
 	}
 }

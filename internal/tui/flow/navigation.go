@@ -1,5 +1,5 @@
 // Package flow owns the Bubble Tea root model and workflow routing for this
-// validation-only slice.
+// sync-and-storage slice.
 // Authored by: OpenCode
 package flow
 
@@ -77,15 +77,15 @@ func (m *Model) updateMainMenu(message tea.Msg) (tea.Model, tea.Cmd) {
 	case key.Matches(keyMessage, editSetupBinding()):
 		return m, m.enterSetup("", bootstrap.SetupRequirementNone)
 	case key.Matches(keyMessage, enterBinding()):
-		return m, m.enterSyncValidation()
+		return m, m.enterSync()
 	default:
 		return m, nil
 	}
 }
 
-// updateValidationResult handles validation-result navigation.
+// updateSyncResult handles sync-result navigation.
 // Authored by: OpenCode
-func (m *Model) updateValidationResult(message tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) updateSyncResult(message tea.Msg) (tea.Model, tea.Cmd) {
 	var keyMessage, ok = message.(tea.KeyPressMsg)
 	if !ok {
 		return m, nil
@@ -108,14 +108,14 @@ func (m *Model) updateValidationResult(message tea.Msg) (tea.Model, tea.Cmd) {
 			case 0:
 				return m.generateDiagnosticReport()
 			case 1:
-				return m, m.enterSyncValidation()
+				return m, m.enterSync()
 			default:
 				m.enterMainMenu()
 				return m, nil
 			}
 		}
 		if m.result.MenuIndex == 0 {
-			return m, m.enterSyncValidation()
+			return m, m.enterSync()
 		}
 		m.enterMainMenu()
 	}
@@ -165,7 +165,7 @@ func (m *Model) updateServerReplacement(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m.startConfirmedServerReplacement()
 		}
 		m.sync.TokenInput.Reset()
-		m.enterValidationResult(runtime.ValidationOutcome{Success: false, FailureReason: runtime.SyncFailureServerReplacementCancelled, DetailReason: string(runtime.SyncFailureServerReplacementCancelled)})
+		m.enterSyncResult(runtime.SyncOutcome{Success: false, FailureReason: runtime.SyncFailureServerReplacementCancelled, DetailReason: string(runtime.SyncFailureServerReplacementCancelled)})
 	}
 
 	return m, nil

@@ -1,5 +1,5 @@
 // Package integration verifies black-box workflow behavior for the current
-// slice, including the setup flow and its test-specific sync validation stub.
+// slice, including the setup flow and its test-specific sync stub.
 // Authored by: OpenCode
 package integration
 
@@ -24,10 +24,10 @@ import (
 // Authored by: OpenCode
 type integrationSyncService struct{}
 
-// Validate implements runtime.SyncService for setup-centric integration tests.
+// Run implements runtime.SyncService for setup-centric integration tests.
 // Authored by: OpenCode
-func (integrationSyncService) Validate(context.Context, runtime.ValidateRequest) runtime.ValidationOutcome {
-	return runtime.ValidationOutcome{Success: true, DetailReason: "activity_data_stored"}
+func (integrationSyncService) Run(context.Context, runtime.SyncRequest) runtime.SyncOutcome {
+	return runtime.SyncOutcome{Success: true, DetailReason: "activity_data_stored"}
 }
 
 func (integrationSyncService) GenerateDiagnosticReport(context.Context, runtime.DiagnosticReportRequest) (string, error) {
@@ -120,7 +120,7 @@ func TestSetupFileRemovalAfterStartupDoesNotBreakCurrentRun(t *testing.T) {
 	_ = testutil.RunCmd(cmd)
 	model = assertFlowModel(t, updated)
 
-	if model.ActiveScreen() != "sync_validation" {
+	if model.ActiveScreen() != "sync" {
 		t.Fatalf("expected current run to keep working after setup file removal")
 	}
 }

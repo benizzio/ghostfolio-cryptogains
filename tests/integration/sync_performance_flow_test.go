@@ -44,7 +44,7 @@ func TestSyncPerformanceFlowLargeHistoryFixture(t *testing.T) {
 		Count:          1,
 		ActivitiesJSON: `[{"id":"baseline-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`,
 	}})
-	var baselineOutcome = service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: token})
+	var baselineOutcome = service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: token})
 	if !baselineOutcome.Success {
 		t.Fatalf("expected baseline sync success before refresh timing, got %#v", baselineOutcome)
 	}
@@ -60,7 +60,7 @@ func TestSyncPerformanceFlowLargeHistoryFixture(t *testing.T) {
 
 	server.SetTokenPages(token, buildLargeHistoryPages(activityCount, 250))
 	var startedAt = time.Now()
-	var outcome = service.Validate(context.Background(), runtime.ValidateRequest{Config: config, SecurityToken: token})
+	var outcome = service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: token})
 	var elapsed = time.Since(startedAt)
 	if !outcome.Success {
 		t.Fatalf("expected large-history refresh success, got %#v", outcome)

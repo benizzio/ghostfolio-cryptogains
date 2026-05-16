@@ -1,5 +1,5 @@
 // Package validator validates the minimal Ghostfolio response contract used by
-// the sync-validation slice.
+// the sync-and-storage slice.
 // Authored by: OpenCode
 package validator
 
@@ -67,18 +67,18 @@ func ValidateActivityPageResponse(response dto.ActivityPageResponse) error {
 	return nil
 }
 
-// ValidateActivitiesProbeResponse verifies that the one-page activities probe
-// satisfies the supported contract for the current validation flow.
+// ValidateSingleActivityPageResponse verifies that one single-page activities
+// response satisfies the supported contract for focused contract checks.
 //
 // Example:
 //
-//	err := validator.ValidateActivitiesProbeResponse(dto.ActivitiesProbeResponse{Count: 0, Activities: []dto.ActivityProbeEntry{}})
+//	err := validator.ValidateSingleActivityPageResponse(dto.ActivityPageResponse{Count: 0, Activities: []dto.ActivityPageEntry{}})
 //	if err != nil {
 //		panic(err)
 //	}
 //
 // Authored by: OpenCode
-func ValidateActivitiesProbeResponse(response dto.ActivitiesProbeResponse) error {
+func ValidateSingleActivityPageResponse(response dto.ActivityPageResponse) error {
 	if response.Count < 0 {
 		return fmt.Errorf("count must be non-negative")
 	}
@@ -86,7 +86,7 @@ func ValidateActivitiesProbeResponse(response dto.ActivitiesProbeResponse) error
 		return fmt.Errorf("activities must be present")
 	}
 	if len(response.Activities) > 1 {
-		return fmt.Errorf("activities probe must return at most one activity")
+		return fmt.Errorf("single-page activities check must return at most one activity")
 	}
 	if response.Count == 0 && len(response.Activities) > 0 {
 		return fmt.Errorf("activities must be empty when count is zero")

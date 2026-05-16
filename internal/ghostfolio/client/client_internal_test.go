@@ -145,7 +145,7 @@ func TestAuthenticateAcceptsJSONContentTypesAndBuildErrors(t *testing.T) {
 	})
 }
 
-func TestFetchActivitiesProbeHandlesServerResponseClasses(t *testing.T) {
+func TestFetchSingleActivitiesPageHandlesServerResponseClasses(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -174,7 +174,7 @@ func TestFetchActivitiesProbeHandlesServerResponseClasses(t *testing.T) {
 			}))
 			defer server.Close()
 
-			_, err := New(server.Client()).FetchActivitiesProbe(context.Background(), server.URL, "jwt")
+			_, err := New(server.Client()).FetchActivitiesHistory(context.Background(), server.URL, "jwt")
 			var failure *RequestFailure
 			if !errors.As(err, &failure) || failure.Category != testCase.expected {
 				t.Fatalf("unexpected failure: %v", err)
@@ -183,14 +183,14 @@ func TestFetchActivitiesProbeHandlesServerResponseClasses(t *testing.T) {
 	}
 }
 
-func TestFetchActivitiesProbeHandlesTransportAndBuildErrors(t *testing.T) {
+func TestFetchActivitiesHistoryHandlesTransportAndBuildErrors(t *testing.T) {
 	t.Parallel()
 
 	t.Run("transport timeout", func(t *testing.T) {
 		var client = New(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 			return nil, timeoutError{}
 		})})
-		_, err := client.FetchActivitiesProbe(context.Background(), "https://ghostfol.io", "jwt")
+		_, err := client.FetchActivitiesHistory(context.Background(), "https://ghostfol.io", "jwt")
 		var failure *RequestFailure
 		if !errors.As(err, &failure) || failure.Category != FailureTimeout {
 			t.Fatalf("unexpected failure: %v", err)
@@ -198,7 +198,7 @@ func TestFetchActivitiesProbeHandlesTransportAndBuildErrors(t *testing.T) {
 	})
 
 	t.Run("invalid origin", func(t *testing.T) {
-		_, err := New(nil).FetchActivitiesProbe(context.Background(), "://bad", "jwt")
+		_, err := New(nil).FetchActivitiesHistory(context.Background(), "://bad", "jwt")
 		if err == nil {
 			t.Fatalf("expected request build error")
 		}
@@ -211,7 +211,7 @@ func TestFetchActivitiesProbeHandlesTransportAndBuildErrors(t *testing.T) {
 		}))
 		defer server.Close()
 
-		var response, err = New(server.Client()).FetchActivitiesProbe(context.Background(), server.URL, "jwt")
+		var response, err = New(server.Client()).FetchActivitiesHistory(context.Background(), server.URL, "jwt")
 		if err != nil || response.Count != 0 {
 			t.Fatalf("expected successful activities fetch, response=%#v err=%v", response, err)
 		}

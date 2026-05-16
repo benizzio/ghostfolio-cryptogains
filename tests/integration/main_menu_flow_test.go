@@ -27,7 +27,7 @@ func TestMainMenuOnlyExposesSyncDataWorkflow(t *testing.T) {
 	}
 }
 
-func TestMainMenuEnterNavigatesToSyncValidation(t *testing.T) {
+func TestMainMenuEnterNavigatesToSync(t *testing.T) {
 	t.Parallel()
 
 	var config = mustCloudSetupConfig(t)
@@ -38,8 +38,8 @@ func TestMainMenuEnterNavigatesToSyncValidation(t *testing.T) {
 	_ = testutil.RunCmd(cmd)
 	model = updated.(*flow.Model)
 
-	if model.ActiveScreen() != "sync_validation" {
-		t.Fatalf("expected sync validation, got %s", model.ActiveScreen())
+	if model.ActiveScreen() != "sync" {
+		t.Fatalf("expected sync screen, got %s", model.ActiveScreen())
 	}
 }
 
@@ -89,8 +89,8 @@ func TestFocusedTokenInputPasteDoesNotTriggerWorkflowNavigation(t *testing.T) {
 	updated, _ = model.Update(tea.PasteEndMsg{})
 	model = updated.(*flow.Model)
 
-	if model.ActiveScreen() != "sync_validation" {
-		t.Fatalf("expected sync validation screen to remain active during paste, got %s", model.ActiveScreen())
+	if model.ActiveScreen() != "sync" {
+		t.Fatalf("expected sync screen to remain active during paste, got %s", model.ActiveScreen())
 	}
 	if got := model.View().Content; !strings.Contains(got, "*********") {
 		t.Fatalf("expected pasted token to remain masked, got %q", got)

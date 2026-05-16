@@ -71,14 +71,13 @@ func NewValidator() Validator {
 
 // Validate enforces the phase-3 supported-history rules for BUY and SELL data.
 // Authored by: OpenCode
-
 func (defaultValidator) Validate(cache syncmodel.ProtectedActivityCache) error {
 	if cache.ActivityCount != len(cache.Activities) {
 		return newValidationError("activity_count does not match the normalized activity list")
 	}
 
 	var zero apd.Decimal
-	var previousKey validationOrderKey
+	var previousKey syncmodel.ActivityOrderingKey
 	var previousRecord syncmodel.ActivityRecord
 	var havePrevious bool
 	var runningQuantityByAsset = map[string]apd.Decimal{}
@@ -92,23 +91,19 @@ func (defaultValidator) Validate(cache syncmodel.ProtectedActivityCache) error {
 		if err != nil {
 			return newValidationError(fmt.Sprintf("activity %q has an unreadable timestamp: %v", record.SourceID, err), record)
 		}
-		var currentKey = validationOrderKey{
-			SourceDate:    occurredAt.Format("2006-01-02"),
-			AssetSymbol:   record.AssetSymbol,
-			ActivityOrder: validationActivityTypeOrder(record.ActivityType),
-			SourceID:      record.SourceID,
-			OccurredAt:    record.OccurredAt,
-			RawHash:       record.RawHash,
+		var currentKey = syncmodel.ActivityOrderingKey{
+			SourceDate:   occurredAt.Format("2006-01-02"),
+			AssetSymbol:  record.AssetSymbol,
+			ActivityType: record.ActivityType,
+			SourceID:     record.SourceID,
+			OccurredAt:   record.OccurredAt,
+			RawHash:      record.RawHash,
 		}
 		if havePrevious {
-			if compareValidationOrderKeys(currentKey, previousKey) < 0 {
+			if syncmodel.CompareActivityOrdering(currentKey, previousKey) < 0 {
 				return newValidationError("normalized activities are not ordered chronologically", previousRecord, record)
 			}
-			if previousKey.SourceDate == currentKey.SourceDate &&
-				previousKey.AssetSymbol == currentKey.AssetSymbol &&
-				previousRecord.ActivityType == record.ActivityType &&
-				previousKey.SourceID == currentKey.SourceID &&
-				previousKey.RawHash != currentKey.RawHash {
+			if syncmodel.HasAmbiguousActivityOrdering(previousKey, currentKey) {
 				return newValidationError(
 					fmt.Sprintf("supported activity ordering is ambiguous for source %q", record.SourceID),
 					previousRecord,
@@ -164,55 +159,6 @@ func (defaultValidator) Validate(cache syncmodel.ProtectedActivityCache) error {
 	}
 
 	return nil
-}
-
-// validationOrderKey stores the deterministic ordering tuple used by validation.
-// Authored by: OpenCode
-type validationOrderKey struct {
-	SourceDate    string
-	AssetSymbol   string
-	ActivityOrder int
-	SourceID      string
-	OccurredAt    string
-	RawHash       string
-}
-
-// compareValidationOrderKeys compares two normalized ordering tuples.
-// Authored by: OpenCode
-func compareValidationOrderKeys(left validationOrderKey, right validationOrderKey) int {
-	if comparison := strings.Compare(left.SourceDate, right.SourceDate); comparison != 0 {
-		return comparison
-	}
-	if comparison := strings.Compare(left.AssetSymbol, right.AssetSymbol); comparison != 0 {
-		return comparison
-	}
-	if left.ActivityOrder != right.ActivityOrder {
-		if left.ActivityOrder < right.ActivityOrder {
-			return -1
-		}
-		return 1
-	}
-	if comparison := strings.Compare(left.SourceID, right.SourceID); comparison != 0 {
-		return comparison
-	}
-	if comparison := strings.Compare(left.OccurredAt, right.OccurredAt); comparison != 0 {
-		return comparison
-	}
-
-	return strings.Compare(left.RawHash, right.RawHash)
-}
-
-// validationActivityTypeOrder ranks activity types for same-asset same-day replay checks.
-// Authored by: OpenCode
-func validationActivityTypeOrder(activityType syncmodel.ActivityType) int {
-	switch activityType {
-	case syncmodel.ActivityTypeBuy:
-		return 0
-	case syncmodel.ActivityTypeSell:
-		return 1
-	default:
-		return 2
-	}
 }
 
 // newValidationError captures the offending normalized records for one validation failure.

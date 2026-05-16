@@ -10,8 +10,7 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/component"
 )
 
-// ValidationResultScreenParams contains the render state for the validation
-// result screen.
+// SyncResultScreenParams contains the render state for the sync result screen.
 //
 // Populate this value with the final validation outcome, the result-menu state,
 // and footer help text for the result workflow. The renderer converts the
@@ -19,28 +18,28 @@ import (
 // any retry or navigation behavior.
 //
 // Authored by: OpenCode
-type ValidationResultScreenParams struct {
+type SyncResultScreenParams struct {
 	Theme         component.Theme
 	Width         int
 	Height        int
 	MenuItems     []component.MenuItem
 	SelectedIndex int
-	Outcome       runtime.ValidationOutcome
+	Outcome       runtime.SyncOutcome
 	HelpText      string
 }
 
-// ValidationResultScreenView renders the result of a completed sync attempt.
+// SyncResultScreenView renders the result of a completed sync attempt.
 //
 // Example:
 //
-//	view := screen.ValidationResultScreenView(params)
+//	view := screen.SyncResultScreenView(params)
 //	_ = view
 //
-// `ValidationResultScreenView` formats the completed sync outcome, follow-up
+// `SyncResultScreenView` formats the completed sync outcome, follow-up
 // guidance, and available next actions into the shared full-screen layout.
 //
 // Authored by: OpenCode
-func ValidationResultScreenView(params ValidationResultScreenParams) string {
+func SyncResultScreenView(params SyncResultScreenParams) string {
 	var resultLine = params.Theme.SuccessStatus.Render("Success")
 	if !params.Outcome.Success {
 		resultLine = params.Theme.FailureStatus.Render(
@@ -74,7 +73,7 @@ func ValidationResultScreenView(params ValidationResultScreenParams) string {
 // validationSummaryText converts the structured sync outcome into the
 // primary result text shown on the TUI result screen.
 // Authored by: OpenCode
-func validationSummaryText(outcome runtime.ValidationOutcome) string {
+func validationSummaryText(outcome runtime.SyncOutcome) string {
 	if outcome.Success {
 		return "Activity data was stored securely for future use."
 	}
@@ -84,7 +83,7 @@ func validationSummaryText(outcome runtime.ValidationOutcome) string {
 // validationFollowUpText converts the structured sync outcome into the
 // secondary guidance shown on the TUI result screen.
 // Authored by: OpenCode
-func validationFollowUpText(outcome runtime.ValidationOutcome) string {
+func validationFollowUpText(outcome runtime.SyncOutcome) string {
 	if outcome.Success {
 		return "No report-generation, report-preview, or cached-data browsing workflow is available in this slice."
 	}
@@ -99,9 +98,9 @@ func validationFollowUpText(outcome runtime.ValidationOutcome) string {
 	switch outcome.FailureReason {
 	case runtime.SyncFailureServerReplacementCancelled:
 		return "The existing protected data was left unchanged because server replacement was cancelled before retrieval started."
-	case runtime.ValidationFailureRejectedToken:
+	case runtime.SyncFailureRejectedToken:
 		return "The supplied token was rejected. Try again with a valid Ghostfolio security token. Local protected data was left unchanged."
-	case runtime.ValidationFailureIncompatibleServerContract:
+	case runtime.SyncFailureIncompatibleServerContract:
 		return "The selected server responded, but it did not satisfy the supported contract for this slice."
 	case runtime.SyncFailureUnsupportedStoredDataVersion:
 		return "Existing protected data uses an unsupported stored-data version, so it was not loaded or overwritten."
