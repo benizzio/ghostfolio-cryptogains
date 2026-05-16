@@ -176,6 +176,13 @@ func TestEncryptedStoreWriteCoversBranches(t *testing.T) {
 		}
 	})
 
+	t.Run("path traversal snapshot id", func(t *testing.T) {
+		_, err := NewEncryptedStore(t.TempDir(), nil).Write(context.Background(), WriteRequest{SnapshotID: "../snapshot-1", SecurityToken: "token", ServerOrigin: "https://ghostfol.io", Payload: encryptedStorePayloadFixture("https://ghostfol.io")})
+		if err == nil {
+			t.Fatalf("expected invalid snapshot identifier to fail")
+		}
+	})
+
 	t.Run("marshal payload error", func(t *testing.T) {
 		originalMarshalPayload := marshalPayload
 		marshalPayload = func(any) ([]byte, error) {

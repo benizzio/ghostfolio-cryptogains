@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	snapshotenvelope "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/envelope"
@@ -182,6 +183,8 @@ func (s *EncryptedStore) Write(ctx context.Context, request WriteRequest) (Candi
 		if err != nil {
 			return Candidate{}, err
 		}
+	} else if err := validateSnapshotID(snapshotID); err != nil {
+		return Candidate{}, err
 	}
 
 	path := s.filesystem.SnapshotPath(snapshotID)
@@ -190,6 +193,20 @@ func (s *EncryptedStore) Write(ctx context.Context, request WriteRequest) (Candi
 	}
 
 	return Candidate{SnapshotID: snapshotID, Path: path, Header: header}, nil
+}
+
+// validateSnapshotID constrains caller-supplied snapshot identifiers to one
+// opaque filename component.
+// Authored by: OpenCode
+func validateSnapshotID(snapshotID string) error {
+	if snapshotID == "." || snapshotID == ".." {
+		return fmt.Errorf("snapshot identifier is invalid")
+	}
+	if filepath.Base(snapshotID) != snapshotID {
+		return fmt.Errorf("snapshot identifier is invalid")
+	}
+
+	return nil
 }
 
 // newEnvelopeHeader creates the authenticated cleartext header for one snapshot write.
