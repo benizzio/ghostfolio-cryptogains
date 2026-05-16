@@ -1,6 +1,6 @@
 ---
 name: address-github-review-comments
-description: GitHub PR review comments, unresolved conversations, sequential replies, commit, and push. Use ONLY when the task is to address review comments on an existing GitHub pull request from the checked-out feature branch or from a PR URL provided in the prompt.
+description: GitHub Pull Request (PR) review comments, unresolved conversations, sequential replies, commit, and push. Use ONLY when the task is to address review comments on an existing GitHub pull request from the checked-out feature branch or from a PR URL provided in the prompt.
 compatibility: Requires a local git checkout, network access, and GitHub access through GitHub MCP tools preferred or authenticated gh CLI fallback.
 metadata:
   author: Benizzio with OpenCode
@@ -9,7 +9,7 @@ metadata:
   scope: project-local
 ---
 
-# Address GitHub PR Review Comments
+# Address GitHub Pull Request Review Comments
 
 ## Use This Skill For
 
@@ -20,11 +20,10 @@ metadata:
 
 - General code review.
 - Resolving threads without implementing and verifying code changes.
-- Guessing which pull request to use when branch-to-PR mapping is ambiguous.
 
 ## Required Capabilities
 
-- Prefer GitHub MCP tools for PR lookup, unresolved review-thread reads, and replies.
+- Prefer GitHub MCP tools for Pull Request lookup, unresolved review-thread reads, and replies.
   - Examples in environments that expose them: `github_search_pull_requests`, `github_pull_request_read`, `github_add_reply_to_pull_request_comment`.
 - If GitHub MCP tools are unavailable, use authenticated `gh` commands.
 - In `gh` fallback mode, use thread-aware API calls. `gh pr view --comments` alone is not enough because it does not reliably expose unresolved review-thread state.
@@ -32,15 +31,15 @@ metadata:
 
 ## Determine The Pull Request
 
-1. If the prompt includes a PR URL, use it.
-2. Otherwise derive the PR from the checked-out local branch:
+1. If the prompt includes a Pull Request URL, use it.
+2. Otherwise derive the Pull Request from the checked-out local branch:
    - inspect the local git remote to identify the GitHub repository
    - inspect the checked-out branch name
    - map that branch to its open pull request in the same repository
-3. If the current branch does not map to exactly one pull request, stop and ask the user for the PR URL.
+3. If the current branch does not map to exactly one pull request, stop and ask the user for the Pull Request URL.
 4. Do not guess between multiple candidate pull requests.
-5. If the derived pull request and a supplied PR URL disagree, stop and ask the user which pull request should be used.
-6. If the pull request cannot be derived from the currently checked-out local branch, stop and ask the user for the PR URL.
+5. If the derived pull request and a supplied Pull Request URL disagree, stop and ask the user which pull request should be used.
+6. If the pull request cannot be derived from the currently checked-out local branch, stop and ask the user for the Pull Request URL.
 
 ## Collect The Unresolved Review Work
 
@@ -74,7 +73,7 @@ For the current thread:
 6. If the change cannot be verified, do not reply in GitHub. Stop and report the blocker.
 7. If the current thread requires code changes:
    - stage only the related modified files
-   - commit with `git commit -m "Adressing review comment"`
+   - commit with `git commit -m "Addressing review comment"`
    - push the current branch
 8. If an earlier sequential change already fully addressed this thread:
    - do not create an empty commit
@@ -99,7 +98,7 @@ For the current thread:
 
 Stop and ask the user for instructions when:
 
-- the PR URL is not in the prompt and the current branch cannot be mapped to exactly one pull request
+- the Pull Request URL is not in the prompt and the current branch cannot be mapped to exactly one pull request
 - unresolved review threads conflict with each other
 - a requested change is unsafe, out of scope, or not feasible from the checked-out branch
 - required GitHub access, push access, or local test execution is unavailable
