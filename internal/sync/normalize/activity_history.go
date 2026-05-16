@@ -321,7 +321,7 @@ func recordHash(record syncmodel.ActivityRecord) (string, error) {
 	var sourceScopeKind = ""
 	var sourceScopeReliability = ""
 	if record.SourceScope != nil {
-		sourceScopeID = record.SourceScope.ID
+		sourceScopeID = strings.TrimSpace(record.SourceScope.ID)
 		sourceScopeName = record.SourceScope.Name
 		sourceScopeKind = string(record.SourceScope.Kind)
 		sourceScopeReliability = string(record.SourceScope.Reliability)

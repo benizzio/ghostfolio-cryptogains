@@ -93,6 +93,16 @@ func TestCompareNormalizedRecordsAndHashBranches(t *testing.T) {
 		t.Fatalf("expected non-empty record hash")
 	}
 
+	trimmedScopeRecord := normalizationTestRecord(t, "activity-1", syncmodel.ActivityTypeBuy)
+	trimmedScopeRecord.SourceScope = &syncmodel.SourceScope{ID: "  scope-1  ", Name: "Primary", Kind: syncmodel.SourceScopeKindWallet, Reliability: syncmodel.ScopeReliabilityReliable}
+	trimmedScopeHash, err := recordHash(trimmedScopeRecord)
+	if err != nil {
+		t.Fatalf("record hash with trimmed scope id: %v", err)
+	}
+	if trimmedScopeHash != hash {
+		t.Fatalf("expected source-scope hash normalization, got %q want %q", trimmedScopeHash, hash)
+	}
+
 	var invalid apd.Decimal
 	invalid.Form = apd.Infinite
 	record.Quantity = invalid
