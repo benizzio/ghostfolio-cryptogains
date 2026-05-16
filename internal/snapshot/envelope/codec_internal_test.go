@@ -203,10 +203,12 @@ func TestDeriveEncryptionKeyAndCiphertextHelpersCoverBranches(t *testing.T) {
 	marshalEnvelopeJSON = func(any) ([]byte, error) {
 		return nil, errors.New("marshal boom")
 	}
+	t.Cleanup(func() {
+		marshalEnvelopeJSON = originalMarshal
+	})
 	if _, _, err := prepareAEAD(header, "token"); err == nil {
 		t.Fatalf("expected authenticated-header encoding failure")
 	}
-	marshalEnvelopeJSON = originalMarshal
 
 	originalNewGCM := newGCM
 	newGCM = func(cipher.Block) (cipher.AEAD, error) {
