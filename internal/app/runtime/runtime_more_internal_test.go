@@ -221,7 +221,7 @@ func TestResolveBaseConfigDirAndGenerateDiagnosticReportCoverBranches(t *testing
 		t.Fatalf("expected resolved user config dir, got %q err=%v", got, err)
 	}
 
-	var service = NewSyncService(nil, time.Second, "", true, nil, nil, nil, runtimeSnapshotStore{}).(*syncService)
+	var service = requireSyncService(t, NewSyncService(nil, time.Second, "", true, nil, nil, nil, runtimeSnapshotStore{}))
 	path, err := service.GenerateDiagnosticReport(context.Background(), runtimeDiagnosticRequestFixture())
 	if err != nil {
 		t.Fatalf("generate diagnostic report: %v", err)
@@ -242,7 +242,7 @@ func TestResolveBaseConfigDirAndGenerateDiagnosticReportCoverBranches(t *testing
 // defaulting and local helper branches.
 // Authored by: OpenCode
 func TestNewSyncServiceAndHelperFunctionsCoverBranches(t *testing.T) {
-	service := NewSyncService(nil, time.Second, "/tmp/config", true, nil, nil, nil, runtimeSnapshotStore{}).(*syncService)
+	service := requireSyncService(t, NewSyncService(nil, time.Second, "/tmp/config", true, nil, nil, nil, runtimeSnapshotStore{}))
 	if service.client == nil || service.decimalService == nil || service.normalizer == nil || service.validator == nil {
 		t.Fatalf("expected nil dependencies to be defaulted: %#v", service)
 	}
@@ -392,7 +392,7 @@ func TestFinalizeSyncFailureCoversDiagnosticBranches(t *testing.T) {
 // Authored by: OpenCode
 func TestValidateCoversProtectedStorageFailureBranches(t *testing.T) {
 	t.Run("snapshot store unavailable", func(t *testing.T) {
-		service := NewSyncService(nil, time.Second, t.TempDir(), true, nil, nil, nil, nil).(*syncService)
+		service := requireSyncService(t, NewSyncService(nil, time.Second, t.TempDir(), true, nil, nil, nil, nil))
 		outcome := service.Run(context.Background(), SyncRequest{Config: runtimeSetupConfigFixture(t, "https://ghostfol.io", true), SecurityToken: "token"})
 		if outcome.FailureReason != SyncFailureIncompatibleNewSyncData {
 			t.Fatalf("expected unavailable snapshot store failure, got %#v", outcome)
@@ -401,7 +401,7 @@ func TestValidateCoversProtectedStorageFailureBranches(t *testing.T) {
 
 	t.Run("server replacement cancelled", func(t *testing.T) {
 		var payload = snapshotmodel.Payload{SetupProfile: snapshotmodel.SetupProfile{ServerOrigin: "https://old.example"}}
-		service := NewSyncService(nil, time.Second, t.TempDir(), true, nil, nil, nil, runtimeSnapshotStore{}).(*syncService)
+		service := requireSyncService(t, NewSyncService(nil, time.Second, t.TempDir(), true, nil, nil, nil, runtimeSnapshotStore{}))
 		service.snapshots.SetActiveSnapshot(snapshotstore.Candidate{SnapshotID: "snapshot-1"}, payload)
 
 		outcome := service.Run(context.Background(), SyncRequest{Config: runtimeSetupConfigFixture(t, "https://new.example", true), SecurityToken: "token"})
@@ -411,7 +411,7 @@ func TestValidateCoversProtectedStorageFailureBranches(t *testing.T) {
 	})
 
 	t.Run("candidate discovery error", func(t *testing.T) {
-		service := NewSyncService(nil, time.Second, t.TempDir(), true, nil, nil, nil, runtimeSnapshotStore{candidatesErr: errors.New("discover boom")}).(*syncService)
+		service := requireSyncService(t, NewSyncService(nil, time.Second, t.TempDir(), true, nil, nil, nil, runtimeSnapshotStore{candidatesErr: errors.New("discover boom")}))
 		outcome := service.Run(context.Background(), SyncRequest{Config: runtimeSetupConfigFixture(t, "https://ghostfol.io", true), SecurityToken: "token"})
 		if outcome.FailureReason != SyncFailureIncompatibleNewSyncData {
 			t.Fatalf("expected discovery failure outcome, got %#v", outcome)
@@ -429,7 +429,7 @@ func TestValidateCoversProtectedStorageFailureBranches(t *testing.T) {
 		}()
 
 		store := runtimeSnapshotStore{candidates: []snapshotstore.Candidate{runtimeSnapshotCandidateFixture(config.ServerOrigin, "snapshot-1")}}
-		service := NewSyncService(nil, time.Second, t.TempDir(), true, nil, nil, nil, store).(*syncService)
+		service := requireSyncService(t, NewSyncService(nil, time.Second, t.TempDir(), true, nil, nil, nil, store))
 		outcome := service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
 		if outcome.FailureReason != SyncFailureUnsupportedStoredDataVersion {
 			t.Fatalf("expected unsupported stored-data version, got %#v", outcome)
@@ -447,7 +447,7 @@ func TestValidateCoversProtectedStorageFailureBranches(t *testing.T) {
 		}()
 
 		store := runtimeSnapshotStore{candidates: []snapshotstore.Candidate{runtimeSnapshotCandidateFixture(config.ServerOrigin, "snapshot-1")}}
-		service := NewSyncService(nil, time.Second, t.TempDir(), true, nil, nil, nil, store).(*syncService)
+		service := requireSyncService(t, NewSyncService(nil, time.Second, t.TempDir(), true, nil, nil, nil, store))
 		outcome := service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
 		if outcome.FailureReason != SyncFailureIncompatibleNewSyncData {
 			t.Fatalf("expected incompatible new sync data failure, got %#v", outcome)
@@ -462,7 +462,7 @@ func TestValidateCoversProtectedStorageFailureBranches(t *testing.T) {
 				return snapshotmodel.Payload{}, snapshotstore.ErrUnsupportedStoredDataVersion
 			},
 		}
-		service := NewSyncService(nil, time.Second, t.TempDir(), true, nil, nil, nil, store).(*syncService)
+		service := requireSyncService(t, NewSyncService(nil, time.Second, t.TempDir(), true, nil, nil, nil, store))
 		outcome := service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
 		if outcome.FailureReason != SyncFailureUnsupportedStoredDataVersion {
 			t.Fatalf("expected unsupported stored-data version from unlock, got %#v", outcome)
@@ -500,7 +500,7 @@ func TestValidateCoversProtectedWriteBranches(t *testing.T) {
 				return snapshotstore.Candidate{SnapshotID: request.SnapshotID, Path: filepath.Join(t.TempDir(), request.SnapshotID)}, nil
 			},
 		}
-		service := NewSyncService(ghostfolioclient.New(server.Client()), time.Second, t.TempDir(), true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), store).(*syncService)
+		service := requireSyncService(t, NewSyncService(ghostfolioclient.New(server.Client()), time.Second, t.TempDir(), true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), store))
 		service.snapshots.SetActiveSnapshot(snapshotstore.Candidate{SnapshotID: "active"}, snapshotmodel.Payload{SetupProfile: snapshotmodel.SetupProfile{ServerOrigin: "https://old.example"}})
 
 		outcome := service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token", ConfirmServerReplacement: true})
@@ -556,7 +556,7 @@ func TestRunCoversMappingNormalizationAndValidationFailures(t *testing.T) {
 		defer server.Close()
 
 		config := runtimeSetupConfigFixture(t, server.URL, true)
-		service := NewSyncService(ghostfolioclient.New(server.Client()), time.Second, t.TempDir(), true, runtimeFailingDecimalService{}, syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), runtimeSnapshotStore{}).(*syncService)
+		service := requireSyncService(t, NewSyncService(ghostfolioclient.New(server.Client()), time.Second, t.TempDir(), true, runtimeFailingDecimalService{}, syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), runtimeSnapshotStore{}))
 		outcome := service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
 		if outcome.FailureReason != SyncFailureUnsupportedActivityHistory || !outcome.Diagnostic.Eligible {
 			t.Fatalf("expected unsupported-history mapping failure, got %#v", outcome)
@@ -686,6 +686,20 @@ func runtimeServiceWithHistoryServer(
 	}))
 	t.Cleanup(server.Close)
 
-	service := NewSyncService(ghostfolioclient.New(server.Client()), time.Second, t.TempDir(), allowDevHTTP, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), store).(*syncService)
+	service := requireSyncService(t, NewSyncService(ghostfolioclient.New(server.Client()), time.Second, t.TempDir(), allowDevHTTP, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), store))
 	return service, runtimeSetupConfigFixture(t, server.URL, allowDevHTTP)
+}
+
+// requireSyncService converts the public SyncService interface to the concrete
+// runtime service type for internal tests.
+// Authored by: OpenCode
+func requireSyncService(t *testing.T, service SyncService) *syncService {
+	t.Helper()
+
+	concrete, ok := service.(*syncService)
+	if !ok {
+		t.Fatalf("expected *syncService, got %T", service)
+	}
+
+	return concrete
 }
