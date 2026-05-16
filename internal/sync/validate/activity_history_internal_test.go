@@ -7,6 +7,7 @@ import (
 
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
+	"github.com/cockroachdb/apd/v3"
 )
 
 func TestValidationErrorHelpersAndValidationBranches(t *testing.T) {
@@ -164,6 +165,30 @@ func TestValidateCoversAdditionalRunningQuantityBranches(t *testing.T) {
 	otherAssetBuy.AssetSymbol = "ETH"
 	if err := validator.Validate(syncmodel.ProtectedActivityCache{ActivityCount: 3, Activities: []syncmodel.ActivityRecord{buy, otherAssetBuy, otherAssetSell}}); err != nil {
 		t.Fatalf("expected independent asset timelines to validate, got %v", err)
+	}
+}
+
+// TestApplyRunningQuantityRejectsInvalidArithmetic verifies invalid decimal arithmetic fails fast.
+// Authored by: OpenCode
+func TestApplyRunningQuantityRejectsInvalidArithmetic(t *testing.T) {
+	t.Parallel()
+
+	var zero apd.Decimal
+	var invalidQuantity apd.Decimal
+	invalidQuantity.Form = apd.NaNSignaling
+
+	record := validationTestRecord(t, "buy-invalid", syncmodel.ActivityTypeBuy)
+	record.Quantity = invalidQuantity
+
+	err := applyRunningQuantity(record, map[string]apd.Decimal{}, &zero)
+	if err == nil {
+		t.Fatalf("expected invalid arithmetic to fail")
+	}
+	if !strings.Contains(err.Error(), "invalid quantity arithmetic") {
+		t.Fatalf("expected invalid arithmetic error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), apd.InvalidOperation.String()) {
+		t.Fatalf("expected invalid operation condition in error, got %v", err)
 	}
 }
 

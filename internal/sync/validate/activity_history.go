@@ -182,9 +182,13 @@ func applyRunningQuantity(record syncmodel.ActivityRecord, runningQuantityByAsse
 	var runningQuantity = runningQuantityByAsset[record.AssetSymbol]
 	switch record.ActivityType {
 	case syncmodel.ActivityTypeBuy:
-		_, _ = apd.BaseContext.Add(&runningQuantity, &runningQuantity, &record.Quantity)
+		if condition, err := apd.BaseContext.Add(&runningQuantity, &runningQuantity, &record.Quantity); err != nil {
+			return newValidationError(fmt.Sprintf("activity %q has invalid quantity arithmetic (%s): %v", record.SourceID, condition, err), record)
+		}
 	case syncmodel.ActivityTypeSell:
-		_, _ = apd.BaseContext.Sub(&runningQuantity, &runningQuantity, &record.Quantity)
+		if condition, err := apd.BaseContext.Sub(&runningQuantity, &runningQuantity, &record.Quantity); err != nil {
+			return newValidationError(fmt.Sprintf("activity %q has invalid quantity arithmetic (%s): %v", record.SourceID, condition, err), record)
+		}
 		if runningQuantity.Cmp(zero) < 0 {
 			return newValidationError(fmt.Sprintf("activity %q would drive holdings below zero", record.SourceID), record)
 		}
