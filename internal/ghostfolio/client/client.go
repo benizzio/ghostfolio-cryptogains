@@ -164,6 +164,32 @@ func (c *Client) Authenticate(ctx context.Context, origin string, accessToken st
 	)
 }
 
+// FetchUser executes the authenticated user boundary for this slice.
+//
+// Example:
+//
+//	response, err := transportClient.FetchUser(ctx, "https://ghostfol.io", "jwt")
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = response.Settings
+//
+// Authored by: OpenCode
+func (c *Client) FetchUser(ctx context.Context, origin string, authToken string) (dto.UserResponse, error) {
+	var endpoint = strings.TrimRight(origin, "/") + apiBasePath + "/user"
+
+	return executeJSONRequest[dto.UserResponse](
+		c.httpClient, ctx, requestSpec{
+			Method:             http.MethodGet,
+			Endpoint:           endpoint,
+			Headers:            map[string]string{"Authorization": "Bearer " + authToken},
+			BuildErrorMessage:  "build user request",
+			DecodeErrorMessage: "user response was not valid JSON",
+			StatusClassifier:   classifyUserStatus,
+		},
+	)
+}
+
 // FetchActivitiesHistory executes the paginated activities retrieval boundary
 // for this slice.
 //
@@ -367,6 +393,26 @@ func classifyActivitiesStatus(response *http.Response) error {
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return unsuccessfulResponseFailure("activities request", response.StatusCode)
+	}
+	return nil
+}
+
+// classifyUserStatus maps authenticated user response codes to Ghostfolio boundary failures.
+// Authored by: OpenCode
+func classifyUserStatus(response *http.Response) error {
+	switch response.StatusCode {
+	case http.StatusNotFound:
+		return &RequestFailure{
+			Category:   FailureIncompatibleServerContract,
+			Operation:  "user request",
+			StatusCode: response.StatusCode,
+			Detail:     "user request did not match the supported server contract",
+		}
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return unsuccessfulResponseFailure("user request", response.StatusCode)
+	}
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return unsuccessfulResponseFailure("user request", response.StatusCode)
 	}
 	return nil
 }

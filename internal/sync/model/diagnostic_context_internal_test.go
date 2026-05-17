@@ -28,18 +28,24 @@ func TestDiagnosticRecordFromActivityRecordCanonicalizesAndPreservesScope(t *tes
 	}
 
 	record := DiagnosticRecordFromActivityRecord(ActivityRecord{
-		SourceID:     "activity-1",
-		OccurredAt:   "2024-01-01T10:00:00Z",
-		ActivityType: ActivityTypeBuy,
-		AssetSymbol:  "BTC",
-		AssetName:    "Bitcoin",
-		BaseCurrency: "USD",
-		Quantity:     quantity,
-		UnitPrice:    unitPrice,
-		GrossValue:   grossValue,
-		FeeAmount:    &feeAmount,
-		Comment:      "comment",
-		DataSource:   "ghostfolio",
+		SourceID:              "activity-1",
+		OccurredAt:            "2024-01-01T10:00:00Z",
+		ActivityType:          ActivityTypeBuy,
+		AssetSymbol:           "BTC",
+		AssetName:             "Bitcoin",
+		OrderCurrency:         "CHF",
+		AssetProfileCurrency:  "EUR",
+		BaseCurrency:          "USD",
+		Quantity:              quantity,
+		OrderUnitPrice:        &unitPrice,
+		OrderGrossValue:       &grossValue,
+		OrderFeeAmount:        &feeAmount,
+		AssetProfileUnitPrice: &unitPrice,
+		AssetProfileFeeAmount: &feeAmount,
+		BaseGrossValue:        &grossValue,
+		BaseFeeAmount:         &feeAmount,
+		Comment:               "comment",
+		DataSource:            "ghostfolio",
 		SourceScope: &SourceScope{
 			ID:          "account-1",
 			Name:        "Main Account",
@@ -50,6 +56,12 @@ func TestDiagnosticRecordFromActivityRecordCanonicalizesAndPreservesScope(t *tes
 
 	if record.Quantity != "1.23" || record.UnitPrice != "100.5" || record.GrossValue != "123.615" || record.FeeAmount != "0.1" {
 		t.Fatalf("unexpected canonical diagnostic values: %#v", record)
+	}
+	if record.OrderCurrency != "CHF" || record.AssetProfileCurrency != "EUR" || record.BaseCurrency != "USD" {
+		t.Fatalf("unexpected currency context: %#v", record)
+	}
+	if record.UnitPriceCurrency != "CHF" || record.GrossValueCurrency != "CHF" || record.FeeAmountCurrency != "CHF" {
+		t.Fatalf("unexpected selected monetary currencies: %#v", record)
 	}
 	if record.SourceScopeID != "account-1" || record.SourceScopeName != "Main Account" || record.SourceScopeKind != string(SourceScopeKindAccount) || record.SourceScopeReliability != string(ScopeReliabilityReliable) {
 		t.Fatalf("unexpected scope diagnostic context: %#v", record)

@@ -184,6 +184,8 @@ func TestRunHandlesActivitiesTransportFailure(t *testing.T) {
 		switch request.URL.Path {
 		case "/api/v1/auth/anonymous":
 			_, _ = writer.Write([]byte(`{"authToken":"jwt"}`))
+		case "/api/v1/user":
+			_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":"USD"}}`))
 		case "/api/v1/activities":
 			writer.WriteHeader(http.StatusUnauthorized)
 		default:
@@ -213,6 +215,8 @@ func TestRunHandlesActivitiesPayloadValidationFailure(t *testing.T) {
 		switch request.URL.Path {
 		case "/api/v1/auth/anonymous":
 			_, _ = writer.Write([]byte(`{"authToken":"jwt"}`))
+		case "/api/v1/user":
+			_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":"USD"}}`))
 		case "/api/v1/activities":
 			_, _ = writer.Write([]byte(`{"activities":[{"id":"","date":"2026-01-31T10:00:00Z","type":"BUY"}],"count":1}`))
 		default:
@@ -242,6 +246,8 @@ func TestRunSuccessOutcomeIncludesAttemptAndMessages(t *testing.T) {
 		switch request.URL.Path {
 		case "/api/v1/auth/anonymous":
 			_, _ = writer.Write([]byte(`{"authToken":"jwt"}`))
+		case "/api/v1/user":
+			_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":"USD"}}`))
 		case "/api/v1/activities":
 			_, _ = writer.Write([]byte(`{"activities":[],"count":0}`))
 		default:

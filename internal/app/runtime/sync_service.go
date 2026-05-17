@@ -165,6 +165,14 @@ func (s *syncService) Run(ctx context.Context, request SyncRequest) SyncOutcome 
 	session.AuthenticatedAt = time.Now().UTC()
 	attempt.Status = AttemptStatusRetrievingHistory
 
+	userResponse, err := s.client.FetchUser(timedContext, session.ServerOrigin, session.AuthToken)
+	if err != nil {
+		return finalizeBoundaryFailure(&session, &attempt, err)
+	}
+	if err := validator.ValidateUserResponse(userResponse); err != nil {
+		return finalizeContractFailure(&session, &attempt, err)
+	}
+
 	historyResponse, err := s.client.FetchActivitiesHistory(timedContext, session.ServerOrigin, session.AuthToken)
 	if err != nil {
 		return finalizeBoundaryFailure(&session, &attempt, err)
@@ -174,7 +182,7 @@ func (s *syncService) Run(ctx context.Context, request SyncRequest) SyncOutcome 
 		return finalizeContractFailure(&session, &attempt, err)
 	}
 
-	cache, outcome, ok := s.buildProtectedActivityCache(historyResponse, request.SecurityToken, &session, &attempt)
+	cache, outcome, ok := s.buildProtectedActivityCache(historyResponse, userResponse, request.SecurityToken, &session, &attempt)
 	if !ok {
 		return outcome
 	}
@@ -299,13 +307,14 @@ func (s *syncService) finalizeUnlockFailure(
 // Authored by: OpenCode
 func (s *syncService) buildProtectedActivityCache(
 	historyResponse ghostfoliodto.ActivityPageResponse,
+	userResponse ghostfoliodto.UserResponse,
 	securityToken string,
 	session *GhostfolioSession,
 	attempt *SyncAttempt,
 ) (syncmodel.ProtectedActivityCache, SyncOutcome, bool) {
 	attempt.Status = AttemptStatusNormalizing
 
-	records, err := ghostfoliomapper.MapActivities(historyResponse.Activities, s.decimalService)
+	records, err := ghostfoliomapper.MapActivities(historyResponse.Activities, userResponse.Settings.BaseCurrency, s.decimalService)
 	if err != nil {
 		return syncmodel.ProtectedActivityCache{}, s.finalizeSyncFailure(
 			session,

@@ -58,13 +58,13 @@ func TestValidationErrorHelpersAndValidationBranches(t *testing.T) {
 	}{
 		{name: "missing identity", cache: syncmodel.ProtectedActivityCache{ActivityCount: 1, Activities: []syncmodel.ActivityRecord{{OccurredAt: "2024-01-01T10:00:00Z"}}}},
 		{name: "non-positive quantity", cache: syncmodel.ProtectedActivityCache{ActivityCount: 1, Activities: []syncmodel.ActivityRecord{func() syncmodel.ActivityRecord { record := buy; record.Quantity = zeroPrice; return record }()}}},
-		{name: "negative gross value", cache: syncmodel.ProtectedActivityCache{ActivityCount: 1, Activities: []syncmodel.ActivityRecord{func() syncmodel.ActivityRecord { record := buy; record.GrossValue = negativeValue; return record }()}}},
-		{name: "negative fee", cache: syncmodel.ProtectedActivityCache{ActivityCount: 1, Activities: []syncmodel.ActivityRecord{func() syncmodel.ActivityRecord { record := buy; record.FeeAmount = &negativeValue; return record }()}}},
-		{name: "buy zero unit price", cache: syncmodel.ProtectedActivityCache{ActivityCount: 1, Activities: []syncmodel.ActivityRecord{func() syncmodel.ActivityRecord { record := buy; record.UnitPrice = zeroPrice; return record }()}}},
-		{name: "sell negative unit price", cache: syncmodel.ProtectedActivityCache{ActivityCount: 1, Activities: []syncmodel.ActivityRecord{func() syncmodel.ActivityRecord { record := sell; record.UnitPrice = negativeValue; return record }()}}},
+		{name: "negative gross value", cache: syncmodel.ProtectedActivityCache{ActivityCount: 1, Activities: []syncmodel.ActivityRecord{func() syncmodel.ActivityRecord { record := buy; record.OrderGrossValue = &negativeValue; return record }()}}},
+		{name: "negative fee", cache: syncmodel.ProtectedActivityCache{ActivityCount: 1, Activities: []syncmodel.ActivityRecord{func() syncmodel.ActivityRecord { record := buy; record.OrderFeeAmount = &negativeValue; return record }()}}},
+		{name: "buy zero unit price", cache: syncmodel.ProtectedActivityCache{ActivityCount: 1, Activities: []syncmodel.ActivityRecord{func() syncmodel.ActivityRecord { record := buy; record.OrderUnitPrice = &zeroPrice; return record }()}}},
+		{name: "sell negative unit price", cache: syncmodel.ProtectedActivityCache{ActivityCount: 1, Activities: []syncmodel.ActivityRecord{func() syncmodel.ActivityRecord { record := sell; record.OrderUnitPrice = &negativeValue; return record }()}}},
 		{name: "sell zero price without comment", cache: syncmodel.ProtectedActivityCache{ActivityCount: 1, Activities: []syncmodel.ActivityRecord{func() syncmodel.ActivityRecord {
 			record := sell
-			record.UnitPrice = zeroPrice
+			record.OrderUnitPrice = &zeroPrice
 			record.Comment = ""
 			return record
 		}()}}},
@@ -192,6 +192,43 @@ func TestApplyRunningQuantityRejectsInvalidArithmetic(t *testing.T) {
 	}
 }
 
+// TestValidateCurrencyContextFailuresExposeDiagnosticContext verifies that
+// incomplete explicit currency identity stays visible in validation diagnostics.
+// Authored by: OpenCode
+func TestValidateCurrencyContextFailuresExposeDiagnosticContext(t *testing.T) {
+	t.Parallel()
+
+	validator := NewValidator()
+	record := validationTestRecord(t, "buy-1", syncmodel.ActivityTypeBuy)
+	record.OrderCurrency = ""
+
+	err := validator.Validate(syncmodel.ProtectedActivityCache{
+		ActivityCount: 1,
+		Activities:    []syncmodel.ActivityRecord{record},
+	})
+	if err == nil {
+		t.Fatalf("expected contradictory currency context rejection")
+	}
+
+	var validationErr *ValidationError
+	if !errors.As(err, &validationErr) {
+		t.Fatalf("expected typed validation error, got %v", err)
+	}
+	context := validationErr.DiagnosticContext()
+	if context.FailureStage != syncmodel.DiagnosticFailureStageValidation {
+		t.Fatalf("expected validation failure stage, got %#v", context)
+	}
+	if !strings.Contains(context.FailureDetail, "currency context is incomplete") {
+		t.Fatalf("expected incomplete currency detail, got %#v", context)
+	}
+	if len(context.Records) != 1 {
+		t.Fatalf("expected one diagnostic record, got %#v", context)
+	}
+	if context.Records[0].OrderCurrency != "" || context.Records[0].OrderUnitPrice != "100" {
+		t.Fatalf("expected preserved currency diagnostic context, got %#v", context.Records[0])
+	}
+}
+
 func validationTestRecord(t *testing.T, sourceID string, activityType syncmodel.ActivityType) syncmodel.ActivityRecord {
 	t.Helper()
 
@@ -209,13 +246,15 @@ func validationTestRecord(t *testing.T, sourceID string, activityType syncmodel.
 	}
 
 	return syncmodel.ActivityRecord{
-		SourceID:     sourceID,
-		OccurredAt:   "2024-01-01T10:00:00Z",
-		ActivityType: activityType,
-		AssetSymbol:  "BTC",
-		Quantity:     quantity,
-		UnitPrice:    unitPrice,
-		GrossValue:   grossValue,
-		RawHash:      sourceID,
+		SourceID:        sourceID,
+		OccurredAt:      "2024-01-01T10:00:00Z",
+		ActivityType:    activityType,
+		AssetSymbol:     "BTC",
+		OrderCurrency:   "USD",
+		BaseCurrency:    "USD",
+		Quantity:        quantity,
+		OrderUnitPrice:  &unitPrice,
+		OrderGrossValue: &grossValue,
+		RawHash:         sourceID,
 	}
 }

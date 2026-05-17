@@ -23,7 +23,11 @@ type ActivityPageEntry struct {
 	Date                            string                `json:"date"`
 	Type                            string                `json:"type"`
 	Quantity                        json.Number           `json:"quantity"`
+	Currency                        string                `json:"currency"`
+	Fee                             json.Number           `json:"fee"`
+	UnitPrice                       json.Number           `json:"unitPrice"`
 	Value                           json.Number           `json:"value"`
+	FeeInAssetProfileCurrency       json.Number           `json:"feeInAssetProfileCurrency"`
 	ValueInBaseCurrency             json.Number           `json:"valueInBaseCurrency"`
 	FeeInBaseCurrency               json.Number           `json:"feeInBaseCurrency"`
 	UnitPriceInAssetProfileCurrency json.Number           `json:"unitPriceInAssetProfileCurrency"`
@@ -31,15 +35,15 @@ type ActivityPageEntry struct {
 	SymbolProfile                   ActivitySymbolProfile `json:"SymbolProfile"`
 	Account                         *ActivityAccountScope `json:"account"`
 	DataSource                      string                `json:"dataSource"`
-	BaseCurrency                    string                `json:"baseCurrency"`
 }
 
 // ActivitySymbolProfile preserves the minimum asset identity metadata required
 // for normalization.
 // Authored by: OpenCode
 type ActivitySymbolProfile struct {
-	Symbol string `json:"symbol"`
-	Name   string `json:"name"`
+	Symbol   string `json:"symbol"`
+	Name     string `json:"name"`
+	Currency string `json:"currency"`
 }
 
 // ActivityAccountScope preserves optional source account metadata that may

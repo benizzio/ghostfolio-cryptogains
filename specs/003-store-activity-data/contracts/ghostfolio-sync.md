@@ -10,13 +10,17 @@ Reference sources of truth:
 - `specs/002-sync-data-validation/contracts/ghostfolio-sync-validation.md`
 - `specs/003-store-activity-data/spec.md`
 
-Observed upstream review evidence refreshed on 2026-05-15:
+Observed upstream review evidence refreshed on 2026-05-17:
 
 - Ghostfolio release `3.3.0` published on 2026-05-14.
 - `apps/api/src/app/auth/auth.controller.ts` exposes `@Post('anonymous')` and returns `{ authToken }` on success while rejected access tokens surface as HTTP `403 Forbidden`.
 - `apps/api/src/app/activities/activities.controller.ts` exposes `GET /activities` with `skip`, `take`, `sortColumn`, and `sortDirection` query parameters and returns `{ activities, count }`.
 - `apps/api/src/app/activities/activities.service.ts` applies `skip` and `take`, defaults to date ordering, and appends `id` as a deterministic tie-break when explicit sorting is requested.
 - Ghostfolio activity capture is date-based, so the `/api/v1/activities` `date` field must be preserved exactly for storage and year derivation but its time-of-day precision is not treated as authoritative for same-asset local ordering.
+- `apps/api/src/app/user/user.controller.ts` exposes authenticated `GET /user`.
+- `libs/common/src/lib/interfaces/user.interface.ts` defines `User.settings`.
+- `libs/common/src/lib/interfaces/user-settings.interface.ts` defines `UserSettings.baseCurrency?: string`.
+- `libs/common/src/lib/interfaces/activities.interface.ts` exposes the mixed-currency money fields required by this slice, but the verified public type review does not establish a required per-activity `baseCurrency` field.
 
 ## Compatibility Rules
 
@@ -27,6 +31,7 @@ Observed upstream review evidence refreshed on 2026-05-15:
 - Sync succeeds only when all of these complete successfully in one workflow:
   - token entry
   - anonymous auth
+  - authenticated user retrieval for sync base-currency context
   - full paginated activity retrieval
   - normalization and validation of the complete supported history
   - atomic protected snapshot write or refresh
@@ -122,14 +127,19 @@ HTTP `200 OK`
       "date": "2026-01-31T10:00:00+01:00",
       "type": "BUY",
       "quantity": 1.25,
+      "currency": "CHF",
+      "unitPrice": 50000,
       "value": 62500,
+      "fee": 25,
+      "unitPriceInAssetProfileCurrency": 52000,
+      "feeInAssetProfileCurrency": 26,
       "valueInBaseCurrency": 62500,
       "feeInBaseCurrency": 25,
-      "unitPriceInAssetProfileCurrency": 50000,
       "comment": "optional",
       "SymbolProfile": {
         "symbol": "BTC",
-        "name": "Bitcoin"
+        "name": "Bitcoin",
+        "currency": "EUR"
       },
       "account": {
         "id": "optional-account-id",
@@ -142,6 +152,44 @@ HTTP `200 OK`
 ```
 
 The upstream Ghostfolio schema is larger than this example. The client depends only on the fields needed for reporting-ready normalization in this slice.
+
+The sync base-currency context is not sourced from a required field on each activity row. The client derives that context from authenticated `GET /api/v1/user` response data and applies it to base-valued activity amounts during mapping and validation.
+
+## Authenticated User Contract
+
+### Request
+
+`GET /api/v1/user`
+
+Headers:
+
+- `Authorization: Bearer <jwt>`
+
+### Successful Response Shape
+
+HTTP `200 OK`
+
+```json
+{
+  "settings": {
+    "baseCurrency": "USD"
+  }
+}
+```
+
+### Runtime Validation Rules
+
+- The response must declare a JSON-compatible content type.
+- The body must parse as JSON.
+- `settings` must exist.
+- `settings.baseCurrency` is used as the sync base-currency context when base-valued activity fields are present.
+
+### Failure Handling Rules
+
+- HTTP `401 Unauthorized` or `403 Forbidden` during user retrieval maps to `unsuccessful server response`.
+- HTTP `404 Not Found` maps to `incompatible server contract`.
+- Other non-2xx responses map to `unsuccessful server response` unless the response itself proves contract incompatibility.
+- Unsupported content type, malformed JSON, or missing `settings` maps to `incompatible server contract`.
 
 ### Minimum Required Inputs Per Retrieved Activity
 

@@ -86,6 +86,44 @@ func TestSnapshotCompatibilityFlowRejectsUnsupportedPayloadVersion(t *testing.T)
 	}
 }
 
+// TestSnapshotCompatibilityFlowRejectsUnsupportedActivityModelVersion verifies
+// that pre-BUG-003 snapshots fail safely without an explicit migration path.
+// Authored by: OpenCode
+func TestSnapshotCompatibilityFlowRejectsUnsupportedActivityModelVersion(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	server := newTokenAwareStorageServer(t)
+	server.SetTokenPages("token-one", []storagePageFixture{{Count: 1, ActivitiesJSON: `[]`}})
+	service := newTokenAwareSyncService(baseDir, server)
+	config := mustSnapshotReuseConfig(t, server.URL())
+	payload := defaultRawSnapshotPayload(server.URL())
+	payload.StoredDataVersion.ActivityModelVersion--
+	path := writeIntegrationSnapshotFixture(t, baseDir, rawSnapshotFixture{
+		SnapshotID:    "unsupported-activity-model",
+		ServerOrigin:  server.URL(),
+		SecurityToken: "token-one",
+		FormatVersion: snapshotmodel.EnvelopeFormatVersion,
+		Payload:       payload,
+	})
+	beforeBytes, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read snapshot before validate: %v", err)
+	}
+
+	outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
+	if outcome.FailureReason != runtime.SyncFailureUnsupportedStoredDataVersion {
+		t.Fatalf("expected unsupported stored-data version outcome, got %#v", outcome)
+	}
+	afterBytes, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read snapshot after validate: %v", err)
+	}
+	if string(beforeBytes) != string(afterBytes) {
+		t.Fatalf("expected unsupported activity model version to leave snapshot unchanged")
+	}
+}
+
 func TestSnapshotCompatibilityFlowRetainsReadableSnapshotWhenNewWriteIsIncompatible(t *testing.T) {
 	t.Parallel()
 
@@ -93,7 +131,7 @@ func TestSnapshotCompatibilityFlowRetainsReadableSnapshotWhenNewWriteIsIncompati
 	server := newTokenAwareStorageServer(t)
 	server.SetTokenPages("token-one", []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`,
+		ActivitiesJSON: `[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
 	}})
 	baseStore := snapshotstore.NewEncryptedStore(baseDir, nil)
 	wrappingStore := &failingCompatibilityWriteStore{Store: baseStore}
@@ -129,7 +167,7 @@ func TestSnapshotCompatibilityFlowRetainsReadableSnapshotWhenNewWriteIsIncompati
 	wrappingStore.failWrites = true
 	server.SetTokenPages("token-one", []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"activity-2","date":"2025-01-01T10:00:00Z","type":"BUY","quantity":2,"valueInBaseCurrency":200,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`,
+		ActivitiesJSON: `[{"id":"activity-2","date":"2025-01-01T10:00:00Z","type":"BUY","quantity":2,"valueInBaseCurrency":200,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
 	}})
 	outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
 	if outcome.FailureReason != runtime.SyncFailureIncompatibleNewSyncData {

@@ -9,7 +9,9 @@ Thumbs.db
 *.swp
 *.test
 *.tmp
+*.class
 build/
 dist/coverage/
 node_modules/
 vendor/
+coverage/

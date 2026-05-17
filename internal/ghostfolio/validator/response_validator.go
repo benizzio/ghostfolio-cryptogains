@@ -11,6 +11,7 @@ import (
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/dto"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	"github.com/cockroachdb/apd/v3"
 )
 
 // ValidateAuthResponse verifies that the anonymous-auth response satisfies the
@@ -28,6 +29,25 @@ func ValidateAuthResponse(response dto.AuthResponse) error {
 	if strings.TrimSpace(response.AuthToken) == "" {
 		return fmt.Errorf("authToken is required")
 	}
+	return nil
+}
+
+// ValidateUserResponse verifies that the authenticated user response satisfies
+// the supported contract for this slice.
+//
+// Example:
+//
+//	err := validator.ValidateUserResponse(dto.UserResponse{Settings: &dto.UserSettings{BaseCurrency: "USD"}})
+//	if err != nil {
+//		panic(err)
+//	}
+//
+// Authored by: OpenCode
+func ValidateUserResponse(response dto.UserResponse) error {
+	if response.Settings == nil {
+		return fmt.Errorf("user settings are required")
+	}
+
 	return nil
 }
 
@@ -139,7 +159,16 @@ func ValidateActivityPageEntry(entry dto.ActivityPageEntry) error {
 	if err := requireJSONNumber(entry.Quantity, "activity quantity"); err != nil {
 		return err
 	}
+	if err := requireOptionalJSONNumber(entry.UnitPrice, "activity unit price"); err != nil {
+		return err
+	}
 	if err := requireBasisInput(entry); err != nil {
+		return err
+	}
+	if err := requireOptionalJSONNumber(entry.Fee, "activity order fee"); err != nil {
+		return err
+	}
+	if err := requireOptionalJSONNumber(entry.FeeInAssetProfileCurrency, "activity asset-profile fee"); err != nil {
 		return err
 	}
 	if err := requireOptionalJSONNumber(entry.FeeInBaseCurrency, "activity fee"); err != nil {
@@ -153,10 +182,10 @@ func ValidateActivityPageEntry(entry dto.ActivityPageEntry) error {
 // and readable for later normalization.
 // Authored by: OpenCode
 func requireBasisInput(entry dto.ActivityPageEntry) error {
-	if err := requireOptionalJSONNumber(
-		entry.UnitPriceInAssetProfileCurrency,
-		"activity unit price",
-	); err != nil {
+	if err := requireOptionalJSONNumber(entry.UnitPrice, "activity order unit price"); err != nil {
+		return err
+	}
+	if err := requireOptionalJSONNumber(entry.UnitPriceInAssetProfileCurrency, "activity asset-profile unit price"); err != nil {
 		return err
 	}
 	if err := requireOptionalJSONNumber(entry.Value, "activity value"); err != nil {
@@ -169,18 +198,37 @@ func requireBasisInput(entry dto.ActivityPageEntry) error {
 		return err
 	}
 
-	if strings.TrimSpace(entry.UnitPriceInAssetProfileCurrency.String()) == "" &&
+	if !hasUnitPriceInput(entry) &&
 		strings.TrimSpace(entry.Value.String()) == "" &&
 		strings.TrimSpace(entry.ValueInBaseCurrency.String()) == "" {
 		return fmt.Errorf("activity basis input is required")
 	}
-	if strings.TrimSpace(entry.UnitPriceInAssetProfileCurrency.String()) == "" {
+	if !hasUnitPriceInput(entry) {
 		if err := requireDerivableUnitPrice(entry); err != nil {
+			return err
+		}
+	}
+	if !hasGrossValueInput(entry) {
+		if err := requireDerivableGrossValue(entry); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+// hasUnitPriceInput reports whether the activity exposes either supported unit-price field.
+// Authored by: OpenCode
+func hasUnitPriceInput(entry dto.ActivityPageEntry) bool {
+	return strings.TrimSpace(entry.UnitPrice.String()) != "" ||
+		strings.TrimSpace(entry.UnitPriceInAssetProfileCurrency.String()) != ""
+}
+
+// hasGrossValueInput reports whether the activity exposes either supported gross-value field.
+// Authored by: OpenCode
+func hasGrossValueInput(entry dto.ActivityPageEntry) bool {
+	return strings.TrimSpace(entry.Value.String()) != "" ||
+		strings.TrimSpace(entry.ValueInBaseCurrency.String()) != ""
 }
 
 // requireDerivableUnitPrice ensures that gross-value-only inputs can still be
@@ -202,15 +250,45 @@ func requireDerivableUnitPrice(entry dto.ActivityPageEntry) error {
 	return nil
 }
 
+// requireDerivableGrossValue ensures that unit-price-only inputs can still be
+// normalized into an exact gross value.
+// Authored by: OpenCode
+func requireDerivableGrossValue(entry dto.ActivityPageEntry) error {
+	quantity, _, err := decimalsupport.ParseNumber(entry.Quantity)
+	if err != nil {
+		return fmt.Errorf("activity quantity must remain readable for basis derivation: %w", err)
+	}
+	unitPrice, _, err := decimalsupport.ParseNumber(selectUnitPrice(entry))
+	if err != nil {
+		return fmt.Errorf("activity unit price must support exact gross-value derivation: %w", err)
+	}
+	var product apd.Decimal
+	if _, err := apd.BaseContext.Mul(&product, &quantity, &unitPrice); err != nil {
+		return fmt.Errorf("activity unit price must support exact gross-value derivation: %w", err)
+	}
+
+	return nil
+}
+
 // selectGrossValue applies the shared DTO gross-value fallback rule for
 // contract validation.
 // Authored by: OpenCode
 func selectGrossValue(entry dto.ActivityPageEntry) json.Number {
-	if strings.TrimSpace(entry.ValueInBaseCurrency.String()) != "" {
-		return entry.ValueInBaseCurrency
+	if strings.TrimSpace(entry.Value.String()) != "" {
+		return entry.Value
 	}
 
-	return entry.Value
+	return entry.ValueInBaseCurrency
+}
+
+// selectUnitPrice applies the shared DTO unit-price fallback rule for contract validation.
+// Authored by: OpenCode
+func selectUnitPrice(entry dto.ActivityPageEntry) json.Number {
+	if strings.TrimSpace(entry.UnitPrice.String()) != "" {
+		return entry.UnitPrice
+	}
+
+	return entry.UnitPriceInAssetProfileCurrency
 }
 
 // requireJSONNumber verifies that one required JSON number is present and

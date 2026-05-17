@@ -70,6 +70,17 @@ type runtimeDiagnosticCarrierError struct {
 	context syncmodel.DiagnosticContext
 }
 
+// runtimeNormalizerFunc adapts one test function to the runtime normalization
+// contract.
+// Authored by: OpenCode
+type runtimeNormalizerFunc func([]syncmodel.ActivityRecord) (syncmodel.ProtectedActivityCache, error)
+
+// Normalize returns the injected normalized cache or error.
+// Authored by: OpenCode
+func (f runtimeNormalizerFunc) Normalize(records []syncmodel.ActivityRecord) (syncmodel.ProtectedActivityCache, error) {
+	return f(records)
+}
+
 type runtimeFailingDecimalService struct{}
 
 func (runtimeFailingDecimalService) ParseString(string) (apd.Decimal, string, error) {
@@ -191,6 +202,57 @@ func TestWriteDiagnosticReportCoversBranches(t *testing.T) {
 			t.Fatalf("expected financial values to be redacted, got %s", raw)
 		}
 	})
+}
+
+// TestBuildDiagnosticReportDocumentPreservesCurrencyContextWhileRedactingFinancialValues
+// verifies BUG-003 currency diagnostics survive production redaction.
+// Authored by: OpenCode
+func TestBuildDiagnosticReportDocumentPreservesCurrencyContextWhileRedactingFinancialValues(t *testing.T) {
+	t.Parallel()
+
+	request := runtimeDiagnosticRequestFixture()
+	request.Context = syncmodel.DiagnosticContext{
+		FailureStage:  syncmodel.DiagnosticFailureStageValidation,
+		FailureDetail: `activity "buy-1" order unit price currency context is incomplete`,
+		Records: []syncmodel.DiagnosticRecord{{
+			SourceID:              "buy-1",
+			OrderCurrency:         "CHF",
+			AssetProfileCurrency:  "EUR",
+			BaseCurrency:          "USD",
+			UnitPrice:             "95",
+			UnitPriceCurrency:     "EUR",
+			GrossValue:            "90",
+			GrossValueCurrency:    "CHF",
+			FeeAmount:             "1.8",
+			FeeAmountCurrency:     "EUR",
+			OrderUnitPrice:        "",
+			AssetProfileUnitPrice: "95",
+			OrderGrossValue:       "90",
+		}},
+	}
+
+	request.RedactFinancialValues = true
+	redacted := buildDiagnosticReportDocument(request, time.Unix(3, 0).UTC())
+	if !redacted.FinancialValuesRedacted {
+		t.Fatalf("expected production diagnostic report to mark financial values as redacted")
+	}
+	if len(redacted.Records) != 1 {
+		t.Fatalf("expected one redacted diagnostic record, got %#v", redacted)
+	}
+	redactedRecord := redacted.Records[0]
+	if redactedRecord.OrderCurrency != "CHF" || redactedRecord.AssetProfileCurrency != "EUR" || redactedRecord.BaseCurrency != "USD" || redactedRecord.UnitPriceCurrency != "EUR" || redactedRecord.FeeAmountCurrency != "EUR" {
+		t.Fatalf("expected currency context to remain visible after redaction, got %#v", redactedRecord)
+	}
+	if redactedRecord.UnitPrice != "" || redactedRecord.GrossValue != "" || redactedRecord.FeeAmount != "" || redactedRecord.AssetProfileUnitPrice != "" {
+		t.Fatalf("expected financial values to be cleared, got %#v", redactedRecord)
+	}
+
+	request.RedactFinancialValues = false
+	unredacted := buildDiagnosticReportDocument(request, time.Unix(3, 0).UTC())
+	unredactedRecord := unredacted.Records[0]
+	if unredactedRecord.UnitPrice != "95" || unredactedRecord.GrossValue != "90" || unredactedRecord.FeeAmount != "1.8" || unredactedRecord.AssetProfileUnitPrice != "95" {
+		t.Fatalf("expected explicit-development-mode diagnostics to retain financial values, got %#v", unredactedRecord)
+	}
 }
 
 // TestResolveBaseConfigDirAndGenerateDiagnosticReportCoverBranches verifies
@@ -481,6 +543,8 @@ func TestValidateCoversProtectedWriteBranches(t *testing.T) {
 			switch request.URL.Path {
 			case "/api/v1/auth/anonymous":
 				_, _ = writer.Write([]byte(`{"authToken":"jwt"}`))
+			case "/api/v1/user":
+				_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":"USD"}}`))
 			case "/api/v1/activities":
 				_, _ = writer.Write([]byte(`{"activities":[],"count":0}`))
 			default:
@@ -547,6 +611,8 @@ func TestRunCoversMappingNormalizationAndValidationFailures(t *testing.T) {
 			switch request.URL.Path {
 			case "/api/v1/auth/anonymous":
 				_, _ = writer.Write([]byte(`{"authToken":"jwt"}`))
+			case "/api/v1/user":
+				_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":"USD"}}`))
 			case "/api/v1/activities":
 				_, _ = writer.Write([]byte(`{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"symbol":"BTC","name":"Bitcoin"},"quantity":1,"unitPriceInAssetProfileCurrency":1,"value":1,"feeInBaseCurrency":0}],"count":1}`))
 			default:
@@ -591,6 +657,107 @@ func TestRunCoversMappingNormalizationAndValidationFailures(t *testing.T) {
 	})
 }
 
+// TestRunPreservesIncompleteCurrencyContextDiagnosticContext verifies that validation
+// failures caused by incomplete explicit currency identity keep offending-record
+// context available for production and explicit-development diagnostic reports.
+// Authored by: OpenCode
+func TestRunPreservesIncompleteCurrencyContextDiagnosticContext(t *testing.T) {
+	t.Parallel()
+
+	var expectedDetail = `activity "buy-1" order gross value currency context is incomplete`
+
+	t.Run("production mode redacts persisted financial values", func(t *testing.T) {
+		var service, config = runtimeServiceWithHistoryServer(t, runtimeSnapshotStore{}, false, `{"activities":[],"count":0}`)
+		service.normalizer = runtimeNormalizerFunc(func([]syncmodel.ActivityRecord) (syncmodel.ProtectedActivityCache, error) {
+			return runtimeCurrencyMismatchCacheFixture(t), nil
+		})
+
+		var outcome = service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
+		if outcome.FailureReason != SyncFailureUnsupportedActivityHistory || !outcome.Diagnostic.Eligible {
+			t.Fatalf("expected diagnostic-eligible unsupported-history failure, got %#v", outcome)
+		}
+		if outcome.Diagnostic.Path != "" {
+			t.Fatalf("expected production mode to defer report creation, got %#v", outcome.Diagnostic)
+		}
+		if !outcome.Diagnostic.Request.RedactFinancialValues || outcome.Diagnostic.Request.ExplicitDevelopmentMode {
+			t.Fatalf("expected production-mode diagnostic request flags, got %#v", outcome.Diagnostic.Request)
+		}
+
+		var diagnosticContext = outcome.Diagnostic.Request.Context
+		if diagnosticContext.FailureStage != syncmodel.DiagnosticFailureStageValidation || diagnosticContext.FailureDetail != expectedDetail {
+			t.Fatalf("expected validation-stage currency mismatch detail, got %#v", diagnosticContext)
+		}
+		if len(diagnosticContext.Records) != 1 {
+			t.Fatalf("expected one diagnostic record, got %#v", diagnosticContext)
+		}
+		var requestRecord = diagnosticContext.Records[0]
+		if requestRecord.OrderCurrency != "" || requestRecord.AssetProfileCurrency != "EUR" || requestRecord.BaseCurrency != "USD" || requestRecord.UnitPriceCurrency != "EUR" || requestRecord.GrossValueCurrency != "" {
+			t.Fatalf("expected preserved currency identifiers in diagnostic request, got %#v", requestRecord)
+		}
+		if requestRecord.UnitPrice != "95" || requestRecord.OrderUnitPrice != "" || requestRecord.AssetProfileUnitPrice != "95" || requestRecord.BaseGrossValue != "100" {
+			t.Fatalf("expected unredacted offending-record values in diagnostic request, got %#v", requestRecord)
+		}
+
+		var reportPath, err = service.GenerateDiagnosticReport(context.Background(), outcome.Diagnostic.Request)
+		if err != nil {
+			t.Fatalf("generate production diagnostic report: %v", err)
+		}
+		var document = mustRuntimeDiagnosticReportDocument(t, reportPath)
+		if !document.FinancialValuesRedacted || document.ExplicitDevelopmentMode {
+			t.Fatalf("expected production diagnostic redaction metadata, got %#v", document)
+		}
+		if document.FailureStage != syncmodel.DiagnosticFailureStageValidation || document.FailureDetail != expectedDetail {
+			t.Fatalf("expected production diagnostic failure detail to be preserved, got %#v", document)
+		}
+		if len(document.Records) != 1 {
+			t.Fatalf("expected one persisted diagnostic record, got %#v", document)
+		}
+		var persistedRecord = document.Records[0]
+		if persistedRecord.OrderCurrency != "" || persistedRecord.AssetProfileCurrency != "EUR" || persistedRecord.BaseCurrency != "USD" || persistedRecord.UnitPriceCurrency != "EUR" || persistedRecord.GrossValueCurrency != "" {
+			t.Fatalf("expected production diagnostic report to preserve currency identifiers, got %#v", persistedRecord)
+		}
+		if persistedRecord.UnitPrice != "" || persistedRecord.AssetProfileUnitPrice != "" || persistedRecord.BaseGrossValue != "" || persistedRecord.FeeAmount != "" {
+			t.Fatalf("expected production diagnostic report to redact financial values, got %#v", persistedRecord)
+		}
+	})
+
+	t.Run("development mode keeps offending-record values", func(t *testing.T) {
+		var service, config = runtimeServiceWithHistoryServer(t, runtimeSnapshotStore{}, true, `{"activities":[],"count":0}`)
+		service.normalizer = runtimeNormalizerFunc(func([]syncmodel.ActivityRecord) (syncmodel.ProtectedActivityCache, error) {
+			return runtimeCurrencyMismatchCacheFixture(t), nil
+		})
+
+		var outcome = service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
+		if outcome.FailureReason != SyncFailureUnsupportedActivityHistory || !outcome.Diagnostic.Eligible {
+			t.Fatalf("expected diagnostic-eligible unsupported-history failure, got %#v", outcome)
+		}
+		if outcome.Diagnostic.Path == "" {
+			t.Fatalf("expected explicit development mode to auto-write the diagnostic report, got %#v", outcome.Diagnostic)
+		}
+		if outcome.Diagnostic.Request.RedactFinancialValues || !outcome.Diagnostic.Request.ExplicitDevelopmentMode {
+			t.Fatalf("expected explicit-development diagnostic request flags, got %#v", outcome.Diagnostic.Request)
+		}
+
+		var document = mustRuntimeDiagnosticReportDocument(t, outcome.Diagnostic.Path)
+		if document.FinancialValuesRedacted || !document.ExplicitDevelopmentMode {
+			t.Fatalf("expected development diagnostic metadata without redaction, got %#v", document)
+		}
+		if document.FailureStage != syncmodel.DiagnosticFailureStageValidation || document.FailureDetail != expectedDetail {
+			t.Fatalf("expected development diagnostic failure detail to be preserved, got %#v", document)
+		}
+		if len(document.Records) != 1 {
+			t.Fatalf("expected one persisted diagnostic record, got %#v", document)
+		}
+		var persistedRecord = document.Records[0]
+		if persistedRecord.OrderCurrency != "" || persistedRecord.AssetProfileCurrency != "EUR" || persistedRecord.BaseCurrency != "USD" || persistedRecord.UnitPriceCurrency != "EUR" || persistedRecord.GrossValueCurrency != "" {
+			t.Fatalf("expected development diagnostic report to preserve currency identifiers, got %#v", persistedRecord)
+		}
+		if persistedRecord.UnitPrice != "95" || persistedRecord.OrderUnitPrice != "" || persistedRecord.AssetProfileUnitPrice != "95" || persistedRecord.BaseGrossValue != "100" {
+			t.Fatalf("expected development diagnostic report to preserve offending-record values, got %#v", persistedRecord)
+		}
+	})
+}
+
 // runtimeDiagnosticRequestFixture returns one structured diagnostic-report
 // request for runtime internal tests.
 // Authored by: OpenCode
@@ -616,6 +783,80 @@ func runtimeDiagnosticRequestFixture() DiagnosticReportRequest {
 			}},
 		},
 	}
+}
+
+// runtimeCurrencyMismatchCacheFixture returns one normalized cache whose
+// explicit order-unit-price amount is missing its required order currency.
+// Authored by: OpenCode
+func runtimeCurrencyMismatchCacheFixture(t *testing.T) syncmodel.ProtectedActivityCache {
+	t.Helper()
+
+	return syncmodel.ProtectedActivityCache{
+		ActivityCount: 1,
+		Activities:    []syncmodel.ActivityRecord{runtimeCurrencyMismatchRecordFixture(t)},
+	}
+}
+
+// runtimeCurrencyMismatchRecordFixture returns one normalized activity record
+// whose explicit order-unit-price amount is missing its required order currency.
+// Authored by: OpenCode
+func runtimeCurrencyMismatchRecordFixture(t *testing.T) syncmodel.ActivityRecord {
+	t.Helper()
+
+	var quantity, _, err = decimalsupport.ParseString("1")
+	if err != nil {
+		t.Fatalf("parse quantity: %v", err)
+	}
+	var grossValue apd.Decimal
+	grossValue, _, err = decimalsupport.ParseString("90")
+	if err != nil {
+		t.Fatalf("parse gross value: %v", err)
+	}
+	var assetProfileUnitPrice apd.Decimal
+	assetProfileUnitPrice, _, err = decimalsupport.ParseString("95")
+	if err != nil {
+		t.Fatalf("parse asset-profile unit price: %v", err)
+	}
+	var baseGrossValue apd.Decimal
+	baseGrossValue, _, err = decimalsupport.ParseString("100")
+	if err != nil {
+		t.Fatalf("parse base gross value: %v", err)
+	}
+
+	return syncmodel.ActivityRecord{
+		SourceID:              "buy-1",
+		OccurredAt:            "2024-01-01T10:00:00Z",
+		ActivityType:          syncmodel.ActivityTypeBuy,
+		AssetSymbol:           "BTC",
+		AssetName:             "Bitcoin",
+		OrderCurrency:         "",
+		AssetProfileCurrency:  "EUR",
+		BaseCurrency:          "USD",
+		Quantity:              quantity,
+		OrderUnitPrice:        nil,
+		OrderGrossValue:       &grossValue,
+		AssetProfileUnitPrice: &assetProfileUnitPrice,
+		BaseGrossValue:        &baseGrossValue,
+		RawHash:               "buy-1",
+	}
+}
+
+// mustRuntimeDiagnosticReportDocument reads one persisted diagnostic report and
+// unmarshals it into the local runtime document model.
+// Authored by: OpenCode
+func mustRuntimeDiagnosticReportDocument(t *testing.T, path string) diagnosticReportDocument {
+	t.Helper()
+
+	var raw, err = os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read diagnostic report: %v", err)
+	}
+	var document diagnosticReportDocument
+	if err := json.Unmarshal(raw, &document); err != nil {
+		t.Fatalf("unmarshal diagnostic report: %v", err)
+	}
+
+	return document
 }
 
 // runtimeCacheFixture returns one protected activity cache fixture for runtime
@@ -673,17 +914,26 @@ func runtimeServiceWithHistoryServer(
 ) (*syncService, configmodel.AppSetupConfig) {
 	t.Helper()
 
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	var handler = http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		switch request.URL.Path {
 		case "/api/v1/auth/anonymous":
 			_, _ = writer.Write([]byte(`{"authToken":"jwt"}`))
+		case "/api/v1/user":
+			_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":"USD"}}`))
 		case "/api/v1/activities":
 			_, _ = writer.Write([]byte(activitiesResponse))
 		default:
 			writer.WriteHeader(http.StatusNotFound)
 		}
-	}))
+	})
+
+	var server *httptest.Server
+	if allowDevHTTP {
+		server = httptest.NewServer(handler)
+	} else {
+		server = httptest.NewTLSServer(handler)
+	}
 	t.Cleanup(server.Close)
 
 	service := requireSyncService(t, NewSyncService(ghostfolioclient.New(server.Client()), time.Second, t.TempDir(), allowDevHTTP, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), store))

@@ -7,6 +7,7 @@ import (
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	syncnormalize "github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
 	syncvalidate "github.com/benizzio/ghostfolio-cryptogains/internal/sync/validate"
+	"github.com/cockroachdb/apd/v3"
 )
 
 func TestActivityValidationContractSupportsZeroPricedSellWithComment(t *testing.T) {
@@ -100,6 +101,58 @@ func TestActivityValidationContractDerivesScopeReliabilityOutcomes(t *testing.T)
 	}
 }
 
+func TestActivityValidationContractRejectsIncompleteCurrencyContext(t *testing.T) {
+	t.Parallel()
+
+	records := []syncmodel.ActivityRecord{
+		activityValidationContractRecord(t, "buy-1", "2024-01-01T10:00:00Z", syncmodel.ActivityTypeBuy, "BTC", "1", "100", "100", func(record *syncmodel.ActivityRecord) {
+			record.OrderCurrency = ""
+			record.OrderUnitPrice = nil
+		})}
+
+	cache, err := syncnormalize.NewNormalizer().Normalize(records)
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	if err := syncvalidate.NewValidator().Validate(cache); err == nil {
+		t.Fatalf("expected incomplete currency context to be rejected")
+	}
+}
+
+func TestActivityValidationContractPreservesMixedCurrencyContext(t *testing.T) {
+	t.Parallel()
+
+	records := []syncmodel.ActivityRecord{
+		activityValidationContractRecord(t, "buy-1", "2024-01-01T10:00:00Z", syncmodel.ActivityTypeBuy, "BTC", "1", "90", "90", func(record *syncmodel.ActivityRecord) {
+			assetProfileUnitPrice, _, err := decimalsupport.ParseString("95")
+			if err != nil {
+				t.Fatalf("parse asset-profile unit price: %v", err)
+			}
+			baseGrossValue, _, err := decimalsupport.ParseString("100")
+			if err != nil {
+				t.Fatalf("parse base gross value: %v", err)
+			}
+			record.OrderCurrency = "CHF"
+			record.AssetProfileCurrency = "EUR"
+			record.BaseCurrency = "USD"
+			record.OrderUnitPrice = mustActivityValidationContractDecimalPointer(t, "90")
+			record.OrderGrossValue = mustActivityValidationContractDecimalPointer(t, "90")
+			record.AssetProfileUnitPrice = &assetProfileUnitPrice
+			record.BaseGrossValue = &baseGrossValue
+		})}
+
+	cache, err := syncnormalize.NewNormalizer().Normalize(records)
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	if err := syncvalidate.NewValidator().Validate(cache); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	if cache.Activities[0].OrderCurrency != "CHF" || cache.Activities[0].AssetProfileCurrency != "EUR" || cache.Activities[0].BaseCurrency != "USD" {
+		t.Fatalf("expected mixed-currency context to be preserved, got %#v", cache.Activities[0])
+	}
+}
+
 // TestActivityValidationContractOrdersSameAssetSameDayUsingActivityTypeBeforeSourceID
 // verifies the reopened same-day Ghostfolio ordering contract.
 // Authored by: OpenCode
@@ -166,17 +219,30 @@ func activityValidationContractRecord(
 	}
 
 	record := syncmodel.ActivityRecord{
-		SourceID:     sourceID,
-		OccurredAt:   occurredAt,
-		ActivityType: activityType,
-		AssetSymbol:  assetSymbol,
-		Quantity:     parsedQuantity,
-		UnitPrice:    parsedUnitPrice,
-		GrossValue:   parsedGrossValue,
+		SourceID:        sourceID,
+		OccurredAt:      occurredAt,
+		ActivityType:    activityType,
+		AssetSymbol:     assetSymbol,
+		OrderCurrency:   "USD",
+		BaseCurrency:    "USD",
+		Quantity:        parsedQuantity,
+		OrderUnitPrice:  &parsedUnitPrice,
+		OrderGrossValue: &parsedGrossValue,
 	}
 	if mutate != nil {
 		mutate(&record)
 	}
 
 	return record
+}
+
+func mustActivityValidationContractDecimalPointer(t *testing.T, raw string) *apd.Decimal {
+	t.Helper()
+
+	value, _, err := decimalsupport.ParseString(raw)
+	if err != nil {
+		t.Fatalf("parse decimal pointer: %v", err)
+	}
+
+	return &value
 }

@@ -29,9 +29,9 @@ func TestSyncStorageFlowCreatesProtectedSnapshotAfterSuccessfulMultiPageSync(t *
 	tempDir := t.TempDir()
 	store := configstore.NewJSONStore(tempDir)
 	server := newGhostfolioStorageServer(t, []storagePageFixture{
-		{Count: 3, ActivitiesJSON: `[{"id":"activity-1","date":"2024-12-31T23:30:00-02:00","type":"BUY","quantity":1.25,"valueInBaseCurrency":62500,"feeInBaseCurrency":25,"unitPriceInAssetProfileCurrency":50000,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"},"account":{"id":"account-1","name":"Main"}}]`},
-		{Count: 3, ActivitiesJSON: `[{"id":"activity-2","date":"2025-01-01T00:15:00+02:00","type":"BUY","quantity":0.50,"valueInBaseCurrency":25000,"unitPriceInAssetProfileCurrency":50000,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`},
-		{Count: 3, ActivitiesJSON: `[{"id":"activity-3","date":"2026-05-01T09:00:00Z","type":"SELL","quantity":0.25,"valueInBaseCurrency":15000,"unitPriceInAssetProfileCurrency":60000,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`},
+		{Count: 3, ActivitiesJSON: `[{"id":"activity-1","date":"2024-12-31T23:30:00-02:00","type":"BUY","quantity":1.25,"valueInBaseCurrency":62500,"feeInBaseCurrency":25,"unitPriceInAssetProfileCurrency":50000,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"},"account":{"id":"account-1","name":"Main"}}]`},
+		{Count: 3, ActivitiesJSON: `[{"id":"activity-2","date":"2025-01-01T00:15:00+02:00","type":"BUY","quantity":0.50,"valueInBaseCurrency":25000,"unitPriceInAssetProfileCurrency":50000,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`},
+		{Count: 3, ActivitiesJSON: `[{"id":"activity-3","date":"2026-05-01T09:00:00Z","type":"SELL","quantity":0.25,"valueInBaseCurrency":15000,"unitPriceInAssetProfileCurrency":60000,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`},
 	})
 	fixture := newSyncStorageFixture(t, tempDir, server.Client(), server.URL, time.Second)
 	if err := store.Save(context.Background(), fixture.config); err != nil {
@@ -102,6 +102,8 @@ func newGhostfolioStorageServer(t *testing.T, pages []storagePageFixture) *httpt
 		switch request.URL.Path {
 		case "/api/v1/auth/anonymous":
 			_, _ = writer.Write([]byte(`{"authToken":"jwt"}`))
+		case "/api/v1/user":
+			_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":"USD"}}`))
 		case "/api/v1/activities":
 			if request.URL.Query().Get("sortColumn") != "date" || request.URL.Query().Get("sortDirection") != "asc" {
 				writer.WriteHeader(http.StatusBadRequest)

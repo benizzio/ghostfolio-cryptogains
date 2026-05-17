@@ -303,17 +303,33 @@ func recordHash(record syncmodel.ActivityRecord) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("hash activity quantity: %w", err)
 	}
-	unitPrice, err := decimalsupport.CanonicalString(record.UnitPrice)
+	orderUnitPrice, err := decimalsupport.CanonicalStringPointer(record.OrderUnitPrice)
 	if err != nil {
-		return "", fmt.Errorf("hash activity unit price: %w", err)
+		return "", fmt.Errorf("hash activity order unit price: %w", err)
 	}
-	grossValue, err := decimalsupport.CanonicalString(record.GrossValue)
+	orderGrossValue, err := decimalsupport.CanonicalStringPointer(record.OrderGrossValue)
 	if err != nil {
-		return "", fmt.Errorf("hash activity gross value: %w", err)
+		return "", fmt.Errorf("hash activity order gross value: %w", err)
 	}
-	feeAmount, err := decimalsupport.CanonicalStringPointer(record.FeeAmount)
+	orderFeeAmount, err := decimalsupport.CanonicalStringPointer(record.OrderFeeAmount)
 	if err != nil {
-		return "", fmt.Errorf("hash activity fee: %w", err)
+		return "", fmt.Errorf("hash activity order fee: %w", err)
+	}
+	assetProfileUnitPrice, err := decimalsupport.CanonicalStringPointer(record.AssetProfileUnitPrice)
+	if err != nil {
+		return "", fmt.Errorf("hash activity asset-profile unit price: %w", err)
+	}
+	assetProfileFeeAmount, err := decimalsupport.CanonicalStringPointer(record.AssetProfileFeeAmount)
+	if err != nil {
+		return "", fmt.Errorf("hash activity asset-profile fee: %w", err)
+	}
+	baseGrossValue, err := decimalsupport.CanonicalStringPointer(record.BaseGrossValue)
+	if err != nil {
+		return "", fmt.Errorf("hash activity base gross value: %w", err)
+	}
+	baseFeeAmount, err := decimalsupport.CanonicalStringPointer(record.BaseFeeAmount)
+	if err != nil {
+		return "", fmt.Errorf("hash activity base fee: %w", err)
 	}
 
 	var sourceScopeID = ""
@@ -333,11 +349,17 @@ func recordHash(record syncmodel.ActivityRecord) (string, error) {
 		string(record.ActivityType),
 		record.AssetSymbol,
 		record.AssetName,
+		record.OrderCurrency,
+		orderUnitPrice,
+		orderGrossValue,
+		orderFeeAmount,
+		record.AssetProfileCurrency,
+		assetProfileUnitPrice,
+		assetProfileFeeAmount,
 		record.BaseCurrency,
 		quantity,
-		unitPrice,
-		grossValue,
-		feeAmount,
+		baseGrossValue,
+		baseFeeAmount,
 		record.Comment,
 		record.DataSource,
 		sourceScopeID,

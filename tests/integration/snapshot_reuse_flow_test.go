@@ -28,7 +28,7 @@ func TestSnapshotReuseFlowRefreshesExistingSnapshotWithSameToken(t *testing.T) {
 	server := newTokenAwareStorageServer(t)
 	server.SetTokenPages("token-one", []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`,
+		ActivitiesJSON: `[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
 	}})
 	service := newTokenAwareSyncService(baseDir, server)
 	config := mustSnapshotReuseConfig(t, server.URL())
@@ -52,7 +52,7 @@ func TestSnapshotReuseFlowRefreshesExistingSnapshotWithSameToken(t *testing.T) {
 
 	server.SetTokenPages("token-one", []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"activity-2","date":"2025-01-01T10:00:00Z","type":"BUY","quantity":2,"valueInBaseCurrency":200,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`,
+		ActivitiesJSON: `[{"id":"activity-2","date":"2025-01-01T10:00:00Z","type":"BUY","quantity":2,"valueInBaseCurrency":200,"unitPriceInAssetProfileCurrency":100,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
 	}})
 	secondOutcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
 	if !secondOutcome.Success {
@@ -87,11 +87,11 @@ func TestSnapshotReuseFlowCreatesIsolatedSnapshotForDifferentValidToken(t *testi
 	server := newTokenAwareStorageServer(t)
 	server.SetTokenPages("token-one", []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`,
+		ActivitiesJSON: `[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
 	}})
 	server.SetTokenPages("token-two", []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"activity-2","date":"2025-01-01T10:00:00Z","type":"BUY","quantity":2,"valueInBaseCurrency":200,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"ETH","name":"Ether"}}]`,
+		ActivitiesJSON: `[{"id":"activity-2","date":"2025-01-01T10:00:00Z","type":"BUY","quantity":2,"valueInBaseCurrency":200,"unitPriceInAssetProfileCurrency":100,"baseCurrency":"USD","SymbolProfile":{"symbol":"ETH","name":"Ether","currency":"USD"}}]`,
 	}})
 	service := newTokenAwareSyncService(baseDir, server)
 	config := mustSnapshotReuseConfig(t, server.URL())
@@ -142,7 +142,7 @@ func TestSnapshotReuseFlowDeniesWrongTokenWithoutChangingExistingSnapshot(t *tes
 	server := newTokenAwareStorageServer(t)
 	server.SetTokenPages("token-one", []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`,
+		ActivitiesJSON: `[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
 	}})
 	server.RejectToken("wrong-token")
 	service := newTokenAwareSyncService(baseDir, server)
@@ -184,7 +184,7 @@ func TestSnapshotReuseFlowLeavesLocalDataUnchangedForInvalidToken(t *testing.T) 
 	server := newTokenAwareStorageServer(t)
 	server.SetTokenPages("token-one", []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`,
+		ActivitiesJSON: `[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
 	}})
 	server.RejectToken("invalid-token")
 	service := newTokenAwareSyncService(baseDir, server)
@@ -260,6 +260,21 @@ func newTokenAwareStorageServer(t *testing.T) *tokenAwareStorageServer {
 				return
 			}
 			_, _ = writer.Write([]byte(`{"authToken":"jwt-` + payload.AccessToken + `"}`))
+		case "/api/v1/user":
+			authorization := request.Header.Get("Authorization")
+			token, ok := strings.CutPrefix(authorization, "Bearer jwt-")
+			if !ok {
+				writer.WriteHeader(http.StatusForbidden)
+				return
+			}
+			server.mutex.Lock()
+			_, known := server.tokenPages[token]
+			server.mutex.Unlock()
+			if !known {
+				writer.WriteHeader(http.StatusForbidden)
+				return
+			}
+			_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":"USD"}}`))
 		case "/api/v1/activities":
 			authorization := request.Header.Get("Authorization")
 			token, ok := strings.CutPrefix(authorization, "Bearer jwt-")

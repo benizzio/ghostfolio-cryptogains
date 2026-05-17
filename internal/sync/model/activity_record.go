@@ -47,18 +47,24 @@ type SourceScope struct {
 // protected persistence.
 // Authored by: OpenCode
 type ActivityRecord struct {
-	SourceID     string
-	OccurredAt   string
-	ActivityType ActivityType
-	AssetSymbol  string
-	AssetName    string
-	BaseCurrency string
-	Quantity     apd.Decimal
-	UnitPrice    apd.Decimal
-	GrossValue   apd.Decimal
-	FeeAmount    *apd.Decimal
-	Comment      string
-	DataSource   string
-	SourceScope  *SourceScope
-	RawHash      string
+	SourceID              string
+	OccurredAt            string
+	ActivityType          ActivityType
+	AssetSymbol           string
+	AssetName             string
+	Quantity              apd.Decimal
+	OrderCurrency         string
+	OrderUnitPrice        *apd.Decimal
+	OrderGrossValue       *apd.Decimal
+	OrderFeeAmount        *apd.Decimal
+	AssetProfileCurrency  string
+	AssetProfileUnitPrice *apd.Decimal
+	AssetProfileFeeAmount *apd.Decimal
+	BaseCurrency          string
+	BaseGrossValue        *apd.Decimal
+	BaseFeeAmount         *apd.Decimal
+	Comment               string
+	DataSource            string
+	SourceScope           *SourceScope
+	RawHash               string
 }

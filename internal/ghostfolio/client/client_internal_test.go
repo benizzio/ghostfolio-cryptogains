@@ -148,6 +148,80 @@ func TestAuthenticateAcceptsJSONContentTypesAndBuildErrors(t *testing.T) {
 	})
 }
 
+func TestFetchUserHandlesServerResponseClasses(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name        string
+		status      int
+		contentType string
+		body        string
+		expected    FailureCategory
+	}{
+		{name: "not found", status: http.StatusNotFound, expected: FailureIncompatibleServerContract},
+		{name: "forbidden", status: http.StatusForbidden, expected: FailureUnsuccessfulServerResponse},
+		{name: "invalid content type", status: http.StatusOK, contentType: "text/plain", body: "ok", expected: FailureIncompatibleServerContract},
+		{name: "invalid json", status: http.StatusOK, contentType: "application/json", body: "{", expected: FailureIncompatibleServerContract},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				if testCase.contentType != "" {
+					writer.Header().Set("Content-Type", testCase.contentType)
+				}
+				writer.WriteHeader(testCase.status)
+				_, _ = writer.Write([]byte(testCase.body))
+			}))
+			defer server.Close()
+
+			_, err := New(server.Client()).FetchUser(context.Background(), server.URL, "jwt")
+			var failure *RequestFailure
+			if !errors.As(err, &failure) || failure.Category != testCase.expected {
+				t.Fatalf("unexpected failure: %v", err)
+			}
+		})
+	}
+}
+
+func TestFetchUserHandlesTransportAndBuildErrors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("transport timeout", func(t *testing.T) {
+		var client = New(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			return nil, timeoutError{}
+		})})
+		_, err := client.FetchUser(context.Background(), "https://ghostfol.io", "jwt")
+		var failure *RequestFailure
+		if !errors.As(err, &failure) || failure.Category != FailureTimeout {
+			t.Fatalf("unexpected failure: %v", err)
+		}
+	})
+
+	t.Run("invalid origin", func(t *testing.T) {
+		_, err := New(nil).FetchUser(context.Background(), "://bad", "jwt")
+		if err == nil {
+			t.Fatalf("expected request build error")
+		}
+	})
+
+	t.Run("success", func(t *testing.T) {
+		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			if request.Header.Get("Authorization") != "Bearer jwt" {
+				t.Fatalf("unexpected auth header: %q", request.Header.Get("Authorization"))
+			}
+			_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":"USD"}}`))
+		}))
+		defer server.Close()
+
+		var response, err = New(server.Client()).FetchUser(context.Background(), server.URL, "jwt")
+		if err != nil || response.Settings == nil || response.Settings.BaseCurrency != "USD" {
+			t.Fatalf("expected successful user fetch, response=%#v err=%v", response, err)
+		}
+	})
+}
+
 func TestFetchSingleActivitiesPageHandlesServerResponseClasses(t *testing.T) {
 	t.Parallel()
 

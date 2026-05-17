@@ -45,6 +45,13 @@ func TestValidatePayloadCompatibilityRejectsUnsupportedPayloadAndActivityVersion
 				return version
 			},
 		},
+		{
+			name: "previous activity model",
+			mutate: func(version snapshotmodel.StoredDataVersion) snapshotmodel.StoredDataVersion {
+				version.ActivityModelVersion--
+				return version
+			},
+		},
 	}
 
 	for _, testCase := range testCases {

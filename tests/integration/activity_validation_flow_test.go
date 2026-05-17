@@ -22,7 +22,7 @@ func TestActivityValidationFlowRejectsUnsupportedHistoryAndKeepsExistingSnapshot
 	server := newTokenAwareStorageServer(t)
 	server.SetTokenPages("token-one", []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"buy-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`,
+		ActivitiesJSON: `[{"id":"buy-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
 	}})
 	service := newActivityValidationSyncService(baseDir, server)
 	config := mustActivityValidationConfig(t, server.URL())
@@ -42,7 +42,7 @@ func TestActivityValidationFlowRejectsUnsupportedHistoryAndKeepsExistingSnapshot
 
 	server.SetTokenPages("token-one", []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`,
+		ActivitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
 	}})
 	outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
 	if outcome.FailureReason != runtime.SyncFailureUnsupportedActivityHistory {
@@ -68,10 +68,10 @@ func TestActivityValidationFlowNormalizesDuplicatesAndSameAssetSameDayOrdering(t
 	server.SetTokenPages("token-one", []storagePageFixture{{
 		Count: 4,
 		ActivitiesJSON: `[
-			{"id":"sell-z","date":"2024-01-01T00:00:00Z","type":"SELL","quantity":1,"valueInBaseCurrency":120,"unitPriceInAssetProfileCurrency":120,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}},
-			{"id":"buy-a","date":"2024-01-01T23:59:59Z","type":"BUY","quantity":2,"valueInBaseCurrency":200,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}},
-			{"id":"buy-a","date":"2024-01-01T23:59:59Z","type":"BUY","quantity":2,"valueInBaseCurrency":200,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}},
-			{"id":"buy-b","date":"2024-01-01T12:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":110,"unitPriceInAssetProfileCurrency":110,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}
+			{"id":"sell-z","date":"2024-01-01T00:00:00Z","type":"SELL","quantity":1,"valueInBaseCurrency":120,"unitPriceInAssetProfileCurrency":120,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}},
+			{"id":"buy-a","date":"2024-01-01T23:59:59Z","type":"BUY","quantity":2,"valueInBaseCurrency":200,"unitPriceInAssetProfileCurrency":100,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}},
+			{"id":"buy-a","date":"2024-01-01T23:59:59Z","type":"BUY","quantity":2,"valueInBaseCurrency":200,"unitPriceInAssetProfileCurrency":100,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}},
+			{"id":"buy-b","date":"2024-01-01T12:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":110,"unitPriceInAssetProfileCurrency":110,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}
 		]`,
 	}})
 	service := newActivityValidationSyncService(baseDir, server)
@@ -112,8 +112,8 @@ func TestActivityValidationFlowRejectsBelowZeroHoldings(t *testing.T) {
 	server.SetTokenPages("token-one", []storagePageFixture{{
 		Count: 2,
 		ActivitiesJSON: `[
-			{"id":"buy-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}},
-			{"id":"sell-1","date":"2024-01-02T10:00:00Z","type":"SELL","quantity":2,"valueInBaseCurrency":200,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}
+			{"id":"buy-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}},
+			{"id":"sell-1","date":"2024-01-02T10:00:00Z","type":"SELL","quantity":2,"valueInBaseCurrency":200,"unitPriceInAssetProfileCurrency":100,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}
 		]`,
 	}})
 	service := newActivityValidationSyncService(baseDir, server)
@@ -136,8 +136,8 @@ func TestActivityValidationFlowUsesSameDayReplayOrderingForArbitraryGhostfolioTi
 	server.SetTokenPages("token-one", []storagePageFixture{{
 		Count: 2,
 		ActivitiesJSON: `[
-			{"id":"sell-early-clock","date":"2024-01-01T00:00:00Z","type":"SELL","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}},
-			{"id":"buy-late-clock","date":"2024-01-01T23:59:59Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}
+			{"id":"sell-early-clock","date":"2024-01-01T00:00:00Z","type":"SELL","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}},
+			{"id":"buy-late-clock","date":"2024-01-01T23:59:59Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}
 		]`,
 	}})
 	service := newActivityValidationSyncService(baseDir, server)
@@ -175,15 +175,15 @@ func TestActivityValidationFlowAppliesZeroPriceRules(t *testing.T) {
 	}{
 		{
 			name:         "reject buy with zero price",
-			activities:   `[{"id":"buy-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":0,"unitPriceInAssetProfileCurrency":0,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`,
+			activities:   `[{"id":"buy-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":0,"unitPriceInAssetProfileCurrency":0,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
 			wantSuccess:  false,
 			wantCategory: runtime.SyncFailureUnsupportedActivityHistory,
 		},
 		{
 			name: "reject sell with zero price and no comment",
 			activities: `[
-				{"id":"buy-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}},
-				{"id":"sell-1","date":"2024-01-02T10:00:00Z","type":"SELL","quantity":1,"valueInBaseCurrency":0,"unitPriceInAssetProfileCurrency":0,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}
+				{"id":"buy-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}},
+				{"id":"sell-1","date":"2024-01-02T10:00:00Z","type":"SELL","quantity":1,"valueInBaseCurrency":0,"unitPriceInAssetProfileCurrency":0,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}
 			]`,
 			wantSuccess:  false,
 			wantCategory: runtime.SyncFailureUnsupportedActivityHistory,
@@ -191,8 +191,8 @@ func TestActivityValidationFlowAppliesZeroPriceRules(t *testing.T) {
 		{
 			name: "accept sell with zero price and comment",
 			activities: `[
-				{"id":"buy-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}},
-				{"id":"sell-1","date":"2024-01-02T10:00:00Z","type":"SELL","quantity":1,"valueInBaseCurrency":0,"unitPriceInAssetProfileCurrency":0,"comment":"manual reduction","SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}
+				{"id":"buy-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}},
+				{"id":"sell-1","date":"2024-01-02T10:00:00Z","type":"SELL","quantity":1,"valueInBaseCurrency":0,"unitPriceInAssetProfileCurrency":0,"baseCurrency":"USD","comment":"manual reduction","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}
 			]`,
 			wantSuccess: true,
 		},
@@ -217,6 +217,65 @@ func TestActivityValidationFlowAppliesZeroPriceRules(t *testing.T) {
 				t.Fatalf("unexpected failure category: got %q want %q", outcome.FailureReason, testCase.wantCategory)
 			}
 		})
+	}
+}
+
+func TestActivityValidationFlowPreservesMixedCurrencyContext(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	server := newTokenAwareStorageServer(t)
+	server.SetTokenPages("token-one", []storagePageFixture{{
+		Count: 1,
+		ActivitiesJSON: `[
+			{"id":"buy-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"currency":"CHF","unitPrice":90,"value":90,"fee":2,"feeInAssetProfileCurrency":1.8,"valueInBaseCurrency":100,"feeInBaseCurrency":2.2,"unitPriceInAssetProfileCurrency":95,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"EUR"}}
+		]`,
+	}})
+	service := newActivityValidationSyncService(baseDir, server)
+	config := mustActivityValidationConfig(t, server.URL())
+	inspector := snapshotstore.NewEncryptedStore(baseDir, nil)
+
+	outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
+	if !outcome.Success {
+		t.Fatalf("expected mixed-currency sync success, got %#v", outcome)
+	}
+	candidates, err := snapshotstore.DiscoverServerCandidates(context.Background(), inspector, server.URL())
+	if err != nil {
+		t.Fatalf("discover candidates: %v", err)
+	}
+	payload, err := inspector.Read(context.Background(), snapshotstore.ReadRequest{Candidate: candidates[0], SecurityToken: "token-one"})
+	if err != nil {
+		t.Fatalf("read payload: %v", err)
+	}
+	record := payload.ProtectedActivityCache.Activities[0]
+	if record.OrderCurrency != "CHF" || record.AssetProfileCurrency != "EUR" || record.BaseCurrency != "USD" {
+		t.Fatalf("expected preserved currency context, got %#v", record)
+	}
+	if record.OrderUnitPrice == nil || record.OrderGrossValue == nil || record.OrderFeeAmount == nil || record.AssetProfileUnitPrice == nil || record.AssetProfileFeeAmount == nil || record.BaseGrossValue == nil || record.BaseFeeAmount == nil {
+		t.Fatalf("expected preserved source monetary groups, got %#v", record)
+	}
+}
+
+func TestActivityValidationFlowRejectsIncompleteCurrencyContext(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	server := newTokenAwareStorageServer(t)
+	server.SetTokenPages("token-one", []storagePageFixture{{
+		Count: 1,
+		ActivitiesJSON: `[
+			{"id":"buy-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"value":90,"unitPrice":90,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}
+		]`,
+	}})
+	service := newActivityValidationSyncService(baseDir, server)
+	config := mustActivityValidationConfig(t, server.URL())
+
+	outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
+	if outcome.FailureReason != runtime.SyncFailureUnsupportedActivityHistory {
+		t.Fatalf("expected incomplete currency context rejection, got %#v", outcome)
+	}
+	if !outcome.Diagnostic.Eligible {
+		t.Fatalf("expected diagnostic eligibility for currency-context rejection, got %#v", outcome)
 	}
 }
 

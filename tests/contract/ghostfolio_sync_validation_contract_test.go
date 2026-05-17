@@ -14,6 +14,10 @@ func TestGhostfolioSyncValidationContract(t *testing.T) {
 		t.Fatalf("expected auth response to satisfy contract: %v", err)
 	}
 
+	if err := validator.ValidateUserResponse(dto.UserResponse{Settings: &dto.UserSettings{BaseCurrency: "USD"}}); err != nil {
+		t.Fatalf("expected user response to satisfy contract: %v", err)
+	}
+
 	if err := validator.ValidateSingleActivityPageResponse(dto.ActivityPageResponse{
 		Count:      1,
 		Activities: []dto.ActivityPageEntry{{ID: "activity-id", Date: "2026-01-31T10:00:00Z", Type: "BUY"}},

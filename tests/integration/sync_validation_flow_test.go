@@ -38,6 +38,10 @@ type ghostfolioScenario struct {
 	authContentType       string
 	authBody              string
 	authDelay             time.Duration
+	userStatus            int
+	userContentType       string
+	userBody              string
+	userDelay             time.Duration
 	activitiesStatus      int
 	activitiesContentType string
 	activitiesBody        string
@@ -57,7 +61,7 @@ func TestSyncValidationSuccessUsesProductionRuntimePath(t *testing.T) {
 
 	var tempDir = t.TempDir()
 	var server = newGhostfolioScenarioServer(t, ghostfolioScenario{
-		activitiesBody: `{"activities":[{"id":"activity-1","date":"2026-01-31T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":10,"unitPriceInAssetProfileCurrency":10,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}],"count":1}`,
+		activitiesBody: `{"activities":[{"id":"activity-1","date":"2026-01-31T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":10,"unitPriceInAssetProfileCurrency":10,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}],"count":1}`,
 	})
 	var fixture = syncValidationFixture{
 		config: mustCustomSetupConfig(t, server.URL),
@@ -336,6 +340,15 @@ func newGhostfolioScenarioServer(t *testing.T, scenario ghostfolioScenario) *htt
 	if scenario.authBody == "" {
 		scenario.authBody = `{"authToken":"jwt"}`
 	}
+	if scenario.userStatus == 0 {
+		scenario.userStatus = http.StatusOK
+	}
+	if scenario.userContentType == "" && scenario.userStatus >= http.StatusOK && scenario.userStatus < http.StatusMultipleChoices {
+		scenario.userContentType = "application/json"
+	}
+	if scenario.userBody == "" {
+		scenario.userBody = `{"settings":{"baseCurrency":"USD"}}`
+	}
 	if scenario.activitiesStatus == 0 {
 		scenario.activitiesStatus = http.StatusOK
 	}
@@ -357,6 +370,15 @@ func newGhostfolioScenarioServer(t *testing.T, scenario ghostfolioScenario) *htt
 			}
 			writer.WriteHeader(scenario.authStatus)
 			_, _ = writer.Write([]byte(scenario.authBody))
+		case "/api/v1/user":
+			if scenario.userDelay > 0 {
+				time.Sleep(scenario.userDelay)
+			}
+			if scenario.userContentType != "" {
+				writer.Header().Set("Content-Type", scenario.userContentType)
+			}
+			writer.WriteHeader(scenario.userStatus)
+			_, _ = writer.Write([]byte(scenario.userBody))
 		case "/api/v1/activities":
 			if scenario.activitiesDelay > 0 {
 				time.Sleep(scenario.activitiesDelay)

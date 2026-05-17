@@ -39,11 +39,23 @@ type DiagnosticRecord struct {
 	ActivityType           string `json:"activity_type,omitempty"`
 	AssetSymbol            string `json:"asset_symbol,omitempty"`
 	AssetName              string `json:"asset_name,omitempty"`
+	OrderCurrency          string `json:"order_currency,omitempty"`
+	AssetProfileCurrency   string `json:"asset_profile_currency,omitempty"`
 	BaseCurrency           string `json:"base_currency,omitempty"`
 	Quantity               string `json:"quantity,omitempty"`
 	UnitPrice              string `json:"unit_price,omitempty"`
+	UnitPriceCurrency      string `json:"unit_price_currency,omitempty"`
 	GrossValue             string `json:"gross_value,omitempty"`
+	GrossValueCurrency     string `json:"gross_value_currency,omitempty"`
 	FeeAmount              string `json:"fee_amount,omitempty"`
+	FeeAmountCurrency      string `json:"fee_amount_currency,omitempty"`
+	OrderUnitPrice         string `json:"order_unit_price,omitempty"`
+	OrderGrossValue        string `json:"order_gross_value,omitempty"`
+	OrderFeeAmount         string `json:"order_fee_amount,omitempty"`
+	AssetProfileUnitPrice  string `json:"asset_profile_unit_price,omitempty"`
+	AssetProfileFeeAmount  string `json:"asset_profile_fee_amount,omitempty"`
+	BaseGrossValue         string `json:"base_gross_value,omitempty"`
+	BaseFeeAmount          string `json:"base_fee_amount,omitempty"`
 	Comment                string `json:"comment,omitempty"`
 	DataSource             string `json:"data_source,omitempty"`
 	SourceScopeID          string `json:"source_scope_id,omitempty"`
@@ -78,7 +90,20 @@ type DiagnosticContextCarrier interface {
 //
 // Authored by: OpenCode
 func DiagnosticRecordFromActivityRecord(record ActivityRecord) DiagnosticRecord {
-	var feeAmount = canonicalDiagnosticDecimalPointer(record.FeeAmount)
+	var resolvedAmounts ResolvedActivityAmounts
+	if amounts, err := ResolveActivityAmounts(record); err == nil {
+		resolvedAmounts = amounts
+	}
+	var unitPrice = canonicalDiagnosticDecimalPointer(resolvedAmounts.UnitPrice)
+	var grossValue = canonicalDiagnosticDecimalPointer(resolvedAmounts.GrossValue)
+	var feeAmount = canonicalDiagnosticDecimalPointer(resolvedAmounts.FeeAmount)
+	var orderUnitPrice = canonicalDiagnosticDecimalPointer(record.OrderUnitPrice)
+	var orderGrossValue = canonicalDiagnosticDecimalPointer(record.OrderGrossValue)
+	var orderFeeAmount = canonicalDiagnosticDecimalPointer(record.OrderFeeAmount)
+	var assetProfileUnitPrice = canonicalDiagnosticDecimalPointer(record.AssetProfileUnitPrice)
+	var assetProfileFeeAmount = canonicalDiagnosticDecimalPointer(record.AssetProfileFeeAmount)
+	var baseGrossValue = canonicalDiagnosticDecimalPointer(record.BaseGrossValue)
+	var baseFeeAmount = canonicalDiagnosticDecimalPointer(record.BaseFeeAmount)
 	var sourceScopeID string
 	var sourceScopeName string
 	var sourceScopeKind string
@@ -96,11 +121,23 @@ func DiagnosticRecordFromActivityRecord(record ActivityRecord) DiagnosticRecord 
 		ActivityType:           string(record.ActivityType),
 		AssetSymbol:            record.AssetSymbol,
 		AssetName:              record.AssetName,
+		OrderCurrency:          record.OrderCurrency,
+		AssetProfileCurrency:   record.AssetProfileCurrency,
 		BaseCurrency:           record.BaseCurrency,
 		Quantity:               canonicalDiagnosticDecimal(record.Quantity),
-		UnitPrice:              canonicalDiagnosticDecimal(record.UnitPrice),
-		GrossValue:             canonicalDiagnosticDecimal(record.GrossValue),
+		UnitPrice:              unitPrice,
+		UnitPriceCurrency:      resolvedAmounts.UnitPriceCurrency,
+		GrossValue:             grossValue,
+		GrossValueCurrency:     resolvedAmounts.GrossValueCurrency,
 		FeeAmount:              feeAmount,
+		FeeAmountCurrency:      resolvedAmounts.FeeAmountCurrency,
+		OrderUnitPrice:         orderUnitPrice,
+		OrderGrossValue:        orderGrossValue,
+		OrderFeeAmount:         orderFeeAmount,
+		AssetProfileUnitPrice:  assetProfileUnitPrice,
+		AssetProfileFeeAmount:  assetProfileFeeAmount,
+		BaseGrossValue:         baseGrossValue,
+		BaseFeeAmount:          baseFeeAmount,
 		Comment:                record.Comment,
 		DataSource:             record.DataSource,
 		SourceScopeID:          sourceScopeID,

@@ -44,45 +44,48 @@ func (e diagnosticCarrierError) DiagnosticContext() syncmodel.DiagnosticContext 
 func TestMapActivityHandlesOptionalValuesAndScopeBranches(t *testing.T) {
 	t.Parallel()
 
-	record, err := MapActivity(validActivityPageEntry(), nil)
+	record, err := MapActivity(validActivityPageEntry(), "USD", nil)
 	if err != nil {
 		t.Fatalf("map activity: %v", err)
 	}
-	if record.GrossValue.String() != "123.45" {
-		t.Fatalf("expected base-currency gross value preference, got %s", record.GrossValue.String())
+	orderGrossValue, err := decimalsupport.CanonicalStringPointer(record.OrderGrossValue)
+	if err != nil {
+		t.Fatalf("canonical order gross value: %v", err)
 	}
-	if record.FeeAmount == nil || record.FeeAmount.String() != "0.25" {
-		t.Fatalf("expected fee amount to be parsed, got %#v", record.FeeAmount)
+	if record.OrderGrossValue == nil || orderGrossValue != "120" {
+		t.Fatalf("expected explicit order gross value, got %#v", record.OrderGrossValue)
+	}
+	orderFeeAmount, err := decimalsupport.CanonicalStringPointer(record.OrderFeeAmount)
+	if err != nil {
+		t.Fatalf("canonical order fee amount: %v", err)
+	}
+	if record.OrderFeeAmount == nil || orderFeeAmount != "0.2" {
+		t.Fatalf("expected explicit order fee amount, got %#v", record.OrderFeeAmount)
 	}
 	if record.SourceScope == nil || record.SourceScope.ID != "account-1" {
 		t.Fatalf("expected mapped source scope, got %#v", record.SourceScope)
 	}
 
 	entry := validActivityPageEntry()
+	entry.UnitPrice = json.Number("")
 	entry.ValueInBaseCurrency = json.Number("")
 	entry.UnitPriceInAssetProfileCurrency = json.Number("")
+	entry.Fee = json.Number("")
+	entry.FeeInAssetProfileCurrency = json.Number("")
 	entry.FeeInBaseCurrency = json.Number("")
 	entry.Account = nil
-	record, err = MapActivity(entry, decimalsupport.NewService())
+	record, err = MapActivity(entry, "USD", decimalsupport.NewService())
 	if err != nil {
 		t.Fatalf("map activity without optional values: %v", err)
 	}
-	grossValue, err := decimalsupport.CanonicalString(record.GrossValue)
-	if err != nil {
-		t.Fatalf("canonical fallback gross value: %v", err)
+	if record.OrderUnitPrice != nil {
+		t.Fatalf("expected no persisted selected unit price when order unit price is absent, got %#v", record.OrderUnitPrice)
 	}
-	if grossValue != "120" {
-		t.Fatalf("expected fallback gross value from activity value, got %s", grossValue)
+	if record.OrderGrossValue == nil {
+		t.Fatalf("expected explicit order gross value to remain persisted, got %#v", record.OrderGrossValue)
 	}
-	unitPrice, err := decimalsupport.CanonicalString(record.UnitPrice)
-	if err != nil {
-		t.Fatalf("canonical derived unit price: %v", err)
-	}
-	if unitPrice != "80" {
-		t.Fatalf("expected derived unit price from gross value and quantity, got %s", unitPrice)
-	}
-	if record.FeeAmount != nil {
-		t.Fatalf("expected nil fee amount when absent, got %#v", record.FeeAmount)
+	if record.OrderFeeAmount != nil {
+		t.Fatalf("expected nil explicit order fee amount when absent, got %#v", record.OrderFeeAmount)
 	}
 	if record.SourceScope != nil {
 		t.Fatalf("expected nil source scope when account is absent, got %#v", record.SourceScope)
@@ -92,11 +95,11 @@ func TestMapActivityHandlesOptionalValuesAndScopeBranches(t *testing.T) {
 func TestMapActivityAndMapActivitiesSurfaceMappingFailures(t *testing.T) {
 	t.Parallel()
 
-	if _, err := MapActivity(validActivityPageEntry(), failingDecimalService{}); err == nil {
+	if _, err := MapActivity(validActivityPageEntry(), "USD", failingDecimalService{}); err == nil {
 		t.Fatalf("expected decimal parse failure")
 	}
 
-	_, err := MapActivities([]dto.ActivityPageEntry{validActivityPageEntry()}, failingDecimalService{})
+	_, err := MapActivities([]dto.ActivityPageEntry{validActivityPageEntry()}, "USD", failingDecimalService{})
 	var mappingError *MappingError
 	if !errors.As(err, &mappingError) {
 		t.Fatalf("expected wrapped mapping error, got %v", err)
@@ -124,7 +127,7 @@ func TestMappingErrorAndParseHelpersCoverRemainingBranches(t *testing.T) {
 	}
 
 	entry := validActivityPageEntry()
-	wrapped := wrapMappingError(entry, diagnosticCarrierError{})
+	wrapped := wrapMappingError(entry, "USD", diagnosticCarrierError{})
 	var mappingError *MappingError
 	if !errors.As(wrapped, &mappingError) {
 		t.Fatalf("expected wrapped mapping error, got %v", wrapped)
@@ -135,36 +138,27 @@ func TestMappingErrorAndParseHelpersCoverRemainingBranches(t *testing.T) {
 
 	unitPriceInvalid := validActivityPageEntry()
 	unitPriceInvalid.UnitPriceInAssetProfileCurrency = json.Number("bad")
-	if _, err := MapActivity(unitPriceInvalid, decimalsupport.NewService()); err == nil {
+	if _, err := MapActivity(unitPriceInvalid, "USD", decimalsupport.NewService()); err == nil {
 		t.Fatalf("expected unit-price parse failure")
 	}
 
 	grossInBaseInvalid := validActivityPageEntry()
 	grossInBaseInvalid.ValueInBaseCurrency = json.Number("bad")
-	if _, err := MapActivity(grossInBaseInvalid, decimalsupport.NewService()); err == nil {
+	if _, err := MapActivity(grossInBaseInvalid, "USD", decimalsupport.NewService()); err == nil {
 		t.Fatalf("expected gross-value parse failure from base currency")
 	}
 
 	feeInvalid := validActivityPageEntry()
 	feeInvalid.FeeInBaseCurrency = json.Number("bad")
-	if _, err := MapActivity(feeInvalid, decimalsupport.NewService()); err == nil {
+	if _, err := MapActivity(feeInvalid, "USD", decimalsupport.NewService()); err == nil {
 		t.Fatalf("expected fee parse failure")
 	}
 
 	fallbackGrossInvalid := validActivityPageEntry()
 	fallbackGrossInvalid.ValueInBaseCurrency = json.Number("")
 	fallbackGrossInvalid.Value = json.Number("bad")
-	if _, err := parseGrossValue(fallbackGrossInvalid, decimalsupport.NewService()); err == nil {
+	if _, err := parseMoneyContext(fallbackGrossInvalid, "USD", decimalsupport.NewService()); err == nil {
 		t.Fatalf("expected fallback gross-value parse failure")
-	}
-
-	derivedUnitPriceInvalid := validActivityPageEntry()
-	derivedUnitPriceInvalid.UnitPriceInAssetProfileCurrency = json.Number("")
-	derivedUnitPriceInvalid.ValueInBaseCurrency = json.Number("")
-	derivedUnitPriceInvalid.Value = json.Number("1")
-	derivedUnitPriceInvalid.Quantity = json.Number("3")
-	if _, err := MapActivity(derivedUnitPriceInvalid, decimalsupport.NewService()); err == nil {
-		t.Fatalf("expected derived unit-price failure")
 	}
 
 	if _, err := parseOptionalNumber(json.Number("bad"), decimalsupport.NewService()); err == nil {
@@ -176,7 +170,7 @@ func TestWrapMappingErrorUsesCarrierAndFallbackContext(t *testing.T) {
 	t.Parallel()
 
 	entry := validActivityPageEntry()
-	wrapped := wrapMappingError(entry, diagnosticCarrierError{context: syncmodel.DiagnosticContext{FailureDetail: "existing detail"}})
+	wrapped := wrapMappingError(entry, "USD", diagnosticCarrierError{context: syncmodel.DiagnosticContext{FailureDetail: "existing detail"}})
 	var mappingError *MappingError
 	if !errors.As(wrapped, &mappingError) {
 		t.Fatalf("expected mapping error wrapper, got %v", wrapped)
@@ -193,7 +187,7 @@ func TestWrapMappingErrorUsesCarrierAndFallbackContext(t *testing.T) {
 		FailureDetail: "preserved detail",
 		Records:       []syncmodel.DiagnosticRecord{{SourceID: "custom"}},
 	}
-	wrapped = wrapMappingError(entry, diagnosticCarrierError{context: customContext})
+	wrapped = wrapMappingError(entry, "USD", diagnosticCarrierError{context: customContext})
 	if !errors.As(wrapped, &mappingError) {
 		t.Fatalf("expected mapping error wrapper, got %v", wrapped)
 	}
@@ -217,8 +211,11 @@ func TestDiagnosticRecordFromActivityEntryCoversGrossValueBranches(t *testing.T)
 	t.Parallel()
 
 	entry := validActivityPageEntry()
-	record := diagnosticRecordFromActivityEntry(entry)
-	if record.GrossValue != "123.45" {
+	record := diagnosticRecordFromActivityEntry(entry, "USD")
+	if record.UnitPrice != "80" || record.UnitPriceCurrency != "CHF" {
+		t.Fatalf("expected transient diagnostic unit price from order currency, got %#v", record)
+	}
+	if record.GrossValue != "120" {
 		t.Fatalf("expected preferred gross value, got %q", record.GrossValue)
 	}
 	if record.SourceScopeKind != string(syncmodel.SourceScopeKindAccount) || record.SourceScopeReliability != string(syncmodel.ScopeReliabilityReliable) {
@@ -226,14 +223,21 @@ func TestDiagnosticRecordFromActivityEntryCoversGrossValueBranches(t *testing.T)
 	}
 
 	entry.ValueInBaseCurrency = json.Number("")
-	record = diagnosticRecordFromActivityEntry(entry)
+	record = diagnosticRecordFromActivityEntry(entry, "USD")
 	if record.GrossValue != "120" {
 		t.Fatalf("expected fallback activity value gross value, got %q", record.GrossValue)
 	}
 
 	entry = validActivityPageEntry()
+	entry.UnitPrice = json.Number("")
+	record = diagnosticRecordFromActivityEntry(entry, "USD")
+	if record.UnitPrice != "82.3" || record.UnitPriceCurrency != "EUR" {
+		t.Fatalf("expected transient diagnostic unit price from asset-profile currency, got %#v", record)
+	}
+
+	entry = validActivityPageEntry()
 	entry.Account.ID = ""
-	record = diagnosticRecordFromActivityEntry(entry)
+	record = diagnosticRecordFromActivityEntry(entry, "USD")
 	if record.SourceScopeID != "" || record.SourceScopeKind != "" || record.SourceScopeReliability != "" {
 		t.Fatalf("expected diagnostic scope to follow shared scope mapping, got %#v", record)
 	}
@@ -245,14 +249,17 @@ func validActivityPageEntry() dto.ActivityPageEntry {
 		Date:                            "2024-01-01T10:00:00Z",
 		Type:                            "buy",
 		Quantity:                        json.Number("1.5"),
+		Currency:                        "CHF",
+		Fee:                             json.Number("0.2"),
+		UnitPrice:                       json.Number("80"),
 		Value:                           json.Number("120"),
+		FeeInAssetProfileCurrency:       json.Number("0.22"),
 		ValueInBaseCurrency:             json.Number("123.45"),
 		FeeInBaseCurrency:               json.Number("0.25"),
 		UnitPriceInAssetProfileCurrency: json.Number("82.3"),
 		Comment:                         "comment",
-		SymbolProfile:                   dto.ActivitySymbolProfile{Symbol: "BTC", Name: "Bitcoin"},
+		SymbolProfile:                   dto.ActivitySymbolProfile{Symbol: "BTC", Name: "Bitcoin", Currency: "EUR"},
 		Account:                         &dto.ActivityAccountScope{ID: "account-1", Name: "Main Account"},
 		DataSource:                      "ghostfolio",
-		BaseCurrency:                    "USD",
 	}
 }

@@ -140,6 +140,13 @@ func redactDiagnosticContext(context syncmodel.DiagnosticContext) syncmodel.Diag
 		record.UnitPrice = ""
 		record.GrossValue = ""
 		record.FeeAmount = ""
+		record.OrderUnitPrice = ""
+		record.OrderGrossValue = ""
+		record.OrderFeeAmount = ""
+		record.AssetProfileUnitPrice = ""
+		record.AssetProfileFeeAmount = ""
+		record.BaseGrossValue = ""
+		record.BaseFeeAmount = ""
 		records = append(records, record)
 	}
 

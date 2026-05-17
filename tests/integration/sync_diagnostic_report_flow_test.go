@@ -31,7 +31,7 @@ func TestSyncDiagnosticReportFlowPromptsInProductionAndWritesOnExplicitChoice(t 
 	baseDir := t.TempDir()
 	server := newGhostfolioStorageTLSServer(t, []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`,
+		ActivitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
 	}})
 	config, err := configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, server.URL, false, time.Now())
 	if err != nil {
@@ -102,7 +102,7 @@ func TestSyncDiagnosticReportFlowGeneratesAutomaticallyInExplicitDevelopmentMode
 	baseDir := t.TempDir()
 	server := newGhostfolioStorageServer(t, []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}]`,
+		ActivitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
 	}})
 	config, err := configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, server.URL, true, time.Now())
 	if err != nil {
@@ -165,6 +165,8 @@ func newGhostfolioStorageTLSServer(t *testing.T, pages []storagePageFixture) *ht
 		switch request.URL.Path {
 		case "/api/v1/auth/anonymous":
 			_, _ = writer.Write([]byte(`{"authToken":"jwt"}`))
+		case "/api/v1/user":
+			_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":"USD"}}`))
 		case "/api/v1/activities":
 			if request.URL.Query().Get("sortColumn") != "date" || request.URL.Query().Get("sortDirection") != "asc" {
 				writer.WriteHeader(http.StatusBadRequest)
@@ -200,9 +202,13 @@ func mustDiagnosticFiles(t *testing.T, baseDir string) []string {
 }
 
 type diagnosticReportRecord struct {
-	Quantity   string `json:"quantity"`
-	UnitPrice  string `json:"unit_price"`
-	GrossValue string `json:"gross_value"`
+	Quantity              string `json:"quantity"`
+	UnitPrice             string `json:"unit_price"`
+	GrossValue            string `json:"gross_value"`
+	OrderUnitPrice        string `json:"order_unit_price"`
+	OrderGrossValue       string `json:"order_gross_value"`
+	AssetProfileUnitPrice string `json:"asset_profile_unit_price"`
+	BaseGrossValue        string `json:"base_gross_value"`
 }
 
 type diagnosticReportPayload struct {

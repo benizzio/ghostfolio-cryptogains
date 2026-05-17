@@ -111,19 +111,19 @@ func TestCompareNormalizedRecordsAndHashBranches(t *testing.T) {
 	}
 
 	record = normalizationTestRecord(t, "activity-2", syncmodel.ActivityTypeBuy)
-	record.UnitPrice = invalid
+	record.OrderUnitPrice = &invalid
 	if _, err := recordHash(record); err == nil {
 		t.Fatalf("expected invalid unit-price canonicalization to fail")
 	}
 
 	record = normalizationTestRecord(t, "activity-3", syncmodel.ActivityTypeBuy)
-	record.GrossValue = invalid
+	record.OrderGrossValue = &invalid
 	if _, err := recordHash(record); err == nil {
 		t.Fatalf("expected invalid gross-value canonicalization to fail")
 	}
 
 	record = normalizationTestRecord(t, "activity-4", syncmodel.ActivityTypeBuy)
-	record.FeeAmount = &invalid
+	record.OrderFeeAmount = &invalid
 	if _, err := recordHash(record); err == nil {
 		t.Fatalf("expected invalid fee canonicalization to fail")
 	}
@@ -192,7 +192,7 @@ func TestNormalizeCoversHashAndAmbiguousOrderingFailures(t *testing.T) {
 	invalidRecord := normalizationTestRecord(t, "activity-2", syncmodel.ActivityTypeBuy)
 	var invalid apd.Decimal
 	invalid.Form = apd.Infinite
-	invalidRecord.GrossValue = invalid
+	invalidRecord.OrderGrossValue = &invalid
 	_, err = NewNormalizer().Normalize([]syncmodel.ActivityRecord{invalidRecord})
 	if !errors.As(err, &normalizationError) {
 		t.Fatalf("expected hash-generation normalization error, got %v", err)
@@ -219,12 +219,14 @@ func normalizationTestRecord(t *testing.T, sourceID string, activityType syncmod
 	}
 
 	return syncmodel.ActivityRecord{
-		SourceID:     sourceID,
-		OccurredAt:   "2024-01-01T10:00:00Z",
-		ActivityType: activityType,
-		AssetSymbol:  "BTC",
-		Quantity:     quantity,
-		UnitPrice:    unitPrice,
-		GrossValue:   grossValue,
+		SourceID:        sourceID,
+		OccurredAt:      "2024-01-01T10:00:00Z",
+		ActivityType:    activityType,
+		AssetSymbol:     "BTC",
+		OrderCurrency:   "USD",
+		BaseCurrency:    "USD",
+		Quantity:        quantity,
+		OrderUnitPrice:  &unitPrice,
+		OrderGrossValue: &grossValue,
 	}
 }

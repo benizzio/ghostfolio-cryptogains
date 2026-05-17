@@ -15,6 +15,10 @@ func TestGhostfolioSyncStorageContract(t *testing.T) {
 		t.Fatalf("expected auth response to satisfy contract: %v", err)
 	}
 
+	if err := validator.ValidateUserResponse(dto.UserResponse{Settings: &dto.UserSettings{BaseCurrency: "USD"}}); err != nil {
+		t.Fatalf("expected user response to satisfy contract: %v", err)
+	}
+
 	if err := validator.ValidateActivityPageResponse(dto.ActivityPageResponse{
 		Count: 2,
 		Activities: []dto.ActivityPageEntry{
@@ -23,10 +27,15 @@ func TestGhostfolioSyncStorageContract(t *testing.T) {
 				Date:                            "2026-01-31T10:00:00+01:00",
 				Type:                            "BUY",
 				Quantity:                        json.Number("1.25"),
+				Currency:                        "CHF",
+				Fee:                             json.Number("20"),
+				UnitPrice:                       json.Number("49000"),
+				Value:                           json.Number("61250"),
+				FeeInAssetProfileCurrency:       json.Number("18"),
 				ValueInBaseCurrency:             json.Number("62500"),
 				FeeInBaseCurrency:               json.Number("25"),
 				UnitPriceInAssetProfileCurrency: json.Number("50000"),
-				SymbolProfile:                   dto.ActivitySymbolProfile{Symbol: "BTC", Name: "Bitcoin"},
+				SymbolProfile:                   dto.ActivitySymbolProfile{Symbol: "BTC", Name: "Bitcoin", Currency: "EUR"},
 				Account:                         &dto.ActivityAccountScope{ID: "account-1", Name: "Main"},
 			},
 			{
@@ -34,9 +43,11 @@ func TestGhostfolioSyncStorageContract(t *testing.T) {
 				Date:                            "2026-02-01T09:00:00Z",
 				Type:                            "SELL",
 				Quantity:                        json.Number("0.25"),
+				Currency:                        "CHF",
+				Value:                           json.Number("14800"),
 				ValueInBaseCurrency:             json.Number("15000"),
 				UnitPriceInAssetProfileCurrency: json.Number("60000"),
-				SymbolProfile:                   dto.ActivitySymbolProfile{Symbol: "BTC", Name: "Bitcoin"},
+				SymbolProfile:                   dto.ActivitySymbolProfile{Symbol: "BTC", Name: "Bitcoin", Currency: "EUR"},
 			},
 		},
 	}); err != nil {

@@ -58,7 +58,22 @@ func TestValidateActivityPageResponseAndEntryCoverBranches(t *testing.T) {
 		}(), wantErr: true},
 		{name: "unreadable unit price", entry: func() dto.ActivityPageEntry {
 			entry := validActivityPageEntry()
+			entry.UnitPrice = json.Number("bad")
+			return entry
+		}(), wantErr: true},
+		{name: "unreadable asset-profile unit price", entry: func() dto.ActivityPageEntry {
+			entry := validActivityPageEntry()
 			entry.UnitPriceInAssetProfileCurrency = json.Number("bad")
+			return entry
+		}(), wantErr: true},
+		{name: "unreadable order fee", entry: func() dto.ActivityPageEntry {
+			entry := validActivityPageEntry()
+			entry.Fee = json.Number("bad")
+			return entry
+		}(), wantErr: true},
+		{name: "unreadable asset-profile fee", entry: func() dto.ActivityPageEntry {
+			entry := validActivityPageEntry()
+			entry.FeeInAssetProfileCurrency = json.Number("bad")
 			return entry
 		}(), wantErr: true},
 		{name: "unreadable fee", entry: func() dto.ActivityPageEntry {
@@ -73,6 +88,7 @@ func TestValidateActivityPageResponseAndEntryCoverBranches(t *testing.T) {
 		}(), wantErr: true},
 		{name: "missing basis inputs", entry: func() dto.ActivityPageEntry {
 			entry := validActivityPageEntry()
+			entry.UnitPrice = json.Number("")
 			entry.UnitPriceInAssetProfileCurrency = json.Number("")
 			entry.Value = json.Number("")
 			entry.ValueInBaseCurrency = json.Number("")
@@ -85,6 +101,13 @@ func TestValidateActivityPageResponseAndEntryCoverBranches(t *testing.T) {
 		}(), wantErr: true},
 		{name: "only unit price basis input", entry: func() dto.ActivityPageEntry {
 			entry := validActivityPageEntry()
+			entry.Value = json.Number("")
+			entry.ValueInBaseCurrency = json.Number("")
+			return entry
+		}(), wantErr: false},
+		{name: "only asset-profile unit price basis input", entry: func() dto.ActivityPageEntry {
+			entry := validActivityPageEntry()
+			entry.UnitPrice = json.Number("")
 			entry.Value = json.Number("")
 			entry.ValueInBaseCurrency = json.Number("")
 			return entry
@@ -103,6 +126,7 @@ func TestValidateActivityPageResponseAndEntryCoverBranches(t *testing.T) {
 		}(), wantErr: false},
 		{name: "gross value basis input requires derivable unit price", entry: func() dto.ActivityPageEntry {
 			entry := validActivityPageEntry()
+			entry.UnitPrice = json.Number("")
 			entry.UnitPriceInAssetProfileCurrency = json.Number("")
 			entry.ValueInBaseCurrency = json.Number("")
 			entry.Value = json.Number("1")
@@ -131,10 +155,14 @@ func validActivityPageEntry() dto.ActivityPageEntry {
 		Date:                            "2024-01-01T10:00:00Z",
 		Type:                            "BUY",
 		Quantity:                        json.Number("1.5"),
+		Currency:                        "CHF",
+		Fee:                             json.Number("0.2"),
+		UnitPrice:                       json.Number("80"),
 		Value:                           json.Number("120"),
+		FeeInAssetProfileCurrency:       json.Number("0.22"),
 		ValueInBaseCurrency:             json.Number("123.45"),
 		FeeInBaseCurrency:               json.Number("0.25"),
 		UnitPriceInAssetProfileCurrency: json.Number("82.3"),
-		SymbolProfile:                   dto.ActivitySymbolProfile{Symbol: "BTC", Name: "Bitcoin"},
+		SymbolProfile:                   dto.ActivitySymbolProfile{Symbol: "BTC", Name: "Bitcoin", Currency: "EUR"},
 	}
 }

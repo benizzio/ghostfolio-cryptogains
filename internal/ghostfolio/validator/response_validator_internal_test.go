@@ -17,6 +17,17 @@ func TestValidateAuthResponseCoversSuccessAndFailure(t *testing.T) {
 	}
 }
 
+func TestValidateUserResponseCoversSuccessAndFailure(t *testing.T) {
+	t.Parallel()
+
+	if err := ValidateUserResponse(dto.UserResponse{}); err == nil {
+		t.Fatalf("expected missing settings to fail")
+	}
+	if err := ValidateUserResponse(dto.UserResponse{Settings: &dto.UserSettings{BaseCurrency: "USD"}}); err != nil {
+		t.Fatalf("expected user settings to pass: %v", err)
+	}
+}
+
 func TestValidateSingleActivityPageResponseCoversBranches(t *testing.T) {
 	t.Parallel()
 
