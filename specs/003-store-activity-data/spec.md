@@ -4,6 +4,7 @@
 **Created**: 2026-05-12  
 **Status**: Ready  
 **Input**: User description: "We will now specify the second slice of the work derived from a split of @specs/001-ghostfolio-gains-reporting/ (should still be the main reference) that will complement and integrate to the work already implemented on @specs/002-sync-data-validation/. In this next slice we will work on obtaining all the activity data returned from the sync with the Ghostfolio server, store it with all the security requirements so it is only accessible using the Ghostfolio Security token provided by the user. This stored activity data must follow the appropriate model already established in the original spec 001 and relevant to the future reporting, but this spec's slice MUST NOT DO ANY REPORTING, just fetch and store data."
+**Bugfix**: 2026-05-15 — [BUG-001] Added synced-data diagnostic-report requirements, redaction rules, and report-path disclosure behavior.
 **Bugfix**: 2026-05-15 — [BUG-002] Corrected deterministic same-asset ordering to ignore Ghostfolio `date` time-of-day precision and prefer `BUY` before `SELL` before `source_id`.
 **Bugfix**: 2026-05-17 — [BUG-003] Added explicit per-amount currency-context requirements for stored Ghostfolio activity data.
 
