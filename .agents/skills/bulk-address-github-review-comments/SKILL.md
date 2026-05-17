@@ -1,6 +1,6 @@
 ---
-name: address-github-review-comments
-description: GitHub Pull Request (PR) review comments, unresolved conversations, sequential replies, commit, and push. Use ONLY when the task is to address review comments on an existing GitHub pull request from the checked-out feature branch or from a PR URL provided in the prompt.
+name: bulk-address-github-review-comments
+description: Bulk GitHub Pull Request (PR) review comments, unresolved conversations, confirmed execution, sequential replies, commit, and push. Use ONLY when the task is to address review comments on an existing GitHub pull request from the checked-out feature branch or from a PR URL provided in the prompt.
 compatibility: Requires a local git checkout, network access, and GitHub access through GitHub MCP tools preferred or authenticated gh CLI fallback.
 metadata:
   author: Benizzio with OpenCode
@@ -9,7 +9,7 @@ metadata:
   scope: project-local
 ---
 
-# Address GitHub Pull Request Review Comments
+# Bulk Address GitHub Pull Request Review Comments
 
 ## Use This Skill For
 
@@ -52,9 +52,24 @@ metadata:
    - outdated and resolved state
 3. Prefer review-thread APIs over plain pull request comments because unresolved state belongs to the thread.
 4. Build a working queue in stable order:
-   - first choice: the unresolved thread order returned by GitHub
-   - fallback: oldest unresolved thread first
+    - first choice: the unresolved thread order returned by GitHub
+    - fallback: oldest unresolved thread first
 5. Before editing, read enough local code to understand the request and detect overlap with other unresolved threads.
+
+## Review And Confirm Before Proceeding
+
+Do not edit code, commit, push, or reply to any review thread until this confirmation gate is complete.
+
+1. Review every unresolved thread in the working queue.
+2. For each thread, produce a concrete conclusion that states one of:
+   - the specific change that needs to be made
+   - that the thread is already satisfied by the current code, with the evidence used
+   - why the requested change is unsafe, out of scope, conflicting, or not feasible
+3. If any thread lacks a concrete conclusion, continue reading the conversation and local code until it has one, or stop and ask the user for clarification.
+4. Present the reviewed queue and conclusions to the user.
+5. Ask the user to confirm that they want to proceed with the proposed process.
+6. Proceed only after explicit user confirmation.
+7. If the user does not confirm, stop without editing, committing, pushing, or replying.
 
 ## Sequential Execution Contract
 
