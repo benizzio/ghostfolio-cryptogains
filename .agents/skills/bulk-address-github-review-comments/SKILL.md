@@ -41,7 +41,7 @@ metadata:
 5. If the derived pull request and a supplied Pull Request URL disagree, stop and ask the user which pull request should be used.
 6. If the pull request cannot be derived from the currently checked-out local branch, stop and ask the user for the Pull Request URL.
 
-## Collect The Unresolved Review Work
+## Collect Unresolved Review Threads
 
 1. Read only review conversations that are still unresolved.
 2. Read the entire conversation for each unresolved review thread:
