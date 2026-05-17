@@ -36,7 +36,7 @@ description: "Task list for Store Activity Data implementation"
 - [X] T002 [P] Create the protected snapshot package skeleton in `internal/snapshot/envelope/`, `internal/snapshot/model/`, and `internal/snapshot/store/`
 - [X] T003 [P] Create the normalized sync package skeleton in `internal/sync/model/`, `internal/sync/normalize/`, and `internal/sync/validate/`
 - [X] T047 [P] Refresh dependency due-diligence evidence for `github.com/cockroachdb/apd/v3` and `golang.org/x/crypto/argon2` in `specs/003-store-activity-data/research.md`
-- [ ] T048 [P] ⚠️ Reopened Refresh Ghostfolio auth and pagination contract review evidence in `specs/003-store-activity-data/research.md` and `specs/003-store-activity-data/contracts/ghostfolio-sync.md` (reopened — BUG-003: confirm upstream `Activity` response coverage for `currency`, `fee`, `unitPrice`, `value`, `feeInAssetProfileCurrency`, `feeInBaseCurrency`, `unitPriceInAssetProfileCurrency`, `valueInBaseCurrency`, and `SymbolProfile.currency` alongside the BUG-002 ordering note)
+- [ ] T048 [P] ⚠️ Reopened Refresh Ghostfolio auth and pagination contract review evidence in `specs/003-store-activity-data/research.md` and `specs/003-store-activity-data/contracts/ghostfolio-sync.md` (reopened — BUG-003: confirm upstream `Activity` response coverage for `currency`, `fee`, `unitPrice`, `value`, `feeInAssetProfileCurrency`, `feeInBaseCurrency`, `unitPriceInAssetProfileCurrency`, `valueInBaseCurrency`, and `SymbolProfile.currency` alongside the BUG-002 ordering note before `T045`, `T046`, and `T055` close)
 
 ---
 
@@ -49,7 +49,7 @@ description: "Task list for Store Activity Data implementation"
 - [X] T004 Implement exact-decimal parsing and canonical string helpers in `internal/support/decimal/decimal.go`
 - [ ] T005 [P] ⚠️ Reopened Extend Ghostfolio transport DTOs for full paginated activities and per-field currency context in `internal/ghostfolio/dto/auth_response.go` and `internal/ghostfolio/dto/activity_page_response.go` (reopened — BUG-003: capture `currency`, `fee`, `unitPrice`, `value`, `feeInAssetProfileCurrency`, `feeInBaseCurrency`, `unitPriceInAssetProfileCurrency`, `valueInBaseCurrency`, and `SymbolProfile.currency`)
 - [X] T006 [P] Implement full-history response validation helpers for auth and paginated activities in `internal/ghostfolio/validator/response_validator.go`
-- [ ] T007 [P] ⚠️ Reopened Define normalized activity, scope, cache, and sync-attempt runtime models in `internal/sync/model/activity_record.go`, `internal/sync/model/protected_activity_cache.go`, and `internal/app/runtime/sync_types.go` (reopened — BUG-003: redesign stored activity monetary fields so each preserved amount keeps explicit order-currency, asset-profile-currency, or base-currency identity)
+- [ ] T007 [P] ⚠️ Reopened Define the persisted normalized activity, scope, and protected-cache models plus the sync-attempt runtime types they feed in `internal/sync/model/activity_record.go`, `internal/sync/model/protected_activity_cache.go`, and `internal/app/runtime/sync_types.go` (reopened — BUG-003: redesign persisted activity monetary fields so each preserved amount keeps explicit order-currency, asset-profile-currency, or base-currency identity, and keep runtime-only sync types persistence-neutral unless snapshot compatibility intentionally changes)
 - [X] T008 [P] Define protected snapshot envelope, payload, version, and profile models in `internal/snapshot/model/envelope.go` and `internal/snapshot/model/payload.go`
 - [X] T009 [P] Implement snapshot envelope encoding, server discovery key derivation, and AEAD header authentication helpers in `internal/snapshot/envelope/codec.go`
 - [X] T010 [P] Implement protected snapshot path resolution, candidate enumeration, and atomic file-replacement helpers in `internal/snapshot/store/store.go`
@@ -109,7 +109,7 @@ description: "Task list for Store Activity Data implementation"
 - [X] T031 [P] [US2] Implement protected snapshot unlock, active readable snapshot tracking, and isolated snapshot creation for new valid tokens in `internal/app/runtime/sync_service.go`
 - [X] T032 [US2] Implement failure and success result handling for rejected token, unsupported stored-data version, and incompatible new sync data in `internal/tui/flow/sync_flow.go` and `internal/tui/screen/validation_result_screen.go`
 - [X] T052 [US2] Implement synced-data diagnostic-report policy using the existing explicit-development-mode runtime option, local artifact writes, and result-screen report-location messaging in `internal/app/runtime/sync_service.go`, `internal/tui/flow/sync_flow.go`, and `internal/tui/screen/validation_result_screen.go`
-- [ ] T056 [P] [US2] Update `activity_model_version` handling and compatibility fixtures for the currency-aware activity-record design in `internal/snapshot/model/version.go`, `tests/integration/snapshot_compatibility_flow_test.go`, and `tests/unit/stored_data_version_test.go`
+- [ ] T056 [P] [US2] Update `activity_model_version` handling and compatibility fixtures for the currency-aware activity-record design in `internal/snapshot/model/version.go`, `tests/integration/snapshot_compatibility_flow_test.go`, and `tests/unit/stored_data_version_test.go` (older pre-BUG-003 snapshots must fail with a compatibility error unless an explicit migration is added)
 
 **Checkpoint**: ⚠️ Reopened by BUG-003. User Story 2 still needs the currency-aware activity-model compatibility update before snapshot reuse and incompatibility handling are complete again.
 
@@ -135,8 +135,8 @@ description: "Task list for Store Activity Data implementation"
 - [X] T038 [P] [US3] ⚠️ Reopened Implement running-quantity replay support and source-scope reliability derivation in `internal/sync/normalize/activity_history.go` so they consume the same-asset source-calendar-date ordering established in `T019` (reopened — BUG-002: replay must use source calendar date, `activity_type`, then `source_id`)
 - [X] T039 [P] [US3] ⚠️ Reopened Implement defensibility checks for missing or contradictory normalized fields, below-zero holdings, zero-priced `SELL` comment rules, and unsupported-history rejection in `internal/sync/validate/activity_history.go` (reopened — BUG-002: defensibility must evaluate same-asset ordering after source calendar date, `activity_type`, and `source_id` tie-breaking)
 - [X] T053 [US3] Extend mapping, normalization, and validation failures to surface offending-record diagnostic context and production/dev redaction inputs in `internal/ghostfolio/mapper/activity_mapper.go`, `internal/sync/normalize/activity_history.go`, `internal/sync/validate/activity_history.go`, and `internal/app/runtime/sync_service.go`
-- [ ] T058 [US3] Implement validation that rejects incomplete or contradictory monetary currency context before persistence in `internal/sync/validate/activity_history.go`
-- [ ] T059 [US3] Implement offending-record diagnostic details for currency-context mismatches in `internal/sync/validate/activity_history.go` and `internal/app/runtime/sync_service.go`
+- [ ] T058 [US3] Implement validation that rejects incomplete or contradictory monetary currency context before persistence and classifies the failure for the existing synced-data diagnostic-report policy in `internal/sync/validate/activity_history.go`
+- [ ] T059 [US3] Implement offending-record diagnostic details for currency-context mismatches, using the existing production redaction and explicit-development-mode detail rules, in `internal/sync/validate/activity_history.go` and `internal/app/runtime/sync_service.go`
 - [X] T040 [P] [US3] Implement server-mismatch detection and replacement gating against the active readable snapshot in `internal/app/runtime/sync_service.go`
 - [X] T041 [US3] Implement server replacement confirmation screen and navigation in `internal/tui/screen/server_replacement_screen.go` and `internal/tui/flow/sync_flow.go`
 - [X] T042 [US3] Update the main menu and sync entry screens to surface protected-data-exists state without exposing cached activity details in `internal/tui/screen/main_menu_screen.go` and `internal/tui/screen/sync_validation_screen.go`
@@ -151,12 +151,14 @@ description: "Task list for Store Activity Data implementation"
 
 - [X] T043 [P] Update protected-storage, diagnostic-report, removal, and no-reporting documentation in `README.md`
 - [X] T044 [P] Reconcile `specs/003-store-activity-data/quickstart.md` with the implemented sync result categories, diagnostic-report generation and inspection steps, persisted-artifact inspection steps, large-history performance verification steps, and verification commands in `specs/003-store-activity-data/quickstart.md`
-- [X] T045 [P] Document the OWASP Top 10 and Cryptographic Storage review, refreshed dependency and API research evidence, and the `SC-006` performance-verification evidence in `specs/003-store-activity-data/checklists/requirements.md`
+- [ ] T045 [P] ⚠️ Reopened Refresh the documented OWASP Top 10 and Cryptographic Storage review summary, dependency and API research evidence, and the `SC-006` performance-verification evidence in `specs/003-store-activity-data/checklists/requirements.md` after the BUG-003 Ghostfolio contract review and final verification rerun are complete
 - [X] T049 [P] Add integration coverage that bootstrap files, protected snapshots, generated diagnostic reports, and persisted workflow artifacts never store Ghostfolio tokens, raw payload fragments, transient sync-failure messages, or production-disallowed financial-value fields in `tests/integration/persistence_security_flow_test.go`
 - [X] T050 [P] Add deterministic large-history performance verification coverage for authenticated retrieval, normalization, validation, and protected replacement in `tests/integration/sync_performance_flow_test.go`
-- [X] T046 Run `make test`, `make coverage`, and the documented large-history performance verification, then verify the generated artifacts in `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`
-- [X] T054 If coverage gates are not met, add targeted tests to address gaps and rerun verification until all gates are satisfied, following defined test approaches
-- [X] T055 Run `make test`, `make coverage` and certify coverage gates are met
+- [ ] T046 ⚠️ Reopened After completing the remaining BUG-003 tasks, run `make test`, `make coverage`, and the documented large-history performance verification, then verify the generated artifacts in `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`
+- [ ] T054 ⚠️ Conditional rerun task: if the final BUG-003 verification rerun exposes coverage gaps, add targeted tests to address them and rerun verification until all gates are satisfied, following defined test approaches
+- [ ] T055 ⚠️ Reopened After the final BUG-003 verification rerun, certify that the coverage gates are met again; if the rerun exposes gaps, reopen `T054`, add the required tests, and rerun verification
+
+**Checkpoint**: ⚠️ Reopened by BUG-003. Phase 6 is not final until `T045`, `T046`, and `T055` are rerun after the remaining currency-aware DTO, model, validation, compatibility, and evidence tasks close.
 
 ---
 
@@ -168,6 +170,7 @@ description: "Task list for Store Activity Data implementation"
 - Phase 2 depends on Phase 1 and blocks all story work.
 - Phase 3, Phase 4, and Phase 5 depend on Phase 2.
 - Phase 6 depends on the stories selected for release.
+- Final Phase 6 evidence and verification closure for this slice depends on the reopened BUG-003 tasks, especially `T048`, `T056`, `T057`, `T058`, and `T059`.
 
 ### Dependency Graph
 
@@ -205,7 +208,7 @@ Cross-story runtime dependencies:
 - T012 through T016 can run in parallel for US1, then T017 through T021 can run in parallel before T022 through T024.
 - T025 through T028 and T051 can run in parallel for US2, then T029 and T030 can run in parallel before T031, T032, T052, and T056.
 - T033 through T037 and T057 can run in parallel for US3, then T038 through T040, T053, T058, and T059 can run in parallel before T041 and T042.
-- T043 through T045 and T049 through T050 can run in parallel once the release scope is stable.
+- T043, T044, T049, and T050 can run in parallel once the release scope is stable; rerun `T045`, `T046`, and `T055` only after the reopened BUG-003 tasks are complete.
 
 ---
 
