@@ -20,7 +20,10 @@ Observed upstream review evidence refreshed on 2026-05-17:
 - `apps/api/src/app/user/user.controller.ts` exposes authenticated `GET /user`.
 - `libs/common/src/lib/interfaces/user.interface.ts` defines `User.settings`.
 - `libs/common/src/lib/interfaces/user-settings.interface.ts` defines `UserSettings.baseCurrency?: string`.
-- `libs/common/src/lib/interfaces/activities.interface.ts` exposes the mixed-currency money fields required by this slice, but the verified public type review does not establish a required per-activity `baseCurrency` field.
+- `libs/common/src/lib/interfaces/activities.interface.ts` exposes `Activity extends Order` plus `feeInAssetProfileCurrency`, `feeInBaseCurrency`, `unitPriceInAssetProfileCurrency`, `value`, `valueInBaseCurrency`, optional `account`, optional `error`, optional `tagIds`, optional `tags`, optional `updateAccountBalance`, and required `SymbolProfile`.
+- `prisma/schema.prisma` defines the underlying `Order.currency` column as nullable (`String?`), while `Order.comment`, `Order.accountId`, and `Order.accountUserId` are also nullable and `Order.fee`, `Order.quantity`, and `Order.unitPrice` are non-null in persisted orders.
+- `libs/common/src/lib/interfaces/enhanced-symbol-profile.interface.ts` exposes `EnhancedSymbolProfile.currency?: string`, `name?: string`, and other optional display fields, so the public response contract does not guarantee `SymbolProfile.currency` on every activity row even though the Prisma `SymbolProfile.currency` column is non-null.
+- `apps/api/src/app/activities/activities.service.ts` computes derived currency-converted amounts using `order.currency ?? order.SymbolProfile.currency`, which empirically confirms Ghostfolio can emit activities where `Order.currency` is null and the service falls back to symbol-profile currency for conversion work.
 
 ## Compatibility Rules
 
@@ -155,6 +158,50 @@ The upstream Ghostfolio schema is larger than this example. The client depends o
 
 The sync base-currency context is not sourced from a required field on each activity row. The client derives that context from authenticated `GET /api/v1/user` response data and applies it to base-valued activity amounts during mapping and validation.
 
+### Activity Field Nullability And Presence Rules
+
+Verified from Ghostfolio `main` as of 2026-05-17:
+
+- Required and non-null in the verified shared `Activity` interface, or non-null in the upstream persisted `Order` model where noted:
+  - `id`
+  - `date`
+  - `type`
+  - `quantity`
+  - `fee`
+  - `unitPrice`
+  - `value`
+  - `feeInAssetProfileCurrency`
+  - `feeInBaseCurrency`
+  - `unitPriceInAssetProfileCurrency`
+  - `valueInBaseCurrency`
+  - `SymbolProfile`
+- Non-null in the upstream persisted `Order` model, but not separately required by this slice as an independent JSON field when the nested `SymbolProfile` object is present:
+  - `symbolProfileId`
+- Present in the public `Activity` interface but nullable in the upstream persisted order model or optional in the shared interface:
+  - `currency`: nullable because `Order.currency` is `String?`
+  - `comment`: nullable because `Order.comment` is `String?`
+  - `accountId`: nullable because `Order.accountId` is `String?`
+  - `accountUserId`: nullable because `Order.accountUserId` is `String?`
+  - `account`: optional on `Activity`
+  - `error`: optional on `Activity`
+  - `tagIds`: optional on `Activity`
+  - `tags`: optional on `Activity`
+  - `updateAccountBalance`: optional on `Activity`
+- Nested `SymbolProfile` fields relevant to this slice:
+  - `symbol`: required in `EnhancedSymbolProfile`
+  - `currency`: optional in `EnhancedSymbolProfile`, so the public response contract does not guarantee it even though the Prisma `SymbolProfile.currency` column is non-null
+  - `name`: optional in `EnhancedSymbolProfile`
+- Fields not guaranteed per activity row in the verified public contract:
+  - no per-activity `baseCurrency` field exists in `Activity`
+  - base-currency context comes from authenticated `GET /api/v1/user` via `User.settings.baseCurrency`
+
+Current-slice contract interpretation:
+
+- `currency = null` is an allowed upstream value and must be preserved as returned.
+- `comment = null` is an allowed upstream value except where this slice separately requires an explanatory comment for a zero-priced `SELL`.
+- `account` and tag-related fields are optional preserved inputs, not current-slice required inputs.
+- `SymbolProfile.currency` must be treated as not guaranteed by the public response contract even though current source wiring usually populates it.
+
 ## Authenticated User Contract
 
 ### Request
@@ -182,7 +229,9 @@ HTTP `200 OK`
 - The response must declare a JSON-compatible content type.
 - The body must parse as JSON.
 - `settings` must exist.
+- `settings.baseCurrency` is optional in the verified public `UserSettings` interface.
 - `settings.baseCurrency` is used as the sync base-currency context when base-valued activity fields are present.
+- If this slice receives base-valued activity amounts but authenticated user data still does not provide `settings.baseCurrency`, that is a current-slice contract failure.
 
 ### Failure Handling Rules
 
@@ -203,6 +252,19 @@ The sync must fail when any activity required for holdings reconstruction is mis
 - unit price or gross value information sufficient to derive normalized basis inputs
 - fee information when present in source data
 - explanatory comment for any zero-priced `SELL`
+
+The current slice treats these activity fields as allowed to be absent, optional, or nullable without failing sync on their own:
+
+- `currency` when Ghostfolio returns `null`
+- `comment` except for a zero-priced `SELL`
+- `account`
+- `tagIds`
+- `tags`
+- `error`
+- `updateAccountBalance`
+- `SymbolProfile.name`
+- `SymbolProfile.currency`
+- `settings.baseCurrency` in authenticated-user
 
 Optional preserved inputs:
 
@@ -244,6 +306,10 @@ SELL
 - A normalized `BUY` with `unit_price = 0` maps to `unsupported activity history` and fails the full sync.
 - A normalized `SELL` with `unit_price = 0` is valid only when an explanatory comment is present. It is stored as a non-taxable holding reduction for future reporting use and does not enable reporting in this slice.
 - A normalized zero-priced `SELL` without an explanatory comment maps to `unsupported activity history` and fails the full sync.
+- Currency-context validation fails only when Ghostfolio omits currency context in all the three tracked currency tiers remains available for the preserved monetary data:
+  - `currency` in the activity record that is obtained through `Order.currency`
+  - `SymbolProfile.currency` for asset-profile-valued fields in the activity record
+  - authenticated-user `settings.baseCurrency` for base-valued fields
 - Remaining gaps or contradictions that make future basis calculation non-defensible map to `unsupported activity history` and fail the full sync.
 - Missing or unreliable source-scope data does not fail sync by itself. The normalized cache records scope reliability for future reporting.
 - `available_report_years` are derived from each normalized timestamp's own offset and calendar date, not from machine-local time or forced UTC year boundaries.
