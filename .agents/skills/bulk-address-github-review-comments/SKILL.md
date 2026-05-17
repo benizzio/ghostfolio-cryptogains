@@ -1,6 +1,6 @@
 ---
-name: address-github-review-comments
-description: GitHub Pull Request (PR) review comments, unresolved conversations, sequential replies, commit, and push. Use ONLY when the task is to address review comments on an existing GitHub pull request from the checked-out feature branch or from a PR URL provided in the prompt.
+name: bulk-address-github-review-comments
+description: Process multiple unresolved GitHub Pull Request (PR) review threads as a reviewed queue with upfront user confirmation, sequential replies, commit, and push. Use ONLY when the task is to address review comments on an existing GitHub pull request from the checked-out feature branch or from a PR URL provided in the prompt.
 compatibility: Requires a local git checkout, network access, and GitHub access through GitHub MCP tools preferred or authenticated gh CLI fallback.
 metadata:
   author: Benizzio with OpenCode
@@ -9,7 +9,7 @@ metadata:
   scope: project-local
 ---
 
-# Address GitHub Pull Request Review Comments
+# Bulk Address GitHub Pull Request Review Comments
 
 ## Use This Skill For
 
@@ -41,7 +41,7 @@ metadata:
 5. If the derived pull request and a supplied Pull Request URL disagree, stop and ask the user which pull request should be used.
 6. If the pull request cannot be derived from the currently checked-out local branch, stop and ask the user for the Pull Request URL.
 
-## Collect The Unresolved Review Work
+## Collect Unresolved Review Threads
 
 1. Read only review conversations that are still unresolved.
 2. Read the entire conversation for each unresolved review thread:
@@ -55,6 +55,17 @@ metadata:
    - first choice: the unresolved thread order returned by GitHub
    - fallback: oldest unresolved thread first
 5. Before editing, read enough local code to understand the request and detect overlap with other unresolved threads.
+
+## Review And Confirm Before Proceeding
+
+Do not edit code, commit, push, or reply to any review thread until this confirmation gate is complete.
+
+1. Present the unresolved thread queue to the user.
+2. Inform the user that they must review the thread comments before the process continues.
+3. Ask the user to confirm that they have reviewed the thread comments and have a concrete conclusion for what needs to be done.
+4. Do not require agent-authored conclusions as part of this gate.
+5. Proceed only after explicit user confirmation.
+6. If the user does not confirm, stop without editing, committing, pushing, or replying.
 
 ## Sequential Execution Contract
 
