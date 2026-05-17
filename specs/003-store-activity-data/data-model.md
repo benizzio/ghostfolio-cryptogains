@@ -169,6 +169,7 @@ Fields:
 |-------|------|-------|
 | `server_origin` | string | Canonical Ghostfolio origin for the protected snapshot |
 | `server_mode` | enum | `ghostfolio_cloud` or `custom_origin` |
+| `allow_dev_http` | boolean | Mirrors the accepted bootstrap-origin mode for this protected snapshot |
 | `last_validated_at` | timestamp | Last successful server compatibility check |
 | `source_api_base_path` | string | Baseline `api/v1` |
 
@@ -198,7 +199,7 @@ Fields:
 | `retrieved_count` | integer | Number of source records retrieved before normalization |
 | `activity_count` | integer | Number of stored activities after normalization and duplicate removal |
 | `available_report_years` | integer array | Distinct years derived from stored activity timestamps |
-| `scope_reliability` | enum | `reliable`, `partial`, `unavailable` |
+| `scope_reliability` | enum | Cache-level summary across stored asset timelines: `reliable`, `partial`, `unavailable` |
 | `activities` | `ActivityRecord[]` | Chronologically ordered normalized activity history |
 
 Relationships:
@@ -210,6 +211,7 @@ Validation rules:
 
 - Persist only after full pagination succeeds.
 - Persist only after chronological sorting, duplicate removal, exact-decimal parsing, activity-type validation, zero-price rule validation, available-year derivation into `available_report_years`, and defensibility checks complete.
+- `scope_reliability` is derived from the stored activities: `partial` when any stored asset timeline has missing or conflicting usable scope data, `reliable` when at least one stored asset timeline has stable usable scope data and none are partial, and `unavailable` when no usable scope data exists.
 - A valid empty history uses `retrieved_count = 0`, `activity_count = 0`, an empty `activities` list, and an empty `available_report_years` set.
 
 ## ActivityRecord
@@ -225,30 +227,38 @@ Fields:
 | `activity_type` | enum | `BUY` or `SELL` only |
 | `asset_symbol` | string | Asset identifier used for future reporting |
 | `asset_name` | string nullable | Optional human-readable asset name |
-| `base_currency` | string nullable | Source base currency label when provided |
+| `order_currency` | string nullable | Currency context for preserved order-currency amounts from `Order.currency` |
+| `order_unit_price` | decimal string nullable | Exact order-currency unit price when provided |
+| `order_gross_value` | decimal string nullable | Exact order-currency gross value when provided |
+| `order_fee_amount` | decimal string nullable | Exact order-currency fee amount when provided |
+| `asset_profile_currency` | string nullable | Currency context for preserved asset-profile amounts from `SymbolProfile.currency` |
+| `asset_profile_unit_price` | decimal string nullable | Exact asset-profile-currency unit price when provided |
+| `asset_profile_fee_amount` | decimal string nullable | Exact asset-profile-currency fee amount when provided |
+| `base_currency` | string nullable | Sync base-currency context derived from authenticated user settings |
+| `base_gross_value` | decimal string nullable | Exact base-currency gross value when provided |
+| `base_fee_amount` | decimal string nullable | Exact base-currency fee amount when provided |
 | `quantity` | decimal string | Exact quantity value |
-| `unit_price` | decimal string | Exact unit price |
-| `gross_value` | decimal string | Exact gross value |
-| `fee_amount` | decimal string | Exact fee value |
 | `comment` | string nullable | Required for zero-priced `SELL` explanation |
 | `data_source` | string nullable | Optional opaque source-system label |
-| `source_scope` | `SourceHoldingScope` nullable | Optional source grouping data |
+| `source_scope` | `SourceScope` nullable | Optional source grouping data |
 | `raw_hash` | string | Exact-duplicate detection hash from normalized fields |
 
 Relationships:
 
-- Optionally references one `SourceHoldingScope`.
+- Optionally references one `SourceScope`.
 
 Validation rules:
 
-- `source_id`, `occurred_at`, `activity_type`, `asset_symbol`, `quantity`, `unit_price`, and `gross_value` are mandatory.
+- `source_id`, `occurred_at`, `activity_type`, `asset_symbol`, and `quantity` are mandatory.
 - `activity_type` must be `BUY` or `SELL`.
-- `BUY` requires `unit_price > 0`.
-- `SELL` with `unit_price = 0` is valid only when `comment` is present and is treated as a non-taxable holding reduction for future reporting.
+- Every preserved monetary amount must keep its own explicit currency identity. A populated order-currency amount requires `order_currency`; a populated asset-profile amount requires `asset_profile_currency`; a populated base-currency amount requires `base_currency`.
+- The current-slice unit-price, gross-value, and fee views are resolved transiently from the preserved explicit-currency groups rather than being stored as separate persisted fields.
+- `BUY` requires a resolved unit price greater than `0`.
+- `SELL` with a resolved unit price of `0` is valid only when `comment` is present and is treated as a non-taxable holding reduction for future reporting.
 - Monetary and quantity fields must remain exact decimal strings and must not be rounded or converted in this slice.
 - `raw_hash` is computed after normalization and is used only for exact-duplicate removal.
 
-## SourceHoldingScope
+## SourceScope
 
 Purpose: Preserved source grouping data from Ghostfolio that a future reporting slice may use to narrow or broaden scope-local reporting behavior.
 
@@ -268,7 +278,7 @@ Relationships:
 Validation rules:
 
 - Missing or unreliable scope data does not fail sync by itself.
-- `reliability` informs future reporting decisions but does not expose any reporting choice in this slice.
+- `reliability` on the stored source scope reflects the preserved record-level source-scope state. The protected activity cache separately stores the cross-timeline summary used by this slice.
 
 ## GhostfolioSession
 

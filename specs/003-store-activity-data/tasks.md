@@ -55,7 +55,7 @@ description: "Task list for Store Activity Data implementation"
 - [X] T010 [P] Implement protected snapshot path resolution, candidate enumeration, and atomic file-replacement helpers in `internal/snapshot/store/store.go`
 - [X] T011 Implement runtime dependency wiring for decimal, sync, and snapshot services in `internal/app/runtime/runtime.go`
 
-**Checkpoint**: ⚠️ Reopened by BUG-003. The shared models and infrastructure still need currency-aware DTO and normalized activity-model updates before story work is fully unblocked.
+**Checkpoint**: BUG-003 reopened this phase and the currency-aware DTO and normalized activity-model updates tracked here are now complete.
 
 ---
 
@@ -84,7 +84,7 @@ description: "Task list for Store Activity Data implementation"
 - [X] T023 [US1] Update sync flow busy-state lifecycle and result routing for full-history storage in `internal/tui/flow/sync_flow.go`
 - [X] T024 [US1] Replace validation-only sync entry and result screens with storage-focused wording in `internal/tui/screen/sync_validation_screen.go` and `internal/tui/screen/validation_result_screen.go`
 
-**Checkpoint**: ⚠️ Reopened by BUG-003. User Story 1 still needs currency-aware contract, DTO, model, and mapping completion before it is independently functional for mixed-currency activity storage.
+**Checkpoint**: BUG-003 currency-aware contract, DTO, model, and mapping updates for User Story 1 are complete.
 
 ---
 
@@ -111,7 +111,7 @@ description: "Task list for Store Activity Data implementation"
 - [X] T052 [US2] Implement synced-data diagnostic-report policy using the existing explicit-development-mode runtime option, local artifact writes, and result-screen report-location messaging in `internal/app/runtime/sync_service.go`, `internal/tui/flow/sync_flow.go`, and `internal/tui/screen/validation_result_screen.go`
 - [X] T056 [P] [US2] Update `activity_model_version` handling and compatibility fixtures for the currency-aware activity-record design in `internal/snapshot/model/version.go`, `tests/integration/snapshot_compatibility_flow_test.go`, and `tests/unit/stored_data_version_test.go` (older pre-BUG-003 snapshots must fail with a compatibility error unless an explicit migration is added)
 
-**Checkpoint**: ⚠️ Reopened by BUG-003. User Story 2 still needs the currency-aware activity-model compatibility update before snapshot reuse and incompatibility handling are complete again.
+**Checkpoint**: BUG-003 activity-model compatibility updates for User Story 2 are complete.
 
 ---
 
@@ -141,7 +141,7 @@ description: "Task list for Store Activity Data implementation"
 - [X] T041 [US3] Implement server replacement confirmation screen and navigation in `internal/tui/screen/server_replacement_screen.go` and `internal/tui/flow/sync_flow.go`
 - [X] T042 [US3] Update the main menu and sync entry screens to surface protected-data-exists state without exposing cached activity details in `internal/tui/screen/main_menu_screen.go` and `internal/tui/screen/sync_validation_screen.go`
 
-**Checkpoint**: ⚠️ Reopened by BUG-003. User Story 3 still needs mixed-currency validation, diagnostic coverage, and incomplete-currency-context rejection before data-quality protection is fully complete again.
+**Checkpoint**: BUG-003 mixed-currency validation, diagnostic coverage, and incomplete-currency-context rejection for User Story 3 are complete.
 
 ---
 
@@ -154,11 +154,11 @@ description: "Task list for Store Activity Data implementation"
 - [X] T045 [P] ⚠️ Reopened Refresh the documented OWASP Top 10 and Cryptographic Storage review summary, dependency and API research evidence, and the `SC-006` performance-verification evidence in `specs/003-store-activity-data/checklists/requirements.md` after the BUG-003 Ghostfolio contract review and final verification rerun are complete
 - [X] T049 [P] Add integration coverage that bootstrap files, protected snapshots, generated diagnostic reports, and persisted workflow artifacts never store Ghostfolio tokens, raw payload fragments, transient sync-failure messages, or production-disallowed financial-value fields in `tests/integration/persistence_security_flow_test.go`
 - [X] T050 [P] Add deterministic large-history performance verification coverage for authenticated retrieval, normalization, validation, and protected replacement in `tests/integration/sync_performance_flow_test.go`
-- [X] T046 ⚠️ Reopened After completing the remaining BUG-003 tasks, run `make test`, `make coverage`, and the documented large-history performance verification, then verify the generated artifacts in `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`
+- [X] T046 ⚠️ Reopened Run `make test`, `make coverage`, and the documented large-history performance verification after the BUG-003 remediation tasks, then verify the generated artifacts in `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`
 - [X] T054 ⚠️ Conditional rerun task: if the final BUG-003 verification rerun exposes coverage gaps, add targeted tests to address them and rerun verification until all gates are satisfied, following defined test approaches
 - [X] T055 ⚠️ Reopened After the final BUG-003 verification rerun, certify that the coverage gates are met again; if the rerun exposes gaps, reopen `T054`, add the required tests, and rerun verification
 
-**Checkpoint**: ⚠️ Reopened by BUG-003. Phase 6 is not final until `T045`, `T046`, and `T055` are rerun after the remaining currency-aware DTO, model, validation, compatibility, and evidence tasks close.
+**Checkpoint**: BUG-003 Phase 6 evidence reruns recorded in `T045`, `T046`, and `T055` are complete.
 
 ---
 
@@ -170,7 +170,7 @@ description: "Task list for Store Activity Data implementation"
 - Phase 2 depends on Phase 1 and blocks all story work.
 - Phase 3, Phase 4, and Phase 5 depend on Phase 2.
 - Phase 6 depends on the stories selected for release.
-- Final Phase 6 evidence and verification closure for this slice depends on the reopened BUG-003 tasks, especially `T048`, `T056`, `T057`, `T058`, and `T059`.
+- Final Phase 6 evidence and verification closure for this slice depended on the reopened BUG-003 tasks, especially `T048`, `T056`, `T057`, `T058`, and `T059`, and those tasks are now marked complete.
 
 ### Dependency Graph
 
@@ -208,7 +208,7 @@ Cross-story runtime dependencies:
 - T012 through T016 can run in parallel for US1, then T017 through T021 can run in parallel before T022 through T024.
 - T025 through T028 and T051 can run in parallel for US2, then T029 and T030 can run in parallel before T031, T032, T052, and T056.
 - T033 through T037 and T057 can run in parallel for US3, then T038 through T040, T053, T058, and T059 can run in parallel before T041 and T042.
-- T043, T044, T049, and T050 can run in parallel once the release scope is stable; rerun `T045`, `T046`, and `T055` only after the reopened BUG-003 tasks are complete.
+- T043, T044, T049, and T050 can run in parallel once the release scope is stable; `T045`, `T046`, and `T055` are the verification reruns that close the BUG-003 follow-up work after the reopened tasks complete.
 
 ---
 

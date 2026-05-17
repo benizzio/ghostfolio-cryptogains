@@ -49,6 +49,7 @@ erDiagram
     SetupProfile {
         string server_origin
         enum server_mode
+        boolean allow_dev_http
         timestamp last_validated_at
         string source_api_base_path
         RegisteredLocalUser registered_local_user
@@ -70,18 +71,24 @@ erDiagram
         enum activity_type
         string asset_symbol
         string_nullable asset_name
+        string_nullable order_currency
+        decimal_string_nullable order_unit_price
+        decimal_string_nullable order_gross_value
+        decimal_string_nullable order_fee_amount
+        string_nullable asset_profile_currency
+        decimal_string_nullable asset_profile_unit_price
+        decimal_string_nullable asset_profile_fee_amount
         string_nullable base_currency
+        decimal_string_nullable base_gross_value
+        decimal_string_nullable base_fee_amount
         decimal_string quantity
-        decimal_string unit_price
-        decimal_string gross_value
-        decimal_string fee_amount
         string_nullable comment
         string_nullable data_source
-        SourceHoldingScope_nullable source_scope
+        SourceScope_nullable source_scope
         string raw_hash
     }
 
-    SourceHoldingScope {
+    SourceScope {
         string scope_id
         string_nullable scope_name
         enum scope_kind
@@ -122,7 +129,7 @@ erDiagram
     RegisteredLocalUser ||--|| ProtectedActivityCache : owns
 
     ProtectedActivityCache ||--o{ ActivityRecord : contains
-    ActivityRecord }o--o| SourceHoldingScope : references
+    ActivityRecord }o--o| SourceScope : references
 
     AppSetupConfig ||--o{ GhostfolioSession : used_by
     GhostfolioSession }o--o| EncryptedSnapshotEnvelope : unlocks_or_creates
