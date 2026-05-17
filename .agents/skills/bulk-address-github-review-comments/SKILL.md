@@ -52,8 +52,8 @@ metadata:
    - outdated and resolved state
 3. Prefer review-thread APIs over plain pull request comments because unresolved state belongs to the thread.
 4. Build a working queue in stable order:
-    - first choice: the unresolved thread order returned by GitHub
-    - fallback: oldest unresolved thread first
+   - first choice: the unresolved thread order returned by GitHub
+   - fallback: oldest unresolved thread first
 5. Before editing, read enough local code to understand the request and detect overlap with other unresolved threads.
 
 ## Review And Confirm Before Proceeding
