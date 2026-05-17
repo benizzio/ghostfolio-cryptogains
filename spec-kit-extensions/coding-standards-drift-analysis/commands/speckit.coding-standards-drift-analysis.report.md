@@ -1,10 +1,10 @@
 ---
-description: "Generate or refresh code-standard-drift-report.md for the active feature"
+description: "Generate or refresh coding-standards-drift-report.md for the active feature"
 ---
 
 <!-- Extension: coding-standards-drift-analysis -->
 <!-- Config: .specify/extensions/coding-standards-drift-analysis/ -->
-# Generate Code Standard Drift Report
+# Generate Coding Standards Drift Report
 
 Review the active feature implementation for divergences from the repository coding-standards baseline and write a structured drift report.
 
@@ -19,7 +19,7 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 ## Purpose
 
 - Focus on coding standards and software engineering practices only.
-- Do not review domain correctness, product behavior, contract compliance, or feature completeness unless that context is required to explain a coding-standard drift.
+- Do not review domain correctness, product behavior, contract compliance, or feature completeness unless that context is required to explain a coding-standards drift.
 - This command is rerunnable. Overwrite the report with a fresh snapshot, but preserve existing `DRIFT-###` identifiers for substantively unchanged findings when possible.
 - Run only after the active feature's normal Spec Kit implementation tasks are complete.
 
@@ -63,11 +63,11 @@ Prioritize the loaded baseline rules around:
   - Don't Repeat Yourself, Keep it Simple, Locality of Behaviour, and Descriptive and Meaningful Phrases
 - code documentation requirements
 - code ownership, author-attribution, or AI-touch documentation requirements when the baseline defines them
-- any other local coding-standard or software-engineering rules explicitly stated by the loaded baseline
+- any other local coding-standards or software-engineering rules explicitly stated by the loaded baseline
 
 ## Outline
 
-1. Load the existing `code-standard-drift-report.md` if it exists. Use it only to preserve stable `DRIFT-###` identifiers for equivalent findings and to keep the correction-tracking link consistent.
+1. Load the existing `coding-standards-drift-report.md` if it exists. Use it only to preserve stable `DRIFT-###` identifiers for equivalent findings and to keep the correction-tracking link consistent.
 2. Read the feature artifacts:
    - `spec.md`
    - `plan.md`
@@ -80,14 +80,14 @@ Prioritize the loaded baseline rules around:
    - `Medium`: decomposition, documentation, or consistency drift that weakens maintainability but is not immediately architecture-breaking
    - `Low`: local style, attribution, or minor consistency drift with limited structural risk
 6. Reuse existing `DRIFT-###` IDs when the finding is substantively the same. Assign new IDs sequentially after the highest existing drift number only for new findings.
-7. Write `FEATURE_DIR/code-standard-drift-report.md`, overwriting the previous file.
+7. Write `FEATURE_DIR/coding-standards-drift-report.md`, overwriting the previous file.
 
 ## Output Format
 
 Write a Markdown report with this structure:
 
 ```markdown
-# Code Standard Drift Report: [Feature Name]
+# Coding Standards Drift Report: [Feature Name]
 
 **Purpose**: Record concrete deviations between the current implementation and the repository coding standards baseline for the active feature slice.
 **Created**: [YYYY-MM-DD]
@@ -135,5 +135,5 @@ Write a Markdown report with this structure:
 - Every finding MUST map to an explicit repo policy source.
 - The `## Standards Baseline` section MUST list every loaded agent-instruction or constitution file used as review evidence.
 - Do not include remediation task checkboxes in this report. Remediation tasks belong in `tasks.md`.
-- If no drift is found, still write the report with `## Findings` stating that no coding-standard drift was identified in the reviewed scope.
+- If no drift is found, still write the report with `## Findings` stating that no coding-standards drift was identified in the reviewed scope.
 - Keep wording grounded and empirical.

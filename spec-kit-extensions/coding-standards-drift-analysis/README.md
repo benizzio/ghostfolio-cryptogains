@@ -16,7 +16,7 @@ Beta Spec Kit extension for reviewing an implemented feature against the reposit
 
 ## Workflow
 
-1. Run `/speckit.coding-standards-drift-analysis.report` after implementation to generate or refresh `code-standard-drift-report.md`.
+1. Run `/speckit.coding-standards-drift-analysis.report` after implementation to generate or refresh `coding-standards-drift-report.md`.
 2. Run `/speckit.coding-standards-drift-analysis.remediation-plan` to append a drift remediation phase to the active feature `tasks.md`.
 3. Run `/speckit.implement` to execute the generated remediation tasks and mark them complete as fixes land.
 
@@ -28,5 +28,5 @@ specify extension add --dev spec-kit-extensions/coding-standards-drift-analysis
 
 ## Output
 
-- `specs/{feature}/code-standard-drift-report.md`
+- `specs/{feature}/coding-standards-drift-report.md`
 - `specs/{feature}/tasks.md` with an appended drift remediation phase

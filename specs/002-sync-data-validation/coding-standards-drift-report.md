@@ -1,9 +1,9 @@
-# Code Standard Drift Report: Sync Data Validation
+# Coding Standards Drift Report: Sync Data Validation
 
 **Purpose**: Record concrete deviations between the current implementation and the repository coding standards baseline for the `002-sync-data-validation` slice.
 **Created**: 2026-05-10
 **Feature**: [spec.md](./spec.md)
-**Correction Tracking**: [checklists/code-standard-drift-remediation.md](./checklists/code-standard-drift-remediation.md)
+**Correction Tracking**: [checklists/coding-standards-drift-remediation.md](./checklists/coding-standards-drift-remediation.md)
 
 ## Scope
 
