@@ -3,8 +3,8 @@ schema_version: "1.0"
 extension:
   id: coding-standards-drift-analysis
   name: "Coding Standards Drift Analysis"
-  version: "0.1.0"
-  description: "Generate coding-standards drift reports and remediation workflows after implementation"
+  version: "0.2.0"
+  description: "Generate coding-standards drift reports and Spec Kit remediation task phases after implementation"
   author: OpenCode
   repository: TODO
   license: MIT
@@ -17,12 +17,9 @@ provides:
     - name: speckit.coding-standards-drift-analysis.report
       file: commands/speckit.coding-standards-drift-analysis.report.md
       description: "Generate or refresh code-standard-drift-report.md for the active feature"
-    - name: speckit.coding-standards-drift-analysis.checklist
-      file: commands/speckit.coding-standards-drift-analysis.checklist.md
-      description: "Generate or extend code-standard-drift-remediation.md from the drift report"
-    - name: speckit.coding-standards-drift-analysis.remediate
-      file: commands/speckit.coding-standards-drift-analysis.remediate.md
-      description: "Execute unresolved remediation tasks and correct flagged code-standard drift"
+    - name: speckit.coding-standards-drift-analysis.remediation-plan
+      file: commands/speckit.coding-standards-drift-analysis.remediation-plan.md
+      description: "Append Spec Kit remediation tasks to tasks.md from the drift report"
 
 hooks:
   after_implement:

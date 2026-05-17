@@ -1,5 +1,5 @@
 ---
-description: Generate or refresh code-standard-drift-report.md for the active feature
+description: "Generate or refresh code-standard-drift-report.md for the active feature"
 ---
 
 <!-- Extension: coding-standards-drift-analysis -->
@@ -21,15 +21,22 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 - Focus on coding standards and software engineering practices only.
 - Do not review domain correctness, product behavior, contract compliance, or feature completeness unless that context is required to explain a coding-standard drift.
 - This command is rerunnable. Overwrite the report with a fresh snapshot, but preserve existing `DRIFT-###` identifiers for substantively unchanged findings when possible.
+- Run only after the active feature's normal Spec Kit implementation tasks are complete.
 
 ## Prerequisites
 
 1. Verify a Spec Kit project exists by checking for `.specify/`.
 2. Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` from repo root and parse the absolute `FEATURE_DIR`.
 3. Verify `spec.md`, `plan.md`, and `tasks.md` exist in `FEATURE_DIR`.
-4. Discover and load `AGENTS.md` plus any other known proprietary agent-instruction files present in repository or feature scope, such as `CLAUDE.md`, `GEMINI.md`, `copilot-instructions.md`, `.cursorrules`, `.cursor/rules/**`, `.windsurfrules`, or `.clinerules`.
-5. Load `.specify/memory/constitution.md` if it exists.
-6. If the loaded instructions and constitution do not enforce concrete coding standards or software engineering practices, derive the best-guess baseline conservatively from the existing code style, structure, documentation patterns, and architectural boundaries in the active feature scope and directly related code.
+4. Load the current local Spec Kit task format references before interpreting task state:
+   - `.opencode/command/speckit.tasks.md` when present
+   - `.opencode/command/speckit.implement.md` when present
+   - `.specify/templates/tasks-template.md` when present
+   - the existing `FEATURE_DIR/tasks.md`
+5. Using the task state syntax from the current local Spec Kit installation and the existing task file, verify there are no open, unchecked, pending, or reopened tasks in `FEATURE_DIR/tasks.md`. If any are present, stop without writing the report and instruct the user to finish implementation with `/speckit.implement` before running drift analysis.
+6. Discover and load `AGENTS.md` plus any other known proprietary agent-instruction files present in repository or feature scope, such as `CLAUDE.md`, `GEMINI.md`, `copilot-instructions.md`, `.cursorrules`, `.cursor/rules/**`, `.windsurfrules`, or `.clinerules`.
+7. Load `.specify/memory/constitution.md` if it exists.
+8. If the loaded instructions and constitution do not enforce concrete coding standards or software engineering practices, derive the best-guess baseline conservatively from the existing code style, structure, documentation patterns, and architectural boundaries in the active feature scope and directly related code.
 
 ## Review Scope
 
@@ -85,7 +92,7 @@ Write a Markdown report with this structure:
 **Purpose**: Record concrete deviations between the current implementation and the repository coding standards baseline for the active feature slice.
 **Created**: [YYYY-MM-DD]
 **Feature**: [spec.md](./spec.md)
-**Correction Tracking**: [checklists/code-standard-drift-remediation.md](./checklists/code-standard-drift-remediation.md)
+**Correction Tracking**: Drift remediation tasks are added to [tasks.md](./tasks.md) by `/speckit.coding-standards-drift-analysis.remediation-plan`.
 
 ## Scope
 
@@ -127,6 +134,6 @@ Write a Markdown report with this structure:
 - Every finding MUST cite exact file references.
 - Every finding MUST map to an explicit repo policy source.
 - The `## Standards Baseline` section MUST list every loaded agent-instruction or constitution file used as review evidence.
-- Do not include remediation checkboxes in this report. That belongs in the remediation checklist.
+- Do not include remediation task checkboxes in this report. Remediation tasks belong in `tasks.md`.
 - If no drift is found, still write the report with `## Findings` stating that no coding-standard drift was identified in the reviewed scope.
 - Keep wording grounded and empirical.
