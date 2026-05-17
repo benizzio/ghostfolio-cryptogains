@@ -37,7 +37,11 @@
       Cheat Sheet alignment for any persisted financial or person-linked data,
       and most recent published OWASP Top 10 review scope are defined.
 - [ ] Precision: all financial calculations use fixed-point decimals or integer
-      minor units, never floating point in domain logic.
+      minor units, never floating point in domain logic; every
+      currency-denominated value remains tied to an explicit currency; stored
+      and intermediate values preserve their original currency unless a
+      documented feature requirement defines the conversion boundary,
+      exchange-rate source, and rounding rules.
 - [ ] Testing: integration-first automated tests, mocked or stubbed outside
       services, unit tests only for justified complex units or integration
       gaps, overlapping unit tests are avoided, and 100% coverage for

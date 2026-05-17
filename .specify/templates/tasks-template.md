@@ -70,8 +70,8 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] T005 [P] Record dependency and external API research in
       specs/[###-feature-name]/research.md
 - [ ] T006 [P] Setup API routing and middleware structure
-- [ ] T007 Create base models/entities and financial precision primitives that
-      all stories depend on
+- [ ] T007 Create base models/entities and currency-aware financial precision
+      primitives that all stories depend on
 - [ ] T008 Configure error handling and security logging infrastructure
 - [ ] T009 Setup justified local-only persistence and protection approach, using token-derived encryption when persisted data includes financial or person-linked information
 - [ ] T010 Setup environment configuration management
@@ -169,6 +169,8 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX Code cleanup and refactoring
 - [ ] TXXX Performance optimization across all stories
 - [ ] TXXX [P] Additional unit tests for justified complex logic in language default location
+- [ ] TXXX [P] Verify financial tests cover amount-plus-currency pairing,
+      original-currency preservation, and any documented conversion boundary
 - [ ] TXXX [P] Verify 100% coverage for project-owned code
 - [ ] TXXX Most recent published OWASP Top 10 review and, when persisted data includes financial or person-linked information, OWASP Cryptographic Storage Cheat Sheet review and security hardening
 - [ ] TXXX Run quickstart.md validation

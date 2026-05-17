@@ -77,9 +77,9 @@
 
 ## Requirements *(mandatory)*
 
-Each feature specification MUST capture security, persistence, precision,
-testing, dependency, and external integration impacts when the feature touches
-those areas.
+Each feature specification MUST capture security, persistence, financial
+precision and currency-handling, testing, dependency, and external integration
+impacts when the feature touches those areas.
 
 <!--
   ACTION REQUIRED: The content in this section represents placeholders.
@@ -109,8 +109,11 @@ those areas.
   aligned with the OWASP Cryptographic Storage Cheat Sheet. For less-sensitive
   bootstrap or machine-local configuration, describe the proportionate local
   protection approach instead]
-- **FIN-001**: [Define the numeric representation, scale, and rounding rules for
-  every financial value involved]
+- **FIN-001**: [Define the numeric representation, scale, currency identity, and
+  rounding rules for every financial value involved. Require stored and
+  intermediate values to preserve the original source currency and amount unless
+  a later documented feature explicitly requires conversion, and if it does,
+  define the exchange-rate source and conversion boundary]
 - **QUAL-001**: [Describe the automated integration tests, mocked or stubbed
   outside services, how overlapping unit tests will be avoided, and how 100%
   coverage will be enforced across project-owned packages]

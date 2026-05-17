@@ -1,10 +1,11 @@
 <!--
 Sync Impact Report
-Version change: 2.0.0 -> 2.1.0
+Version change: 2.1.0 -> 2.2.0
 Modified principles:
-- III. Testability with Full Coverage
+- II. Deterministic Financial Precision
 Modified sections:
-- III. Testability with Full Coverage
+- II. Deterministic Financial Precision
+- Operational Constraints
 - Delivery Workflow & Quality Gates
 Added sections:
 - None
@@ -67,6 +68,19 @@ fraud, and account access risk.
 - Monetary amounts, quantities, cost basis, exchange rates, taxes, and gains or
   losses MUST use fixed-point decimals or integer minor units with explicit
   scale.
+- Every currency-denominated financial value MUST remain explicitly tied to its
+  currency. A numeric amount without its currency is incomplete and MUST NOT be
+  stored, passed across domain boundaries, asserted in tests, or used in
+  calculations as if the currency were implicit.
+- Stored and intermediate financial data MUST preserve the original source
+  currency and exact source amount until a feature specification and
+  implementation plan explicitly require conversion for a defined user-facing or
+  reporting outcome.
+- Cross-currency conversion MUST NOT occur during ingestion, normalization,
+  storage, validation, or intermediate calculations unless the relevant
+  `spec.md` and `plan.md` define why the conversion is necessary, the exchange
+  rate source, the conversion boundary, the rounding rules, and the audit trail
+  needed to reproduce the result.
 - Rounding and conversion rules MUST be defined where values cross currencies,
   units, or reporting boundaries.
 - Calculations MUST remain auditable and reproducible from the stored inputs and
@@ -139,17 +153,20 @@ the codebase maintainable.
   documentation.
 - Dependency and external API research MUST be recorded in `research.md`,
   `plan.md`, or equivalent review evidence before implementation starts.
-- Features that affect calculations MUST define numeric representation, scale,
-  rounding, and reporting assumptions in the specification.
+- Features that affect calculations or persist financial values MUST define the
+  numeric representation, scale, currency identity, any authorized conversion
+  boundary, rounding, and reporting assumptions in the specification.
 - Unsupported practices include plaintext local caches, cloud persistence of
-  sensitive data, floating-point ledger math, unreviewed dependency additions,
-  and undocumented API version assumptions.
+  sensitive data, floating-point ledger math, storing currency-denominated
+  values without an explicit currency, cross-currency conversion before a
+  documented feature-defined boundary, unreviewed dependency additions, and
+  undocumented API version assumptions.
 
 ## Delivery Workflow & Quality Gates
 
 - Every feature specification MUST capture the feature's impacts on persistence,
-  token handling, financial precision, testing strategy, dependency choices, and
-  external integrations when applicable.
+  token handling, financial precision and currency handling, testing strategy,
+  dependency choices, and external integrations when applicable.
 - Every feature or change that persists financial information or person- or
   user-linkable data MUST record its OWASP Cryptographic Storage Cheat Sheet
   compliance evidence in `spec.md`, `plan.md`, `tasks.md`, or equivalent review
@@ -187,4 +204,4 @@ the codebase maintainable.
   review notes, or equivalent artifacts. Missing evidence counts as
   non-compliance.
 
-**Version**: 2.1.0 | **Ratified**: 2026-05-01 | **Last Amended**: 2026-05-12
+**Version**: 2.2.0 | **Ratified**: 2026-05-01 | **Last Amended**: 2026-05-17
