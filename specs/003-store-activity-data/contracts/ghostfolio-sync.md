@@ -272,6 +272,7 @@ Optional preserved inputs:
 - account or other source-scope grouping data
 - asset display metadata
 - opaque source-system identity
+- Ghostfolio `quantity`, `unitPrice`, and `value` remain preserved as independent source fields. The current slice does not assume that `value == quantity * unitPrice` exactly for every activity row, because production rows can contain precision or truncation differences while still providing sufficient basis inputs.
 
 ### Pagination Rules
 
@@ -313,6 +314,7 @@ SELL
   - authenticated-user `settings.baseCurrency` for base-valued fields
 - all three currency tiers and their related fields are independent and don't need to maintain consistency with each other
 - Remaining gaps or contradictions that make future basis calculation non-defensible map to `unsupported activity history` and fail the full sync.
+- An exact mismatch between preserved source `value` and a recomputed `quantity * unitPrice` does not by itself make a row unsupported or non-defensible in this slice.
 - Missing or unreliable source-scope data does not fail sync by itself. The normalized cache records scope reliability for future reporting.
 - `available_report_years` are derived from each normalized timestamp's own offset and calendar date, not from machine-local time or forced UTC year boundaries.
 

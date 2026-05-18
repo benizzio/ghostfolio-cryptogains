@@ -68,6 +68,7 @@ Selected normalization rules:
 - compute a `raw_hash` from normalized source fields and remove exact duplicates by that hash
 - reject the full sync if a supported deterministic order cannot be established
 - preserve order-currency, asset-profile-currency, and sync-base-currency identities separately; derive base-currency identity from authenticated user settings rather than from each activity row
+- preserve Ghostfolio `quantity`, `unitPrice`, and `value` exactly as independent source inputs; do not require exact arithmetic equality between `value` and `quantity * unitPrice` because production rows can include precision or truncation differences
 - reject any activity type other than `BUY` or `SELL`
 - reject normalized `BUY` records with `unit_price = 0`
 - accept normalized `SELL` records with `unit_price = 0` only when an explanatory comment is present, storing them as non-taxable holding reductions for future reporting

@@ -41,20 +41,55 @@ func TestActivityValidationFlowRejectsUnsupportedHistoryAndKeepsExistingSnapshot
 		t.Fatalf("read baseline snapshot: %v", err)
 	}
 
+	failureCases := []struct {
+		name           string
+		activitiesJSON string
+	}{
+		{
+			name:           "unsupported activity type",
+			activitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
+		},
+	}
+
+	for _, testCase := range failureCases {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			server.SetTokenPages("token-one", []storagePageFixture{{
+				Count:          1,
+				ActivitiesJSON: testCase.activitiesJSON,
+			}})
+			outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
+			if outcome.FailureReason != runtime.SyncFailureUnsupportedActivityHistory {
+				t.Fatalf("expected unsupported activity history outcome, got %#v", outcome)
+			}
+			afterPayload, err := inspector.Read(context.Background(), snapshotstore.ReadRequest{Candidate: candidates[0], SecurityToken: "token-one"})
+			if err != nil {
+				t.Fatalf("read retained snapshot: %v", err)
+			}
+			if afterPayload.ProtectedActivityCache.Activities[0].SourceID != beforePayload.ProtectedActivityCache.Activities[0].SourceID {
+				t.Fatalf("expected previous readable snapshot to stay unchanged")
+			}
+		})
+	}
+}
+
+func TestActivityValidationFlowAllowsProdLikeOrderTierPrecisionDifferences(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	server := newTokenAwareStorageServer(t)
 	server.SetTokenPages("token-one", []storagePageFixture{{
-		Count:          1,
-		ActivitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"baseCurrency":"USD","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
+		Count: 1,
+		ActivitiesJSON: `[
+			{"id":"prod-like-buy","date":"2025-06-22T09:41:33.202Z","type":"BUY","quantity":238.70829827,"currency":"USD","unitPrice":1.254775813,"value":299.5253990315857,"fee":0,"feeInAssetProfileCurrency":0,"valueInBaseCurrency":260.52719207767325,"feeInBaseCurrency":0,"unitPriceInAssetProfileCurrency":1.254775813,"baseCurrency":"EUR","comment":"Blockchain migration swapped from MATIC","SymbolProfile":{"symbol":"POL28321-USD.CC","name":"POL (ex-MATIC)","currency":"USD"},"account":{"id":"24f2c5ed-c7c8-4802-aa25-f18395640308","name":"Cryptofolio"}}
+		]`,
 	}})
+	service := newActivityValidationSyncService(baseDir, server)
+	config := mustActivityValidationConfig(t, server.URL())
+
 	outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
-	if outcome.FailureReason != runtime.SyncFailureUnsupportedActivityHistory {
-		t.Fatalf("expected unsupported activity history outcome, got %#v", outcome)
-	}
-	afterPayload, err := inspector.Read(context.Background(), snapshotstore.ReadRequest{Candidate: candidates[0], SecurityToken: "token-one"})
-	if err != nil {
-		t.Fatalf("read retained snapshot: %v", err)
-	}
-	if afterPayload.ProtectedActivityCache.Activities[0].SourceID != beforePayload.ProtectedActivityCache.Activities[0].SourceID {
-		t.Fatalf("expected previous readable snapshot to stay unchanged")
+	if !outcome.Success {
+		t.Fatalf("expected prod-like precision mismatch success, got %#v", outcome)
 	}
 }
 

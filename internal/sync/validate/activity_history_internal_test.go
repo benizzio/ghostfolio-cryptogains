@@ -257,6 +257,45 @@ func TestValidateCurrencyContextAllowsSingleUninformedTierWhenOthersRemainInform
 	}
 }
 
+// TestValidateAllowsProdLikeOrderTierPrecisionDifferences verifies that
+// preserved Ghostfolio source values remain valid even when `value` does not
+// equal `quantity * unitPrice` exactly.
+// Authored by: OpenCode
+func TestValidateAllowsProdLikeOrderTierPrecisionDifferences(t *testing.T) {
+	t.Parallel()
+
+	validator := NewValidator()
+	record := validationTestRecord(t, "prod-like-buy", syncmodel.ActivityTypeBuy)
+	quantity, _, err := decimalsupport.ParseString("238.70829827")
+	if err != nil {
+		t.Fatalf("parse quantity: %v", err)
+	}
+	orderUnitPrice, _, err := decimalsupport.ParseString("1.254775813")
+	if err != nil {
+		t.Fatalf("parse order unit price: %v", err)
+	}
+	orderGrossValue, _, err := decimalsupport.ParseString("299.5253990315857")
+	if err != nil {
+		t.Fatalf("parse order gross value: %v", err)
+	}
+	baseGrossValue, _, err := decimalsupport.ParseString("260.52719207767325")
+	if err != nil {
+		t.Fatalf("parse base gross value: %v", err)
+	}
+	record.Quantity = quantity
+	record.OrderCurrency = "USD"
+	record.AssetProfileCurrency = "USD"
+	record.BaseCurrency = "EUR"
+	record.OrderUnitPrice = &orderUnitPrice
+	record.OrderGrossValue = &orderGrossValue
+	record.BaseGrossValue = &baseGrossValue
+
+	err = validator.Validate(syncmodel.ProtectedActivityCache{ActivityCount: 1, Activities: []syncmodel.ActivityRecord{record}})
+	if err != nil {
+		t.Fatalf("expected prod-like precision mismatch to remain valid, got %v", err)
+	}
+}
+
 func validationTestRecord(t *testing.T, sourceID string, activityType syncmodel.ActivityType) syncmodel.ActivityRecord {
 	t.Helper()
 

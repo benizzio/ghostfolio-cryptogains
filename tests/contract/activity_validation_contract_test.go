@@ -46,6 +46,26 @@ func TestActivityValidationContractRejectsBelowZeroHoldings(t *testing.T) {
 	}
 }
 
+func TestActivityValidationContractAllowsProdLikeOrderTierPrecisionDifferences(t *testing.T) {
+	t.Parallel()
+
+	records := []syncmodel.ActivityRecord{
+		activityValidationContractRecord(t, "buy-1", "2024-01-01T10:00:00Z", syncmodel.ActivityTypeBuy, "BTC", "238.70829827", "1.254775813", "299.5253990315857", func(record *syncmodel.ActivityRecord) {
+			record.AssetProfileCurrency = "USD"
+			record.BaseCurrency = "EUR"
+			record.BaseGrossValue = mustActivityValidationContractDecimalPointer(t, "260.52719207767325")
+		}),
+	}
+
+	cache, err := syncnormalize.NewNormalizer().Normalize(records)
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	if err := syncvalidate.NewValidator().Validate(cache); err != nil {
+		t.Fatalf("expected prod-like precision mismatch to remain valid, got %v", err)
+	}
+}
+
 func TestActivityValidationContractDerivesScopeReliabilityOutcomes(t *testing.T) {
 	t.Parallel()
 
