@@ -3,6 +3,7 @@ package integration
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -155,6 +156,30 @@ func TestSyncDiagnosticReportFlowGeneratesAutomaticallyInExplicitDevelopmentMode
 	}
 }
 
+func TestSyncDiagnosticReportFlowTLSServerHandlesEmptyPagesFixture(t *testing.T) {
+	t.Parallel()
+
+	var server = newGhostfolioStorageTLSServer(t, nil)
+	var response, err = server.Client().Get(server.URL + "/api/v1/activities?sortColumn=date&sortDirection=asc")
+	if err != nil {
+		t.Fatalf("get empty activity page: %v", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("expected empty fixture request to succeed, got %d", response.StatusCode)
+	}
+
+	var responseBody []byte
+	responseBody, err = io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatalf("read empty activity page: %v", err)
+	}
+	if string(responseBody) != `{"activities":[],"count":0}` {
+		t.Fatalf("expected explicit empty activity response, got %q", string(responseBody))
+	}
+}
+
 func newGhostfolioStorageTLSServer(t *testing.T, pages []storagePageFixture) *httptest.Server {
 	t.Helper()
 
@@ -170,6 +195,10 @@ func newGhostfolioStorageTLSServer(t *testing.T, pages []storagePageFixture) *ht
 		case "/api/v1/activities":
 			if request.URL.Query().Get("sortColumn") != "date" || request.URL.Query().Get("sortDirection") != "asc" {
 				writer.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			if len(pages) == 0 {
+				_, _ = writer.Write([]byte(`{"activities":[],"count":0}`))
 				return
 			}
 			if requestCount >= len(pages) {

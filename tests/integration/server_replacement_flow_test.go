@@ -111,6 +111,9 @@ func TestServerReplacementFlowConfirmSuccessReplacesSnapshot(t *testing.T) {
 	if payload.SetupProfile.ServerOrigin != secondServer.URL {
 		t.Fatalf("expected replacement payload to track new server, got %q", payload.SetupProfile.ServerOrigin)
 	}
+	if len(payload.ProtectedActivityCache.Activities) == 0 {
+		t.Fatalf("expected replacement payload activities")
+	}
 	if payload.ProtectedActivityCache.Activities[0].SourceID != "activity-new" {
 		t.Fatalf("expected replacement payload content, got %#v", payload.ProtectedActivityCache.Activities)
 	}
@@ -131,6 +134,9 @@ func TestServerReplacementFlowFailedReplacementRetainsPreviousSnapshot(t *testin
 	firstCandidates, err := snapshotstore.DiscoverServerCandidates(context.Background(), inspector, firstServer.URL)
 	if err != nil {
 		t.Fatalf("discover initial candidates: %v", err)
+	}
+	if len(firstCandidates) == 0 {
+		t.Fatalf("expected initial snapshot candidates")
 	}
 
 	secondServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

@@ -203,6 +203,9 @@ func TestActivityValidationContractOrdersSameAssetSameDayUsingActivityTypeBefore
 	if err := syncvalidate.NewValidator().Validate(cache); err != nil {
 		t.Fatalf("validate: %v", err)
 	}
+	if len(cache.Activities) != 3 {
+		t.Fatalf("expected three normalized activities, got %d", len(cache.Activities))
+	}
 
 	var got = []string{
 		cache.Activities[0].SourceID,
