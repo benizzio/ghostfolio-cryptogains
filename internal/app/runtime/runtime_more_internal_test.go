@@ -406,7 +406,7 @@ func TestFinalizeSyncFailureCoversDiagnosticBranches(t *testing.T) {
 		session := &GhostfolioSession{ServerOrigin: "https://ghostfol.io", SecurityToken: "token", AuthToken: "jwt"}
 		attempt := &SyncAttempt{}
 
-		outcome := service.finalizeSyncFailure(session, attempt, SyncFailureTimeout, syncmodel.DiagnosticContext{})
+		outcome := service.finalizeSyncFailure(context.Background(), session, attempt, SyncFailureTimeout, syncmodel.DiagnosticContext{})
 		if outcome.Diagnostic.Eligible {
 			t.Fatalf("expected timeout failure to remain diagnostic ineligible")
 		}
@@ -417,7 +417,7 @@ func TestFinalizeSyncFailureCoversDiagnosticBranches(t *testing.T) {
 
 	t.Run("eligible failure in production mode", func(t *testing.T) {
 		service := &syncService{allowDevHTTP: false}
-		outcome := service.finalizeSyncFailure(&GhostfolioSession{ServerOrigin: "https://ghostfol.io"}, &SyncAttempt{}, SyncFailureUnsupportedActivityHistory, syncmodel.DiagnosticContext{})
+		outcome := service.finalizeSyncFailure(context.Background(), &GhostfolioSession{ServerOrigin: "https://ghostfol.io"}, &SyncAttempt{}, SyncFailureUnsupportedActivityHistory, syncmodel.DiagnosticContext{})
 		if !outcome.Diagnostic.Eligible || outcome.Diagnostic.Path != "" {
 			t.Fatalf("expected manual diagnostic eligibility, got %#v", outcome.Diagnostic)
 		}
@@ -428,7 +428,7 @@ func TestFinalizeSyncFailureCoversDiagnosticBranches(t *testing.T) {
 
 	t.Run("eligible failure in development mode writes report", func(t *testing.T) {
 		service := &syncService{allowDevHTTP: true, diagnosticReports: newDiagnosticReportService(t.TempDir())}
-		outcome := service.finalizeSyncFailure(&GhostfolioSession{ServerOrigin: "https://ghostfol.io"}, &SyncAttempt{}, SyncFailureIncompatibleNewSyncData, runtimeDiagnosticRequestFixture().Context)
+		outcome := service.finalizeSyncFailure(context.Background(), &GhostfolioSession{ServerOrigin: "https://ghostfol.io"}, &SyncAttempt{}, SyncFailureIncompatibleNewSyncData, runtimeDiagnosticRequestFixture().Context)
 		if !outcome.Diagnostic.Eligible || outcome.Diagnostic.Path == "" {
 			t.Fatalf("expected automatic diagnostic report path, got %#v", outcome.Diagnostic)
 		}
@@ -441,7 +441,7 @@ func TestFinalizeSyncFailureCoversDiagnosticBranches(t *testing.T) {
 		}
 
 		service := &syncService{allowDevHTTP: true, diagnosticReports: newDiagnosticReportService(baseConfigPath)}
-		outcome := service.finalizeSyncFailure(&GhostfolioSession{ServerOrigin: "https://ghostfol.io"}, &SyncAttempt{}, SyncFailureUnsupportedStoredDataVersion, runtimeDiagnosticRequestFixture().Context)
+		outcome := service.finalizeSyncFailure(context.Background(), &GhostfolioSession{ServerOrigin: "https://ghostfol.io"}, &SyncAttempt{}, SyncFailureUnsupportedStoredDataVersion, runtimeDiagnosticRequestFixture().Context)
 		if !outcome.Diagnostic.Eligible || outcome.Diagnostic.Path != "" {
 			t.Fatalf("expected dev-mode report failure to be ignored, got %#v", outcome.Diagnostic)
 		}

@@ -184,7 +184,7 @@ func (s *syncService) Run(ctx context.Context, request SyncRequest) SyncOutcome 
 		return finalizeContractFailure(&session, &attempt, err)
 	}
 
-	cache, outcome, ok := s.buildProtectedActivityCache(historyResponse, request.SecurityToken, &session, &attempt)
+	cache, outcome, ok := s.buildProtectedActivityCache(timedContext, historyResponse, request.SecurityToken, &session, &attempt)
 	if !ok {
 		return outcome
 	}
@@ -193,6 +193,7 @@ func (s *syncService) Run(ctx context.Context, request SyncRequest) SyncOutcome 
 	attempt.Status = AttemptStatusValidating
 	if err := s.validator.Validate(cache); err != nil {
 		return s.finalizeSyncFailure(
+			timedContext,
 			&session,
 			&attempt,
 			SyncFailureUnsupportedActivityHistory,
@@ -208,7 +209,7 @@ func (s *syncService) Run(ctx context.Context, request SyncRequest) SyncOutcome 
 		Existing:      unlockedSnapshot,
 	})
 	if err != nil {
-		return s.finalizePersistenceFailure(&session, &attempt, err, request.SecurityToken)
+		return s.finalizePersistenceFailure(timedContext, &session, &attempt, err, request.SecurityToken)
 	}
 
 	attempt.Status = AttemptStatusSuccess
@@ -247,13 +248,13 @@ func (s *syncService) prepareSyncAttempt(
 	attempt *SyncAttempt,
 ) (snapshotUnlockResult, SyncOutcome, bool) {
 	if s.snapshots == nil {
-		return snapshotUnlockResult{}, s.finalizeSyncFailure(session, attempt, SyncFailureIncompatibleNewSyncData, syncmodel.DiagnosticContext{
+		return snapshotUnlockResult{}, s.finalizeSyncFailure(ctx, session, attempt, SyncFailureIncompatibleNewSyncData, syncmodel.DiagnosticContext{
 			FailureStage:  syncmodel.DiagnosticFailureStageProtectedPersistence,
 			FailureDetail: "protected snapshot store is unavailable",
 		}), false
 	}
 
-	var outcome, ok = s.confirmServerReplacement(request, session, attempt)
+	var outcome, ok = s.confirmServerReplacement(ctx, request, session, attempt)
 	if !ok {
 		return snapshotUnlockResult{}, outcome, false
 	}
@@ -263,12 +264,14 @@ func (s *syncService) prepareSyncAttempt(
 		return unlockedSnapshot, SyncOutcome{}, true
 	}
 
-	return snapshotUnlockResult{}, s.finalizeUnlockFailure(session, attempt, err, request.SecurityToken), false
+	return snapshotUnlockResult{}, s.finalizeUnlockFailure(ctx, session, attempt, err, request.SecurityToken), false
 }
 
 // confirmServerReplacement handles the active-snapshot replacement gate before retrieval starts.
 // Authored by: OpenCode
+
 func (s *syncService) confirmServerReplacement(
+	ctx context.Context,
 	request SyncRequest,
 	session *GhostfolioSession,
 	attempt *SyncAttempt,
@@ -279,7 +282,7 @@ func (s *syncService) confirmServerReplacement(
 	}
 	if !request.ConfirmServerReplacement {
 		attempt.Status = AttemptStatusAborted
-		return s.finalizeSyncFailure(session, attempt, SyncFailureServerReplacementCancelled, syncmodel.DiagnosticContext{}), false
+		return s.finalizeSyncFailure(ctx, session, attempt, SyncFailureServerReplacementCancelled, syncmodel.DiagnosticContext{}), false
 	}
 
 	attempt.ServerMismatchConfirmed = true
@@ -289,6 +292,7 @@ func (s *syncService) confirmServerReplacement(
 // finalizeUnlockFailure maps snapshot discovery and unlock failures into supported sync outcomes.
 // Authored by: OpenCode
 func (s *syncService) finalizeUnlockFailure(
+	ctx context.Context,
 	session *GhostfolioSession,
 	attempt *SyncAttempt,
 	err error,
@@ -299,7 +303,7 @@ func (s *syncService) finalizeUnlockFailure(
 		reason = SyncFailureUnsupportedStoredDataVersion
 	}
 
-	return s.finalizeSyncFailure(session, attempt, reason, syncmodel.DiagnosticContext{
+	return s.finalizeSyncFailure(ctx, session, attempt, reason, syncmodel.DiagnosticContext{
 		FailureStage:  syncmodel.DiagnosticFailureStageStoredDataCompatibility,
 		FailureDetail: redact.ErrorText(err, securityToken),
 	})
@@ -308,6 +312,7 @@ func (s *syncService) finalizeUnlockFailure(
 // buildProtectedActivityCache maps, normalizes, and returns the protected activity cache for one retrieved history.
 // Authored by: OpenCode
 func (s *syncService) buildProtectedActivityCache(
+	ctx context.Context,
 	historyResponse ghostfoliodto.ActivityPageResponse,
 	securityToken string,
 	session *GhostfolioSession,
@@ -318,6 +323,7 @@ func (s *syncService) buildProtectedActivityCache(
 	records, err := ghostfoliomapper.MapActivities(historyResponse.Activities, session.UserBaseCurrency, s.decimalService)
 	if err != nil {
 		return syncmodel.ProtectedActivityCache{}, s.finalizeSyncFailure(
+			ctx,
 			session,
 			attempt,
 			SyncFailureUnsupportedActivityHistory,
@@ -328,6 +334,7 @@ func (s *syncService) buildProtectedActivityCache(
 	cache, err := s.normalizer.Normalize(records)
 	if err != nil {
 		return syncmodel.ProtectedActivityCache{}, s.finalizeSyncFailure(
+			ctx,
 			session,
 			attempt,
 			SyncFailureUnsupportedActivityHistory,
@@ -341,6 +348,7 @@ func (s *syncService) buildProtectedActivityCache(
 // finalizePersistenceFailure converts protected-write failures into one supported sync outcome.
 // Authored by: OpenCode
 func (s *syncService) finalizePersistenceFailure(
+	ctx context.Context,
 	session *GhostfolioSession,
 	attempt *SyncAttempt,
 	err error,
@@ -351,7 +359,7 @@ func (s *syncService) finalizePersistenceFailure(
 		reason = SyncFailureUnsupportedStoredDataVersion
 	}
 
-	return s.finalizeSyncFailure(session, attempt, reason, syncmodel.DiagnosticContext{
+	return s.finalizeSyncFailure(ctx, session, attempt, reason, syncmodel.DiagnosticContext{
 		FailureStage:  syncmodel.DiagnosticFailureStageProtectedPersistence,
 		FailureDetail: redact.ErrorText(err, securityToken),
 	})
@@ -410,6 +418,7 @@ func finalizeContractFailure(
 // finalizeSyncFailure converts an internal sync failure into one supported user-visible category.
 // Authored by: OpenCode
 func (s *syncService) finalizeSyncFailure(
+	ctx context.Context,
 	session *GhostfolioSession,
 	attempt *SyncAttempt,
 	reason SyncFailureReason,
@@ -438,7 +447,7 @@ func (s *syncService) finalizeSyncFailure(
 		RedactFinancialValues:   !s.allowDevHTTP,
 		ExplicitDevelopmentMode: s.allowDevHTTP,
 	}
-	outcome.Diagnostic = s.diagnosticReports.PrepareState(request)
+	outcome.Diagnostic = s.diagnosticReports.PrepareState(ctx, request)
 
 	return outcome
 }

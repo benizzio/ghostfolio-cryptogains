@@ -31,7 +31,10 @@ func (s diagnosticReportService) Write(ctx context.Context, request DiagnosticRe
 // PrepareState builds the user-visible diagnostic-report state and auto-writes
 // the report when explicit development mode is active.
 // Authored by: OpenCode
-func (s diagnosticReportService) PrepareState(request DiagnosticReportRequest) DiagnosticReportState {
+func (s diagnosticReportService) PrepareState(
+	ctx context.Context,
+	request DiagnosticReportRequest,
+) DiagnosticReportState {
 	var state = DiagnosticReportState{
 		Eligible: true,
 		Request:  request,
@@ -40,7 +43,7 @@ func (s diagnosticReportService) PrepareState(request DiagnosticReportRequest) D
 		return state
 	}
 
-	var path, err = s.Write(context.Background(), request)
+	var path, err = s.Write(ctx, request)
 	if err == nil {
 		state.Path = path
 	}
