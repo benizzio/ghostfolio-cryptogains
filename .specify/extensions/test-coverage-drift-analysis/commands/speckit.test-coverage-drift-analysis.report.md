@@ -37,7 +37,7 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 6. Load the coverage definition reference files that define the repository's coverage target and expected test structure:
    - `.specify/memory/constitution.md` when present
    - `AGENTS.md` when present
-   - any known proprietary agent-instruction files present in repository or feature scope, such as `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `copilot-instructions.md`, `.cursorrules`, `.cursor/rules/**`, `.windsurfrules`, or `.clinerules`
+   - any known proprietary agent-instruction files present in repository or feature scope, such as `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `.cursorrules`, `.cursor/rules/**`, `.windsurfrules`, or `.clinerules`
 7. If the loaded coverage definition reference files do not define concrete coverage targets, coverage gates, or test-structure expectations, derive the best-guess baseline conservatively from existing repository coverage commands, CI workflows, tests, and feature planning artifacts. Mark derived baseline items as derived in the report.
 
 ## Review Scope
