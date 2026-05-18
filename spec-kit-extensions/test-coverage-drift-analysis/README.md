@@ -7,6 +7,7 @@ Beta Spec Kit extension for reviewing an implemented feature against the reposit
 - Provides the `speckit.test-coverage-drift-analysis.report` command
 - Provides the `speckit.test-coverage-drift-analysis.remediation-plan` command
 - Registers an optional `after_implement` hook for report generation
+- The installed hook registry may set `enabled: true` to register the optional hook by default while still allowing users to disable it
 - Uses `.specify/memory/constitution.md`, `AGENTS.md`, and any other known proprietary agent-instruction files present in repository or feature scope as the coverage-policy baseline
 - Scans the same coverage definition reference files as the report baseline: constitution and instruction files
 - Focuses on coverage target, coverage gate instrumentation, required test structure, and the expected balance between integration and unit tests

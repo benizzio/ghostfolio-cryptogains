@@ -37,7 +37,7 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 6. Load the coverage definition reference files that define the repository's coverage target and expected test structure:
    - `.specify/memory/constitution.md` when present
    - `AGENTS.md` when present
-   - any known proprietary agent-instruction files present in repository or feature scope, such as `CLAUDE.md`, `GEMINI.md`, `copilot-instructions.md`, `.cursorrules`, `.cursor/rules/**`, `.windsurfrules`, or `.clinerules`
+   - any known proprietary agent-instruction files present in repository or feature scope, such as `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `copilot-instructions.md`, `.cursorrules`, `.cursor/rules/**`, `.windsurfrules`, or `.clinerules`
 7. If the loaded coverage definition reference files do not define concrete coverage targets, coverage gates, or test-structure expectations, derive the best-guess baseline conservatively from existing repository coverage commands, CI workflows, tests, and feature planning artifacts. Mark derived baseline items as derived in the report.
 
 ## Review Scope
@@ -63,7 +63,7 @@ Prioritize the loaded baseline rules around:
 - required coverage percentage targets, including line, statement, branch, or file coverage when the tooling distinguishes them
 - coverage instrumentation of project-owned packages from contract, integration, and other black-box test packages
 - required coverage commands and CI quality gates
-- required test structure, including integration tests as the default for user journeys and Ghostfolio-facing workflows
+- required test structure, including integration tests as the default for user journeys and external-service-facing workflows
 - when unit tests are expected, when they are discouraged, and when duplicated unit tests should be removed
 - evidence that coverage-relevant regressions and test suites pass before completion
 
@@ -78,7 +78,7 @@ Prioritize the loaded baseline rules around:
 3. Inspect relevant implementation files, test files, coverage commands, and coverage gate definitions.
 4. Identify only concrete drift items that have explicit coverage-policy evidence from the loaded coverage definition reference files, or clearly marked derived evidence when the explicit baseline is incomplete.
 5. Assign severity:
-   - `High`: the feature cannot demonstrate the required coverage target, bypasses coverage instrumentation for project-owned packages, or lacks required tests for critical user journeys or Ghostfolio-facing workflows
+   - `High`: the feature cannot demonstrate the required coverage target, bypasses coverage instrumentation for project-owned packages, or lacks required tests for critical user journeys or external-service-facing workflows
    - `Medium`: test structure drifts from the required integration-first approach, coverage evidence is incomplete, or unit tests duplicate integration coverage in a maintainability-relevant way
    - `Low`: local coverage documentation, command alignment, or minor test organization drift with limited release risk
 6. Reuse existing `COV-DRIFT-###` IDs when the finding is substantively the same. Assign new IDs sequentially after the highest existing coverage drift number only for new findings.

@@ -42,7 +42,8 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 4. Read `FEATURE_DIR/tasks.md` and identify the current task numbering, phase heading style, separator style, path-reference style, and task checkbox syntax from the file itself and the loaded Spec Kit references.
 5. Append a new final phase dedicated to test-coverage drift remediation, following the phase structure used by the current `tasks.md` rather than a hard-coded template.
 6. Create one unchecked Spec Kit task per selected coverage drift finding:
-   - continue task IDs from the highest existing task ID in `tasks.md`
+   - continue task IDs by finding existing IDs that match `T` followed by digits, incrementing the highest numeric suffix, and preserving the existing numeric width
+   - ignore mixed-prefix IDs and non-numeric suffix variants such as `T012a` when deriving the next numeric task ID
    - use the task checkbox and task-line conventions from the current local Spec Kit installation
    - include the `COV-DRIFT-###` ID, severity, and finding title
    - reference `test-coverage-drift-report.md` and the finding's report topic or anchor
