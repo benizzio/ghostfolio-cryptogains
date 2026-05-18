@@ -178,6 +178,19 @@ description: "Task list for Store Activity Data implementation"
 
 ---
 
+## Phase 8: Coding Standards Drift Remediation
+
+**Purpose**: Close the recorded documentation, naming, and local Go-style consistency drift captured in `specs/003-store-activity-data/coding-standards-drift-report.md`.
+
+- [ ] T066 [P] DRIFT-001 Medium: Apply the repository-required package-level, function-level, and author-attribution documentation pattern consistently in `tests/unit/decimal_test.go`, `tests/unit/snapshot_store_test.go`, `tests/unit/snapshot_envelope_test.go`, `tests/unit/year_derivation_test.go`, `tests/contract/ghostfolio_sync_storage_contract_test.go`, `tests/contract/helpers_test.go`, and `tests/integration/sync_storage_flow_test.go`, following `specs/003-store-activity-data/coding-standards-drift-report.md#drift-001-feature-test-files-apply-the-required-documentation-pattern-inconsistently`
+- [ ] T067 [P] DRIFT-002 Medium: Rename validation-era storage-slice files, helper names, and screen terminology in `tests/integration/sync_validation_flow_test.go`, `tests/contract/ghostfolio_sync_validation_contract_test.go`, `internal/tui/screen/sync_validation_screen.go`, and `internal/tui/screen/validation_result_screen.go`, plus dependent references, so the active sync-and-store surface uses storage-oriented names consistent with the implemented behavior, following `specs/003-store-activity-data/coding-standards-drift-report.md#drift-002-directly-supporting-files-still-use-validation-era-names-for-a-storage-slice`
+- [ ] T068 [P] DRIFT-003 Low: Replace first-use short declarations with explicit `var` declarations in `internal/sync/model/activity_amount_resolution.go` where they fall outside the documented reuse exception, preserving existing behavior while closing the local Go-style drift recorded in `specs/003-store-activity-data/coding-standards-drift-report.md#drift-003-production-go-code-repeats-short-declarations-against-the-local-var-preference`
+- [ ] T069 Re-run `make test` and `make coverage`, then confirm the remediated files close `DRIFT-001`, `DRIFT-002`, and `DRIFT-003` in `specs/003-store-activity-data/coding-standards-drift-report.md`
+
+**Checkpoint**: Coding-standards drift remediation is complete only after `T066` through `T069` land together and the Store Activity Data verification path still passes.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -187,8 +200,10 @@ description: "Task list for Store Activity Data implementation"
 - Phase 3, Phase 4, and Phase 5 depend on Phase 2.
 - Phase 6 depends on the stories selected for release.
 - Phase 7 depends on Phase 6 and runs only after the implementation phases are complete.
+- Phase 8 depends on Phase 7 and runs only after coverage-drift remediation is complete.
 - Final Phase 6 evidence and verification closure for this slice now depends on the remaining nullable-contract follow-up and unchecked validation work, especially `T048`, `T012`, `T018`, `T039`, `T057`, `T058`, `T059`, `T060`, `T061`, `T062`, and the rerun tasks `T045`, `T046`, and `T055`.
 - Final coverage-drift closure now depends on `T063`, `T064`, and `T065`.
+- Final coding-standards-drift closure now depends on `T066`, `T067`, `T068`, and `T069`.
 
 ### Dependency Graph
 
@@ -200,6 +215,7 @@ Phase 1 Setup
       -> US3 Preserve Data Quality And Server Boundaries
         -> Phase 6 Polish
           -> Phase 7 Test Coverage Drift Remediation
+            -> Phase 8 Coding Standards Drift Remediation
 
 Cross-story runtime dependencies:
   US1 provides the initial full-history sync, protected snapshot write, and success result path.
@@ -230,7 +246,8 @@ Cross-story runtime dependencies:
 - T025 through T028 and T051 can run in parallel for US2, then T029 and T030 can run in parallel before T031, T032, T052, and T056.
 - T033 through T037, T057, and T061 can run in parallel for US3; `T038` through `T040` and `T053` can proceed after the shared fixtures exist, and `T058` plus `T059` close after `T057` and `T061` establish the BUG-004 validation and diagnostic expectations, before `T041` and `T042`.
 - T043, T044, T049, T050, and T062 can run in parallel once the release scope is stable; `T045`, `T046`, and `T055` are the verification reruns that close the BUG-004 follow-up work after the reopened tasks complete.
-- T063 and `T064` can run in parallel after Phase 6; `T065` runs after both remediation tasks complete.
+- `T063` and `T064` can run in parallel after Phase 6; `T065` runs after both remediation tasks complete.
+- `T066`, `T067`, and `T068` can run in parallel after Phase 7; `T069` runs after the remediation tasks complete.
 
 ---
 
@@ -295,6 +312,7 @@ Task: T040 Implement server-mismatch detection in internal/app/runtime/sync_serv
 3. Deliver US3 so invalid histories and server changes cannot silently replace good data.
 4. Finish Phase 6 to lock documentation, security review, and coverage evidence.
 5. Finish Phase 7 to restore enforced 100% coverage gating and close the recorded coverage drift.
+6. Finish Phase 8 to close the recorded coding-standards drift while keeping the verification path green.
 
 ### Parallel Team Strategy
 
