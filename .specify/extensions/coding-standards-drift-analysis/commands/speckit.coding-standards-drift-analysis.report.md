@@ -34,7 +34,7 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
    - `.specify/templates/tasks-template.md` when present
    - the existing `FEATURE_DIR/tasks.md`
 5. Using the task state syntax from the current local Spec Kit installation and the existing task file, verify there are no open, unchecked, pending, or reopened tasks in `FEATURE_DIR/tasks.md`. If any are present, stop without writing the report and instruct the user to finish implementation with `/speckit.implement` before running drift analysis.
-6. Discover and load `AGENTS.md` plus any other known proprietary agent-instruction files present in repository or feature scope, such as `CLAUDE.md`, `GEMINI.md`, `copilot-instructions.md`, `.cursorrules`, `.cursor/rules/**`, `.windsurfrules`, or `.clinerules`.
+6. Discover and load `AGENTS.md` plus any other known proprietary agent-instruction files present in repository or feature scope, such as `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `.cursorrules`, `.cursor/rules/**`, `.windsurfrules`, or `.clinerules`.
 7. Load `.specify/memory/constitution.md` if it exists.
 8. If the loaded instructions and constitution do not enforce concrete coding standards or software engineering practices, derive the best-guess baseline conservatively from the existing code style, structure, documentation patterns, and architectural boundaries in the active feature scope and directly related code.
 
