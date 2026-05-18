@@ -185,6 +185,8 @@ func MapActivity(entry dto.ActivityPageEntry, baseCurrency string, decimalServic
 	if decimalService == nil {
 		decimalService = decimalsupport.NewService()
 	}
+	var sourceID = strings.TrimSpace(entry.ID)
+	var occurredAt = strings.TrimSpace(entry.Date)
 
 	quantity, _, err := decimalService.ParseNumber(entry.Quantity)
 	if err != nil {
@@ -197,8 +199,8 @@ func MapActivity(entry dto.ActivityPageEntry, baseCurrency string, decimalServic
 	}
 
 	return syncmodel.ActivityRecord{
-		SourceID:              entry.ID,
-		OccurredAt:            entry.Date,
+		SourceID:              sourceID,
+		OccurredAt:            occurredAt,
 		ActivityType:          syncmodel.ActivityType(strings.ToUpper(strings.TrimSpace(entry.Type))),
 		AssetSymbol:           strings.TrimSpace(entry.SymbolProfile.Symbol),
 		AssetName:             strings.TrimSpace(entry.SymbolProfile.Name),

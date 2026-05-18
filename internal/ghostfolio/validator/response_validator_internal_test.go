@@ -49,6 +49,7 @@ func TestValidateSingleActivityPageResponseCoversBranches(t *testing.T) {
 		{name: "missing type", response: dto.ActivityPageResponse{Count: 1, Activities: []dto.ActivityPageEntry{{ID: "1", Date: "2026-01-31T10:00:00Z"}}}, wantErr: true},
 		{name: "missing date", response: dto.ActivityPageResponse{Count: 1, Activities: []dto.ActivityPageEntry{{ID: "1", Type: "BUY"}}}, wantErr: true},
 		{name: "invalid date", response: dto.ActivityPageResponse{Count: 1, Activities: []dto.ActivityPageEntry{{ID: "1", Date: "bad", Type: "BUY"}}}, wantErr: true},
+		{name: "valid activity with padded date", response: dto.ActivityPageResponse{Count: 1, Activities: []dto.ActivityPageEntry{{ID: "1", Date: " 2026-01-31T10:00:00Z ", Type: "BUY"}}}, wantErr: false},
 		{name: "valid activity with fractional seconds", response: dto.ActivityPageResponse{Count: 1, Activities: []dto.ActivityPageEntry{{ID: "1", Date: "2026-01-31T10:00:00.000Z", Type: "BUY"}}}, wantErr: false},
 		{name: "valid activity", response: dto.ActivityPageResponse{Count: 1, Activities: []dto.ActivityPageEntry{{ID: "1", Date: "2026-01-31T10:00:00Z", Type: "BUY"}}}, wantErr: false},
 	}

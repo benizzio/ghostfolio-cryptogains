@@ -129,7 +129,7 @@ func ValidateSingleActivityPageResponse(response dto.ActivityPageResponse) error
 	if strings.TrimSpace(entry.Date) == "" {
 		return fmt.Errorf("activity date is required")
 	}
-	if _, err := time.Parse(time.RFC3339Nano, entry.Date); err != nil {
+	if _, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(entry.Date)); err != nil {
 		return fmt.Errorf("activity date must be a readable timestamp: %w", err)
 	}
 
@@ -150,7 +150,7 @@ func ValidateActivityPageEntry(entry dto.ActivityPageEntry) error {
 	if strings.TrimSpace(entry.Date) == "" {
 		return fmt.Errorf("activity date is required")
 	}
-	if _, err := time.Parse(time.RFC3339Nano, entry.Date); err != nil {
+	if _, err := time.Parse(time.RFC3339Nano, strings.TrimSpace(entry.Date)); err != nil {
 		return fmt.Errorf("activity date must be a readable timestamp: %w", err)
 	}
 	if strings.TrimSpace(entry.SymbolProfile.Symbol) == "" {
@@ -298,7 +298,7 @@ func requireJSONNumber(raw json.Number, fieldName string) error {
 	if strings.TrimSpace(raw.String()) == "" {
 		return fmt.Errorf("%s is required", fieldName)
 	}
-	if _, err := raw.Float64(); err != nil {
+	if _, _, err := decimalsupport.ParseNumber(raw); err != nil {
 		return fmt.Errorf("%s must be a readable JSON number: %w", fieldName, err)
 	}
 	return nil
@@ -311,7 +311,7 @@ func requireOptionalJSONNumber(raw json.Number, fieldName string) error {
 	if strings.TrimSpace(raw.String()) == "" {
 		return nil
 	}
-	if _, err := raw.Float64(); err != nil {
+	if _, _, err := decimalsupport.ParseNumber(raw); err != nil {
 		return fmt.Errorf("%s must be a readable JSON number: %w", fieldName, err)
 	}
 	return nil

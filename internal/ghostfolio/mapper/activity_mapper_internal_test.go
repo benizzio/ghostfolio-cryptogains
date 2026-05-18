@@ -101,6 +101,17 @@ func TestMapActivityHandlesOptionalValuesAndScopeBranches(t *testing.T) {
 	if record.OrderCurrency != "" || record.Comment != "" {
 		t.Fatalf("expected uninformed nullable strings to map cleanly, got %#v", record)
 	}
+
+	entry = validActivityPageEntry()
+	entry.ID = "  activity-2  "
+	entry.Date = "  2024-01-01T10:00:00Z  "
+	record, err = MapActivity(entry, "USD", decimalsupport.NewService())
+	if err != nil {
+		t.Fatalf("map activity with padded identifiers: %v", err)
+	}
+	if record.SourceID != "activity-2" || record.OccurredAt != "2024-01-01T10:00:00Z" {
+		t.Fatalf("expected stored identity fields to be trimmed, got %#v", record)
+	}
 }
 
 func TestMapActivityAndMapActivitiesSurfaceMappingFailures(t *testing.T) {

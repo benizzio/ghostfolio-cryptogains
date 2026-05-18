@@ -45,6 +45,11 @@ func TestValidateActivityPageResponseAndEntryCoverBranches(t *testing.T) {
 		{name: "missing type", entry: dto.ActivityPageEntry{ID: "1"}, wantErr: true},
 		{name: "missing date", entry: dto.ActivityPageEntry{ID: "1", Type: "BUY"}, wantErr: true},
 		{name: "invalid date", entry: dto.ActivityPageEntry{ID: "1", Type: "BUY", Date: "bad"}, wantErr: true},
+		{name: "valid date with whitespace", entry: func() dto.ActivityPageEntry {
+			entry := validActivityPageEntry()
+			entry.Date = " 2024-01-01T10:00:00Z "
+			return entry
+		}(), wantErr: false},
 		{name: "missing symbol", entry: dto.ActivityPageEntry{ID: "1", Type: "BUY", Date: "2024-01-01T10:00:00Z"}, wantErr: true},
 		{name: "missing quantity", entry: func() dto.ActivityPageEntry {
 			entry := validActivityPageEntry()
@@ -56,6 +61,11 @@ func TestValidateActivityPageResponseAndEntryCoverBranches(t *testing.T) {
 			entry.Quantity = json.Number("bad")
 			return entry
 		}(), wantErr: true},
+		{name: "large exact quantity stays readable", entry: func() dto.ActivityPageEntry {
+			entry := validActivityPageEntry()
+			entry.Quantity = json.Number("1e309")
+			return entry
+		}(), wantErr: false},
 		{name: "unreadable unit price", entry: func() dto.ActivityPageEntry {
 			entry := validActivityPageEntry()
 			entry.UnitPrice = json.Number("bad")
@@ -71,6 +81,11 @@ func TestValidateActivityPageResponseAndEntryCoverBranches(t *testing.T) {
 			entry.Fee = json.Number("bad")
 			return entry
 		}(), wantErr: true},
+		{name: "large exact optional fee stays readable", entry: func() dto.ActivityPageEntry {
+			entry := validActivityPageEntry()
+			entry.Fee = json.Number("1e309")
+			return entry
+		}(), wantErr: false},
 		{name: "unreadable asset-profile fee", entry: func() dto.ActivityPageEntry {
 			entry := validActivityPageEntry()
 			entry.FeeInAssetProfileCurrency = json.Number("bad")
