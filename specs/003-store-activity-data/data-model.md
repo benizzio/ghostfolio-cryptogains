@@ -227,14 +227,14 @@ Fields:
 | `activity_type` | enum | `BUY` or `SELL` only |
 | `asset_symbol` | string | Asset identifier used for future reporting |
 | `asset_name` | string nullable | Optional human-readable asset name |
-| `order_currency` | string nullable | Currency context for preserved order-currency amounts from `Order.currency` |
+| `order_currency` | string nullable | Currency context for preserved order-currency amounts from `Order.currency`; nullable because Ghostfolio may return `Order.currency = null` |
 | `order_unit_price` | decimal string nullable | Exact order-currency unit price when provided |
 | `order_gross_value` | decimal string nullable | Exact order-currency gross value when provided |
 | `order_fee_amount` | decimal string nullable | Exact order-currency fee amount when provided |
-| `asset_profile_currency` | string nullable | Currency context for preserved asset-profile amounts from `SymbolProfile.currency` |
+| `asset_profile_currency` | string nullable | Currency context for preserved asset-profile amounts from `SymbolProfile.currency`; optional because Ghostfolio may omit `SymbolProfile.currency` |
 | `asset_profile_unit_price` | decimal string nullable | Exact asset-profile-currency unit price when provided |
 | `asset_profile_fee_amount` | decimal string nullable | Exact asset-profile-currency fee amount when provided |
-| `base_currency` | string nullable | Sync base-currency context derived from authenticated user settings |
+| `base_currency` | string nullable | Optional sync base-currency context derived once per sync from authenticated user `settings.baseCurrency`; not sourced from each activity row |
 | `base_gross_value` | decimal string nullable | Exact base-currency gross value when provided |
 | `base_fee_amount` | decimal string nullable | Exact base-currency fee amount when provided |
 | `quantity` | decimal string | Exact quantity value |
@@ -252,6 +252,7 @@ Validation rules:
 - `source_id`, `occurred_at`, `activity_type`, `asset_symbol`, and `quantity` are mandatory.
 - `activity_type` must be `BUY` or `SELL`.
 - Every preserved monetary amount must keep its own explicit currency identity. A populated order-currency amount requires `order_currency`; a populated asset-profile amount requires `asset_profile_currency`; a populated base-currency amount requires `base_currency`.
+- The three currency-definition tiers are independent. Missing `order_currency`, `asset_profile_currency`, or `base_currency` does not fail sync by itself. Currency-context fails only when preserved monetary data remains uninformed across all three tiers.
 - The current-slice unit-price, gross-value, and fee views are resolved transiently from the preserved explicit-currency groups rather than being stored as separate persisted fields.
 - `BUY` requires a resolved unit price greater than `0`.
 - `SELL` with a resolved unit price of `0` is valid only when `comment` is present and is treated as a non-taxable holding reduction for future reporting.
@@ -293,6 +294,7 @@ Fields:
 | `auth_token` | secret string | runtime only | Bearer JWT returned by Ghostfolio |
 | `started_at` | timestamp | runtime only | Session start time |
 | `authenticated_at` | timestamp nullable | runtime only | Set after anonymous auth succeeds |
+| `user_base_currency` | string nullable | runtime only | Optional authenticated-user `settings.baseCurrency` captured for the current sync attempt; may remain absent even after user retrieval |
 
 Relationships:
 
@@ -303,6 +305,7 @@ Relationships:
 Validation rules:
 
 - Never persisted.
+- `user_base_currency` is sourced from authenticated `GET /api/v1/user` data and remains optional because Ghostfolio may omit `settings.baseCurrency`.
 - Cleared on success, failure, cancel, or application exit.
 - Must never be written to logs, user-visible messages, or diagnostics.
 
