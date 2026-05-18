@@ -1,6 +1,6 @@
-# Checklist: Code Standard Drift Remediation
+# Checklist: Coding Standards Drift Remediation
 
-**Purpose**: Track correction of the coding-standard drift recorded in [`../code-standard-drift-report.md`](../code-standard-drift-report.md).
+**Purpose**: Track correction of the coding-standards drift recorded in [`../coding-standards-drift-report.md`](../coding-standards-drift-report.md).
 **Created**: 2026-05-10
 **Feature**: [spec.md](../spec.md)
 
@@ -23,6 +23,6 @@
 
 ## Closure Criteria
 
-- [x] Re-run the coding-standards review after remediation and confirm that every drift item in `../code-standard-drift-report.md` is either resolved or intentionally reclassified.
+- [x] Re-run the coding-standards review after remediation and confirm that every drift item in `../coding-standards-drift-report.md` is either resolved or intentionally reclassified.
 - [x] Confirm the remediation changes preserve project-owned automated coverage expectations.
 - [x] Confirm any updated public API comments remain accurate after the code changes.
