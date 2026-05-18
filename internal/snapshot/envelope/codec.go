@@ -29,6 +29,11 @@ var unmarshalEnvelopeJSON = json.Unmarshal
 // Authored by: OpenCode
 var newGCM = cipher.NewGCM
 
+// Test seams wrap AES block construction so envelope tests can inject cipher
+// creation failures safely.
+// Authored by: OpenCode
+var newAESCipher = aes.NewCipher
+
 // Codec defines the serialization boundary for protected snapshot envelopes.
 //
 // Example:
@@ -280,7 +285,7 @@ func prepareAEAD(header snapshotmodel.EnvelopeHeader, securityToken string) (cip
 	}
 
 	var block cipher.Block
-	block, err = aes.NewCipher(key)
+	block, err = newAESCipher(key)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create AES cipher: %w", err)
 	}

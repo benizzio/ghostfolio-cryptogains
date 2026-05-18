@@ -199,27 +199,32 @@ func TestDeriveEncryptionKeyAndCiphertextHelpersCoverBranches(t *testing.T) {
 		t.Fatalf("expected invalid key length to fail")
 	}
 
+	originalNewAESCipher := newAESCipher
+	newAESCipher = func([]byte) (cipher.Block, error) {
+		return nil, errors.New("cipher boom")
+	}
+	if _, _, err := prepareAEAD(header, "token"); err == nil {
+		t.Fatalf("expected injected AES cipher failure")
+	}
+	newAESCipher = originalNewAESCipher
+
 	originalMarshal := marshalEnvelopeJSON
 	marshalEnvelopeJSON = func(any) ([]byte, error) {
 		return nil, errors.New("marshal boom")
 	}
-	t.Cleanup(func() {
-		marshalEnvelopeJSON = originalMarshal
-	})
 	if _, _, err := prepareAEAD(header, "token"); err == nil {
 		t.Fatalf("expected authenticated-header encoding failure")
 	}
+	marshalEnvelopeJSON = originalMarshal
 
 	originalNewGCM := newGCM
 	newGCM = func(cipher.Block) (cipher.AEAD, error) {
 		return nil, errors.New("gcm boom")
 	}
-	t.Cleanup(func() {
-		newGCM = originalNewGCM
-	})
 	if _, _, err := prepareAEAD(header, "token"); err == nil {
 		t.Fatalf("expected injected GCM failure")
 	}
+	newGCM = originalNewGCM
 }
 
 // TestValidateEnvelopeHeaderCoversValidationBranches verifies every supported

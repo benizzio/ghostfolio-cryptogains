@@ -726,6 +726,17 @@ func TestUpdateSyncResultCoversNavigation(t *testing.T) {
 	if updated.(*Model).active != syncResultScreenKey {
 		t.Fatalf("expected non-key sync result message to be ignored")
 	}
+
+	model = newTestModel(t, &config)
+	model.active = syncResultScreenKey
+	model.result = resultState{Busy: true, Outcome: runtime.SyncOutcome{Success: false}}
+	if items := model.resultMenuItems(); len(items) != 3 || items[0].Enabled || items[1].Enabled || items[2].Enabled {
+		t.Fatalf("expected busy result menu items to be present but disabled, got %#v", items)
+	}
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	if cmd != nil || !updated.(*Model).result.Busy || updated.(*Model).result.MenuIndex != 0 {
+		t.Fatalf("expected busy sync result to ignore key input, got model=%#v cmd=%v", updated.(*Model).result, cmd)
+	}
 }
 
 func TestUpdateMainMenuCoversEnterAndDefaultKey(t *testing.T) {

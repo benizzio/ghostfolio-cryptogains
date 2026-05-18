@@ -369,13 +369,9 @@ func diagnosticDerivedUnitPrice(quantity string, grossValue string) string {
 	if grossValueErr != nil {
 		return ""
 	}
-	var unitPrice, _, err = decimalsupport.DivideExact(parsedGrossValue, parsedQuantity)
+	_, canonical, err := decimalsupport.DivideExact(parsedGrossValue, parsedQuantity)
 	if err != nil {
 		return ""
-	}
-	var canonical, canonicalErr = decimalsupport.CanonicalString(unitPrice)
-	if canonicalErr != nil {
-		return unitPrice.String()
 	}
 
 	return canonical
@@ -398,15 +394,10 @@ func diagnosticDerivedGrossValue(quantity string, unitPrice string) string {
 		return ""
 	}
 	var grossValue apd.Decimal
-	if _, err := apd.BaseContext.Mul(&grossValue, &parsedQuantity, &parsedUnitPrice); err != nil {
-		return ""
-	}
-	var canonical, canonicalErr = decimalsupport.CanonicalString(grossValue)
-	if canonicalErr != nil {
-		return grossValue.String()
-	}
+	_, _ = apd.BaseContext.Mul(&grossValue, &parsedQuantity, &parsedUnitPrice)
+	grossValue.Reduce(&grossValue)
 
-	return canonical
+	return grossValue.Text('f')
 }
 
 // parseOptionalNumber parses one optional decimal number when it is present.

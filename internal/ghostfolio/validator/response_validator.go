@@ -14,6 +14,11 @@ import (
 	"github.com/cockroachdb/apd/v3"
 )
 
+// Test seams wrap decimal multiplication so validator tests can inject gross-
+// value derivation failures safely.
+// Authored by: OpenCode
+var multiplyDecimals = apd.BaseContext.Mul
+
 // ValidateAuthResponse verifies that the anonymous-auth response satisfies the
 // supported contract for this slice.
 //
@@ -263,7 +268,7 @@ func requireDerivableGrossValue(entry dto.ActivityPageEntry) error {
 		return fmt.Errorf("activity unit price must support exact gross-value derivation: %w", err)
 	}
 	var product apd.Decimal
-	if _, err := apd.BaseContext.Mul(&product, &quantity, &unitPrice); err != nil {
+	if _, err := multiplyDecimals(&product, &quantity, &unitPrice); err != nil {
 		return fmt.Errorf("activity unit price must support exact gross-value derivation: %w", err)
 	}
 

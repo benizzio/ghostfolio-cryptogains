@@ -758,6 +758,132 @@ func TestRunPreservesIncompleteCurrencyContextDiagnosticContext(t *testing.T) {
 	})
 }
 
+// TestSnapshotLifecycleAndWrapperNilBranches verifies the remaining nil-guard
+// and payload-build branches around protected snapshot state helpers.
+// Authored by: OpenCode
+func TestSnapshotLifecycleAndWrapperNilBranches(t *testing.T) {
+	t.Parallel()
+
+	var nilActiveState *activeSnapshotState
+	nilActiveState.Set(snapshotstore.Candidate{SnapshotID: "ignored"}, snapshotmodel.Payload{})
+	if state := nilActiveState.ProtectedDataState(); state != (ProtectedDataState{}) {
+		t.Fatalf("expected nil active snapshot state to report zero value, got %#v", state)
+	}
+
+	lifecycle := newSnapshotLifecycle(runtimeSnapshotStore{}, nil, protectedPayloadBuilder{})
+	if lifecycle == nil || lifecycle.state == nil {
+		t.Fatalf("expected new snapshot lifecycle to create default state, got %#v", lifecycle)
+	}
+	lifecycle.SetActiveSnapshot(snapshotstore.Candidate{SnapshotID: "active"}, snapshotmodel.Payload{SetupProfile: snapshotmodel.SetupProfile{ServerOrigin: "https://ghostfol.io"}})
+	if state := lifecycle.ProtectedDataState(); !state.HasReadableSnapshot || state.ServerOrigin != "https://ghostfol.io" {
+		t.Fatalf("expected non-nil snapshot lifecycle state, got %#v", state)
+	}
+
+	var nilLifecycle *snapshotLifecycle
+	if state := nilLifecycle.ProtectedDataState(); state != (ProtectedDataState{}) {
+		t.Fatalf("expected nil snapshot lifecycle to report zero protected data state, got %#v", state)
+	}
+	if check := nilLifecycle.CheckServerReplacement(runtimeSetupConfigFixture(t, "https://ghostfol.io", true)); check != (ServerReplacementCheck{}) {
+		t.Fatalf("expected nil snapshot lifecycle to report no replacement requirement, got %#v", check)
+	}
+	nilLifecycle.SetActiveSnapshot(snapshotstore.Candidate{SnapshotID: "ignored"}, snapshotmodel.Payload{})
+
+	err := (&snapshotLifecycle{}).Persist(context.Background(), snapshotPersistRequest{})
+	if !errors.Is(err, errSnapshotStoreUnavailable) {
+		t.Fatalf("expected missing store to fail persist, got %v", err)
+	}
+
+	originalReadRandom := readRandom
+	readRandom = func([]byte) (int, error) {
+		return 0, errors.New("random boom")
+	}
+	defer func() {
+		readRandom = originalReadRandom
+	}()
+
+	err = lifecycle.Persist(context.Background(), snapshotPersistRequest{
+		Config:        runtimeSetupConfigFixture(t, "https://ghostfol.io", true),
+		SecurityToken: "token",
+		Cache:         runtimeCacheFixture(),
+	})
+	if err == nil || !strings.Contains(err.Error(), "build protected payload local user id") {
+		t.Fatalf("expected payload build failure from random identifier error, got %v", err)
+	}
+}
+
+// TestSyncServiceUserFetchAndSnapshotWrapperBranches verifies the remaining
+// sync-service wrapper and user-fetch failure branches.
+// Authored by: OpenCode
+func TestSyncServiceUserFetchAndSnapshotWrapperBranches(t *testing.T) {
+	t.Parallel()
+
+	t.Run("wrapper methods handle nil snapshots", func(t *testing.T) {
+		config := runtimeSetupConfigFixture(t, "https://ghostfol.io", true)
+		service := &syncService{}
+		lifecycle := newSnapshotLifecycle(runtimeSnapshotStore{}, newActiveSnapshotState(), protectedPayloadBuilder{})
+		lifecycle.SetActiveSnapshot(snapshotstore.Candidate{SnapshotID: "active"}, snapshotmodel.Payload{SetupProfile: snapshotmodel.SetupProfile{ServerOrigin: "https://ghostfol.io"}})
+		if state := service.ProtectedDataState(); state != (ProtectedDataState{}) {
+			t.Fatalf("expected zero protected data state when snapshots are absent, got %#v", state)
+		}
+		if check := service.CheckServerReplacement(config); check != (ServerReplacementCheck{}) {
+			t.Fatalf("expected zero server replacement check when snapshots are absent, got %#v", check)
+		}
+
+		session, attempt := newSyncAttemptState(SyncRequest{Config: config, SecurityToken: "token"})
+		_, outcome, ok := service.prepareSyncAttempt(context.Background(), SyncRequest{Config: config, SecurityToken: "token"}, &session, &attempt)
+		if ok || outcome.FailureReason != SyncFailureIncompatibleNewSyncData {
+			t.Fatalf("expected prepareSyncAttempt to fail without snapshot lifecycle, got ok=%v outcome=%#v", ok, outcome)
+		}
+
+		service.snapshots = lifecycle
+		if state := service.ProtectedDataState(); !state.HasReadableSnapshot || state.ServerOrigin != "https://ghostfol.io" {
+			t.Fatalf("expected sync-service wrapper to delegate protected data state, got %#v", state)
+		}
+	})
+
+	t.Run("run handles authenticated user request failure", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			switch request.URL.Path {
+			case "/api/v1/auth/anonymous":
+				_, _ = writer.Write([]byte(`{"authToken":"jwt"}`))
+			case "/api/v1/user":
+				writer.WriteHeader(http.StatusUnauthorized)
+			default:
+				writer.WriteHeader(http.StatusNotFound)
+			}
+		}))
+		defer server.Close()
+
+		service := requireSyncService(t, NewSyncService(ghostfolioclient.New(server.Client()), time.Second, t.TempDir(), true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), runtimeSnapshotStore{}))
+		outcome := service.Run(context.Background(), SyncRequest{Config: runtimeSetupConfigFixture(t, server.URL, true), SecurityToken: "token"})
+		if outcome.FailureReason != SyncFailureUnsuccessfulServerResponse {
+			t.Fatalf("expected user-request failure to map to unsuccessful response, got %#v", outcome)
+		}
+	})
+
+	t.Run("run handles authenticated user contract failure", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			switch request.URL.Path {
+			case "/api/v1/auth/anonymous":
+				_, _ = writer.Write([]byte(`{"authToken":"jwt"}`))
+			case "/api/v1/user":
+				_, _ = writer.Write([]byte(`{"settings":null}`))
+			default:
+				writer.WriteHeader(http.StatusNotFound)
+			}
+		}))
+		defer server.Close()
+
+		service := requireSyncService(t, NewSyncService(ghostfolioclient.New(server.Client()), time.Second, t.TempDir(), true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), runtimeSnapshotStore{}))
+		outcome := service.Run(context.Background(), SyncRequest{Config: runtimeSetupConfigFixture(t, server.URL, true), SecurityToken: "token"})
+		if outcome.FailureReason != SyncFailureIncompatibleServerContract {
+			t.Fatalf("expected user-response contract failure, got %#v", outcome)
+		}
+	})
+}
+
 // runtimeDiagnosticRequestFixture returns one structured diagnostic-report
 // request for runtime internal tests.
 // Authored by: OpenCode

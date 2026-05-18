@@ -2,9 +2,11 @@ package validator
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/dto"
+	"github.com/cockroachdb/apd/v3"
 )
 
 func TestValidateActivityPageResponseAndEntryCoverBranches(t *testing.T) {
@@ -185,5 +187,82 @@ func validActivityPageEntry() dto.ActivityPageEntry {
 		FeeInBaseCurrency:               json.Number("0.25"),
 		UnitPriceInAssetProfileCurrency: json.Number("82.3"),
 		SymbolProfile:                   dto.ActivitySymbolProfile{Symbol: "BTC", Name: "Bitcoin", Currency: "EUR"},
+	}
+}
+
+// TestBasisDerivationHelpersCoverRemainingBranches verifies the internal basis-
+// derivation helpers across their direct error and fallback branches.
+// Authored by: OpenCode
+func TestBasisDerivationHelpersCoverRemainingBranches(t *testing.T) {
+	entry := validActivityPageEntry()
+	entry.UnitPrice = json.Number("bad")
+	if err := requireBasisInput(entry); err == nil {
+		t.Fatalf("expected invalid direct unit-price basis to fail")
+	}
+
+	entry = validActivityPageEntry()
+	entry.UnitPrice = json.Number("")
+	entry.UnitPriceInAssetProfileCurrency = json.Number("")
+	entry.Value = json.Number("")
+	entry.ValueInBaseCurrency = json.Number("10")
+	entry.Quantity = json.Number("2")
+	if err := requireDerivableUnitPrice(entry); err != nil {
+		t.Fatalf("expected base-currency gross value to derive exact unit price, got %v", err)
+	}
+	if got := selectGrossValue(entry); got.String() != "10" {
+		t.Fatalf("expected base-currency gross value fallback, got %q", got.String())
+	}
+
+	entry = validActivityPageEntry()
+	entry.UnitPrice = json.Number("")
+	entry.UnitPriceInAssetProfileCurrency = json.Number("")
+	entry.Quantity = json.Number("bad")
+	if err := requireDerivableUnitPrice(entry); err == nil {
+		t.Fatalf("expected unreadable quantity to fail unit-price derivation")
+	}
+
+	entry = validActivityPageEntry()
+	entry.UnitPrice = json.Number("")
+	entry.UnitPriceInAssetProfileCurrency = json.Number("")
+	entry.Value = json.Number("")
+	entry.ValueInBaseCurrency = json.Number("bad")
+	if err := requireDerivableUnitPrice(entry); err == nil {
+		t.Fatalf("expected unreadable gross value fallback to fail unit-price derivation")
+	}
+
+	entry = validActivityPageEntry()
+	entry.Value = json.Number("")
+	entry.ValueInBaseCurrency = json.Number("")
+	entry.Quantity = json.Number("bad")
+	if err := requireDerivableGrossValue(entry); err == nil {
+		t.Fatalf("expected unreadable quantity to fail gross-value derivation")
+	}
+
+	entry = validActivityPageEntry()
+	entry.Value = json.Number("")
+	entry.ValueInBaseCurrency = json.Number("")
+	entry.UnitPrice = json.Number("")
+	entry.UnitPriceInAssetProfileCurrency = json.Number("bad")
+	if err := requireDerivableGrossValue(entry); err == nil {
+		t.Fatalf("expected unreadable unit-price fallback to fail gross-value derivation")
+	}
+
+	originalMultiplyDecimals := multiplyDecimals
+	multiplyDecimals = func(*apd.Decimal, *apd.Decimal, *apd.Decimal) (apd.Condition, error) {
+		return apd.InvalidOperation, errors.New("mul boom")
+	}
+	defer func() {
+		multiplyDecimals = originalMultiplyDecimals
+	}()
+
+	entry = validActivityPageEntry()
+	entry.Value = json.Number("")
+	entry.ValueInBaseCurrency = json.Number("")
+	if err := requireBasisInput(entry); err == nil {
+		t.Fatalf("expected gross-value derivation failure to propagate from basis validation")
+	}
+
+	if err := requireDerivableGrossValue(entry); err == nil {
+		t.Fatalf("expected injected multiplication failure to fail gross-value derivation")
 	}
 }

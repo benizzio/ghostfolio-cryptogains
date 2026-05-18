@@ -18,3 +18,4 @@ coverage:
 	mkdir -p dist/coverage
 	$(GO) test ./cmd/... ./internal/... ./tests/contract ./tests/integration ./tests/unit -covermode=atomic -coverpkg=$(PRODUCTION_PACKAGES) -coverprofile=dist/coverage/coverage.out
 	$(GOCOVERAGEPLUS) -i dist/coverage/coverage.out -o dist/coverage/coverage.xml
+	$(GO) run ./tools/coveragegate -profile dist/coverage/coverage.out -cobertura dist/coverage/coverage.xml

@@ -296,6 +296,36 @@ func TestValidateAllowsProdLikeOrderTierPrecisionDifferences(t *testing.T) {
 	}
 }
 
+// TestDirectValidationHelpersCoverRemainingBranches verifies the direct helper
+// branches not covered through end-to-end cache validation.
+// Authored by: OpenCode
+func TestDirectValidationHelpersCoverRemainingBranches(t *testing.T) {
+	t.Parallel()
+
+	var zero apd.Decimal
+	record := validationTestRecord(t, "missing-unit-price", syncmodel.ActivityTypeBuy)
+	if err := validateActivityType(record, syncmodel.ResolvedActivityAmounts{}, &zero); err == nil {
+		t.Fatalf("expected missing resolved unit price to fail")
+	}
+
+	var invalidQuantity apd.Decimal
+	invalidQuantity.Form = apd.NaNSignaling
+	record = validationTestRecord(t, "sell-invalid", syncmodel.ActivityTypeSell)
+	record.Quantity = invalidQuantity
+	record.Comment = "sell"
+
+	err := applyRunningQuantity(record, map[string]apd.Decimal{}, &zero)
+	if err == nil {
+		t.Fatalf("expected invalid sell arithmetic to fail")
+	}
+	if !strings.Contains(err.Error(), "invalid quantity arithmetic") {
+		t.Fatalf("expected invalid arithmetic error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), apd.InvalidOperation.String()) {
+		t.Fatalf("expected invalid operation condition in error, got %v", err)
+	}
+}
+
 func validationTestRecord(t *testing.T, sourceID string, activityType syncmodel.ActivityType) syncmodel.ActivityRecord {
 	t.Helper()
 

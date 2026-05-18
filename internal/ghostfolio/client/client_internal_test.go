@@ -28,6 +28,12 @@ func TestRequestFailureHelpers(t *testing.T) {
 	if got := (&RequestFailure{Category: FailureRejectedToken, Operation: "anonymous auth", StatusCode: http.StatusForbidden}).Error(); got != "anonymous auth returned HTTP 403" {
 		t.Fatalf("unexpected default error text: %q", got)
 	}
+	if got := (&RequestFailure{Category: FailureConnectivityProblem, Operation: "user request"}).Error(); got != "user request failed" {
+		t.Fatalf("unexpected operation-only error text: %q", got)
+	}
+	if got := (&RequestFailure{Category: FailureConnectivityProblem}).Error(); got != string(FailureConnectivityProblem) {
+		t.Fatalf("unexpected category fallback error text: %q", got)
+	}
 	if got := (*RequestFailure)(nil).Error(); got != "" {
 		t.Fatalf("unexpected nil error text: %q", got)
 	}
@@ -160,6 +166,7 @@ func TestFetchUserHandlesServerResponseClasses(t *testing.T) {
 	}{
 		{name: "not found", status: http.StatusNotFound, expected: FailureIncompatibleServerContract},
 		{name: "forbidden", status: http.StatusForbidden, expected: FailureUnsuccessfulServerResponse},
+		{name: "server error", status: http.StatusInternalServerError, expected: FailureUnsuccessfulServerResponse},
 		{name: "invalid content type", status: http.StatusOK, contentType: "text/plain", body: "ok", expected: FailureIncompatibleServerContract},
 		{name: "invalid json", status: http.StatusOK, contentType: "application/json", body: "{", expected: FailureIncompatibleServerContract},
 	}

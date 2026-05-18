@@ -3,6 +3,7 @@ package mapper
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/dto"
@@ -186,6 +187,24 @@ func TestMappingErrorAndParseHelpersCoverRemainingBranches(t *testing.T) {
 	if _, err := parseOptionalNumber(json.Number("bad"), decimalsupport.NewService()); err == nil {
 		t.Fatalf("expected optional-number parse failure")
 	}
+
+	orderUnitPriceInvalid := validActivityPageEntry()
+	orderUnitPriceInvalid.UnitPrice = json.Number("bad")
+	if _, err := parseMoneyContext(orderUnitPriceInvalid, "USD", decimalsupport.NewService()); err == nil || !strings.Contains(err.Error(), "order unit price") {
+		t.Fatalf("expected order unit-price parse failure, got %v", err)
+	}
+
+	orderFeeInvalid := validActivityPageEntry()
+	orderFeeInvalid.Fee = json.Number("bad")
+	if _, err := parseMoneyContext(orderFeeInvalid, "USD", decimalsupport.NewService()); err == nil || !strings.Contains(err.Error(), "order fee") {
+		t.Fatalf("expected order fee parse failure, got %v", err)
+	}
+
+	assetProfileFeeInvalid := validActivityPageEntry()
+	assetProfileFeeInvalid.FeeInAssetProfileCurrency = json.Number("bad")
+	if _, err := parseMoneyContext(assetProfileFeeInvalid, "USD", decimalsupport.NewService()); err == nil || !strings.Contains(err.Error(), "asset-profile fee") {
+		t.Fatalf("expected asset-profile fee parse failure, got %v", err)
+	}
 }
 
 func TestWrapMappingErrorUsesCarrierAndFallbackContext(t *testing.T) {
@@ -262,6 +281,91 @@ func TestDiagnosticRecordFromActivityEntryCoversGrossValueBranches(t *testing.T)
 	record = diagnosticRecordFromActivityEntry(entry, "USD")
 	if record.SourceScopeID != "" || record.SourceScopeKind != "" || record.SourceScopeReliability != "" {
 		t.Fatalf("expected diagnostic scope to follow shared scope mapping, got %#v", record)
+	}
+}
+
+// TestDiagnosticHelperDerivationsCoverRemainingBranches verifies diagnostic-only
+// currency and decimal derivation helpers across the remaining branches.
+// Authored by: OpenCode
+func TestDiagnosticHelperDerivationsCoverRemainingBranches(t *testing.T) {
+	t.Parallel()
+
+	entry := validActivityPageEntry()
+	entry.UnitPrice = json.Number("")
+	entry.UnitPriceInAssetProfileCurrency = json.Number("")
+	entry.Value = json.Number("")
+	record := diagnosticRecordFromActivityEntry(entry, "USD")
+	if record.UnitPrice != "82.3" || record.UnitPriceCurrency != "USD" {
+		t.Fatalf("expected diagnostic unit price derived from base gross value, got %#v", record)
+	}
+	if record.GrossValue != "123.45" || record.GrossValueCurrency != "USD" {
+		t.Fatalf("expected base-currency gross value preference, got %#v", record)
+	}
+
+	entry = validActivityPageEntry()
+	entry.Value = json.Number("")
+	entry.ValueInBaseCurrency = json.Number("")
+	record = diagnosticRecordFromActivityEntry(entry, "USD")
+	if record.GrossValue != "123.45" || record.GrossValueCurrency != "EUR" {
+		t.Fatalf("expected gross value derived from asset-profile unit price, got %#v", record)
+	}
+
+	entry = validActivityPageEntry()
+	entry.Value = json.Number("")
+	entry.ValueInBaseCurrency = json.Number("")
+	entry.UnitPriceInAssetProfileCurrency = json.Number("")
+	record = diagnosticRecordFromActivityEntry(entry, "USD")
+	if record.GrossValue != "120" || record.GrossValueCurrency != "CHF" {
+		t.Fatalf("expected gross value derived from order unit price, got %#v", record)
+	}
+
+	entry = validActivityPageEntry()
+	entry.Fee = json.Number("")
+	entry.FeeInBaseCurrency = json.Number("")
+	if amount := diagnosticPreferredFeeAmount(entry); amount != "0.22" {
+		t.Fatalf("expected asset-profile fee preference, got %q", amount)
+	}
+	if currency := diagnosticPreferredFeeAmountCurrency(entry, "USD"); currency != "EUR" {
+		t.Fatalf("expected asset-profile fee currency, got %q", currency)
+	}
+
+	entry = validActivityPageEntry()
+	entry.Fee = json.Number("")
+	entry.FeeInAssetProfileCurrency = json.Number("")
+	if amount := diagnosticPreferredFeeAmount(entry); amount != "0.25" {
+		t.Fatalf("expected base fee preference, got %q", amount)
+	}
+	if currency := diagnosticPreferredFeeAmountCurrency(entry, "USD"); currency != "USD" {
+		t.Fatalf("expected base fee currency, got %q", currency)
+	}
+
+	if derived := diagnosticDerivedUnitPrice("", "10"); derived != "" {
+		t.Fatalf("expected empty derived unit price for missing quantity, got %q", derived)
+	}
+	if derived := diagnosticDerivedUnitPrice("bad", "10"); derived != "" {
+		t.Fatalf("expected empty derived unit price for unreadable quantity, got %q", derived)
+	}
+	if derived := diagnosticDerivedUnitPrice("1", "bad"); derived != "" {
+		t.Fatalf("expected empty derived unit price for unreadable gross value, got %q", derived)
+	}
+	if derived := diagnosticDerivedUnitPrice("3", "10"); derived != "" {
+		t.Fatalf("expected empty derived unit price for inexact division, got %q", derived)
+	}
+	if derived := diagnosticDerivedUnitPrice("1.5", "123.45"); derived != "82.3" {
+		t.Fatalf("expected exact derived unit price, got %q", derived)
+	}
+
+	if derived := diagnosticDerivedGrossValue("", "10"); derived != "" {
+		t.Fatalf("expected empty derived gross value for missing quantity, got %q", derived)
+	}
+	if derived := diagnosticDerivedGrossValue("bad", "10"); derived != "" {
+		t.Fatalf("expected empty derived gross value for unreadable quantity, got %q", derived)
+	}
+	if derived := diagnosticDerivedGrossValue("1", "bad"); derived != "" {
+		t.Fatalf("expected empty derived gross value for unreadable unit price, got %q", derived)
+	}
+	if derived := diagnosticDerivedGrossValue("1.5", "82.3"); derived != "123.45" {
+		t.Fatalf("expected exact derived gross value, got %q", derived)
 	}
 }
 

@@ -2,6 +2,7 @@ package decimal
 
 import (
 	"encoding/json"
+	"math/big"
 	"testing"
 
 	"github.com/cockroachdb/apd/v3"
@@ -114,5 +115,52 @@ func TestExactServiceAndPackageHelpersCoverSuccessAndErrorBranches(t *testing.T)
 	}
 	if _, err := CanonicalStringPointer(&invalid); err == nil {
 		t.Fatalf("expected non-finite decimal pointer canonicalization to fail")
+	}
+}
+
+// TestInternalDecimalHelpersCoverRemainingBranches verifies the direct helper
+// branches that package-level API calls do not reach naturally.
+// Authored by: OpenCode
+func TestInternalDecimalHelpersCoverRemainingBranches(t *testing.T) {
+	t.Parallel()
+
+	dividend, _, err := ParseString("1")
+	if err != nil {
+		t.Fatalf("parse dividend: %v", err)
+	}
+	divisor, _, err := ParseString("2")
+	if err != nil {
+		t.Fatalf("parse divisor: %v", err)
+	}
+
+	var invalid apd.Decimal
+	invalid.Form = apd.Infinite
+	if _, _, err := DivideExact(invalid, divisor); err == nil {
+		t.Fatalf("expected invalid dividend to fail exact division")
+	}
+	if _, _, err := DivideExact(dividend, invalid); err == nil {
+		t.Fatalf("expected invalid divisor to fail exact division")
+	}
+	if _, err := finiteDecimalToRat(invalid); err == nil {
+		t.Fatalf("expected invalid finite-decimal conversion to fail")
+	}
+
+	negative, _, err := ParseString("-1.25")
+	if err != nil {
+		t.Fatalf("parse negative decimal: %v", err)
+	}
+	rat, err := finiteDecimalToRat(negative)
+	if err != nil {
+		t.Fatalf("convert negative finite decimal: %v", err)
+	}
+	if rat.String() != "-5/4" {
+		t.Fatalf("unexpected negative rational: %q", rat.String())
+	}
+
+	if _, err := exactDecimalString(nil); err == nil {
+		t.Fatalf("expected nil rational to fail exact-decimal conversion")
+	}
+	if got, err := exactDecimalString(big.NewRat(1, 5)); err != nil || got != "0.2" {
+		t.Fatalf("expected terminating fifth to render as 0.2, got %q err=%v", got, err)
 	}
 }

@@ -363,6 +363,20 @@ func TestNewEnvelopeHeaderCoversBranches(t *testing.T) {
 	}
 }
 
+// TestValidateSnapshotIDRejectsDotSegments verifies caller-supplied snapshot
+// identifiers cannot use the current or parent directory names.
+// Authored by: OpenCode
+func TestValidateSnapshotIDRejectsDotSegments(t *testing.T) {
+	t.Parallel()
+
+	if err := validateSnapshotID("."); err == nil {
+		t.Fatalf("expected current-directory snapshot identifier to fail")
+	}
+	if err := validateSnapshotID(".."); err == nil {
+		t.Fatalf("expected parent-directory snapshot identifier to fail")
+	}
+}
+
 // encryptedSnapshotFixture stores one fully specified protected snapshot fixture
 // for encrypted-store tests.
 // Authored by: OpenCode

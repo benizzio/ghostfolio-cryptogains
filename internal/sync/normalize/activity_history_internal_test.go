@@ -202,6 +202,46 @@ func TestNormalizeCoversHashAndAmbiguousOrderingFailures(t *testing.T) {
 	}
 }
 
+// TestUsableSourceScopeAndRecordHashCoverRemainingBranches verifies the direct
+// scope-usability and optional amount-hash failure branches.
+// Authored by: OpenCode
+func TestUsableSourceScopeAndRecordHashCoverRemainingBranches(t *testing.T) {
+	t.Parallel()
+
+	var unusableRecord = normalizationTestRecord(t, "activity-scope", syncmodel.ActivityTypeBuy)
+	unusableRecord.SourceScope = &syncmodel.SourceScope{ID: "   ", Kind: syncmodel.SourceScopeKindWallet}
+	if scopeID, scopeKind, usable := usableSourceScope(unusableRecord); usable || scopeID != "" || scopeKind != "" {
+		t.Fatalf("expected blank source-scope identity to remain unusable, got %q %q %t", scopeID, scopeKind, usable)
+	}
+
+	var invalid apd.Decimal
+	invalid.Form = apd.Infinite
+
+	assetProfileUnitPriceRecord := normalizationTestRecord(t, "activity-asset-profile-price", syncmodel.ActivityTypeBuy)
+	assetProfileUnitPriceRecord.AssetProfileUnitPrice = &invalid
+	if _, err := recordHash(assetProfileUnitPriceRecord); err == nil {
+		t.Fatalf("expected invalid asset-profile unit price canonicalization to fail")
+	}
+
+	assetProfileFeeRecord := normalizationTestRecord(t, "activity-asset-profile-fee", syncmodel.ActivityTypeBuy)
+	assetProfileFeeRecord.AssetProfileFeeAmount = &invalid
+	if _, err := recordHash(assetProfileFeeRecord); err == nil {
+		t.Fatalf("expected invalid asset-profile fee canonicalization to fail")
+	}
+
+	baseGrossValueRecord := normalizationTestRecord(t, "activity-base-gross", syncmodel.ActivityTypeBuy)
+	baseGrossValueRecord.BaseGrossValue = &invalid
+	if _, err := recordHash(baseGrossValueRecord); err == nil {
+		t.Fatalf("expected invalid base gross-value canonicalization to fail")
+	}
+
+	baseFeeAmountRecord := normalizationTestRecord(t, "activity-base-fee", syncmodel.ActivityTypeBuy)
+	baseFeeAmountRecord.BaseFeeAmount = &invalid
+	if _, err := recordHash(baseFeeAmountRecord); err == nil {
+		t.Fatalf("expected invalid base fee canonicalization to fail")
+	}
+}
+
 func normalizationTestRecord(t *testing.T, sourceID string, activityType syncmodel.ActivityType) syncmodel.ActivityRecord {
 	t.Helper()
 
