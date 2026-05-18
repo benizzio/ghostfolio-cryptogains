@@ -8,7 +8,7 @@ Beta Spec Kit extension for reviewing an implemented feature against the reposit
 - Provides the `speckit.coding-standards-drift-analysis.remediation-plan` command
 - Registers an optional `after_implement` hook for report generation
 - Uses `AGENTS.md`, `.specify/memory/constitution.md`, and any other known proprietary agent-instruction files present in repository or feature scope as the repository-policy baseline
-- Discovers known proprietary agent-instruction files such as `CLAUDE.md`, `GEMINI.md`, `copilot-instructions.md`, `.cursorrules`, `.cursor/rules/**`, `.windsurfrules`, and `.clinerules` when they are present
+- Discovers known proprietary agent-instruction files such as `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `.cursorrules`, `.cursor/rules/**`, `.windsurfrules`, and `.clinerules` when they are present
 - Focuses on coding standards and engineering practices, not feature-domain correctness
 - Blocks report generation and remediation planning while the active feature has open or pending tasks
 - Preserves existing `DRIFT-###` identifiers when the same findings remain on rerun
