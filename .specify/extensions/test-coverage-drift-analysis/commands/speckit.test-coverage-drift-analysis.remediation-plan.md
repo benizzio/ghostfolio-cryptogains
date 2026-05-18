@@ -21,7 +21,6 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 - Add actionable remediation tasks to the active feature's `tasks.md` so `/speckit.implement` can execute them.
 - Run only after the normal implementation task list is complete.
 - Keep generated tasks tied to their source `COV-DRIFT-###` report topics for context.
-- Do not create `test-coverage-drift-remediation.md` or any other separate remediation checklist.
 
 ## Prerequisites
 
