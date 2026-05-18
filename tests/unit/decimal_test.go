@@ -1,3 +1,6 @@
+// Package unit verifies focused exact-decimal and normalization helpers for the
+// sync-and-storage slice.
+// Authored by: OpenCode
 package unit
 
 import (
@@ -7,6 +10,9 @@ import (
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 )
 
+// TestDecimalParsingCanonicalizesExactValues verifies canonical persisted
+// decimal strings for readable source inputs.
+// Authored by: OpenCode
 func TestDecimalParsingCanonicalizesExactValues(t *testing.T) {
 	t.Parallel()
 
@@ -27,6 +33,9 @@ func TestDecimalParsingCanonicalizesExactValues(t *testing.T) {
 	}
 }
 
+// TestDecimalParsingRejectsInvalidInputs verifies failures for unreadable
+// decimal inputs.
+// Authored by: OpenCode
 func TestDecimalParsingRejectsInvalidInputs(t *testing.T) {
 	t.Parallel()
 

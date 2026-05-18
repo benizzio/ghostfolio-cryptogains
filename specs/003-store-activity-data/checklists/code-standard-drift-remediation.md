@@ -23,6 +23,10 @@
 
 ## Closure Criteria
 
-- [ ] Re-run the coding-standards review after remediation and confirm that every drift item in `../code-standard-drift-report.md` is either resolved or intentionally reclassified.
+- [x] Re-run the coding-standards review after remediation and confirm that every drift item in `../code-standard-drift-report.md` is either resolved or intentionally reclassified.
 - [x] Confirm the remediation changes preserve project-owned automated coverage expectations.
 - [x] Confirm any updated public API comments or author-attribution notes remain accurate after the code changes.
+
+## Deprecation Note
+
+- 2026-05-18: The older `code-standard-drift-report.md` findings were either resolved directly or intentionally reclassified into `../coding-standards-drift-report.md`, and the replacement remediation flow now records the verified closure state.

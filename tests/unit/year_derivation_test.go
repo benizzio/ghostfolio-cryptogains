@@ -1,3 +1,6 @@
+// Package unit verifies focused exact-decimal and normalization helpers for the
+// sync-and-storage slice.
+// Authored by: OpenCode
 package unit
 
 import (
@@ -8,6 +11,9 @@ import (
 	syncnormalize "github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
 )
 
+// TestYearDerivationUsesSourceTimestampOffset verifies report-year derivation
+// from the source timestamp offset instead of machine-local time.
+// Authored by: OpenCode
 func TestYearDerivationUsesSourceTimestampOffset(t *testing.T) {
 	t.Parallel()
 

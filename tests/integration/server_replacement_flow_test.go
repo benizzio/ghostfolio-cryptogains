@@ -37,9 +37,9 @@ func TestServerReplacementFlowCancelKeepsReadableSnapshotUnchanged(t *testing.T)
 	secondServer := newGhostfolioStorageServer(t, []storagePageFixture{{Count: 1, ActivitiesJSON: `[{"id":"activity-new","date":"2025-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"ETH","name":"Ether","currency":"USD"}}]`}})
 	secondConfig := mustCustomSetupConfig(t, secondServer.URL)
 	model := flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &secondConfig}, true, service))
-	model = openSyncValidation(t, model)
+	model = openSyncEntry(t, model)
 	model = typeToken(t, model, "token-one")
-	model = blurTokenInput(t, model)
+	model = blurTokenInputFromSyncEntry(t, model)
 
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	_ = testutil.RunCmd(cmd)
@@ -80,9 +80,9 @@ func TestServerReplacementFlowConfirmSuccessReplacesSnapshot(t *testing.T) {
 	}
 	model := flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &secondConfig}, true, replacementService))
 
-	model = openSyncValidation(t, model)
+	model = openSyncEntry(t, model)
 	model = typeToken(t, model, "token-one")
-	model = blurTokenInput(t, model)
+	model = blurTokenInputFromSyncEntry(t, model)
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	_ = testutil.RunCmd(cmd)
 	model = assertFlowModel(t, updated)
@@ -91,7 +91,7 @@ func TestServerReplacementFlowConfirmSuccessReplacesSnapshot(t *testing.T) {
 	}
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = assertFlowModel(t, updated)
-	model = applyValidationBatch(t, model, cmd)
+	model = applySyncBatch(t, model, cmd)
 	if model.ActiveScreen() != "sync_result" {
 		t.Fatalf("expected result screen after confirmed replacement, got %s", model.ActiveScreen())
 	}

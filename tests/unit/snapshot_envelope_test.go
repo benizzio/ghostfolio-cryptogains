@@ -1,3 +1,6 @@
+// Package unit verifies focused exact-decimal and snapshot helpers for the
+// sync-and-storage slice.
+// Authored by: OpenCode
 package unit
 
 import (
@@ -8,6 +11,9 @@ import (
 	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
 )
 
+// TestSnapshotEnvelopeAuthenticatesHeaderBytes verifies that header tampering
+// breaks protected payload decryption.
+// Authored by: OpenCode
 func TestSnapshotEnvelopeAuthenticatesHeaderBytes(t *testing.T) {
 	t.Parallel()
 

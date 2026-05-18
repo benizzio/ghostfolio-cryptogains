@@ -1,3 +1,6 @@
+// Package contract verifies rendered workflow and Ghostfolio-boundary contracts
+// for the sync-and-storage slice.
+// Authored by: OpenCode
 package contract
 
 import (
@@ -7,7 +10,10 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/validator"
 )
 
-func TestGhostfolioSyncValidationContract(t *testing.T) {
+// TestGhostfolioSyncProbeContract verifies the focused single-page probe
+// contract that remains available for validator branch coverage.
+// Authored by: OpenCode
+func TestGhostfolioSyncProbeContract(t *testing.T) {
 	t.Parallel()
 
 	if err := validator.ValidateAuthResponse(dto.AuthResponse{AuthToken: "jwt"}); err != nil {

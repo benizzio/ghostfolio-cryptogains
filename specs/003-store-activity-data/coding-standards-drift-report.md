@@ -4,6 +4,7 @@
 **Created**: 2026-05-18
 **Feature**: [spec.md](./spec.md)
 **Correction Tracking**: Drift remediation tasks are added to [tasks.md](./tasks.md) by `/speckit.coding-standards-drift-analysis.remediation-plan`.
+**Status**: RESOLVED on 2026-05-18 after the Phase 8 remediation rerun.
 
 ## Scope
 
@@ -19,6 +20,14 @@
 - `AGENTS.md:110-117` states a local Go style preference for `var` over `:=`, except for the documented reuse case.
 - `.specify/memory/constitution.md:128-139` requires descriptive naming, cohesive modules and functions, minimized duplication, and documented consistency.
 - No additional proprietary instruction files were present in repository or feature scope at review time beyond `AGENTS.md`.
+
+## Remediation Verification
+
+- 2026-05-18 remediation rerun: `make test` passed.
+- 2026-05-18 remediation rerun: `make coverage` passed and regenerated `dist/coverage/coverage.out` plus `dist/coverage/coverage.xml`.
+- `DRIFT-001` is resolved. The flagged test files now carry package-level comments, function-level comments, and `Authored by: OpenCode` attribution where this feature slice had been inconsistent.
+- `DRIFT-002` is resolved. The validation-era support files were renamed to storage-oriented names: `tests/integration/sync_entry_flow_test.go`, `tests/contract/ghostfolio_sync_probe_contract_test.go`, `internal/tui/screen/sync_entry_screen.go`, and `internal/tui/screen/sync_result_screen.go`, with dependent helper names updated to match.
+- `DRIFT-003` is resolved. The flagged first-use short declarations in `internal/sync/model/activity_amount_resolution.go` now use explicit `var` declarations without changing behavior.
 
 ## Findings
 
@@ -85,4 +94,5 @@ The feature now implements a sync-and-store slice, and the screen types themselv
 ## Notes
 
 - No prior `coding-standards-drift-report.md` existed in this feature directory, so this report starts a new ID sequence at `DRIFT-001`.
-- Task-state review found no unchecked tasks in `specs/003-store-activity-data/tasks.md`; completed items that still include `Reopened` text were treated as historical labels inside checked tasks rather than open work.
+- Phase 8 remediation tasks `T066` through `T069` are now complete in `specs/003-store-activity-data/tasks.md`.
+- The findings above remain as the point-in-time snapshot that triggered remediation. The `Remediation Verification` section records the verified closure state.

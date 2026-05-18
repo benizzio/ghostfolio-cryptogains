@@ -1,3 +1,6 @@
+// Package unit verifies focused exact-decimal and snapshot helpers for the
+// sync-and-storage slice.
+// Authored by: OpenCode
 package unit
 
 import (
@@ -11,6 +14,9 @@ import (
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
 
+// TestSnapshotStoreWritesAndReadsProtectedPayloadAtomically verifies the
+// encrypted snapshot round-trip through the protected store.
+// Authored by: OpenCode
 func TestSnapshotStoreWritesAndReadsProtectedPayloadAtomically(t *testing.T) {
 	t.Parallel()
 

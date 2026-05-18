@@ -51,15 +51,25 @@ type ResolvedActivityAmounts struct {
 // asset-profile-currency, and base-currency groups that Ghostfolio exposes.
 // Authored by: OpenCode
 func ResolveActivityAmounts(record ActivityRecord) (ResolvedActivityAmounts, error) {
-	grossValue, grossValueCurrency, err := resolveGrossValue(record)
+	var grossValue *apd.Decimal
+	var grossValueCurrency string
+	var err error
+
+	grossValue, grossValueCurrency, err = resolveGrossValue(record)
 	if err != nil {
 		return ResolvedActivityAmounts{}, err
 	}
-	unitPrice, unitPriceCurrency, err := resolveUnitPrice(record, grossValue, grossValueCurrency)
+
+	var unitPrice *apd.Decimal
+	var unitPriceCurrency string
+	unitPrice, unitPriceCurrency, err = resolveUnitPrice(record, grossValue, grossValueCurrency)
 	if err != nil {
 		return ResolvedActivityAmounts{}, err
 	}
-	feeAmount, feeAmountCurrency, err := resolveFeeAmount(record)
+
+	var feeAmount *apd.Decimal
+	var feeAmountCurrency string
+	feeAmount, feeAmountCurrency, err = resolveFeeAmount(record)
 	if err != nil {
 		return ResolvedActivityAmounts{}, err
 	}
@@ -83,18 +93,24 @@ func resolveUnitPrice(
 	grossValue *apd.Decimal,
 	grossValueCurrency string,
 ) (*apd.Decimal, string, error) {
+	var value *apd.Decimal
+	var currency string
+	var ok bool
+	var err error
 
-	if value, currency, ok := informedActivityAmount(record.OrderUnitPrice, record.OrderCurrency); ok {
+	value, currency, ok = informedActivityAmount(record.OrderUnitPrice, record.OrderCurrency)
+	if ok {
 		return value, currency, nil
 	}
 
-	if value, currency, ok := informedActivityAmount(record.AssetProfileUnitPrice, record.AssetProfileCurrency); ok {
+	value, currency, ok = informedActivityAmount(record.AssetProfileUnitPrice, record.AssetProfileCurrency)
+	if ok {
 		return value, currency, nil
 	}
 
 	if grossValue != nil && strings.TrimSpace(grossValueCurrency) != "" {
-
-		unitPrice, _, err := decimalsupport.DivideExact(*grossValue, record.Quantity)
+		var unitPrice apd.Decimal
+		unitPrice, _, err = decimalsupport.DivideExact(*grossValue, record.Quantity)
 		if err != nil {
 			return nil, "", fmt.Errorf(
 				"activity %q unit price basis input is not exact: %w",
@@ -122,13 +138,20 @@ func resolveUnitPrice(
 //
 // Authored by: OpenCode and benizzio
 func resolveGrossValue(record ActivityRecord) (*apd.Decimal, string, error) {
+	var value *apd.Decimal
+	var currency string
+	var ok bool
 
-	if value, currency, ok := informedActivityAmount(record.OrderGrossValue, record.OrderCurrency); ok {
+	value, currency, ok = informedActivityAmount(record.OrderGrossValue, record.OrderCurrency)
+	if ok {
 		return value, currency, nil
 	}
 
-	if value, currency, ok := informedActivityAmount(record.OrderUnitPrice, record.OrderCurrency); ok {
-		grossValue, err := multiplyActivityAmount(record.Quantity, *value)
+	value, currency, ok = informedActivityAmount(record.OrderUnitPrice, record.OrderCurrency)
+	if ok {
+		var grossValue apd.Decimal
+		var err error
+		grossValue, err = multiplyActivityAmount(record.Quantity, *value)
 		if err != nil {
 			return nil, "", fmt.Errorf(
 				"activity %q gross value basis input is invalid: %w",
@@ -139,8 +162,11 @@ func resolveGrossValue(record ActivityRecord) (*apd.Decimal, string, error) {
 		return &grossValue, currency, nil
 	}
 
-	if value, currency, ok := informedActivityAmount(record.AssetProfileUnitPrice, record.AssetProfileCurrency); ok {
-		grossValue, err := multiplyActivityAmount(record.Quantity, *value)
+	value, currency, ok = informedActivityAmount(record.AssetProfileUnitPrice, record.AssetProfileCurrency)
+	if ok {
+		var grossValue apd.Decimal
+		var err error
+		grossValue, err = multiplyActivityAmount(record.Quantity, *value)
 		if err != nil {
 			return nil, "", fmt.Errorf(
 				"activity %q gross value basis input is invalid: %w",
@@ -151,7 +177,8 @@ func resolveGrossValue(record ActivityRecord) (*apd.Decimal, string, error) {
 		return &grossValue, currency, nil
 	}
 
-	if value, currency, ok := informedActivityAmount(record.BaseGrossValue, record.BaseCurrency); ok {
+	value, currency, ok = informedActivityAmount(record.BaseGrossValue, record.BaseCurrency)
+	if ok {
 		return value, currency, nil
 	}
 
@@ -167,16 +194,22 @@ func resolveGrossValue(record ActivityRecord) (*apd.Decimal, string, error) {
 //
 // Authored by: OpenCode
 func resolveFeeAmount(record ActivityRecord) (*apd.Decimal, string, error) {
+	var value *apd.Decimal
+	var currency string
+	var ok bool
 
-	if value, currency, ok := informedActivityAmount(record.OrderFeeAmount, record.OrderCurrency); ok {
+	value, currency, ok = informedActivityAmount(record.OrderFeeAmount, record.OrderCurrency)
+	if ok {
 		return value, currency, nil
 	}
 
-	if value, currency, ok := informedActivityAmount(record.AssetProfileFeeAmount, record.AssetProfileCurrency); ok {
+	value, currency, ok = informedActivityAmount(record.AssetProfileFeeAmount, record.AssetProfileCurrency)
+	if ok {
 		return value, currency, nil
 	}
 
-	if value, currency, ok := informedActivityAmount(record.BaseFeeAmount, record.BaseCurrency); ok {
+	value, currency, ok = informedActivityAmount(record.BaseFeeAmount, record.BaseCurrency)
+	if ok {
 		return value, currency, nil
 	}
 
@@ -233,7 +266,9 @@ func allTierUninformedCurrencyError(sourceID string, amountName string) error {
 // Authored by: OpenCode
 func multiplyActivityAmount(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
 	var product apd.Decimal
-	if _, err := apd.BaseContext.Mul(&product, &left, &right); err != nil {
+	var err error
+	_, err = apd.BaseContext.Mul(&product, &left, &right)
+	if err != nil {
 		return apd.Decimal{}, fmt.Errorf("derive activity amount from quantity and unit price: %w", err)
 	}
 

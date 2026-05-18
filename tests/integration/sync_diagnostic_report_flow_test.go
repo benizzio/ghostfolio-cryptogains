@@ -50,11 +50,11 @@ func TestSyncDiagnosticReportFlowPromptsInProductionAndWritesOnExplicitChoice(t 
 	)
 	model := flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &config}, false, service))
 
-	model = openSyncValidation(t, model)
+	model = openSyncEntry(t, model)
 	model = typeToken(t, model, "abc123")
-	model = blurTokenInput(t, model)
-	model, cmd := startSyncValidationAttempt(t, model)
-	model = applyValidationBatch(t, model, cmd)
+	model = blurTokenInputFromSyncEntry(t, model)
+	model, cmd := startSyncAttempt(t, model)
+	model = applySyncBatch(t, model, cmd)
 
 	content := model.View().Content
 	if !strings.Contains(content, "Generate Diagnostic Report") {
@@ -121,11 +121,11 @@ func TestSyncDiagnosticReportFlowGeneratesAutomaticallyInExplicitDevelopmentMode
 	)
 	model := flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &config}, true, service))
 
-	model = openSyncValidation(t, model)
+	model = openSyncEntry(t, model)
 	model = typeToken(t, model, "abc123")
-	model = blurTokenInput(t, model)
-	model, cmd := startSyncValidationAttempt(t, model)
-	model = applyValidationBatch(t, model, cmd)
+	model = blurTokenInputFromSyncEntry(t, model)
+	model, cmd := startSyncAttempt(t, model)
+	model = applySyncBatch(t, model, cmd)
 
 	content := model.View().Content
 	if strings.Contains(content, "Generate Diagnostic Report") {

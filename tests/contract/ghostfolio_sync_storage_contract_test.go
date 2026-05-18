@@ -1,3 +1,6 @@
+// Package contract verifies rendered workflow and Ghostfolio-boundary contracts
+// for the sync-and-storage slice.
+// Authored by: OpenCode
 package contract
 
 import (
@@ -8,6 +11,9 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/validator"
 )
 
+// TestGhostfolioSyncStorageContract verifies the supported full-history storage
+// contract for auth, user, and activity-page responses.
+// Authored by: OpenCode
 func TestGhostfolioSyncStorageContract(t *testing.T) {
 	t.Parallel()
 

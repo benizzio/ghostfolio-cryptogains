@@ -1,3 +1,6 @@
+// Package integration verifies black-box sync-and-storage workflows through the
+// production runtime path.
+// Authored by: OpenCode
 package integration
 
 import (
@@ -23,6 +26,9 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 )
 
+// TestSyncStorageFlowCreatesProtectedSnapshotAfterSuccessfulMultiPageSync
+// verifies the successful multi-page storage path and protected snapshot write.
+// Authored by: OpenCode
 func TestSyncStorageFlowCreatesProtectedSnapshotAfterSuccessfulMultiPageSync(t *testing.T) {
 	t.Parallel()
 
@@ -39,11 +45,11 @@ func TestSyncStorageFlowCreatesProtectedSnapshotAfterSuccessfulMultiPageSync(t *
 	}
 
 	model := flow.NewModel(newFlowDependenciesWithStore(t, bootstrap.StartupState{ActiveConfig: &fixture.config}, true, fixture.service, store))
-	model = openSyncValidation(t, model)
+	model = openSyncEntry(t, model)
 	model = typeToken(t, model, "abc123")
-	model = blurTokenInput(t, model)
-	model, cmd := startSyncValidationAttempt(t, model)
-	model = applyValidationBatch(t, model, cmd)
+	model = blurTokenInputFromSyncEntry(t, model)
+	model, cmd := startSyncAttempt(t, model)
+	model = applySyncBatch(t, model, cmd)
 
 	if model.ActiveScreen() != "sync_result" {
 		t.Fatalf("expected sync result screen, got %s", model.ActiveScreen())
@@ -62,6 +68,9 @@ func TestSyncStorageFlowCreatesProtectedSnapshotAfterSuccessfulMultiPageSync(t *
 	}
 }
 
+// TestSyncStorageFlowHandlesEmptyHistoryAsSuccessfulStoredState verifies that a
+// valid empty history still refreshes protected local state successfully.
+// Authored by: OpenCode
 func TestSyncStorageFlowHandlesEmptyHistoryAsSuccessfulStoredState(t *testing.T) {
 	t.Parallel()
 
@@ -70,11 +79,11 @@ func TestSyncStorageFlowHandlesEmptyHistoryAsSuccessfulStoredState(t *testing.T)
 	fixture := newSyncStorageFixture(t, tempDir, server.Client(), server.URL, time.Second)
 	model := flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &fixture.config}, true, fixture.service))
 
-	model = openSyncValidation(t, model)
+	model = openSyncEntry(t, model)
 	model = typeToken(t, model, "abc123")
-	model = blurTokenInput(t, model)
-	model, cmd := startSyncValidationAttempt(t, model)
-	model = applyValidationBatch(t, model, cmd)
+	model = blurTokenInputFromSyncEntry(t, model)
+	model, cmd := startSyncAttempt(t, model)
+	model = applySyncBatch(t, model, cmd)
 
 	content := model.View().Content
 	if !strings.Contains(content, "Activity data was stored securely for future use.") {
@@ -82,16 +91,25 @@ func TestSyncStorageFlowHandlesEmptyHistoryAsSuccessfulStoredState(t *testing.T)
 	}
 }
 
+// storagePageFixture describes one deterministic paginated activity response
+// for the storage-flow server fixture.
+// Authored by: OpenCode
 type storagePageFixture struct {
 	Count          int
 	ActivitiesJSON string
 }
 
+// syncStorageFixture groups the remembered setup and runtime service used by
+// one storage-flow test.
+// Authored by: OpenCode
 type syncStorageFixture struct {
 	config  configmodel.AppSetupConfig
 	service runtime.SyncService
 }
 
+// newGhostfolioStorageServer returns a deterministic paginated Ghostfolio test
+// server for sync-and-storage integration tests.
+// Authored by: OpenCode
 func newGhostfolioStorageServer(t *testing.T, pages []storagePageFixture) *httptest.Server {
 	t.Helper()
 
@@ -123,6 +141,9 @@ func newGhostfolioStorageServer(t *testing.T, pages []storagePageFixture) *httpt
 	return server
 }
 
+// newSyncStorageFixture wires one remembered setup and runtime service for the
+// storage-flow integration tests.
+// Authored by: OpenCode
 func newSyncStorageFixture(t *testing.T, tempDir string, client *http.Client, origin string, requestTimeout time.Duration) syncStorageFixture {
 	t.Helper()
 

@@ -84,7 +84,7 @@ description: "Task list for Store Activity Data implementation"
 - [X] T021 [P] [US1] Implement protected snapshot encryption, decryption, and atomic persistence in `internal/snapshot/store/encrypted_store.go`
 - [X] T022 [US1] Implement full sync orchestration from auth through protected write in `internal/app/runtime/sync_service.go`
 - [X] T023 [US1] Update sync flow busy-state lifecycle and result routing for full-history storage in `internal/tui/flow/sync_flow.go`
-- [X] T024 [US1] Replace validation-only sync entry and result screens with storage-focused wording in `internal/tui/screen/sync_validation_screen.go` and `internal/tui/screen/validation_result_screen.go`
+- [X] T024 [US1] Replace validation-only sync entry and result screens with storage-focused wording in `internal/tui/screen/sync_entry_screen.go` and `internal/tui/screen/sync_result_screen.go`
 
 **Checkpoint**: BUG-004 reopens `T012`, `T018`, and `T060` for nullable-contract currency-tier handling in User Story 1.
 
@@ -102,15 +102,15 @@ description: "Task list for Store Activity Data implementation"
 - [X] T026 [P] [US2] Add integration coverage for same-token refresh, wrong-token denial, different-valid-token isolation, and invalid-token no-change behavior in `tests/integration/snapshot_reuse_flow_test.go`
 - [X] T027 [P] [US2] Add integration coverage for unsupported envelope version, unsupported payload version, and incompatible new sync data retention in `tests/integration/snapshot_compatibility_flow_test.go`
 - [X] T028 [P] [US2] Add unit coverage for server-scoped candidate filtering and payload version checks in `tests/unit/snapshot_discovery_test.go` and `tests/unit/stored_data_version_test.go`
-- [X] T051 [P] [US2] Add contract and integration coverage for production opt-in, explicit-development-mode automatic synced-data diagnostic reports, and generated-report path disclosure in `tests/contract/sync_storage_workflow_contract_test.go`, `tests/contract/validation_result_workflow_contract_test.go`, and `tests/integration/sync_diagnostic_report_flow_test.go`
+- [X] T051 [P] [US2] Add contract and integration coverage for production opt-in, explicit-development-mode automatic synced-data diagnostic reports, and generated-report path disclosure in `tests/contract/sync_storage_workflow_contract_test.go`, `tests/contract/sync_result_workflow_contract_test.go`, and `tests/integration/sync_diagnostic_report_flow_test.go`
 
 ### Implementation for User Story 2
 
 - [X] T029 [P] [US2] Implement server-scoped snapshot header discovery and candidate filtering in `internal/snapshot/store/discovery.go`
 - [X] T030 [P] [US2] Implement stored-data version compatibility checks for envelope and payload models in `internal/snapshot/model/version.go` and `internal/snapshot/store/compatibility.go`
 - [X] T031 [P] [US2] Implement protected snapshot unlock, active readable snapshot tracking, and isolated snapshot creation for new valid tokens in `internal/app/runtime/sync_service.go`
-- [X] T032 [US2] Implement failure and success result handling for rejected token, unsupported stored-data version, and incompatible new sync data in `internal/tui/flow/sync_flow.go` and `internal/tui/screen/validation_result_screen.go`
-- [X] T052 [US2] Implement synced-data diagnostic-report policy using the existing explicit-development-mode runtime option, local artifact writes, and result-screen report-location messaging in `internal/app/runtime/sync_service.go`, `internal/tui/flow/sync_flow.go`, and `internal/tui/screen/validation_result_screen.go`
+- [X] T032 [US2] Implement failure and success result handling for rejected token, unsupported stored-data version, and incompatible new sync data in `internal/tui/flow/sync_flow.go` and `internal/tui/screen/sync_result_screen.go`
+- [X] T052 [US2] Implement synced-data diagnostic-report policy using the existing explicit-development-mode runtime option, local artifact writes, and result-screen report-location messaging in `internal/app/runtime/sync_service.go`, `internal/tui/flow/sync_flow.go`, and `internal/tui/screen/sync_result_screen.go`
 - [X] T056 [P] [US2] Update `activity_model_version` handling and compatibility fixtures for the currency-aware activity-record design in `internal/snapshot/model/version.go`, `tests/integration/snapshot_compatibility_flow_test.go`, and `tests/unit/stored_data_version_test.go` (older pre-BUG-003 snapshots must fail with a compatibility error unless an explicit migration is added)
 
 **Checkpoint**: BUG-003 activity-model compatibility updates for User Story 2 are complete.
@@ -142,7 +142,7 @@ description: "Task list for Store Activity Data implementation"
 - [X] T059 [US3] ⚠️ Reopened Implement offending-record diagnostic details for all-tier-uninformed currency-context failures, reusing the existing production redaction and explicit-development-mode detail rules, in `internal/sync/validate/activity_history.go` and `internal/app/runtime/sync_service.go`
 - [X] T040 [P] [US3] Implement server-mismatch detection and replacement gating against the active readable snapshot in `internal/app/runtime/sync_service.go`
 - [X] T041 [US3] Implement server replacement confirmation screen and navigation in `internal/tui/screen/server_replacement_screen.go` and `internal/tui/flow/sync_flow.go`
-- [X] T042 [US3] Update the main menu and sync entry screens to surface protected-data-exists state without exposing cached activity details in `internal/tui/screen/main_menu_screen.go` and `internal/tui/screen/sync_validation_screen.go`
+- [X] T042 [US3] Update the main menu and sync entry screens to surface protected-data-exists state without exposing cached activity details in `internal/tui/screen/main_menu_screen.go` and `internal/tui/screen/sync_entry_screen.go`
 
 **Checkpoint**: BUG-004 reopens `T057`, `T058`, `T059`, and `T061` for three-tier currency-context validation follow-up in User Story 3. `T039` remains the broader defensibility task in the same validator.
 
@@ -182,10 +182,10 @@ description: "Task list for Store Activity Data implementation"
 
 **Purpose**: Close the recorded documentation, naming, and local Go-style consistency drift captured in `specs/003-store-activity-data/coding-standards-drift-report.md`.
 
-- [ ] T066 [P] DRIFT-001 Medium: Apply the repository-required package-level, function-level, and author-attribution documentation pattern consistently in `tests/unit/decimal_test.go`, `tests/unit/snapshot_store_test.go`, `tests/unit/snapshot_envelope_test.go`, `tests/unit/year_derivation_test.go`, `tests/contract/ghostfolio_sync_storage_contract_test.go`, `tests/contract/helpers_test.go`, and `tests/integration/sync_storage_flow_test.go`, following `specs/003-store-activity-data/coding-standards-drift-report.md#drift-001-feature-test-files-apply-the-required-documentation-pattern-inconsistently`
-- [ ] T067 [P] DRIFT-002 Medium: Rename validation-era storage-slice files, helper names, and screen terminology in `tests/integration/sync_validation_flow_test.go`, `tests/contract/ghostfolio_sync_validation_contract_test.go`, `internal/tui/screen/sync_validation_screen.go`, and `internal/tui/screen/validation_result_screen.go`, plus dependent references, so the active sync-and-store surface uses storage-oriented names consistent with the implemented behavior, following `specs/003-store-activity-data/coding-standards-drift-report.md#drift-002-directly-supporting-files-still-use-validation-era-names-for-a-storage-slice`
-- [ ] T068 [P] DRIFT-003 Low: Replace first-use short declarations with explicit `var` declarations in `internal/sync/model/activity_amount_resolution.go` where they fall outside the documented reuse exception, preserving existing behavior while closing the local Go-style drift recorded in `specs/003-store-activity-data/coding-standards-drift-report.md#drift-003-production-go-code-repeats-short-declarations-against-the-local-var-preference`
-- [ ] T069 Re-run `make test` and `make coverage`, then confirm the remediated files close `DRIFT-001`, `DRIFT-002`, and `DRIFT-003` in `specs/003-store-activity-data/coding-standards-drift-report.md`
+- [X] T066 [P] DRIFT-001 Medium: Apply the repository-required package-level, function-level, and author-attribution documentation pattern consistently in `tests/unit/decimal_test.go`, `tests/unit/snapshot_store_test.go`, `tests/unit/snapshot_envelope_test.go`, `tests/unit/year_derivation_test.go`, `tests/contract/ghostfolio_sync_storage_contract_test.go`, `tests/contract/helpers_test.go`, and `tests/integration/sync_storage_flow_test.go`, following `specs/003-store-activity-data/coding-standards-drift-report.md#drift-001-feature-test-files-apply-the-required-documentation-pattern-inconsistently`
+- [X] T067 [P] DRIFT-002 Medium: Rename validation-era storage-slice files, helper names, and screen terminology in `tests/integration/sync_entry_flow_test.go`, `tests/contract/ghostfolio_sync_probe_contract_test.go`, `internal/tui/screen/sync_entry_screen.go`, and `internal/tui/screen/sync_result_screen.go`, plus dependent references, so the active sync-and-store surface uses storage-oriented names consistent with the implemented behavior, following `specs/003-store-activity-data/coding-standards-drift-report.md#drift-002-directly-supporting-files-still-use-validation-era-names-for-a-storage-slice`
+- [X] T068 [P] DRIFT-003 Low: Replace first-use short declarations with explicit `var` declarations in `internal/sync/model/activity_amount_resolution.go` where they fall outside the documented reuse exception, preserving existing behavior while closing the local Go-style drift recorded in `specs/003-store-activity-data/coding-standards-drift-report.md#drift-003-production-go-code-repeats-short-declarations-against-the-local-var-preference`
+- [X] T069 Re-run `make test` and `make coverage`, then confirm the remediated files close `DRIFT-001`, `DRIFT-002`, and `DRIFT-003` in `specs/003-store-activity-data/coding-standards-drift-report.md`
 
 **Checkpoint**: Coding-standards drift remediation is complete only after `T066` through `T069` land together and the Store Activity Data verification path still passes.
 

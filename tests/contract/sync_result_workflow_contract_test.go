@@ -1,3 +1,6 @@
+// Package contract verifies rendered workflow and Ghostfolio-boundary contracts
+// for the sync-and-storage slice.
+// Authored by: OpenCode
 package contract
 
 import (
@@ -8,7 +11,10 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/screen"
 )
 
-func TestValidationResultWorkflowContract(t *testing.T) {
+// TestSyncResultWorkflowContract verifies the rendered sync-result workflow
+// contract for success, failure, and diagnostic-report outcomes.
+// Authored by: OpenCode
+func TestSyncResultWorkflowContract(t *testing.T) {
 	t.Parallel()
 
 	var success = screen.SyncResultScreenView(screen.SyncResultScreenParams{

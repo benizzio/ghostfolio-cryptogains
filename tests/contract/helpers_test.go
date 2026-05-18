@@ -1,3 +1,6 @@
+// Package contract verifies rendered workflow and Ghostfolio-boundary contracts
+// for the sync-and-storage slice.
+// Authored by: OpenCode
 package contract
 
 import (
@@ -5,6 +8,9 @@ import (
 	"testing"
 )
 
+// assertContains verifies that one rendered contract artifact includes the
+// required text.
+// Authored by: OpenCode
 func assertContains(t *testing.T, content string, expected string) {
 	t.Helper()
 	if !strings.Contains(content, expected) {
@@ -12,6 +18,9 @@ func assertContains(t *testing.T, content string, expected string) {
 	}
 }
 
+// assertNotContains verifies that one rendered contract artifact excludes the
+// forbidden text.
+// Authored by: OpenCode
 func assertNotContains(t *testing.T, content string, unexpected string) {
 	t.Helper()
 	if strings.Contains(content, unexpected) {
