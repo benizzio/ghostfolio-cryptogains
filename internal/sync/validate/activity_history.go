@@ -158,50 +158,15 @@ func validateActivityFields(record syncmodel.ActivityRecord, zero *apd.Decimal) 
 	return validateActivityType(record, resolvedAmounts, zero)
 }
 
-// validateCurrencyContext rejects missing or contradictory per-amount currency identity.
+// validateCurrencyContext rejects preserved monetary concepts that remain uninformed across all supported currency tiers.
 // Authored by: OpenCode
 func validateCurrencyContext(record syncmodel.ActivityRecord) (syncmodel.ResolvedActivityAmounts, error) {
-	if err := validateSourceMoneyCurrency(record.SourceID, "order unit price", record.OrderUnitPrice, record.OrderCurrency); err != nil {
-		return syncmodel.ResolvedActivityAmounts{}, newValidationError(err.Error(), record)
-	}
-	if err := validateSourceMoneyCurrency(record.SourceID, "order gross value", record.OrderGrossValue, record.OrderCurrency); err != nil {
-		return syncmodel.ResolvedActivityAmounts{}, newValidationError(err.Error(), record)
-	}
-	if err := validateSourceMoneyCurrency(record.SourceID, "order fee amount", record.OrderFeeAmount, record.OrderCurrency); err != nil {
-		return syncmodel.ResolvedActivityAmounts{}, newValidationError(err.Error(), record)
-	}
-	if err := validateSourceMoneyCurrency(record.SourceID, "asset-profile unit price", record.AssetProfileUnitPrice, record.AssetProfileCurrency); err != nil {
-		return syncmodel.ResolvedActivityAmounts{}, newValidationError(err.Error(), record)
-	}
-	if err := validateSourceMoneyCurrency(record.SourceID, "asset-profile fee amount", record.AssetProfileFeeAmount, record.AssetProfileCurrency); err != nil {
-		return syncmodel.ResolvedActivityAmounts{}, newValidationError(err.Error(), record)
-	}
-	if err := validateSourceMoneyCurrency(record.SourceID, "base gross value", record.BaseGrossValue, record.BaseCurrency); err != nil {
-		return syncmodel.ResolvedActivityAmounts{}, newValidationError(err.Error(), record)
-	}
-	if err := validateSourceMoneyCurrency(record.SourceID, "base fee amount", record.BaseFeeAmount, record.BaseCurrency); err != nil {
-		return syncmodel.ResolvedActivityAmounts{}, newValidationError(err.Error(), record)
-	}
-
 	resolvedAmounts, err := syncmodel.ResolveActivityAmounts(record)
 	if err != nil {
 		return syncmodel.ResolvedActivityAmounts{}, newValidationError(err.Error(), record)
 	}
 
 	return resolvedAmounts, nil
-}
-
-// validateSourceMoneyCurrency rejects preserved source amounts that lost their own currency identity.
-// Authored by: OpenCode
-func validateSourceMoneyCurrency(sourceID string, fieldName string, value *apd.Decimal, currency string) error {
-	if value == nil {
-		return nil
-	}
-	if strings.TrimSpace(currency) == "" {
-		return fmt.Errorf("activity %q %s currency context is incomplete", sourceID, fieldName)
-	}
-
-	return nil
 }
 
 // validateActivityType enforces the supported BUY and SELL price rules for one normalized record.

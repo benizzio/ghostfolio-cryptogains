@@ -8,6 +8,8 @@ All persisted activity timestamps keep the source offset that Ghostfolio provide
 
 No raw Ghostfolio payloads, Ghostfolio tokens, JWTs, or reusable token verifiers are persisted.
 
+BUG-004 follow-up: `order_currency`, `asset_profile_currency`, and sync-scoped `base_currency` are independent currency-definition tiers. A valid stored record may leave one or two tiers absent. Current-slice validation resolves transient unit-price, gross-value, and fee views from informed tiers only and fails only when a preserved monetary concept remains uninformed across all three tiers.
+
 ## Forward Slice Evolution
 
 | Entity | Status From `002` | `003` Decision |

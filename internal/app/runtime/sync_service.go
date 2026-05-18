@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
@@ -172,6 +173,7 @@ func (s *syncService) Run(ctx context.Context, request SyncRequest) SyncOutcome 
 	if err := validator.ValidateUserResponse(userResponse); err != nil {
 		return finalizeContractFailure(&session, &attempt, err)
 	}
+	session.UserBaseCurrency = strings.TrimSpace(userResponse.Settings.BaseCurrency.String())
 
 	historyResponse, err := s.client.FetchActivitiesHistory(timedContext, session.ServerOrigin, session.AuthToken)
 	if err != nil {
@@ -182,7 +184,7 @@ func (s *syncService) Run(ctx context.Context, request SyncRequest) SyncOutcome 
 		return finalizeContractFailure(&session, &attempt, err)
 	}
 
-	cache, outcome, ok := s.buildProtectedActivityCache(historyResponse, userResponse, request.SecurityToken, &session, &attempt)
+	cache, outcome, ok := s.buildProtectedActivityCache(historyResponse, request.SecurityToken, &session, &attempt)
 	if !ok {
 		return outcome
 	}
@@ -307,14 +309,13 @@ func (s *syncService) finalizeUnlockFailure(
 // Authored by: OpenCode
 func (s *syncService) buildProtectedActivityCache(
 	historyResponse ghostfoliodto.ActivityPageResponse,
-	userResponse ghostfoliodto.UserResponse,
 	securityToken string,
 	session *GhostfolioSession,
 	attempt *SyncAttempt,
 ) (syncmodel.ProtectedActivityCache, SyncOutcome, bool) {
 	attempt.Status = AttemptStatusNormalizing
 
-	records, err := ghostfoliomapper.MapActivities(historyResponse.Activities, userResponse.Settings.BaseCurrency, s.decimalService)
+	records, err := ghostfoliomapper.MapActivities(historyResponse.Activities, session.UserBaseCurrency, s.decimalService)
 	if err != nil {
 		return syncmodel.ProtectedActivityCache{}, s.finalizeSyncFailure(
 			session,
@@ -511,6 +512,7 @@ func diagnosticContextFromError(
 func clearSessionSecrets(session *GhostfolioSession) {
 	session.SecurityToken = ""
 	session.AuthToken = ""
+	session.UserBaseCurrency = ""
 }
 
 // ProtectedDataState reports whether a readable protected snapshot is active for this run.

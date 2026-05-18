@@ -59,7 +59,10 @@ func ResolveActivityAmounts(record ActivityRecord) (ResolvedActivityAmounts, err
 	if err != nil {
 		return ResolvedActivityAmounts{}, err
 	}
-	feeAmount, feeAmountCurrency := resolveFeeAmount(record)
+	feeAmount, feeAmountCurrency, err := resolveFeeAmount(record)
+	if err != nil {
+		return ResolvedActivityAmounts{}, err
+	}
 
 	return ResolvedActivityAmounts{
 		UnitPrice:          unitPrice,
@@ -73,53 +76,87 @@ func ResolveActivityAmounts(record ActivityRecord) (ResolvedActivityAmounts, err
 
 // resolveUnitPrice derives the current-slice unit price view without persisting
 // it on the activity record.
+//
 // Authored by: OpenCode
 func resolveUnitPrice(
 	record ActivityRecord,
 	grossValue *apd.Decimal,
 	grossValueCurrency string,
 ) (*apd.Decimal, string, error) {
-	if record.OrderUnitPrice != nil {
-		return record.OrderUnitPrice, strings.TrimSpace(record.OrderCurrency), nil
+
+	if value, currency, ok := informedActivityAmount(record.OrderUnitPrice, record.OrderCurrency); ok {
+		return value, currency, nil
 	}
-	if record.AssetProfileUnitPrice != nil {
-		return record.AssetProfileUnitPrice, strings.TrimSpace(record.AssetProfileCurrency), nil
+
+	if value, currency, ok := informedActivityAmount(record.AssetProfileUnitPrice, record.AssetProfileCurrency); ok {
+		return value, currency, nil
 	}
+
+	if grossValue != nil && strings.TrimSpace(grossValueCurrency) != "" {
+
+		unitPrice, _, err := decimalsupport.DivideExact(*grossValue, record.Quantity)
+		if err != nil {
+			return nil, "", fmt.Errorf(
+				"activity %q unit price basis input is not exact: %w",
+				strings.TrimSpace(record.SourceID),
+				err,
+			)
+		}
+
+		return &unitPrice, strings.TrimSpace(grossValueCurrency), nil
+	}
+
+	if hasUnitPriceBasis(record) || hasGrossValueBasis(record) {
+		return nil, "", allTierUninformedCurrencyError(record.SourceID, "unit price")
+	}
+
 	if grossValue == nil {
 		return nil, "", fmt.Errorf("activity %q unit price basis input is required", strings.TrimSpace(record.SourceID))
 	}
 
-	unitPrice, _, err := decimalsupport.DivideExact(*grossValue, record.Quantity)
-	if err != nil {
-		return nil, "", fmt.Errorf("activity %q unit price basis input is not exact: %w", strings.TrimSpace(record.SourceID), err)
-	}
-
-	return &unitPrice, strings.TrimSpace(grossValueCurrency), nil
+	return nil, "", fmt.Errorf("activity %q unit price basis input is required", strings.TrimSpace(record.SourceID))
 }
 
 // resolveGrossValue derives the current-slice gross value view without
 // persisting it on the activity record.
-// Authored by: OpenCode
+//
+// Authored by: OpenCode and benizzio
 func resolveGrossValue(record ActivityRecord) (*apd.Decimal, string, error) {
-	if record.OrderGrossValue != nil {
-		return record.OrderGrossValue, strings.TrimSpace(record.OrderCurrency), nil
+
+	if value, currency, ok := informedActivityAmount(record.OrderGrossValue, record.OrderCurrency); ok {
+		return value, currency, nil
 	}
-	if record.BaseGrossValue != nil {
-		return record.BaseGrossValue, strings.TrimSpace(record.BaseCurrency), nil
-	}
-	if record.AssetProfileUnitPrice != nil {
-		grossValue, err := multiplyActivityAmount(record.Quantity, *record.AssetProfileUnitPrice)
+
+	if value, currency, ok := informedActivityAmount(record.OrderUnitPrice, record.OrderCurrency); ok {
+		grossValue, err := multiplyActivityAmount(record.Quantity, *value)
 		if err != nil {
-			return nil, "", fmt.Errorf("activity %q gross value basis input is invalid: %w", strings.TrimSpace(record.SourceID), err)
+			return nil, "", fmt.Errorf(
+				"activity %q gross value basis input is invalid: %w",
+				strings.TrimSpace(record.SourceID),
+				err,
+			)
 		}
-		return &grossValue, strings.TrimSpace(record.AssetProfileCurrency), nil
+		return &grossValue, currency, nil
 	}
-	if record.OrderUnitPrice != nil {
-		grossValue, err := multiplyActivityAmount(record.Quantity, *record.OrderUnitPrice)
+
+	if value, currency, ok := informedActivityAmount(record.AssetProfileUnitPrice, record.AssetProfileCurrency); ok {
+		grossValue, err := multiplyActivityAmount(record.Quantity, *value)
 		if err != nil {
-			return nil, "", fmt.Errorf("activity %q gross value basis input is invalid: %w", strings.TrimSpace(record.SourceID), err)
+			return nil, "", fmt.Errorf(
+				"activity %q gross value basis input is invalid: %w",
+				strings.TrimSpace(record.SourceID),
+				err,
+			)
 		}
-		return &grossValue, strings.TrimSpace(record.OrderCurrency), nil
+		return &grossValue, currency, nil
+	}
+
+	if value, currency, ok := informedActivityAmount(record.BaseGrossValue, record.BaseCurrency); ok {
+		return value, currency, nil
+	}
+
+	if hasGrossValueBasis(record) || hasUnitPriceBasis(record) {
+		return nil, "", allTierUninformedCurrencyError(record.SourceID, "gross value")
 	}
 
 	return nil, "", fmt.Errorf("activity %q gross value basis input is required", strings.TrimSpace(record.SourceID))
@@ -127,19 +164,68 @@ func resolveGrossValue(record ActivityRecord) (*apd.Decimal, string, error) {
 
 // resolveFeeAmount selects the current-slice fee view without persisting it on
 // the activity record.
+//
 // Authored by: OpenCode
-func resolveFeeAmount(record ActivityRecord) (*apd.Decimal, string) {
-	if record.OrderFeeAmount != nil {
-		return record.OrderFeeAmount, strings.TrimSpace(record.OrderCurrency)
-	}
-	if record.AssetProfileFeeAmount != nil {
-		return record.AssetProfileFeeAmount, strings.TrimSpace(record.AssetProfileCurrency)
-	}
-	if record.BaseFeeAmount != nil {
-		return record.BaseFeeAmount, strings.TrimSpace(record.BaseCurrency)
+func resolveFeeAmount(record ActivityRecord) (*apd.Decimal, string, error) {
+
+	if value, currency, ok := informedActivityAmount(record.OrderFeeAmount, record.OrderCurrency); ok {
+		return value, currency, nil
 	}
 
-	return nil, ""
+	if value, currency, ok := informedActivityAmount(record.AssetProfileFeeAmount, record.AssetProfileCurrency); ok {
+		return value, currency, nil
+	}
+
+	if value, currency, ok := informedActivityAmount(record.BaseFeeAmount, record.BaseCurrency); ok {
+		return value, currency, nil
+	}
+
+	if hasFeeBasis(record) {
+		return nil, "", allTierUninformedCurrencyError(record.SourceID, "fee amount")
+	}
+
+	return nil, "", nil
+}
+
+// informedActivityAmount returns one preserved amount only when its currency tier is informed.
+// Authored by: OpenCode
+func informedActivityAmount(value *apd.Decimal, currency string) (*apd.Decimal, string, bool) {
+	if value == nil {
+		return nil, "", false
+	}
+	if strings.TrimSpace(currency) == "" {
+		return nil, "", false
+	}
+
+	return value, strings.TrimSpace(currency), true
+}
+
+// hasUnitPriceBasis reports whether the record preserves any unit-price input, informed or not.
+// Authored by: OpenCode
+func hasUnitPriceBasis(record ActivityRecord) bool {
+	return record.OrderUnitPrice != nil || record.AssetProfileUnitPrice != nil
+}
+
+// hasGrossValueBasis reports whether the record preserves any gross-value input, informed or not.
+// Authored by: OpenCode
+func hasGrossValueBasis(record ActivityRecord) bool {
+	return record.OrderGrossValue != nil || record.BaseGrossValue != nil
+}
+
+// hasFeeBasis reports whether the record preserves any fee input, informed or not.
+// Authored by: OpenCode
+func hasFeeBasis(record ActivityRecord) bool {
+	return record.OrderFeeAmount != nil || record.AssetProfileFeeAmount != nil || record.BaseFeeAmount != nil
+}
+
+// allTierUninformedCurrencyError describes the BUG-004 validation rule for preserved money concepts.
+// Authored by: OpenCode
+func allTierUninformedCurrencyError(sourceID string, amountName string) error {
+	return fmt.Errorf(
+		"activity %q %s currency context is uninformed across order, asset-profile, and base tiers",
+		strings.TrimSpace(sourceID),
+		amountName,
+	)
 }
 
 // multiplyActivityAmount preserves exact-decimal precision when one transient

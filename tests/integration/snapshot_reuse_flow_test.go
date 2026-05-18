@@ -19,6 +19,7 @@ import (
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	syncnormalize "github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
 	syncvalidate "github.com/benizzio/ghostfolio-cryptogains/internal/sync/validate"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 )
 
 func TestSnapshotReuseFlowRefreshesExistingSnapshotWithSameToken(t *testing.T) {
@@ -227,6 +228,7 @@ type tokenAwareStorageServer struct {
 	testServer *httptest.Server
 	mutex      sync.Mutex
 	tokenPages map[string][]storagePageFixture
+	userBodies map[string]string
 	rejected   map[string]bool
 	pageIndex  map[string]int
 	url        string
@@ -237,6 +239,7 @@ func newTokenAwareStorageServer(t *testing.T) *tokenAwareStorageServer {
 
 	server := &tokenAwareStorageServer{
 		tokenPages: map[string][]storagePageFixture{},
+		userBodies: map[string]string{},
 		rejected:   map[string]bool{},
 		pageIndex:  map[string]int{},
 	}
@@ -269,12 +272,16 @@ func newTokenAwareStorageServer(t *testing.T) *tokenAwareStorageServer {
 			}
 			server.mutex.Lock()
 			_, known := server.tokenPages[token]
+			userBody := server.userBodies[token]
 			server.mutex.Unlock()
 			if !known {
 				writer.WriteHeader(http.StatusForbidden)
 				return
 			}
-			_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":"USD"}}`))
+			if userBody == "" {
+				userBody = testutil.GhostfolioUserBody("USD")
+			}
+			_, _ = writer.Write([]byte(userBody))
 		case "/api/v1/activities":
 			authorization := request.Header.Get("Authorization")
 			token, ok := strings.CutPrefix(authorization, "Bearer jwt-")
@@ -322,11 +329,19 @@ func (s *tokenAwareStorageServer) SetTokenPages(token string, pages []storagePag
 	delete(s.rejected, token)
 }
 
+func (s *tokenAwareStorageServer) SetTokenUserBody(token string, userBody string) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	s.userBodies[token] = userBody
+	delete(s.rejected, token)
+}
+
 func (s *tokenAwareStorageServer) RejectToken(token string) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 	s.rejected[token] = true
 	delete(s.tokenPages, token)
+	delete(s.userBodies, token)
 	s.pageIndex[token] = 0
 }
 

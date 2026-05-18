@@ -16,5 +16,5 @@ type UserResponse struct {
 //
 // Authored by: OpenCode
 type UserSettings struct {
-	BaseCurrency string `json:"baseCurrency"`
+	BaseCurrency NullableString `json:"baseCurrency"`
 }

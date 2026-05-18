@@ -27,32 +27,34 @@ func TestDiagnosticRecordFromActivityRecordCanonicalizesAndPreservesScope(t *tes
 		t.Fatalf("parse fee amount: %v", err)
 	}
 
-	record := DiagnosticRecordFromActivityRecord(ActivityRecord{
-		SourceID:              "activity-1",
-		OccurredAt:            "2024-01-01T10:00:00Z",
-		ActivityType:          ActivityTypeBuy,
-		AssetSymbol:           "BTC",
-		AssetName:             "Bitcoin",
-		OrderCurrency:         "CHF",
-		AssetProfileCurrency:  "EUR",
-		BaseCurrency:          "USD",
-		Quantity:              quantity,
-		OrderUnitPrice:        &unitPrice,
-		OrderGrossValue:       &grossValue,
-		OrderFeeAmount:        &feeAmount,
-		AssetProfileUnitPrice: &unitPrice,
-		AssetProfileFeeAmount: &feeAmount,
-		BaseGrossValue:        &grossValue,
-		BaseFeeAmount:         &feeAmount,
-		Comment:               "comment",
-		DataSource:            "ghostfolio",
-		SourceScope: &SourceScope{
-			ID:          "account-1",
-			Name:        "Main Account",
-			Kind:        SourceScopeKindAccount,
-			Reliability: ScopeReliabilityReliable,
+	record := DiagnosticRecordFromActivityRecord(
+		ActivityRecord{
+			SourceID:              "activity-1",
+			OccurredAt:            "2024-01-01T10:00:00Z",
+			ActivityType:          ActivityTypeBuy,
+			AssetSymbol:           "BTC",
+			AssetName:             "Bitcoin",
+			OrderCurrency:         "CHF",
+			AssetProfileCurrency:  "EUR",
+			BaseCurrency:          "USD",
+			Quantity:              quantity,
+			OrderUnitPrice:        &unitPrice,
+			OrderGrossValue:       &grossValue,
+			OrderFeeAmount:        &feeAmount,
+			AssetProfileUnitPrice: &unitPrice,
+			AssetProfileFeeAmount: &feeAmount,
+			BaseGrossValue:        &grossValue,
+			BaseFeeAmount:         &feeAmount,
+			Comment:               "comment",
+			DataSource:            "ghostfolio",
+			SourceScope: &SourceScope{
+				ID:          "account-1",
+				Name:        "Main Account",
+				Kind:        SourceScopeKindAccount,
+				Reliability: ScopeReliabilityReliable,
+			},
 		},
-	})
+	)
 
 	if record.Quantity != "1.23" || record.UnitPrice != "100.5" || record.GrossValue != "123.615" || record.FeeAmount != "0.1" {
 		t.Fatalf("unexpected canonical diagnostic values: %#v", record)
@@ -81,5 +83,46 @@ func TestCanonicalDiagnosticDecimalFallbackBranches(t *testing.T) {
 	}
 	if got := canonicalDiagnosticDecimalPointer(&invalid); got != invalid.String() {
 		t.Fatalf("expected pointer fallback string, got %q want %q", got, invalid.String())
+	}
+}
+
+func TestDiagnosticRecordFromActivityRecordPrefersInformedCurrencyTiers(t *testing.T) {
+	t.Parallel()
+
+	quantity, _, err := decimalsupport.ParseString("1")
+	if err != nil {
+		t.Fatalf("parse quantity: %v", err)
+	}
+	orderUnitPrice, _, err := decimalsupport.ParseString("90")
+	if err != nil {
+		t.Fatalf("parse order unit price: %v", err)
+	}
+	assetProfileUnitPrice, _, err := decimalsupport.ParseString("95")
+	if err != nil {
+		t.Fatalf("parse asset-profile unit price: %v", err)
+	}
+	baseGrossValue, _, err := decimalsupport.ParseString("100")
+	if err != nil {
+		t.Fatalf("parse base gross value: %v", err)
+	}
+
+	record := DiagnosticRecordFromActivityRecord(
+		ActivityRecord{
+			SourceID:              "activity-1",
+			OccurredAt:            "2024-01-01T10:00:00Z",
+			ActivityType:          ActivityTypeBuy,
+			AssetSymbol:           "BTC",
+			Quantity:              quantity,
+			OrderCurrency:         "",
+			AssetProfileCurrency:  "EUR",
+			BaseCurrency:          "USD",
+			OrderUnitPrice:        &orderUnitPrice,
+			AssetProfileUnitPrice: &assetProfileUnitPrice,
+			BaseGrossValue:        &baseGrossValue,
+		},
+	)
+
+	if record.UnitPriceCurrency != "EUR" || record.GrossValueCurrency != "EUR" {
+		t.Fatalf("expected diagnostics to prefer informed tiers, got %#v", record)
 	}
 }

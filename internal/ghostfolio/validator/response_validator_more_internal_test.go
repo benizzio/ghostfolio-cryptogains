@@ -134,6 +134,12 @@ func TestValidateActivityPageResponseAndEntryCoverBranches(t *testing.T) {
 			return entry
 		}(), wantErr: true},
 		{name: "valid page entry", entry: validActivityPageEntry(), wantErr: false},
+		{name: "nullable order currency and comment stay allowed", entry: func() dto.ActivityPageEntry {
+			entry := validActivityPageEntry()
+			entry.Currency = dto.NullableString("")
+			entry.Comment = dto.NullableString("")
+			return entry
+		}(), wantErr: false},
 	}
 
 	for _, testCase := range entryCases {

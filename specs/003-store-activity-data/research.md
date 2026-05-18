@@ -50,6 +50,8 @@ Selected retrieval rules:
 - treat inconsistent pagination, malformed JSON, unsupported content types, or missing required activity fields as sync failure
 - treat a valid empty history as successful retrieval
 
+BUG-004 propagation verification rerun completed on 2026-05-18. Contract, unit, and integration coverage now exercise `Order.currency = null`, missing `SymbolProfile.currency`, and omitted authenticated-user `settings.baseCurrency`, and the implementation preserves informed order-, asset-profile-, and base-currency tiers independently while rejecting only preserved monetary concepts that remain uninformed across all three tiers.
+
 Alternatives considered: Keeping the `take=1` activities probe from `002` was rejected because it cannot prove full-history correctness. Using only a health probe or auth-only success was rejected because this slice depends on the actual activity-history contract. Persisting raw Ghostfolio payloads and postponing normalization was rejected because the spec requires storage to stop only after normalization and validation succeed.
 
 ## Normalization, Deduplication, And Validation Pipeline

@@ -220,6 +220,19 @@ func TestFetchUserHandlesTransportAndBuildErrors(t *testing.T) {
 			t.Fatalf("expected successful user fetch, response=%#v err=%v", response, err)
 		}
 	})
+
+	t.Run("nullable base currency", func(t *testing.T) {
+		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":null}}`))
+		}))
+		defer server.Close()
+
+		var response, err = New(server.Client()).FetchUser(context.Background(), server.URL, "jwt")
+		if err != nil || response.Settings == nil || response.Settings.BaseCurrency.String() != "" {
+			t.Fatalf("expected nullable base currency to decode as uninformed, response=%#v err=%v", response, err)
+		}
+	})
 }
 
 func TestFetchSingleActivitiesPageHandlesServerResponseClasses(t *testing.T) {
@@ -284,12 +297,12 @@ func TestFetchActivitiesHistoryHandlesTransportAndBuildErrors(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			writer.Header().Set("Content-Type", "application/json")
-			_, _ = writer.Write([]byte(`{"activities":[],"count":0}`))
+			_, _ = writer.Write([]byte(`{"activities":[{"id":"a","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"currency":null,"value":90,"unitPrice":90,"fee":2,"unitPriceInAssetProfileCurrency":95,"feeInAssetProfileCurrency":1.8,"valueInBaseCurrency":100,"feeInBaseCurrency":2.2,"comment":null,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"EUR"}}],"count":1}`))
 		}))
 		defer server.Close()
 
 		var response, err = New(server.Client()).FetchActivitiesHistory(context.Background(), server.URL, "jwt")
-		if err != nil || response.Count != 0 {
+		if err != nil || response.Count != 1 || response.Activities[0].Currency.String() != "" || response.Activities[0].Comment.String() != "" {
 			t.Fatalf("expected successful activities fetch, response=%#v err=%v", response, err)
 		}
 	})

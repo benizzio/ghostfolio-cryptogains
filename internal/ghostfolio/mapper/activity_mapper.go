@@ -117,7 +117,7 @@ func diagnosticRecordFromActivityEntry(entry dto.ActivityPageEntry, baseCurrency
 		ActivityType:          strings.ToUpper(strings.TrimSpace(entry.Type)),
 		AssetSymbol:           strings.TrimSpace(entry.SymbolProfile.Symbol),
 		AssetName:             strings.TrimSpace(entry.SymbolProfile.Name),
-		OrderCurrency:         strings.TrimSpace(entry.Currency),
+		OrderCurrency:         strings.TrimSpace(entry.Currency.String()),
 		AssetProfileCurrency:  strings.TrimSpace(entry.SymbolProfile.Currency),
 		BaseCurrency:          strings.TrimSpace(baseCurrency),
 		Quantity:              quantity,
@@ -134,7 +134,7 @@ func diagnosticRecordFromActivityEntry(entry dto.ActivityPageEntry, baseCurrency
 		AssetProfileFeeAmount: strings.TrimSpace(entry.FeeInAssetProfileCurrency.String()),
 		BaseGrossValue:        strings.TrimSpace(entry.ValueInBaseCurrency.String()),
 		BaseFeeAmount:         strings.TrimSpace(entry.FeeInBaseCurrency.String()),
-		Comment:               strings.TrimSpace(entry.Comment),
+		Comment:               strings.TrimSpace(entry.Comment.String()),
 		DataSource:            strings.TrimSpace(entry.DataSource),
 	}
 	if sourceScope != nil {
@@ -213,7 +213,7 @@ func MapActivity(entry dto.ActivityPageEntry, baseCurrency string, decimalServic
 		BaseCurrency:          moneyContext.baseCurrency,
 		BaseGrossValue:        moneyContext.baseGrossValue,
 		BaseFeeAmount:         moneyContext.baseFeeAmount,
-		Comment:               strings.TrimSpace(entry.Comment),
+		Comment:               strings.TrimSpace(entry.Comment.String()),
 		DataSource:            strings.TrimSpace(entry.DataSource),
 		SourceScope:           mapSourceScope(entry),
 	}, nil
@@ -224,7 +224,7 @@ func MapActivity(entry dto.ActivityPageEntry, baseCurrency string, decimalServic
 // Authored by: OpenCode
 func parseMoneyContext(entry dto.ActivityPageEntry, baseCurrency string, decimalService decimalsupport.Service) (activityMoneyContext, error) {
 	var context activityMoneyContext
-	context.orderCurrency = strings.TrimSpace(entry.Currency)
+	context.orderCurrency = strings.TrimSpace(entry.Currency.String())
 	context.assetProfileCurrency = strings.TrimSpace(entry.SymbolProfile.Currency)
 	context.baseCurrency = strings.TrimSpace(baseCurrency)
 
@@ -280,7 +280,7 @@ func diagnosticPreferredUnitPrice(entry dto.ActivityPageEntry, quantity string) 
 // Authored by: OpenCode
 func diagnosticPreferredUnitPriceCurrency(entry dto.ActivityPageEntry, baseCurrency string) string {
 	if strings.TrimSpace(entry.UnitPrice.String()) != "" {
-		return strings.TrimSpace(entry.Currency)
+		return strings.TrimSpace(entry.Currency.String())
 	}
 	if strings.TrimSpace(entry.UnitPriceInAssetProfileCurrency.String()) != "" {
 		return strings.TrimSpace(entry.SymbolProfile.Currency)
@@ -311,7 +311,7 @@ func diagnosticPreferredGrossValue(entry dto.ActivityPageEntry, quantity string)
 // Authored by: OpenCode
 func diagnosticPreferredGrossValueCurrency(entry dto.ActivityPageEntry, baseCurrency string) string {
 	if strings.TrimSpace(entry.Value.String()) != "" {
-		return strings.TrimSpace(entry.Currency)
+		return strings.TrimSpace(entry.Currency.String())
 	}
 	if strings.TrimSpace(entry.ValueInBaseCurrency.String()) != "" {
 		return strings.TrimSpace(baseCurrency)
@@ -320,7 +320,7 @@ func diagnosticPreferredGrossValueCurrency(entry dto.ActivityPageEntry, baseCurr
 		return strings.TrimSpace(entry.SymbolProfile.Currency)
 	}
 
-	return strings.TrimSpace(entry.Currency)
+	return strings.TrimSpace(entry.Currency.String())
 }
 
 // diagnosticPreferredFeeAmount returns the transient fee view used only in
@@ -342,7 +342,7 @@ func diagnosticPreferredFeeAmount(entry dto.ActivityPageEntry) string {
 // Authored by: OpenCode
 func diagnosticPreferredFeeAmountCurrency(entry dto.ActivityPageEntry, baseCurrency string) string {
 	if strings.TrimSpace(entry.Fee.String()) != "" {
-		return strings.TrimSpace(entry.Currency)
+		return strings.TrimSpace(entry.Currency.String())
 	}
 	if strings.TrimSpace(entry.FeeInAssetProfileCurrency.String()) != "" {
 		return strings.TrimSpace(entry.SymbolProfile.Currency)

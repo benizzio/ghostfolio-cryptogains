@@ -90,11 +90,12 @@ const (
 // GhostfolioSession is the transient authenticated runtime state for one sync attempt.
 // Authored by: OpenCode
 type GhostfolioSession struct {
-	ServerOrigin    string
-	SecurityToken   string
-	AuthToken       string
-	StartedAt       time.Time
-	AuthenticatedAt time.Time
+	ServerOrigin     string
+	SecurityToken    string
+	AuthToken        string
+	StartedAt        time.Time
+	AuthenticatedAt  time.Time
+	UserBaseCurrency string
 }
 
 // SyncAttempt is the transient workflow state for one sync-data execution.

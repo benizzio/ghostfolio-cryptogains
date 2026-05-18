@@ -23,7 +23,7 @@ type ActivityPageEntry struct {
 	Date                            string                `json:"date"`
 	Type                            string                `json:"type"`
 	Quantity                        json.Number           `json:"quantity"`
-	Currency                        string                `json:"currency"`
+	Currency                        NullableString        `json:"currency"`
 	Fee                             json.Number           `json:"fee"`
 	UnitPrice                       json.Number           `json:"unitPrice"`
 	Value                           json.Number           `json:"value"`
@@ -31,7 +31,7 @@ type ActivityPageEntry struct {
 	ValueInBaseCurrency             json.Number           `json:"valueInBaseCurrency"`
 	FeeInBaseCurrency               json.Number           `json:"feeInBaseCurrency"`
 	UnitPriceInAssetProfileCurrency json.Number           `json:"unitPriceInAssetProfileCurrency"`
-	Comment                         string                `json:"comment"`
+	Comment                         NullableString        `json:"comment"`
 	SymbolProfile                   ActivitySymbolProfile `json:"SymbolProfile"`
 	Account                         *ActivityAccountScope `json:"account"`
 	DataSource                      string                `json:"dataSource"`

@@ -1,8 +1,9 @@
-# Checklist: Code Standard Drift Remediation
+# Checklist: Code Standard Drift Remediation - DEPRECATED
 
 **Purpose**: Track correction of the coding-standard drift recorded in [`../code-standard-drift-report.md`](../code-standard-drift-report.md).
 **Created**: 2026-05-16
 **Feature**: [spec.md](../spec.md)
+**Status**: DEPRECATED - this Checklist was replaced by a new version of the drift report and remediation process
 
 ## High Priority
 

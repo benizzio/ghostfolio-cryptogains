@@ -18,6 +18,9 @@ func TestGhostfolioSyncStorageContract(t *testing.T) {
 	if err := validator.ValidateUserResponse(dto.UserResponse{Settings: &dto.UserSettings{BaseCurrency: "USD"}}); err != nil {
 		t.Fatalf("expected user response to satisfy contract: %v", err)
 	}
+	if err := validator.ValidateUserResponse(dto.UserResponse{Settings: &dto.UserSettings{BaseCurrency: ""}}); err != nil {
+		t.Fatalf("expected missing user base currency to satisfy contract: %v", err)
+	}
 
 	if err := validator.ValidateActivityPageResponse(dto.ActivityPageResponse{
 		Count: 2,
@@ -27,7 +30,7 @@ func TestGhostfolioSyncStorageContract(t *testing.T) {
 				Date:                            "2026-01-31T10:00:00+01:00",
 				Type:                            "BUY",
 				Quantity:                        json.Number("1.25"),
-				Currency:                        "CHF",
+				Currency:                        dto.NullableString("CHF"),
 				Fee:                             json.Number("20"),
 				UnitPrice:                       json.Number("49000"),
 				Value:                           json.Number("61250"),
@@ -43,11 +46,12 @@ func TestGhostfolioSyncStorageContract(t *testing.T) {
 				Date:                            "2026-02-01T09:00:00Z",
 				Type:                            "SELL",
 				Quantity:                        json.Number("0.25"),
-				Currency:                        "CHF",
+				Currency:                        dto.NullableString(""),
 				Value:                           json.Number("14800"),
 				ValueInBaseCurrency:             json.Number("15000"),
 				UnitPriceInAssetProfileCurrency: json.Number("60000"),
-				SymbolProfile:                   dto.ActivitySymbolProfile{Symbol: "BTC", Name: "Bitcoin", Currency: "EUR"},
+				Comment:                         dto.NullableString(""),
+				SymbolProfile:                   dto.ActivitySymbolProfile{Symbol: "BTC", Name: "Bitcoin", Currency: ""},
 			},
 		},
 	}); err != nil {

@@ -13,6 +13,7 @@ import (
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	syncnormalize "github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
 	syncvalidate "github.com/benizzio/ghostfolio-cryptogains/internal/sync/validate"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 )
 
 func TestActivityValidationFlowRejectsUnsupportedHistoryAndKeepsExistingSnapshot(t *testing.T) {
@@ -256,17 +257,48 @@ func TestActivityValidationFlowPreservesMixedCurrencyContext(t *testing.T) {
 	}
 }
 
+func TestActivityValidationFlowAllowsSingleUninformedCurrencyTierWhenOtherTiersRemainInformed(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	server := newTokenAwareStorageServer(t)
+	setTokenAwareCurrencyContextFixtures(
+		server,
+		"token-order-null",
+		testutil.GhostfolioUserBody("USD"),
+		testutil.GhostfolioNullableOrderCurrencyActivityJSON(),
+	)
+	setTokenAwareCurrencyContextFixtures(
+		server,
+		"token-user-base-missing",
+		testutil.GhostfolioUserBody(""),
+		testutil.GhostfolioMissingSymbolProfileCurrencyActivityJSON(),
+	)
+	service := newActivityValidationSyncService(baseDir, server)
+	config := mustActivityValidationConfig(t, server.URL())
+
+	for _, securityToken := range []string{"token-order-null", "token-user-base-missing"} {
+		securityToken := securityToken
+		t.Run(securityToken, func(t *testing.T) {
+			outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: securityToken})
+			if !outcome.Success {
+				t.Fatalf("expected valid mixed-tier sync success, got %#v", outcome)
+			}
+		})
+	}
+}
+
 func TestActivityValidationFlowRejectsIncompleteCurrencyContext(t *testing.T) {
 	t.Parallel()
 
 	baseDir := t.TempDir()
 	server := newTokenAwareStorageServer(t)
-	server.SetTokenPages("token-one", []storagePageFixture{{
-		Count: 1,
-		ActivitiesJSON: `[
-			{"id":"buy-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"value":90,"unitPrice":90,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin"}}
-		]`,
-	}})
+	setTokenAwareCurrencyContextFixtures(
+		server,
+		"token-one",
+		testutil.GhostfolioUserBody(""),
+		testutil.GhostfolioAllTierUninformedCurrencyActivityJSON(),
+	)
 	service := newActivityValidationSyncService(baseDir, server)
 	config := mustActivityValidationConfig(t, server.URL())
 
@@ -276,6 +308,9 @@ func TestActivityValidationFlowRejectsIncompleteCurrencyContext(t *testing.T) {
 	}
 	if !outcome.Diagnostic.Eligible {
 		t.Fatalf("expected diagnostic eligibility for currency-context rejection, got %#v", outcome)
+	}
+	if !strings.Contains(outcome.Diagnostic.Request.Context.FailureDetail, "uninformed across order, asset-profile, and base tiers") {
+		t.Fatalf("expected all-tier-uninformed diagnostic detail, got %#v", outcome.Diagnostic.Request.Context)
 	}
 }
 

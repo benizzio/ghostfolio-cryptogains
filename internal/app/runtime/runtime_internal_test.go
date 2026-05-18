@@ -304,9 +304,9 @@ func TestFinalizeFailureUsesCategorizedRequestFailure(t *testing.T) {
 func TestClearSessionSecrets(t *testing.T) {
 	t.Parallel()
 
-	var session = GhostfolioSession{SecurityToken: "token", AuthToken: "jwt"}
+	var session = GhostfolioSession{SecurityToken: "token", AuthToken: "jwt", UserBaseCurrency: "USD"}
 	clearSessionSecrets(&session)
-	if session.SecurityToken != "" || session.AuthToken != "" {
+	if session.SecurityToken != "" || session.AuthToken != "" || session.UserBaseCurrency != "" {
 		t.Fatalf("expected secrets to be cleared: %#v", session)
 	}
 }

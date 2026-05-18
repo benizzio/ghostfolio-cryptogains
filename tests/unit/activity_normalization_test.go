@@ -108,7 +108,9 @@ func TestActivityNormalizationValidationRejectsIncompleteCurrencyContext(t *test
 		func() syncmodel.ActivityRecord {
 			record := unitActivityRecord(t, "buy-1", "2024-01-01T10:00:00Z", syncmodel.ActivityTypeBuy, "BTC", "1", "100", "100", nil)
 			record.OrderCurrency = ""
-			record.OrderUnitPrice = nil
+			record.AssetProfileCurrency = ""
+			record.BaseCurrency = ""
+			record.BaseGrossValue = nil
 			return record
 		}(),
 	})
@@ -117,6 +119,36 @@ func TestActivityNormalizationValidationRejectsIncompleteCurrencyContext(t *test
 	}
 	if err := syncvalidate.NewValidator().Validate(cache); err == nil {
 		t.Fatalf("expected incomplete currency context rejection")
+	}
+}
+
+func TestActivityNormalizationValidationAllowsOneUninformedCurrencyTierWhenOthersRemainInformed(t *testing.T) {
+	t.Parallel()
+
+	cache, err := syncnormalize.NewNormalizer().Normalize([]syncmodel.ActivityRecord{
+		func() syncmodel.ActivityRecord {
+			record := unitActivityRecord(t, "buy-1", "2024-01-01T10:00:00Z", syncmodel.ActivityTypeBuy, "BTC", "1", "90", "90", nil)
+			assetProfileUnitPrice, _, err := decimalsupport.ParseString("95")
+			if err != nil {
+				t.Fatalf("parse asset-profile unit price: %v", err)
+			}
+			baseGrossValue, _, err := decimalsupport.ParseString("100")
+			if err != nil {
+				t.Fatalf("parse base gross value: %v", err)
+			}
+			record.OrderCurrency = ""
+			record.AssetProfileCurrency = "EUR"
+			record.BaseCurrency = "USD"
+			record.AssetProfileUnitPrice = &assetProfileUnitPrice
+			record.BaseGrossValue = &baseGrossValue
+			return record
+		}(),
+	})
+	if err != nil {
+		t.Fatalf("normalize: %v", err)
+	}
+	if err := syncvalidate.NewValidator().Validate(cache); err != nil {
+		t.Fatalf("expected one uninformed tier to remain valid, got %v", err)
 	}
 }
 

@@ -213,7 +213,7 @@ func TestBuildDiagnosticReportDocumentPreservesCurrencyContextWhileRedactingFina
 	request := runtimeDiagnosticRequestFixture()
 	request.Context = syncmodel.DiagnosticContext{
 		FailureStage:  syncmodel.DiagnosticFailureStageValidation,
-		FailureDetail: `activity "buy-1" order unit price currency context is incomplete`,
+		FailureDetail: `activity "buy-1" unit price currency context is uninformed across order, asset-profile, and base tiers`,
 		Records: []syncmodel.DiagnosticRecord{{
 			SourceID:              "buy-1",
 			OrderCurrency:         "CHF",
@@ -664,7 +664,7 @@ func TestRunCoversMappingNormalizationAndValidationFailures(t *testing.T) {
 func TestRunPreservesIncompleteCurrencyContextDiagnosticContext(t *testing.T) {
 	t.Parallel()
 
-	var expectedDetail = `activity "buy-1" order gross value currency context is incomplete`
+	var expectedDetail = `activity "buy-1" gross value currency context is uninformed across order, asset-profile, and base tiers`
 
 	t.Run("production mode redacts persisted financial values", func(t *testing.T) {
 		var service, config = runtimeServiceWithHistoryServer(t, runtimeSnapshotStore{}, false, `{"activities":[],"count":0}`)
@@ -691,10 +691,10 @@ func TestRunPreservesIncompleteCurrencyContextDiagnosticContext(t *testing.T) {
 			t.Fatalf("expected one diagnostic record, got %#v", diagnosticContext)
 		}
 		var requestRecord = diagnosticContext.Records[0]
-		if requestRecord.OrderCurrency != "" || requestRecord.AssetProfileCurrency != "EUR" || requestRecord.BaseCurrency != "USD" || requestRecord.UnitPriceCurrency != "EUR" || requestRecord.GrossValueCurrency != "" {
+		if requestRecord.OrderCurrency != "" || requestRecord.AssetProfileCurrency != "" || requestRecord.BaseCurrency != "" || requestRecord.UnitPriceCurrency != "" || requestRecord.GrossValueCurrency != "" {
 			t.Fatalf("expected preserved currency identifiers in diagnostic request, got %#v", requestRecord)
 		}
-		if requestRecord.UnitPrice != "95" || requestRecord.OrderUnitPrice != "" || requestRecord.AssetProfileUnitPrice != "95" || requestRecord.BaseGrossValue != "100" {
+		if requestRecord.UnitPrice != "" || requestRecord.OrderUnitPrice != "" || requestRecord.AssetProfileUnitPrice != "95" || requestRecord.BaseGrossValue != "100" || requestRecord.OrderGrossValue != "90" {
 			t.Fatalf("expected unredacted offending-record values in diagnostic request, got %#v", requestRecord)
 		}
 
@@ -713,10 +713,10 @@ func TestRunPreservesIncompleteCurrencyContextDiagnosticContext(t *testing.T) {
 			t.Fatalf("expected one persisted diagnostic record, got %#v", document)
 		}
 		var persistedRecord = document.Records[0]
-		if persistedRecord.OrderCurrency != "" || persistedRecord.AssetProfileCurrency != "EUR" || persistedRecord.BaseCurrency != "USD" || persistedRecord.UnitPriceCurrency != "EUR" || persistedRecord.GrossValueCurrency != "" {
+		if persistedRecord.OrderCurrency != "" || persistedRecord.AssetProfileCurrency != "" || persistedRecord.BaseCurrency != "" || persistedRecord.UnitPriceCurrency != "" || persistedRecord.GrossValueCurrency != "" {
 			t.Fatalf("expected production diagnostic report to preserve currency identifiers, got %#v", persistedRecord)
 		}
-		if persistedRecord.UnitPrice != "" || persistedRecord.AssetProfileUnitPrice != "" || persistedRecord.BaseGrossValue != "" || persistedRecord.FeeAmount != "" {
+		if persistedRecord.UnitPrice != "" || persistedRecord.AssetProfileUnitPrice != "" || persistedRecord.BaseGrossValue != "" || persistedRecord.OrderGrossValue != "" || persistedRecord.FeeAmount != "" {
 			t.Fatalf("expected production diagnostic report to redact financial values, got %#v", persistedRecord)
 		}
 	})
@@ -749,10 +749,10 @@ func TestRunPreservesIncompleteCurrencyContextDiagnosticContext(t *testing.T) {
 			t.Fatalf("expected one persisted diagnostic record, got %#v", document)
 		}
 		var persistedRecord = document.Records[0]
-		if persistedRecord.OrderCurrency != "" || persistedRecord.AssetProfileCurrency != "EUR" || persistedRecord.BaseCurrency != "USD" || persistedRecord.UnitPriceCurrency != "EUR" || persistedRecord.GrossValueCurrency != "" {
+		if persistedRecord.OrderCurrency != "" || persistedRecord.AssetProfileCurrency != "" || persistedRecord.BaseCurrency != "" || persistedRecord.UnitPriceCurrency != "" || persistedRecord.GrossValueCurrency != "" {
 			t.Fatalf("expected development diagnostic report to preserve currency identifiers, got %#v", persistedRecord)
 		}
-		if persistedRecord.UnitPrice != "95" || persistedRecord.OrderUnitPrice != "" || persistedRecord.AssetProfileUnitPrice != "95" || persistedRecord.BaseGrossValue != "100" {
+		if persistedRecord.UnitPrice != "" || persistedRecord.OrderUnitPrice != "" || persistedRecord.OrderGrossValue != "90" || persistedRecord.AssetProfileUnitPrice != "95" || persistedRecord.BaseGrossValue != "100" {
 			t.Fatalf("expected development diagnostic report to preserve offending-record values, got %#v", persistedRecord)
 		}
 	})
@@ -786,7 +786,7 @@ func runtimeDiagnosticRequestFixture() DiagnosticReportRequest {
 }
 
 // runtimeCurrencyMismatchCacheFixture returns one normalized cache whose
-// explicit order-unit-price amount is missing its required order currency.
+// preserved gross-value basis stays uninformed across all tracked currency tiers.
 // Authored by: OpenCode
 func runtimeCurrencyMismatchCacheFixture(t *testing.T) syncmodel.ProtectedActivityCache {
 	t.Helper()
@@ -798,7 +798,7 @@ func runtimeCurrencyMismatchCacheFixture(t *testing.T) syncmodel.ProtectedActivi
 }
 
 // runtimeCurrencyMismatchRecordFixture returns one normalized activity record
-// whose explicit order-unit-price amount is missing its required order currency.
+// whose preserved gross-value basis stays uninformed across all tracked tiers.
 // Authored by: OpenCode
 func runtimeCurrencyMismatchRecordFixture(t *testing.T) syncmodel.ActivityRecord {
 	t.Helper()
@@ -830,8 +830,8 @@ func runtimeCurrencyMismatchRecordFixture(t *testing.T) syncmodel.ActivityRecord
 		AssetSymbol:           "BTC",
 		AssetName:             "Bitcoin",
 		OrderCurrency:         "",
-		AssetProfileCurrency:  "EUR",
-		BaseCurrency:          "USD",
+		AssetProfileCurrency:  "",
+		BaseCurrency:          "",
 		Quantity:              quantity,
 		OrderUnitPrice:        nil,
 		OrderGrossValue:       &grossValue,

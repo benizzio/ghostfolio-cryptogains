@@ -201,6 +201,9 @@ func TestValidateCurrencyContextFailuresExposeDiagnosticContext(t *testing.T) {
 	validator := NewValidator()
 	record := validationTestRecord(t, "buy-1", syncmodel.ActivityTypeBuy)
 	record.OrderCurrency = ""
+	record.AssetProfileCurrency = ""
+	record.BaseCurrency = ""
+	record.BaseGrossValue = nil
 
 	err := validator.Validate(syncmodel.ProtectedActivityCache{
 		ActivityCount: 1,
@@ -218,7 +221,7 @@ func TestValidateCurrencyContextFailuresExposeDiagnosticContext(t *testing.T) {
 	if context.FailureStage != syncmodel.DiagnosticFailureStageValidation {
 		t.Fatalf("expected validation failure stage, got %#v", context)
 	}
-	if !strings.Contains(context.FailureDetail, "currency context is incomplete") {
+	if !strings.Contains(context.FailureDetail, "uninformed across order, asset-profile, and base tiers") {
 		t.Fatalf("expected incomplete currency detail, got %#v", context)
 	}
 	if len(context.Records) != 1 {
@@ -226,6 +229,31 @@ func TestValidateCurrencyContextFailuresExposeDiagnosticContext(t *testing.T) {
 	}
 	if context.Records[0].OrderCurrency != "" || context.Records[0].OrderUnitPrice != "100" {
 		t.Fatalf("expected preserved currency diagnostic context, got %#v", context.Records[0])
+	}
+}
+
+func TestValidateCurrencyContextAllowsSingleUninformedTierWhenOthersRemainInformed(t *testing.T) {
+	t.Parallel()
+
+	validator := NewValidator()
+	record := validationTestRecord(t, "buy-1", syncmodel.ActivityTypeBuy)
+	record.OrderCurrency = ""
+	record.AssetProfileCurrency = "EUR"
+	record.BaseCurrency = "USD"
+	assetProfileUnitPrice, _, err := decimalsupport.ParseString("95")
+	if err != nil {
+		t.Fatalf("parse asset-profile unit price: %v", err)
+	}
+	baseGrossValue, _, err := decimalsupport.ParseString("100")
+	if err != nil {
+		t.Fatalf("parse base gross value: %v", err)
+	}
+	record.AssetProfileUnitPrice = &assetProfileUnitPrice
+	record.BaseGrossValue = &baseGrossValue
+
+	err = validator.Validate(syncmodel.ProtectedActivityCache{ActivityCount: 1, Activities: []syncmodel.ActivityRecord{record}})
+	if err != nil {
+		t.Fatalf("expected one uninformed tier to stay valid, got %v", err)
 	}
 }
 

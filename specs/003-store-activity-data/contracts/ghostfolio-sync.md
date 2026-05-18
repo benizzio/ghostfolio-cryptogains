@@ -201,6 +201,7 @@ Current-slice contract interpretation:
 - `comment = null` is an allowed upstream value except where this slice separately requires an explanatory comment for a zero-priced `SELL`.
 - `account` and tag-related fields are optional preserved inputs, not current-slice required inputs.
 - `SymbolProfile.currency` must be treated as not guaranteed by the public response contract even though current source wiring usually populates it.
+- Current-slice verification rerun on 2026-05-18 covers `currency = null`, missing `SymbolProfile.currency`, and omitted authenticated-user `settings.baseCurrency`; valid rows with one uninformed tier still succeed when other tiers remain informed.
 
 ## Authenticated User Contract
 

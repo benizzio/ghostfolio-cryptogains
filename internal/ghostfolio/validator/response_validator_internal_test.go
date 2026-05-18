@@ -26,6 +26,9 @@ func TestValidateUserResponseCoversSuccessAndFailure(t *testing.T) {
 	if err := ValidateUserResponse(dto.UserResponse{Settings: &dto.UserSettings{BaseCurrency: "USD"}}); err != nil {
 		t.Fatalf("expected user settings to pass: %v", err)
 	}
+	if err := ValidateUserResponse(dto.UserResponse{Settings: &dto.UserSettings{BaseCurrency: ""}}); err != nil {
+		t.Fatalf("expected missing authenticated-user base currency to remain allowed: %v", err)
+	}
 }
 
 func TestValidateSingleActivityPageResponseCoversBranches(t *testing.T) {

@@ -90,6 +90,17 @@ func TestMapActivityHandlesOptionalValuesAndScopeBranches(t *testing.T) {
 	if record.SourceScope != nil {
 		t.Fatalf("expected nil source scope when account is absent, got %#v", record.SourceScope)
 	}
+
+	entry = validActivityPageEntry()
+	entry.Currency = dto.NullableString("")
+	entry.Comment = dto.NullableString("")
+	record, err = MapActivity(entry, "", decimalsupport.NewService())
+	if err != nil {
+		t.Fatalf("map activity with uninformed nullable strings: %v", err)
+	}
+	if record.OrderCurrency != "" || record.Comment != "" {
+		t.Fatalf("expected uninformed nullable strings to map cleanly, got %#v", record)
+	}
 }
 
 func TestMapActivityAndMapActivitiesSurfaceMappingFailures(t *testing.T) {
