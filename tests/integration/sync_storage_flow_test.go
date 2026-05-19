@@ -32,19 +32,19 @@ import (
 func TestSyncStorageFlowCreatesProtectedSnapshotAfterSuccessfulMultiPageSync(t *testing.T) {
 	t.Parallel()
 
-	tempDir := t.TempDir()
-	store := configstore.NewJSONStore(tempDir)
-	server := newGhostfolioStorageServer(t, []storagePageFixture{
+	var tempDir = t.TempDir()
+	var store = configstore.NewJSONStore(tempDir)
+	var server = newGhostfolioStorageServer(t, []storagePageFixture{
 		{Count: 3, ActivitiesJSON: `[{"id":"activity-1","date":"2024-12-31T23:30:00-02:00","type":"BUY","quantity":1.25,"valueInBaseCurrency":62500,"feeInBaseCurrency":25,"unitPriceInAssetProfileCurrency":50000,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"},"account":{"id":"account-1","name":"Main"}}]`},
 		{Count: 3, ActivitiesJSON: `[{"id":"activity-2","date":"2025-01-01T00:15:00+02:00","type":"BUY","quantity":0.50,"valueInBaseCurrency":25000,"unitPriceInAssetProfileCurrency":50000,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`},
 		{Count: 3, ActivitiesJSON: `[{"id":"activity-3","date":"2026-05-01T09:00:00Z","type":"SELL","quantity":0.25,"valueInBaseCurrency":15000,"unitPriceInAssetProfileCurrency":60000,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`},
 	})
-	fixture := newSyncStorageFixture(t, tempDir, server.Client(), server.URL, time.Second)
+	var fixture = newSyncStorageFixture(t, tempDir, server.Client(), server.URL, time.Second)
 	if err := store.Save(context.Background(), fixture.config); err != nil {
 		t.Fatalf("save config: %v", err)
 	}
 
-	model := flow.NewModel(newFlowDependenciesWithStore(t, bootstrap.StartupState{ActiveConfig: &fixture.config}, true, fixture.service, store))
+	var model = flow.NewModel(newFlowDependenciesWithStore(t, bootstrap.StartupState{ActiveConfig: &fixture.config}, true, fixture.service, store))
 	model = openSyncEntry(t, model)
 	model = typeToken(t, model, "abc123")
 	model = blurTokenInputFromSyncEntry(t, model)
@@ -54,7 +54,7 @@ func TestSyncStorageFlowCreatesProtectedSnapshotAfterSuccessfulMultiPageSync(t *
 	if model.ActiveScreen() != "sync_result" {
 		t.Fatalf("expected sync result screen, got %s", model.ActiveScreen())
 	}
-	content := model.View().Content
+	var content = model.View().Content
 	if !strings.Contains(content, "Activity data was stored securely for future use.") {
 		t.Fatalf("expected storage success summary, got %q", content)
 	}
@@ -74,10 +74,10 @@ func TestSyncStorageFlowCreatesProtectedSnapshotAfterSuccessfulMultiPageSync(t *
 func TestSyncStorageFlowHandlesEmptyHistoryAsSuccessfulStoredState(t *testing.T) {
 	t.Parallel()
 
-	tempDir := t.TempDir()
-	server := newGhostfolioStorageServer(t, []storagePageFixture{{Count: 0, ActivitiesJSON: `[]`}})
-	fixture := newSyncStorageFixture(t, tempDir, server.Client(), server.URL, time.Second)
-	model := flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &fixture.config}, true, fixture.service))
+	var tempDir = t.TempDir()
+	var server = newGhostfolioStorageServer(t, []storagePageFixture{{Count: 0, ActivitiesJSON: `[]`}})
+	var fixture = newSyncStorageFixture(t, tempDir, server.Client(), server.URL, time.Second)
+	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &fixture.config}, true, fixture.service))
 
 	model = openSyncEntry(t, model)
 	model = typeToken(t, model, "abc123")
@@ -85,7 +85,7 @@ func TestSyncStorageFlowHandlesEmptyHistoryAsSuccessfulStoredState(t *testing.T)
 	model, cmd := startSyncAttempt(t, model)
 	model = applySyncBatch(t, model, cmd)
 
-	content := model.View().Content
+	var content = model.View().Content
 	if !strings.Contains(content, "Activity data was stored securely for future use.") {
 		t.Fatalf("expected empty-history sync to remain successful, got %q", content)
 	}
@@ -114,8 +114,7 @@ func newGhostfolioStorageServer(t *testing.T, pages []storagePageFixture) *httpt
 	t.Helper()
 
 	var requestCount int
-	var server *httptest.Server
-	server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		switch request.URL.Path {
 		case "/api/v1/auth/anonymous":
@@ -130,9 +129,9 @@ func newGhostfolioStorageServer(t *testing.T, pages []storagePageFixture) *httpt
 			if requestCount >= len(pages) {
 				requestCount = len(pages) - 1
 			}
-			page := pages[requestCount]
+			var page = pages[requestCount]
 			requestCount++
-			_, _ = writer.Write([]byte(fmt.Sprintf(`{"activities":%s,"count":%d}`, page.ActivitiesJSON, page.Count)))
+			_, _ = fmt.Fprintf(writer, `{"activities":%s,"count":%d}`, page.ActivitiesJSON, page.Count)
 		default:
 			writer.WriteHeader(http.StatusNotFound)
 		}
@@ -152,7 +151,7 @@ func newSyncStorageFixture(t *testing.T, tempDir string, client *http.Client, or
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	service := runtime.NewSyncService(
+	var service = runtime.NewSyncService(
 		ghostfolioclient.New(client),
 		requestTimeout,
 		tempDir,
