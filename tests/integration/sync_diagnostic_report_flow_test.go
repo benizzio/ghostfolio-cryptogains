@@ -206,7 +206,7 @@ func newGhostfolioStorageTLSServer(t *testing.T, pages []storagePageFixture) *ht
 			}
 			page := pages[requestCount]
 			requestCount++
-			_, _ = writer.Write([]byte(fmt.Sprintf(`{"activities":%s,"count":%d}`, page.ActivitiesJSON, page.Count)))
+			_, _ = fmt.Fprintf(writer, `{"activities":%s,"count":%d}`, page.ActivitiesJSON, page.Count)
 		default:
 			writer.WriteHeader(http.StatusNotFound)
 		}
