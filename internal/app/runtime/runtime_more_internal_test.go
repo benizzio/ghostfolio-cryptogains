@@ -219,9 +219,13 @@ func TestBuildDiagnosticReportDocumentPreservesCurrencyContextWhileRedactingFina
 			OrderCurrency:         "CHF",
 			AssetProfileCurrency:  "EUR",
 			BaseCurrency:          "USD",
-			OrderUnitPrice:        "",
+			OrderUnitPrice:        "90",
+			OrderFeeAmount:        "1.5",
 			AssetProfileUnitPrice: "95",
+			AssetProfileFeeAmount: "1.6",
 			OrderGrossValue:       "90",
+			BaseGrossValue:        "100",
+			BaseFeeAmount:         "1.7",
 		}},
 	}
 
@@ -237,14 +241,14 @@ func TestBuildDiagnosticReportDocumentPreservesCurrencyContextWhileRedactingFina
 	if redactedRecord.OrderCurrency != "CHF" || redactedRecord.AssetProfileCurrency != "EUR" || redactedRecord.BaseCurrency != "USD" {
 		t.Fatalf("expected currency context to remain visible after redaction, got %#v", redactedRecord)
 	}
-	if redactedRecord.OrderGrossValue != "" || redactedRecord.AssetProfileUnitPrice != "" {
+	if redactedRecord.OrderUnitPrice != "" || redactedRecord.OrderGrossValue != "" || redactedRecord.OrderFeeAmount != "" || redactedRecord.AssetProfileUnitPrice != "" || redactedRecord.AssetProfileFeeAmount != "" || redactedRecord.BaseGrossValue != "" || redactedRecord.BaseFeeAmount != "" {
 		t.Fatalf("expected financial values to be cleared, got %#v", redactedRecord)
 	}
 
 	request.RedactFinancialValues = false
 	unredacted := buildDiagnosticReportDocument(request, time.Unix(3, 0).UTC())
 	unredactedRecord := unredacted.Records[0]
-	if unredactedRecord.OrderGrossValue != "90" || unredactedRecord.AssetProfileUnitPrice != "95" {
+	if unredactedRecord.OrderUnitPrice != "90" || unredactedRecord.OrderGrossValue != "90" || unredactedRecord.OrderFeeAmount != "1.5" || unredactedRecord.AssetProfileUnitPrice != "95" || unredactedRecord.AssetProfileFeeAmount != "1.6" || unredactedRecord.BaseGrossValue != "100" || unredactedRecord.BaseFeeAmount != "1.7" {
 		t.Fatalf("expected explicit-development-mode diagnostics to retain source financial values, got %#v", unredactedRecord)
 	}
 }
