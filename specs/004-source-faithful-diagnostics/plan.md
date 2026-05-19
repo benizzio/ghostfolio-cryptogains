@@ -3,6 +3,7 @@
 **Branch**: `[004-source-faithful-diagnostics]`  
 **Date**: 2026-05-19  
 **Spec**: `/specs/004-source-faithful-diagnostics/spec.md`
+**Process**: Summarized version; not part of a full Spec Kit process.
 
 ## Summary
 

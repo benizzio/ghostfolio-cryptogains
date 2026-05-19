@@ -3,6 +3,7 @@
 **Branch**: `[004-source-faithful-diagnostics]`  
 **Date**: 2026-05-19  
 **Input**: Issue "Simplify synced-data diagnostic records to mirror the actual activity record"
+**Process**: Summarized version; not part of a full Spec Kit process.
 
 ## Summary
 
