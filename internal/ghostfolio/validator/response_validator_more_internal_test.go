@@ -10,8 +10,6 @@ import (
 )
 
 func TestValidateActivityPageResponseAndEntryCoverBranches(t *testing.T) {
-	t.Parallel()
-
 	responseCases := []struct {
 		name     string
 		response dto.ActivityPageResponse
