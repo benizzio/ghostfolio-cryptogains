@@ -308,7 +308,7 @@ SELL
 - A normalized `BUY` with `unit_price = 0` maps to `unsupported activity history` and fails the full sync.
 - A normalized `SELL` with `unit_price = 0` is valid only when an explanatory comment is present. It is stored as a non-taxable holding reduction for future reporting use and does not enable reporting in this slice.
 - A normalized zero-priced `SELL` without an explanatory comment maps to `unsupported activity history` and fails the full sync.
-- Currency-context validation fails only when Ghostfolio omits currency context in all the three tracked currency tiers described below remains available for the preserved monetary data:
+- Currency-context validation fails only when Ghostfolio omits currency context in all the three tracked currency tiers described below:
   - `currency` in the activity record that is obtained through `Order.currency`
   - `SymbolProfile.currency` for asset-profile-valued fields in the activity record
   - authenticated-user `settings.baseCurrency` for base-valued fields
