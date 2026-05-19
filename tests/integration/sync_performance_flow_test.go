@@ -139,11 +139,11 @@ func buildLargeHistoryPages(activityCount int, pageSize int) []storagePageFixtur
 			}
 
 			var occurredAt = startedAt.Add(time.Duration(index) * 5 * time.Hour).Format(time.RFC3339)
-			builder.WriteString(fmt.Sprintf(
+			_, _ = fmt.Fprintf(&builder,
 				`{"id":"activity-%05d","date":"%s","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}`,
 				index+1,
 				occurredAt,
-			))
+			)
 		}
 		builder.WriteByte(']')
 
