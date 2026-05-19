@@ -99,6 +99,44 @@ HTTP `200 OK`
 - Other non-2xx responses map to `unsuccessful server response` unless the response itself proves contract incompatibility.
 - Unsupported content type, malformed JSON, missing `authToken`, or empty `authToken` maps to `incompatible server contract`.
 
+## Authenticated User Contract
+
+### Request
+
+`GET /api/v1/user`
+
+Headers:
+
+- `Authorization: Bearer <jwt>`
+
+### Successful Response Shape
+
+HTTP `200 OK`
+
+```json
+{
+  "settings": {
+    "baseCurrency": "USD"
+  }
+}
+```
+
+### Runtime Validation Rules
+
+- The response must declare a JSON-compatible content type.
+- The body must parse as JSON.
+- `settings` must exist.
+- `settings.baseCurrency` is optional in the verified public `UserSettings` interface.
+- `settings.baseCurrency` is used as the sync base-currency context when base-valued activity fields are present.
+- If this slice receives base-valued activity amounts but authenticated user data still does not provide `settings.baseCurrency`, that is a current-slice contract failure.
+
+### Failure Handling Rules
+
+- HTTP `401 Unauthorized` or `403 Forbidden` during user retrieval maps to `unsuccessful server response`.
+- HTTP `404 Not Found` maps to `incompatible server contract`.
+- Other non-2xx responses map to `unsuccessful server response` unless the response itself proves contract incompatibility.
+- Unsupported content type, malformed JSON, or missing `settings` maps to `incompatible server contract`.
+
 ## Activities Retrieval Contract
 
 ### Request
@@ -202,44 +240,6 @@ Current-slice contract interpretation:
 - `account` and tag-related fields are optional preserved inputs, not current-slice required inputs.
 - `SymbolProfile.currency` must be treated as not guaranteed by the public response contract even though current source wiring usually populates it.
 - Current-slice verification rerun on 2026-05-18 covers `currency = null`, missing `SymbolProfile.currency`, and omitted authenticated-user `settings.baseCurrency`; valid rows with one uninformed tier still succeed when other tiers remain informed.
-
-## Authenticated User Contract
-
-### Request
-
-`GET /api/v1/user`
-
-Headers:
-
-- `Authorization: Bearer <jwt>`
-
-### Successful Response Shape
-
-HTTP `200 OK`
-
-```json
-{
-  "settings": {
-    "baseCurrency": "USD"
-  }
-}
-```
-
-### Runtime Validation Rules
-
-- The response must declare a JSON-compatible content type.
-- The body must parse as JSON.
-- `settings` must exist.
-- `settings.baseCurrency` is optional in the verified public `UserSettings` interface.
-- `settings.baseCurrency` is used as the sync base-currency context when base-valued activity fields are present.
-- If this slice receives base-valued activity amounts but authenticated user data still does not provide `settings.baseCurrency`, that is a current-slice contract failure.
-
-### Failure Handling Rules
-
-- HTTP `401 Unauthorized` or `403 Forbidden` during user retrieval maps to `unsuccessful server response`.
-- HTTP `404 Not Found` maps to `incompatible server contract`.
-- Other non-2xx responses map to `unsuccessful server response` unless the response itself proves contract incompatibility.
-- Unsupported content type, malformed JSON, or missing `settings` maps to `incompatible server contract`.
 
 ### Minimum Required Inputs Per Retrieved Activity
 
