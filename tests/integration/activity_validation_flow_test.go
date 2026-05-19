@@ -36,6 +36,9 @@ func TestActivityValidationFlowRejectsUnsupportedHistoryAndKeepsExistingSnapshot
 	if err != nil {
 		t.Fatalf("discover candidates: %v", err)
 	}
+	if len(candidates) == 0 {
+		t.Fatalf("expected discovered snapshot candidates")
+	}
 	beforePayload, err := inspector.Read(context.Background(), snapshotstore.ReadRequest{Candidate: candidates[0], SecurityToken: "token-one"})
 	if err != nil {
 		t.Fatalf("read baseline snapshot: %v", err)
@@ -52,7 +55,6 @@ func TestActivityValidationFlowRejectsUnsupportedHistoryAndKeepsExistingSnapshot
 	}
 
 	for _, testCase := range failureCases {
-		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			server.SetTokenPages("token-one", []storagePageFixture{{
 				Count:          1,
@@ -122,6 +124,9 @@ func TestActivityValidationFlowNormalizesDuplicatesAndSameAssetSameDayOrdering(t
 	if err != nil {
 		t.Fatalf("discover candidates: %v", err)
 	}
+	if len(candidates) == 0 {
+		t.Fatalf("expected discovered snapshot candidates")
+	}
 	payload, err := inspector.Read(context.Background(), snapshotstore.ReadRequest{Candidate: candidates[0], SecurityToken: "token-one"})
 	if err != nil {
 		t.Fatalf("read payload: %v", err)
@@ -187,6 +192,9 @@ func TestActivityValidationFlowUsesSameDayReplayOrderingForArbitraryGhostfolioTi
 	candidates, err := snapshotstore.DiscoverServerCandidates(context.Background(), inspector, server.URL())
 	if err != nil {
 		t.Fatalf("discover candidates: %v", err)
+	}
+	if len(candidates) == 0 {
+		t.Fatalf("expected discovered snapshot candidates")
 	}
 	payload, err := inspector.Read(context.Background(), snapshotstore.ReadRequest{Candidate: candidates[0], SecurityToken: "token-one"})
 	if err != nil {
@@ -279,6 +287,9 @@ func TestActivityValidationFlowPreservesMixedCurrencyContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("discover candidates: %v", err)
 	}
+	if len(candidates) == 0 {
+		t.Fatalf("expected discovered snapshot candidates")
+	}
 	payload, err := inspector.Read(context.Background(), snapshotstore.ReadRequest{Candidate: candidates[0], SecurityToken: "token-one"})
 	if err != nil {
 		t.Fatalf("read payload: %v", err)
@@ -313,7 +324,6 @@ func TestActivityValidationFlowAllowsSingleUninformedCurrencyTierWhenOtherTiersR
 	config := mustActivityValidationConfig(t, server.URL())
 
 	for _, securityToken := range []string{"token-order-null", "token-user-base-missing"} {
-		securityToken := securityToken
 		t.Run(securityToken, func(t *testing.T) {
 			outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: securityToken})
 			if !outcome.Success {

@@ -155,6 +155,9 @@ func TestSnapshotCompatibilityFlowRetainsReadableSnapshotWhenNewWriteIsIncompati
 	if err != nil {
 		t.Fatalf("discover candidates after first sync: %v", err)
 	}
+	if len(candidates) == 0 {
+		t.Fatalf("expected discovered snapshot candidates")
+	}
 	beforeBytes, err := os.ReadFile(candidates[0].Path)
 	if err != nil {
 		t.Fatalf("read snapshot before incompatible write: %v", err)
@@ -162,6 +165,9 @@ func TestSnapshotCompatibilityFlowRetainsReadableSnapshotWhenNewWriteIsIncompati
 	beforePayload, err := inspector.Read(context.Background(), snapshotstore.ReadRequest{Candidate: candidates[0], SecurityToken: "token-one"})
 	if err != nil {
 		t.Fatalf("read payload before incompatible write: %v", err)
+	}
+	if len(beforePayload.ProtectedActivityCache.Activities) == 0 {
+		t.Fatalf("expected payload before incompatible write to contain activities")
 	}
 
 	wrappingStore.failWrites = true
@@ -183,6 +189,9 @@ func TestSnapshotCompatibilityFlowRetainsReadableSnapshotWhenNewWriteIsIncompati
 	afterPayload, err := inspector.Read(context.Background(), snapshotstore.ReadRequest{Candidate: candidates[0], SecurityToken: "token-one"})
 	if err != nil {
 		t.Fatalf("read payload after incompatible write: %v", err)
+	}
+	if len(afterPayload.ProtectedActivityCache.Activities) == 0 {
+		t.Fatalf("expected payload after incompatible write to contain activities")
 	}
 	if afterPayload.ProtectedActivityCache.Activities[0].SourceID != beforePayload.ProtectedActivityCache.Activities[0].SourceID {
 		t.Fatalf("expected previous readable payload to remain active and unchanged")

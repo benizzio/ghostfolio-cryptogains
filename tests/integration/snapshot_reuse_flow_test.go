@@ -157,6 +157,9 @@ func TestSnapshotReuseFlowDeniesWrongTokenWithoutChangingExistingSnapshot(t *tes
 	if err != nil {
 		t.Fatalf("discover candidates: %v", err)
 	}
+	if len(candidates) == 0 {
+		t.Fatalf("expected discovered snapshot candidates")
+	}
 	beforeBytes, err := os.ReadFile(candidates[0].Path)
 	if err != nil {
 		t.Fatalf("read existing snapshot: %v", err)
@@ -199,6 +202,9 @@ func TestSnapshotReuseFlowLeavesLocalDataUnchangedForInvalidToken(t *testing.T) 
 	if err != nil {
 		t.Fatalf("discover candidates before invalid attempt: %v", err)
 	}
+	if len(beforeCandidates) == 0 {
+		t.Fatalf("expected discovered snapshot candidates before invalid attempt")
+	}
 	beforeBytes, err := os.ReadFile(beforeCandidates[0].Path)
 	if err != nil {
 		t.Fatalf("read snapshot before invalid attempt: %v", err)
@@ -211,6 +217,9 @@ func TestSnapshotReuseFlowLeavesLocalDataUnchangedForInvalidToken(t *testing.T) 
 	afterCandidates, err := snapshotstore.DiscoverServerCandidates(context.Background(), inspector, server.URL())
 	if err != nil {
 		t.Fatalf("discover candidates after invalid attempt: %v", err)
+	}
+	if len(afterCandidates) == 0 {
+		t.Fatalf("expected discovered snapshot candidates after invalid attempt")
 	}
 	if len(afterCandidates) != len(beforeCandidates) {
 		t.Fatalf("expected invalid token to leave candidate count unchanged")

@@ -199,6 +199,9 @@ func TestActivityValidationContractPreservesMixedCurrencyContext(t *testing.T) {
 	if err := syncvalidate.NewValidator().Validate(cache); err != nil {
 		t.Fatalf("validate: %v", err)
 	}
+	if len(cache.Activities) == 0 {
+		t.Fatalf("expected normalized activities, got %d", len(cache.Activities))
+	}
 	if cache.Activities[0].OrderCurrency != "CHF" || cache.Activities[0].AssetProfileCurrency != "EUR" || cache.Activities[0].BaseCurrency != "USD" {
 		t.Fatalf("expected mixed-currency context to be preserved, got %#v", cache.Activities[0])
 	}
