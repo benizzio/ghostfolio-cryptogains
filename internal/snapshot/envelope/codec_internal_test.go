@@ -203,6 +203,9 @@ func TestDeriveEncryptionKeyAndCiphertextHelpersCoverBranches(t *testing.T) {
 	newAESCipher = func([]byte) (cipher.Block, error) {
 		return nil, errors.New("cipher boom")
 	}
+	t.Cleanup(func() {
+		newAESCipher = originalNewAESCipher
+	})
 	if _, _, err := prepareAEAD(header, "token"); err == nil {
 		t.Fatalf("expected injected AES cipher failure")
 	}
@@ -212,6 +215,9 @@ func TestDeriveEncryptionKeyAndCiphertextHelpersCoverBranches(t *testing.T) {
 	marshalEnvelopeJSON = func(any) ([]byte, error) {
 		return nil, errors.New("marshal boom")
 	}
+	t.Cleanup(func() {
+		marshalEnvelopeJSON = originalMarshal
+	})
 	if _, _, err := prepareAEAD(header, "token"); err == nil {
 		t.Fatalf("expected authenticated-header encoding failure")
 	}
@@ -221,6 +227,9 @@ func TestDeriveEncryptionKeyAndCiphertextHelpersCoverBranches(t *testing.T) {
 	newGCM = func(cipher.Block) (cipher.AEAD, error) {
 		return nil, errors.New("gcm boom")
 	}
+	t.Cleanup(func() {
+		newGCM = originalNewGCM
+	})
 	if _, _, err := prepareAEAD(header, "token"); err == nil {
 		t.Fatalf("expected injected GCM failure")
 	}
