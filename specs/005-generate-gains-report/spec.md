@@ -67,7 +67,7 @@ Before generating the report, the user can review the available cost basis metho
 
 1. **Given** the user is on the cost basis selection step, **When** the highlighted method changes, **Then** a short explanation describes how acquisitions and liquidations are matched or pooled and whether scope-specific fallback rules apply.
 2. **Given** any supported cost basis method is selected, **When** the yearly report is generated, **Then** that one method is applied consistently to every included liquidation in that report run.
-3. **Given** the scope-local hybrid method is selected and reliable scope information is unavailable for an asset, **When** the report is calculated, **Then** the method broadens to the whole asset instead of failing the report solely because scope detail is missing.
+3. **Given** the scope-local hybrid method is selected and reliable wallet or centralized trading platform account scope information is unavailable for an asset, **When** the report is calculated, **Then** the method broadens to the whole asset instead of failing the report solely because scope detail is missing.
 
 ---
 
@@ -116,6 +116,7 @@ impacts when the feature touches those areas.
 - **FR-025**: The system MUST define Average Cost Basis by the mathematical rules in `Cost Basis Method Definitions`.
 - **FR-026**: The system MUST define Scope-Local Exact Unit Matching, otherwise Scope-Local Average Cost with Oldest-Acquired Deemed-Disposal Order by the mathematical rules in `Cost Basis Method Definitions`.
 - **FR-027**: The system MUST apply the selected cost basis method consistently to every included liquidation in a single report run.
+- **FR-027a**: For the Scope-Local Exact Unit Matching method, the system MUST apply the selected exact-identification or fallback treatment consistently per `(asset, applicable_scope)` until that asset's quantity in that applicable scope reaches zero.
 - **FR-028**: The system MUST use the report-wide monetary label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` for this slice's generated report.
 - **FR-029**: The system MUST treat zero-priced disposal records that were admitted into synced data by the explained zero-priced `SELL` rule from `specs/003-store-activity-data/spec.md` as holding reductions that remove quantity and basis under the selected cost basis method without creating gain or loss entries in the report.
 - **FR-030**: The system MUST apply `Single-Activity Currency Context Definitions` whenever monetary amounts are needed for calculations from one activity.
@@ -256,16 +257,18 @@ When pool quantity reaches zero, the next acquisition starts a new pool for that
 This method first chooses the most reliable available scope for an asset:
 
 ```text
-applicable_scope = reliable wallet or account scope when available and defensible
-otherwise applicable_scope = the asset as a whole
+applicable_scope = reliable wallet or centralized trading platform account scope when available and defensible
+otherwise the applicable_scope = the asset as a whole
 ```
 
 Within that applicable scope:
 
 1. If the outgoing units can be defensibly identified exactly, allocate basis from those exact units.
-2. Otherwise, use average cost within that same scope.
-3. After the first average-cost fallback in an open scope, continue using pooled average cost in that scope until its quantity returns to zero.
-4. While pooled average cost is active in that scope, provenance is still deemed to leave in oldest-acquired order within that same scope.
+2. If exact identification is not possible, deem the oldest-acquired units of the same asset in that same scope to have been disposed first.
+3. For valuation under the fallback, use average cost within that same scope.
+4. If exact identification remains possible for every liquidation in an open scope, continue exact-unit matching in that scope.
+5. After the first average-cost fallback in an open scope, continue using wallet-local average cost for that asset in that scope until all units of that asset in that scope have been fully liquidated, even if later records contain more source detail.
+6. After full liquidation and later reacquisition in that same scope, a new method choice can apply in a later report run.
 
 Exact-unit basis:
 
@@ -277,6 +280,7 @@ matched_unit_cost_i = matched_basis_i / matched_quantity_i
 Scope-local average-cost fallback:
 
 ```text
+deemed_disposal_order = remaining quantities ordered by acquired_at ascending, then deterministic synced-history order
 scope_quantity = sum(remaining_quantity_i)
 scope_basis = sum(remaining_basis_i)
 average_unit_cost = scope_basis / scope_quantity
