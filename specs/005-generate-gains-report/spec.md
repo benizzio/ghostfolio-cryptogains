@@ -333,11 +333,14 @@ After values from multiple activities enter cost basis and gains-and-losses calc
 
 ### Key Entities *(include if feature involves data)*
 
+- **Protected Activity Cache**: The existing protected synced dataset reused by this slice. It contains the normalized activity history, available report years, scope reliability, and last successful sync metadata that gate and drive yearly report generation.
 - **Sync and Reports Context**: The active token-unlocked workflow state for one selected server and one token-scoped protected dataset, exposing `Sync Data` and `Generate Capital Gains Report` without repeated token entry while the context stays open.
-- **Report Request**: The user's selection of one report year and one cost basis method for a single generation run.
-- **Single-Activity Currency Context**: The chosen monetary context for one activity, selected in `order -> asset -> base` priority and used consistently for every monetary value needed from that activity.
-- **Reference Section Entry**: The per-asset reference record that shows whether an asset is reference-only for the selected year and how many full liquidations it has completed by the end of that year.
-- **Yearly Capital Gains And Losses Report**: The generated yearly statement containing the gains-and-losses summary, the reference section, and the per-asset detail sections.
+- **Report Request**: The user's selected report year and cost basis method for one report-generation run.
+- **Activity Record**: One normalized `BUY` or `SELL` event from the protected activity cache, carrying the quantity, monetary tiers, explanatory comment, and source-scope details needed for basis allocation and yearly gains-and-losses calculations.
+- **Single-Activity Currency Context**: The chosen monetary context for one activity, selected in tiers `order -> asset -> base` priority and used consistently for every monetary value needed from that activity.
+- **Source Scope**: The optional preserved account, wallet, or equivalent grouping attached to an activity record. It determines whether the scope-local hybrid method can remain narrow or must broaden to the asset as a whole.
+- **Asset Position Timeline**: The derived per-asset chronological view used to establish opening position, in-year activity, closing position, report-section inclusion, and full-liquidation counting through the end of the selected year.
+- **Capital Gains Report**: The generated yearly report that contains the gains-and-losses summary, the reference section, the per-asset detail sections, the report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`, and the generated Markdown output path.
 - **Report Output File**: The clear Markdown file saved in the user's Documents folder after generation, with a timestamped name and no continuing application ownership after save.
 
 ## Success Criteria *(mandatory)*
