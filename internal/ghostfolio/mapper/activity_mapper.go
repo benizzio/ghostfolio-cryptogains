@@ -4,6 +4,7 @@
 package mapper
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -158,13 +159,9 @@ func errorAsDiagnosticCarrier(err error, target *interface {
 	var carrier interface {
 		DiagnosticContext() syncmodel.DiagnosticContext
 	}
-	typed, ok := err.(interface {
-		DiagnosticContext() syncmodel.DiagnosticContext
-	})
-	if !ok {
+	if !errors.As(err, &carrier) {
 		return false
 	}
-	carrier = typed
 	*target = carrier
 	return true
 }
