@@ -22,9 +22,11 @@ import (
 //	}
 //	_ = amounts.UnitPrice
 //
-// The resolved values are not persisted. They exist only so validation and
-// validation code can apply the current slice's basis-input rules without
-// forcing the mapper to store one selected cross-currency view.
+// The resolved values are not persisted. They exist only so validation code can
+// apply the current slice's basis-input rules without forcing the mapper to
+// store one selected cross-currency view.
+// Diagnostic records preserve source fields instead of using these resolved
+// values.
 // Authored by: OpenCode
 type ResolvedActivityAmounts struct {
 	UnitPrice          *apd.Decimal

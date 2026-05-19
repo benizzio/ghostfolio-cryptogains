@@ -83,7 +83,7 @@ func TestCanonicalDiagnosticDecimalFallbackBranches(t *testing.T) {
 	}
 }
 
-func TestDiagnosticRecordFromActivityRecordDoesNotResolvePreferredAmounts(t *testing.T) {
+func TestDiagnosticRecordFromActivityRecordPreservesSourceAmounts(t *testing.T) {
 	t.Parallel()
 
 	quantity, _, err := decimalsupport.ParseString("1")
