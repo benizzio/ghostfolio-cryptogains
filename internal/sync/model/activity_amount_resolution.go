@@ -23,7 +23,7 @@ import (
 //	_ = amounts.UnitPrice
 //
 // The resolved values are not persisted. They exist only so validation and
-// diagnostic-report code can apply the current slice's basis-input rules without
+// validation code can apply the current slice's basis-input rules without
 // forcing the mapper to store one selected cross-currency view.
 // Authored by: OpenCode
 type ResolvedActivityAmounts struct {
@@ -46,8 +46,8 @@ type ResolvedActivityAmounts struct {
 //	}
 //	_ = amounts.GrossValue
 //
-// The selection rules stay local to validation and diagnostics. The persisted
-// activity record itself keeps only the explicit order-currency,
+// The selection rules stay local to validation. The persisted activity record
+// itself keeps only the explicit order-currency,
 // asset-profile-currency, and base-currency groups that Ghostfolio exposes.
 // Authored by: OpenCode
 func ResolveActivityAmounts(record ActivityRecord) (ResolvedActivityAmounts, error) {

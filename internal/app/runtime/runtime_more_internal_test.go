@@ -219,12 +219,6 @@ func TestBuildDiagnosticReportDocumentPreservesCurrencyContextWhileRedactingFina
 			OrderCurrency:         "CHF",
 			AssetProfileCurrency:  "EUR",
 			BaseCurrency:          "USD",
-			UnitPrice:             "95",
-			UnitPriceCurrency:     "EUR",
-			GrossValue:            "90",
-			GrossValueCurrency:    "CHF",
-			FeeAmount:             "1.8",
-			FeeAmountCurrency:     "EUR",
 			OrderUnitPrice:        "",
 			AssetProfileUnitPrice: "95",
 			OrderGrossValue:       "90",
@@ -240,18 +234,18 @@ func TestBuildDiagnosticReportDocumentPreservesCurrencyContextWhileRedactingFina
 		t.Fatalf("expected one redacted diagnostic record, got %#v", redacted)
 	}
 	redactedRecord := redacted.Records[0]
-	if redactedRecord.OrderCurrency != "CHF" || redactedRecord.AssetProfileCurrency != "EUR" || redactedRecord.BaseCurrency != "USD" || redactedRecord.UnitPriceCurrency != "EUR" || redactedRecord.FeeAmountCurrency != "EUR" {
+	if redactedRecord.OrderCurrency != "CHF" || redactedRecord.AssetProfileCurrency != "EUR" || redactedRecord.BaseCurrency != "USD" {
 		t.Fatalf("expected currency context to remain visible after redaction, got %#v", redactedRecord)
 	}
-	if redactedRecord.UnitPrice != "" || redactedRecord.GrossValue != "" || redactedRecord.FeeAmount != "" || redactedRecord.AssetProfileUnitPrice != "" {
+	if redactedRecord.OrderGrossValue != "" || redactedRecord.AssetProfileUnitPrice != "" {
 		t.Fatalf("expected financial values to be cleared, got %#v", redactedRecord)
 	}
 
 	request.RedactFinancialValues = false
 	unredacted := buildDiagnosticReportDocument(request, time.Unix(3, 0).UTC())
 	unredactedRecord := unredacted.Records[0]
-	if unredactedRecord.UnitPrice != "95" || unredactedRecord.GrossValue != "90" || unredactedRecord.FeeAmount != "1.8" || unredactedRecord.AssetProfileUnitPrice != "95" {
-		t.Fatalf("expected explicit-development-mode diagnostics to retain financial values, got %#v", unredactedRecord)
+	if unredactedRecord.OrderGrossValue != "90" || unredactedRecord.AssetProfileUnitPrice != "95" {
+		t.Fatalf("expected explicit-development-mode diagnostics to retain source financial values, got %#v", unredactedRecord)
 	}
 }
 
@@ -691,10 +685,10 @@ func TestRunPreservesIncompleteCurrencyContextDiagnosticContext(t *testing.T) {
 			t.Fatalf("expected one diagnostic record, got %#v", diagnosticContext)
 		}
 		var requestRecord = diagnosticContext.Records[0]
-		if requestRecord.OrderCurrency != "" || requestRecord.AssetProfileCurrency != "" || requestRecord.BaseCurrency != "" || requestRecord.UnitPriceCurrency != "" || requestRecord.GrossValueCurrency != "" {
+		if requestRecord.OrderCurrency != "" || requestRecord.AssetProfileCurrency != "" || requestRecord.BaseCurrency != "" {
 			t.Fatalf("expected preserved currency identifiers in diagnostic request, got %#v", requestRecord)
 		}
-		if requestRecord.UnitPrice != "" || requestRecord.OrderUnitPrice != "" || requestRecord.AssetProfileUnitPrice != "95" || requestRecord.BaseGrossValue != "100" || requestRecord.OrderGrossValue != "90" {
+		if requestRecord.OrderUnitPrice != "" || requestRecord.AssetProfileUnitPrice != "95" || requestRecord.BaseGrossValue != "100" || requestRecord.OrderGrossValue != "90" {
 			t.Fatalf("expected unredacted offending-record values in diagnostic request, got %#v", requestRecord)
 		}
 
@@ -713,10 +707,10 @@ func TestRunPreservesIncompleteCurrencyContextDiagnosticContext(t *testing.T) {
 			t.Fatalf("expected one persisted diagnostic record, got %#v", document)
 		}
 		var persistedRecord = document.Records[0]
-		if persistedRecord.OrderCurrency != "" || persistedRecord.AssetProfileCurrency != "" || persistedRecord.BaseCurrency != "" || persistedRecord.UnitPriceCurrency != "" || persistedRecord.GrossValueCurrency != "" {
+		if persistedRecord.OrderCurrency != "" || persistedRecord.AssetProfileCurrency != "" || persistedRecord.BaseCurrency != "" {
 			t.Fatalf("expected production diagnostic report to preserve currency identifiers, got %#v", persistedRecord)
 		}
-		if persistedRecord.UnitPrice != "" || persistedRecord.AssetProfileUnitPrice != "" || persistedRecord.BaseGrossValue != "" || persistedRecord.OrderGrossValue != "" || persistedRecord.FeeAmount != "" {
+		if persistedRecord.AssetProfileUnitPrice != "" || persistedRecord.BaseGrossValue != "" || persistedRecord.OrderGrossValue != "" {
 			t.Fatalf("expected production diagnostic report to redact financial values, got %#v", persistedRecord)
 		}
 	})
@@ -749,10 +743,10 @@ func TestRunPreservesIncompleteCurrencyContextDiagnosticContext(t *testing.T) {
 			t.Fatalf("expected one persisted diagnostic record, got %#v", document)
 		}
 		var persistedRecord = document.Records[0]
-		if persistedRecord.OrderCurrency != "" || persistedRecord.AssetProfileCurrency != "" || persistedRecord.BaseCurrency != "" || persistedRecord.UnitPriceCurrency != "" || persistedRecord.GrossValueCurrency != "" {
+		if persistedRecord.OrderCurrency != "" || persistedRecord.AssetProfileCurrency != "" || persistedRecord.BaseCurrency != "" {
 			t.Fatalf("expected development diagnostic report to preserve currency identifiers, got %#v", persistedRecord)
 		}
-		if persistedRecord.UnitPrice != "" || persistedRecord.OrderUnitPrice != "" || persistedRecord.OrderGrossValue != "90" || persistedRecord.AssetProfileUnitPrice != "95" || persistedRecord.BaseGrossValue != "100" {
+		if persistedRecord.OrderUnitPrice != "" || persistedRecord.OrderGrossValue != "90" || persistedRecord.AssetProfileUnitPrice != "95" || persistedRecord.BaseGrossValue != "100" {
 			t.Fatalf("expected development diagnostic report to preserve offending-record values, got %#v", persistedRecord)
 		}
 	})
@@ -901,11 +895,11 @@ func runtimeDiagnosticRequestFixture() DiagnosticReportRequest {
 			FailureStage:  syncmodel.DiagnosticFailureStageValidation,
 			FailureDetail: "token detail",
 			Records: []syncmodel.DiagnosticRecord{{
-				SourceID:   "activity-1",
-				Quantity:   "1",
-				UnitPrice:  "2",
-				GrossValue: "3",
-				FeeAmount:  "4",
+				SourceID:        "activity-1",
+				Quantity:        "1",
+				OrderUnitPrice:  "2",
+				OrderGrossValue: "3",
+				OrderFeeAmount:  "4",
 			}},
 		},
 	}

@@ -56,14 +56,11 @@ func TestDiagnosticRecordFromActivityRecordCanonicalizesAndPreservesScope(t *tes
 		},
 	)
 
-	if record.Quantity != "1.23" || record.UnitPrice != "100.5" || record.GrossValue != "123.615" || record.FeeAmount != "0.1" {
+	if record.Quantity != "1.23" || record.OrderUnitPrice != "100.5" || record.OrderGrossValue != "123.615" || record.OrderFeeAmount != "0.1" {
 		t.Fatalf("unexpected canonical diagnostic values: %#v", record)
 	}
 	if record.OrderCurrency != "CHF" || record.AssetProfileCurrency != "EUR" || record.BaseCurrency != "USD" {
 		t.Fatalf("unexpected currency context: %#v", record)
-	}
-	if record.UnitPriceCurrency != "CHF" || record.GrossValueCurrency != "CHF" || record.FeeAmountCurrency != "CHF" {
-		t.Fatalf("unexpected selected monetary currencies: %#v", record)
 	}
 	if record.SourceScopeID != "account-1" || record.SourceScopeName != "Main Account" || record.SourceScopeKind != string(SourceScopeKindAccount) || record.SourceScopeReliability != string(ScopeReliabilityReliable) {
 		t.Fatalf("unexpected scope diagnostic context: %#v", record)
@@ -86,7 +83,7 @@ func TestCanonicalDiagnosticDecimalFallbackBranches(t *testing.T) {
 	}
 }
 
-func TestDiagnosticRecordFromActivityRecordPrefersInformedCurrencyTiers(t *testing.T) {
+func TestDiagnosticRecordFromActivityRecordDoesNotResolvePreferredAmounts(t *testing.T) {
 	t.Parallel()
 
 	quantity, _, err := decimalsupport.ParseString("1")
@@ -122,7 +119,7 @@ func TestDiagnosticRecordFromActivityRecordPrefersInformedCurrencyTiers(t *testi
 		},
 	)
 
-	if record.UnitPriceCurrency != "EUR" || record.GrossValueCurrency != "EUR" {
-		t.Fatalf("expected diagnostics to prefer informed tiers, got %#v", record)
+	if record.OrderUnitPrice != "90" || record.AssetProfileUnitPrice != "95" || record.BaseGrossValue != "100" {
+		t.Fatalf("expected diagnostics to preserve source amount tiers, got %#v", record)
 	}
 }
