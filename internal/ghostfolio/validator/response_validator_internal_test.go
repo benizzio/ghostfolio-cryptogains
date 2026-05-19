@@ -17,31 +17,46 @@ func TestValidateAuthResponseCoversSuccessAndFailure(t *testing.T) {
 	}
 }
 
-func TestValidateActivitiesProbeResponseCoversBranches(t *testing.T) {
+func TestValidateUserResponseCoversSuccessAndFailure(t *testing.T) {
+	t.Parallel()
+
+	if err := ValidateUserResponse(dto.UserResponse{}); err == nil {
+		t.Fatalf("expected missing settings to fail")
+	}
+	if err := ValidateUserResponse(dto.UserResponse{Settings: &dto.UserSettings{BaseCurrency: "USD"}}); err != nil {
+		t.Fatalf("expected user settings to pass: %v", err)
+	}
+	if err := ValidateUserResponse(dto.UserResponse{Settings: &dto.UserSettings{BaseCurrency: ""}}); err != nil {
+		t.Fatalf("expected missing authenticated-user base currency to remain allowed: %v", err)
+	}
+}
+
+func TestValidateSingleActivityPageResponseCoversBranches(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
 		name     string
-		response dto.ActivitiesProbeResponse
+		response dto.ActivityPageResponse
 		wantErr  bool
 	}{
-		{name: "negative count", response: dto.ActivitiesProbeResponse{Count: -1}, wantErr: true},
-		{name: "missing activities field", response: dto.ActivitiesProbeResponse{Count: 0}, wantErr: true},
-		{name: "more than one activity", response: dto.ActivitiesProbeResponse{Count: 2, Activities: []dto.ActivityProbeEntry{{ID: "1", Date: "2026-01-31T10:00:00Z", Type: "BUY"}, {ID: "2", Date: "2026-01-31T10:00:00Z", Type: "SELL"}}}, wantErr: true},
-		{name: "count zero with activity", response: dto.ActivitiesProbeResponse{Count: 0, Activities: []dto.ActivityProbeEntry{{ID: "1", Date: "2026-01-31T10:00:00Z", Type: "BUY"}}}, wantErr: true},
-		{name: "count positive without activity", response: dto.ActivitiesProbeResponse{Count: 1, Activities: []dto.ActivityProbeEntry{}}, wantErr: true},
-		{name: "empty history", response: dto.ActivitiesProbeResponse{Count: 0, Activities: []dto.ActivityProbeEntry{}}, wantErr: false},
-		{name: "missing id", response: dto.ActivitiesProbeResponse{Count: 1, Activities: []dto.ActivityProbeEntry{{Date: "2026-01-31T10:00:00Z", Type: "BUY"}}}, wantErr: true},
-		{name: "missing type", response: dto.ActivitiesProbeResponse{Count: 1, Activities: []dto.ActivityProbeEntry{{ID: "1", Date: "2026-01-31T10:00:00Z"}}}, wantErr: true},
-		{name: "missing date", response: dto.ActivitiesProbeResponse{Count: 1, Activities: []dto.ActivityProbeEntry{{ID: "1", Type: "BUY"}}}, wantErr: true},
-		{name: "invalid date", response: dto.ActivitiesProbeResponse{Count: 1, Activities: []dto.ActivityProbeEntry{{ID: "1", Date: "bad", Type: "BUY"}}}, wantErr: true},
-		{name: "valid activity with fractional seconds", response: dto.ActivitiesProbeResponse{Count: 1, Activities: []dto.ActivityProbeEntry{{ID: "1", Date: "2026-01-31T10:00:00.000Z", Type: "BUY"}}}, wantErr: false},
-		{name: "valid activity", response: dto.ActivitiesProbeResponse{Count: 1, Activities: []dto.ActivityProbeEntry{{ID: "1", Date: "2026-01-31T10:00:00Z", Type: "BUY"}}}, wantErr: false},
+		{name: "negative count", response: dto.ActivityPageResponse{Count: -1}, wantErr: true},
+		{name: "missing activities field", response: dto.ActivityPageResponse{Count: 0}, wantErr: true},
+		{name: "more than one activity", response: dto.ActivityPageResponse{Count: 2, Activities: []dto.ActivityPageEntry{{ID: "1", Date: "2026-01-31T10:00:00Z", Type: "BUY"}, {ID: "2", Date: "2026-01-31T10:00:00Z", Type: "SELL"}}}, wantErr: true},
+		{name: "count zero with activity", response: dto.ActivityPageResponse{Count: 0, Activities: []dto.ActivityPageEntry{{ID: "1", Date: "2026-01-31T10:00:00Z", Type: "BUY"}}}, wantErr: true},
+		{name: "count positive without activity", response: dto.ActivityPageResponse{Count: 1, Activities: []dto.ActivityPageEntry{}}, wantErr: true},
+		{name: "empty history", response: dto.ActivityPageResponse{Count: 0, Activities: []dto.ActivityPageEntry{}}, wantErr: false},
+		{name: "missing id", response: dto.ActivityPageResponse{Count: 1, Activities: []dto.ActivityPageEntry{{Date: "2026-01-31T10:00:00Z", Type: "BUY"}}}, wantErr: true},
+		{name: "missing type", response: dto.ActivityPageResponse{Count: 1, Activities: []dto.ActivityPageEntry{{ID: "1", Date: "2026-01-31T10:00:00Z"}}}, wantErr: true},
+		{name: "missing date", response: dto.ActivityPageResponse{Count: 1, Activities: []dto.ActivityPageEntry{{ID: "1", Type: "BUY"}}}, wantErr: true},
+		{name: "invalid date", response: dto.ActivityPageResponse{Count: 1, Activities: []dto.ActivityPageEntry{{ID: "1", Date: "bad", Type: "BUY"}}}, wantErr: true},
+		{name: "valid activity with padded date", response: dto.ActivityPageResponse{Count: 1, Activities: []dto.ActivityPageEntry{{ID: "1", Date: " 2026-01-31T10:00:00Z ", Type: "BUY"}}}, wantErr: false},
+		{name: "valid activity with fractional seconds", response: dto.ActivityPageResponse{Count: 1, Activities: []dto.ActivityPageEntry{{ID: "1", Date: "2026-01-31T10:00:00.000Z", Type: "BUY"}}}, wantErr: false},
+		{name: "valid activity", response: dto.ActivityPageResponse{Count: 1, Activities: []dto.ActivityPageEntry{{ID: "1", Date: "2026-01-31T10:00:00Z", Type: "BUY"}}}, wantErr: false},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			err := ValidateActivitiesProbeResponse(testCase.response)
+			err := ValidateSingleActivityPageResponse(testCase.response)
 			if testCase.wantErr && err == nil {
 				t.Fatalf("expected validation error")
 			}

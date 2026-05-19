@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 )
 
 // assertFlowModel converts the updated Bubble Tea model into the integration
@@ -76,4 +78,18 @@ func TestMustCloudSetupConfigReturnsValidCloudSetup(t *testing.T) {
 	if config.ServerOrigin != configmodel.GhostfolioCloudOrigin {
 		t.Fatalf("unexpected server origin: %q", config.ServerOrigin)
 	}
+}
+
+// setTokenAwareCurrencyContextFixtures applies one reusable BUG-004 user/body
+// permutation to the shared token-aware Ghostfolio test server.
+// Authored by: OpenCode
+func setTokenAwareCurrencyContextFixtures(server *tokenAwareStorageServer, token string, userBody string, activities ...string) {
+	if userBody == "" {
+		userBody = testutil.GhostfolioUserBody("USD")
+	}
+	server.SetTokenUserBody(token, userBody)
+	server.SetTokenPages(token, []storagePageFixture{{
+		Count:          len(activities),
+		ActivitiesJSON: "[" + strings.Join(activities, ",") + "]",
+	}})
 }

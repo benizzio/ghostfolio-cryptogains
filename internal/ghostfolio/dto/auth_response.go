@@ -1,10 +1,10 @@
-// Package dto defines the minimal Ghostfolio transport models required by this
-// validation-only slice.
+// Package dto defines the Ghostfolio transport models required by the sync and
+// protected-storage slices.
 // Authored by: OpenCode
 package dto
 
-// AuthResponse is the minimal successful anonymous-auth response required by
-// this slice.
+// AuthResponse is the successful anonymous-auth response required by the sync
+// slice.
 //
 // Authored by: OpenCode
 type AuthResponse struct {

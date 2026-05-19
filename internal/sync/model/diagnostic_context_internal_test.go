@@ -1,0 +1,128 @@
+package model
+
+import (
+	"testing"
+
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	"github.com/cockroachdb/apd/v3"
+)
+
+func TestDiagnosticRecordFromActivityRecordCanonicalizesAndPreservesScope(t *testing.T) {
+	t.Parallel()
+
+	quantity, _, err := decimalsupport.ParseString("001.2300")
+	if err != nil {
+		t.Fatalf("parse quantity: %v", err)
+	}
+	unitPrice, _, err := decimalsupport.ParseString("100.5000")
+	if err != nil {
+		t.Fatalf("parse unit price: %v", err)
+	}
+	grossValue, _, err := decimalsupport.ParseString("123.6150")
+	if err != nil {
+		t.Fatalf("parse gross value: %v", err)
+	}
+	feeAmount, _, err := decimalsupport.ParseString("0.1000")
+	if err != nil {
+		t.Fatalf("parse fee amount: %v", err)
+	}
+
+	record := DiagnosticRecordFromActivityRecord(
+		ActivityRecord{
+			SourceID:              "activity-1",
+			OccurredAt:            "2024-01-01T10:00:00Z",
+			ActivityType:          ActivityTypeBuy,
+			AssetSymbol:           "BTC",
+			AssetName:             "Bitcoin",
+			OrderCurrency:         "CHF",
+			AssetProfileCurrency:  "EUR",
+			BaseCurrency:          "USD",
+			Quantity:              quantity,
+			OrderUnitPrice:        &unitPrice,
+			OrderGrossValue:       &grossValue,
+			OrderFeeAmount:        &feeAmount,
+			AssetProfileUnitPrice: &unitPrice,
+			AssetProfileFeeAmount: &feeAmount,
+			BaseGrossValue:        &grossValue,
+			BaseFeeAmount:         &feeAmount,
+			Comment:               "comment",
+			DataSource:            "ghostfolio",
+			SourceScope: &SourceScope{
+				ID:          "account-1",
+				Name:        "Main Account",
+				Kind:        SourceScopeKindAccount,
+				Reliability: ScopeReliabilityReliable,
+			},
+		},
+	)
+
+	if record.Quantity != "1.23" || record.UnitPrice != "100.5" || record.GrossValue != "123.615" || record.FeeAmount != "0.1" {
+		t.Fatalf("unexpected canonical diagnostic values: %#v", record)
+	}
+	if record.OrderCurrency != "CHF" || record.AssetProfileCurrency != "EUR" || record.BaseCurrency != "USD" {
+		t.Fatalf("unexpected currency context: %#v", record)
+	}
+	if record.UnitPriceCurrency != "CHF" || record.GrossValueCurrency != "CHF" || record.FeeAmountCurrency != "CHF" {
+		t.Fatalf("unexpected selected monetary currencies: %#v", record)
+	}
+	if record.SourceScopeID != "account-1" || record.SourceScopeName != "Main Account" || record.SourceScopeKind != string(SourceScopeKindAccount) || record.SourceScopeReliability != string(ScopeReliabilityReliable) {
+		t.Fatalf("unexpected scope diagnostic context: %#v", record)
+	}
+}
+
+func TestCanonicalDiagnosticDecimalFallbackBranches(t *testing.T) {
+	t.Parallel()
+
+	var invalid apd.Decimal
+	invalid.Form = apd.Infinite
+	if got := canonicalDiagnosticDecimal(invalid); got != invalid.String() {
+		t.Fatalf("expected decimal fallback string, got %q want %q", got, invalid.String())
+	}
+	if got := canonicalDiagnosticDecimalPointer(nil); got != "" {
+		t.Fatalf("expected nil pointer to return empty string, got %q", got)
+	}
+	if got := canonicalDiagnosticDecimalPointer(&invalid); got != invalid.String() {
+		t.Fatalf("expected pointer fallback string, got %q want %q", got, invalid.String())
+	}
+}
+
+func TestDiagnosticRecordFromActivityRecordPrefersInformedCurrencyTiers(t *testing.T) {
+	t.Parallel()
+
+	quantity, _, err := decimalsupport.ParseString("1")
+	if err != nil {
+		t.Fatalf("parse quantity: %v", err)
+	}
+	orderUnitPrice, _, err := decimalsupport.ParseString("90")
+	if err != nil {
+		t.Fatalf("parse order unit price: %v", err)
+	}
+	assetProfileUnitPrice, _, err := decimalsupport.ParseString("95")
+	if err != nil {
+		t.Fatalf("parse asset-profile unit price: %v", err)
+	}
+	baseGrossValue, _, err := decimalsupport.ParseString("100")
+	if err != nil {
+		t.Fatalf("parse base gross value: %v", err)
+	}
+
+	record := DiagnosticRecordFromActivityRecord(
+		ActivityRecord{
+			SourceID:              "activity-1",
+			OccurredAt:            "2024-01-01T10:00:00Z",
+			ActivityType:          ActivityTypeBuy,
+			AssetSymbol:           "BTC",
+			Quantity:              quantity,
+			OrderCurrency:         "",
+			AssetProfileCurrency:  "EUR",
+			BaseCurrency:          "USD",
+			OrderUnitPrice:        &orderUnitPrice,
+			AssetProfileUnitPrice: &assetProfileUnitPrice,
+			BaseGrossValue:        &baseGrossValue,
+		},
+	)
+
+	if record.UnitPriceCurrency != "EUR" || record.GrossValueCurrency != "EUR" {
+		t.Fatalf("expected diagnostics to prefer informed tiers, got %#v", record)
+	}
+}

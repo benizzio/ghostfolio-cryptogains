@@ -17,16 +17,25 @@ func (timeoutError) Temporary() bool { return false }
 func TestRequestFailureHelpers(t *testing.T) {
 	t.Parallel()
 
-	var err = &RequestFailure{Category: FailureTimeout, Message: "timeout", Err: context.DeadlineExceeded}
-	if err.Error() != "timeout" {
+	var err = &RequestFailure{Category: FailureTimeout, Detail: "ghostfolio request deadline exceeded", Err: context.DeadlineExceeded}
+	if err.Error() != "ghostfolio request deadline exceeded" {
 		t.Fatalf("unexpected error text: %q", err.Error())
 	}
 	if !errors.Is(err.Unwrap(), context.DeadlineExceeded) {
 		t.Fatalf("unexpected unwrap value")
 	}
 
-	if got := (&RequestFailure{Category: FailureRejectedToken}).Error(); got != string(FailureRejectedToken) {
+	if got := (&RequestFailure{Category: FailureRejectedToken, Operation: "anonymous auth", StatusCode: http.StatusForbidden}).Error(); got != "anonymous auth returned HTTP 403" {
 		t.Fatalf("unexpected default error text: %q", got)
+	}
+	if got := (&RequestFailure{Category: FailureConnectivityProblem, Operation: "user request"}).Error(); got != "user request failed" {
+		t.Fatalf("unexpected operation-only error text: %q", got)
+	}
+	if got := (&RequestFailure{Category: FailureConnectivityProblem}).Error(); got != string(FailureConnectivityProblem) {
+		t.Fatalf("unexpected category fallback error text: %q", got)
+	}
+	if got := (*RequestFailure)(nil).Error(); got != "" {
+		t.Fatalf("unexpected nil error text: %q", got)
 	}
 }
 
@@ -145,7 +154,97 @@ func TestAuthenticateAcceptsJSONContentTypesAndBuildErrors(t *testing.T) {
 	})
 }
 
-func TestFetchActivitiesProbeHandlesServerResponseClasses(t *testing.T) {
+func TestFetchUserHandlesServerResponseClasses(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name        string
+		status      int
+		contentType string
+		body        string
+		expected    FailureCategory
+	}{
+		{name: "not found", status: http.StatusNotFound, expected: FailureIncompatibleServerContract},
+		{name: "forbidden", status: http.StatusForbidden, expected: FailureUnsuccessfulServerResponse},
+		{name: "server error", status: http.StatusInternalServerError, expected: FailureUnsuccessfulServerResponse},
+		{name: "invalid content type", status: http.StatusOK, contentType: "text/plain", body: "ok", expected: FailureIncompatibleServerContract},
+		{name: "invalid json", status: http.StatusOK, contentType: "application/json", body: "{", expected: FailureIncompatibleServerContract},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				if testCase.contentType != "" {
+					writer.Header().Set("Content-Type", testCase.contentType)
+				}
+				writer.WriteHeader(testCase.status)
+				_, _ = writer.Write([]byte(testCase.body))
+			}))
+			defer server.Close()
+
+			_, err := New(server.Client()).FetchUser(context.Background(), server.URL, "jwt")
+			var failure *RequestFailure
+			if !errors.As(err, &failure) || failure.Category != testCase.expected {
+				t.Fatalf("unexpected failure: %v", err)
+			}
+		})
+	}
+}
+
+func TestFetchUserHandlesTransportAndBuildErrors(t *testing.T) {
+	t.Parallel()
+
+	t.Run("transport timeout", func(t *testing.T) {
+		var client = New(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			return nil, timeoutError{}
+		})})
+		_, err := client.FetchUser(context.Background(), "https://ghostfol.io", "jwt")
+		var failure *RequestFailure
+		if !errors.As(err, &failure) || failure.Category != FailureTimeout {
+			t.Fatalf("unexpected failure: %v", err)
+		}
+	})
+
+	t.Run("invalid origin", func(t *testing.T) {
+		_, err := New(nil).FetchUser(context.Background(), "://bad", "jwt")
+		if err == nil {
+			t.Fatalf("expected request build error")
+		}
+	})
+
+	t.Run("success", func(t *testing.T) {
+		var authHeader string
+		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			authHeader = request.Header.Get("Authorization")
+			_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":"USD"}}`))
+		}))
+		defer server.Close()
+
+		var response, err = New(server.Client()).FetchUser(context.Background(), server.URL, "jwt")
+		if authHeader != "Bearer jwt" {
+			t.Fatalf("unexpected auth header: %q", authHeader)
+		}
+		if err != nil || response.Settings == nil || response.Settings.BaseCurrency != "USD" {
+			t.Fatalf("expected successful user fetch, response=%#v err=%v", response, err)
+		}
+	})
+
+	t.Run("nullable base currency", func(t *testing.T) {
+		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":null}}`))
+		}))
+		defer server.Close()
+
+		var response, err = New(server.Client()).FetchUser(context.Background(), server.URL, "jwt")
+		if err != nil || response.Settings == nil || response.Settings.BaseCurrency.String() != "" {
+			t.Fatalf("expected nullable base currency to decode as uninformed, response=%#v err=%v", response, err)
+		}
+	})
+}
+
+func TestFetchSingleActivitiesPageHandlesServerResponseClasses(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -174,7 +273,7 @@ func TestFetchActivitiesProbeHandlesServerResponseClasses(t *testing.T) {
 			}))
 			defer server.Close()
 
-			_, err := New(server.Client()).FetchActivitiesProbe(context.Background(), server.URL, "jwt")
+			_, err := New(server.Client()).FetchActivitiesHistory(context.Background(), server.URL, "jwt")
 			var failure *RequestFailure
 			if !errors.As(err, &failure) || failure.Category != testCase.expected {
 				t.Fatalf("unexpected failure: %v", err)
@@ -183,14 +282,14 @@ func TestFetchActivitiesProbeHandlesServerResponseClasses(t *testing.T) {
 	}
 }
 
-func TestFetchActivitiesProbeHandlesTransportAndBuildErrors(t *testing.T) {
+func TestFetchActivitiesHistoryHandlesTransportAndBuildErrors(t *testing.T) {
 	t.Parallel()
 
 	t.Run("transport timeout", func(t *testing.T) {
 		var client = New(&http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 			return nil, timeoutError{}
 		})})
-		_, err := client.FetchActivitiesProbe(context.Background(), "https://ghostfol.io", "jwt")
+		_, err := client.FetchActivitiesHistory(context.Background(), "https://ghostfol.io", "jwt")
 		var failure *RequestFailure
 		if !errors.As(err, &failure) || failure.Category != FailureTimeout {
 			t.Fatalf("unexpected failure: %v", err)
@@ -198,7 +297,7 @@ func TestFetchActivitiesProbeHandlesTransportAndBuildErrors(t *testing.T) {
 	})
 
 	t.Run("invalid origin", func(t *testing.T) {
-		_, err := New(nil).FetchActivitiesProbe(context.Background(), "://bad", "jwt")
+		_, err := New(nil).FetchActivitiesHistory(context.Background(), "://bad", "jwt")
 		if err == nil {
 			t.Fatalf("expected request build error")
 		}
@@ -207,13 +306,154 @@ func TestFetchActivitiesProbeHandlesTransportAndBuildErrors(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			writer.Header().Set("Content-Type", "application/json")
+			_, _ = writer.Write([]byte(`{"activities":[{"id":"a","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"currency":null,"value":90,"unitPrice":90,"fee":2,"unitPriceInAssetProfileCurrency":95,"feeInAssetProfileCurrency":1.8,"valueInBaseCurrency":100,"feeInBaseCurrency":2.2,"comment":null,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"EUR"}}],"count":1}`))
+		}))
+		defer server.Close()
+
+		var response, err = New(server.Client()).FetchActivitiesHistory(context.Background(), server.URL, "jwt")
+		if err != nil || response.Count != 1 || response.Activities[0].Currency.String() != "" || response.Activities[0].Comment.String() != "" {
+			t.Fatalf("expected successful activities fetch, response=%#v err=%v", response, err)
+		}
+	})
+}
+
+// TestFetchActivitiesHistoryCoversPaginationBranches verifies paginated history
+// retrieval across success and incompatible-pagination branches.
+// Authored by: OpenCode
+func TestFetchActivitiesHistoryCoversPaginationBranches(t *testing.T) {
+	t.Parallel()
+
+	t.Run("multi page success", func(t *testing.T) {
+		var requestCount int
+		var unexpectedPaginationQuery string
+		var authHeader string
+		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			requestCount++
+			writer.Header().Set("Content-Type", "application/json")
+			if request.URL.Query().Get("take") != "250" || request.URL.Query().Get("sortColumn") != "date" || request.URL.Query().Get("sortDirection") != "asc" {
+				unexpectedPaginationQuery = request.URL.RawQuery
+			}
+			authHeader = request.Header.Get("Authorization")
+
+			switch request.URL.Query().Get("skip") {
+			case "0":
+				_, _ = writer.Write([]byte(`{"activities":[{"id":"a"},{"id":"b"}],"count":3}`))
+			case "2":
+				_, _ = writer.Write([]byte(`{"activities":[{"id":"c"}],"count":3}`))
+			default:
+				writer.WriteHeader(http.StatusInternalServerError)
+			}
+		}))
+		defer server.Close()
+
+		var response, err = New(server.Client()).FetchActivitiesHistory(context.Background(), server.URL, "jwt")
+		if err != nil {
+			t.Fatalf("fetch activities history: %v", err)
+		}
+		if unexpectedPaginationQuery != "" {
+			t.Fatalf("unexpected pagination query: %s", unexpectedPaginationQuery)
+		}
+		if authHeader != "Bearer jwt" {
+			t.Fatalf("unexpected auth header: %q", authHeader)
+		}
+		if response.Count != 3 || len(response.Activities) != 3 {
+			t.Fatalf("unexpected paginated response: %#v", response)
+		}
+		if requestCount != 2 {
+			t.Fatalf("expected two paginated requests, got %d", requestCount)
+		}
+	})
+
+	t.Run("zero count success", func(t *testing.T) {
+		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
 			_, _ = writer.Write([]byte(`{"activities":[],"count":0}`))
 		}))
 		defer server.Close()
 
-		var response, err = New(server.Client()).FetchActivitiesProbe(context.Background(), server.URL, "jwt")
-		if err != nil || response.Count != 0 {
-			t.Fatalf("expected successful activities fetch, response=%#v err=%v", response, err)
+		var response, err = New(server.Client()).FetchActivitiesHistory(context.Background(), server.URL, "jwt")
+		if err != nil {
+			t.Fatalf("fetch zero-count history: %v", err)
+		}
+		if response.Count != 0 || len(response.Activities) != 0 {
+			t.Fatalf("unexpected zero-count response: %#v", response)
+		}
+	})
+
+	t.Run("count changes during retrieval", func(t *testing.T) {
+		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			switch request.URL.Query().Get("skip") {
+			case "0":
+				_, _ = writer.Write([]byte(`{"activities":[{"id":"a"}],"count":2}`))
+			case "1":
+				_, _ = writer.Write([]byte(`{"activities":[{"id":"b"}],"count":3}`))
+			default:
+				writer.WriteHeader(http.StatusInternalServerError)
+			}
+		}))
+		defer server.Close()
+
+		_, err := New(server.Client()).FetchActivitiesHistory(context.Background(), server.URL, "jwt")
+		var failure *RequestFailure
+		if !errors.As(err, &failure) || failure.Category != FailureIncompatibleServerContract {
+			t.Fatalf("expected incompatible-contract failure, got %v", err)
+		}
+	})
+
+	t.Run("zero count with activities fails", func(t *testing.T) {
+		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			_, _ = writer.Write([]byte(`{"activities":[{"id":"a"}],"count":0}`))
+		}))
+		defer server.Close()
+
+		_, err := New(server.Client()).FetchActivitiesHistory(context.Background(), server.URL, "jwt")
+		var failure *RequestFailure
+		if !errors.As(err, &failure) || failure.Category != FailureIncompatibleServerContract {
+			t.Fatalf("expected incompatible-contract failure, got %v", err)
+		}
+	})
+
+	t.Run("pagination ends early", func(t *testing.T) {
+		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			switch request.URL.Query().Get("skip") {
+			case "0":
+				_, _ = writer.Write([]byte(`{"activities":[{"id":"a"}],"count":2}`))
+			case "1":
+				_, _ = writer.Write([]byte(`{"activities":[],"count":2}`))
+			default:
+				writer.WriteHeader(http.StatusInternalServerError)
+			}
+		}))
+		defer server.Close()
+
+		_, err := New(server.Client()).FetchActivitiesHistory(context.Background(), server.URL, "jwt")
+		var failure *RequestFailure
+		if !errors.As(err, &failure) || failure.Category != FailureIncompatibleServerContract {
+			t.Fatalf("expected incompatible-contract failure, got %v", err)
+		}
+	})
+
+	t.Run("pagination exceeds reported count", func(t *testing.T) {
+		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			writer.Header().Set("Content-Type", "application/json")
+			_, _ = writer.Write([]byte(`{"activities":[{"id":"a"},{"id":"b"}],"count":1}`))
+		}))
+		defer server.Close()
+
+		_, err := New(server.Client()).FetchActivitiesHistory(context.Background(), server.URL, "jwt")
+		var failure *RequestFailure
+		if !errors.As(err, &failure) || failure.Category != FailureIncompatibleServerContract {
+			t.Fatalf("expected incompatible-contract failure, got %v", err)
+		}
+	})
+
+	t.Run("invalid origin", func(t *testing.T) {
+		_, err := New(nil).FetchActivitiesHistory(context.Background(), "://bad", "jwt")
+		if err == nil {
+			t.Fatalf("expected invalid origin to fail")
 		}
 	})
 }

@@ -2,6 +2,7 @@
   "OutputFormat": "cobertura",
   "SourcePath": "./",
   "ExcludePaths": [
+    ".cache",
     "tests",
     "tools"
   ],

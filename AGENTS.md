@@ -1,6 +1,6 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
-shell commands, and other important information, read `specs/002-sync-data-validation/plan.md`
+shell commands, and other important information, read `specs/003-store-activity-data/plan.md`
 <!-- SPECKIT END -->
 
 <!--suppress HtmlUnknownTag -->
@@ -72,6 +72,10 @@ TO BE DEFINED
 - Follow the general principles of "Domain-Driven Design: Tackling Complexity in the Heart of Software" by Eric Evans
 - Follow the general principles of "Clean Architecture: A Craftsman's Guide to Software Structure and Design" by Robert
   C. Martin
+- Cognitive complexity in functions SHOULD be kept under 15. When it exceeds 15 an analysis of SRP and decomposition
+  should be made to split it
+  - for Go code, use `github.com/uudashr/gocognit` to measure it
+  - test code does not need to follow this rule
 
 </LiteratureAndIndustryReferences>
 
@@ -86,7 +90,7 @@ TO BE DEFINED
             - for public methods/functions, a detailed description of the purpose of the method, including an example of
               usage
             - for components/modules/packages, a detailed description of the purpose
-            - for classes/entities/components, a detailed description of the purpose. No example usage should be added.
+            - for classes/entities/components/structs/interfaces, a detailed description of the purpose. No example usage should be added.
         - all agent touched code must contain authoring information
             - new code created by an agent must include only the agent as the author
             - existing code unauthored can be considered as authored by a human user

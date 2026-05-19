@@ -1,5 +1,5 @@
 // Package integration verifies black-box workflow behavior for the current
-// slice, including the setup flow and its test-specific sync validation stub.
+// slice, including the setup flow and its test-specific sync stub.
 // Authored by: OpenCode
 package integration
 
@@ -19,22 +19,46 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 )
 
-// integrationSyncService returns a stable successful validation outcome for
+// integrationSyncService returns a stable successful sync outcome for
 // setup-centric integration tests.
+//
 // Authored by: OpenCode
 type integrationSyncService struct{}
 
-// Validate implements runtime.SyncService for setup-centric integration tests.
+// Run implements runtime.SyncService for setup-centric integration tests.
 // Authored by: OpenCode
-func (integrationSyncService) Validate(context.Context, runtime.ValidateRequest) runtime.ValidationOutcome {
-	return runtime.ValidationOutcome{Success: true, DetailReason: "communication_ok"}
+func (integrationSyncService) Run(context.Context, runtime.SyncRequest) runtime.SyncOutcome {
+	return runtime.SyncOutcome{Success: true, DetailReason: "activity_data_stored"}
+}
+
+func (integrationSyncService) GenerateDiagnosticReport(context.Context, runtime.DiagnosticReportRequest) (
+	string,
+	error,
+) {
+	return "", nil
+}
+
+func (integrationSyncService) ProtectedDataState() runtime.ProtectedDataState {
+	return runtime.ProtectedDataState{}
+}
+
+func (integrationSyncService) CheckServerReplacement(configmodel.AppSetupConfig) runtime.ServerReplacementCheck {
+	return runtime.ServerReplacementCheck{}
 }
 
 func TestFreshRunCompletesSetupAndReachesMainMenu(t *testing.T) {
 	t.Parallel()
 
 	var store = configstore.NewJSONStore(t.TempDir())
-	var model = flow.NewModel(newFlowDependenciesWithStore(t, bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementMissing}, false, integrationSyncService{}, store))
+	var model = flow.NewModel(
+		newFlowDependenciesWithStore(
+			t,
+			bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementMissing},
+			false,
+			integrationSyncService{},
+			store,
+		),
+	)
 
 	updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 	model = assertFlowModel(t, updated)
@@ -61,12 +85,24 @@ func TestFreshRunCompletesSetupAndReachesMainMenu(t *testing.T) {
 func TestStartupSkipsSetupWhenRememberedConfigExists(t *testing.T) {
 	t.Parallel()
 
-	var config, err = configmodel.NewSetupConfig(configmodel.ServerModeGhostfolioCloud, configmodel.GhostfolioCloudOrigin, false, time.Now())
+	var config, err = configmodel.NewSetupConfig(
+		configmodel.ServerModeGhostfolioCloud,
+		configmodel.GhostfolioCloudOrigin,
+		false,
+		time.Now(),
+	)
 	if err != nil {
 		t.Fatalf("new setup config: %v", err)
 	}
 
-	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &config}, false, integrationSyncService{}))
+	var model = flow.NewModel(
+		newFlowDependencies(
+			t,
+			bootstrap.StartupState{ActiveConfig: &config},
+			false,
+			integrationSyncService{},
+		),
+	)
 
 	if model.ActiveScreen() != "main_menu" {
 		t.Fatalf("expected main menu startup, got %s", model.ActiveScreen())
@@ -76,7 +112,17 @@ func TestStartupSkipsSetupWhenRememberedConfigExists(t *testing.T) {
 func TestInvalidRememberedSetupFallsBackToSetup(t *testing.T) {
 	t.Parallel()
 
-	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementInvalidRememberedSetup}, false, integrationSyncService{}))
+	var model = flow.NewModel(
+		newFlowDependencies(
+			t,
+			bootstrap.StartupState{
+				NeedsSetup:             true,
+				SetupRequirementReason: bootstrap.SetupRequirementInvalidRememberedSetup,
+			},
+			false,
+			integrationSyncService{},
+		),
+	)
 
 	if model.ActiveScreen() != "setup" {
 		t.Fatalf("expected setup screen, got %s", model.ActiveScreen())
@@ -90,7 +136,12 @@ func TestSetupFileRemovalAfterStartupDoesNotBreakCurrentRun(t *testing.T) {
 	t.Parallel()
 
 	var store = configstore.NewJSONStore(t.TempDir())
-	var config, err = configmodel.NewSetupConfig(configmodel.ServerModeGhostfolioCloud, configmodel.GhostfolioCloudOrigin, false, time.Now())
+	var config, err = configmodel.NewSetupConfig(
+		configmodel.ServerModeGhostfolioCloud,
+		configmodel.GhostfolioCloudOrigin,
+		false,
+		time.Now(),
+	)
 	if err != nil {
 		t.Fatalf("new setup config: %v", err)
 	}
@@ -98,7 +149,15 @@ func TestSetupFileRemovalAfterStartupDoesNotBreakCurrentRun(t *testing.T) {
 		t.Fatalf("save config: %v", err)
 	}
 
-	var model = flow.NewModel(newFlowDependenciesWithStore(t, bootstrap.StartupState{ActiveConfig: &config}, false, integrationSyncService{}, store))
+	var model = flow.NewModel(
+		newFlowDependenciesWithStore(
+			t,
+			bootstrap.StartupState{ActiveConfig: &config},
+			false,
+			integrationSyncService{},
+			store,
+		),
+	)
 
 	if err := store.Delete(context.Background()); err != nil {
 		t.Fatalf("delete setup file: %v", err)
@@ -108,7 +167,7 @@ func TestSetupFileRemovalAfterStartupDoesNotBreakCurrentRun(t *testing.T) {
 	_ = testutil.RunCmd(cmd)
 	model = assertFlowModel(t, updated)
 
-	if model.ActiveScreen() != "sync_validation" {
+	if model.ActiveScreen() != "sync" {
 		t.Fatalf("expected current run to keep working after setup file removal")
 	}
 }
@@ -116,7 +175,14 @@ func TestSetupFileRemovalAfterStartupDoesNotBreakCurrentRun(t *testing.T) {
 func TestFocusedCustomOriginInputEnterReturnsToSavePath(t *testing.T) {
 	t.Parallel()
 
-	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementMissing}, false, integrationSyncService{}))
+	var model = flow.NewModel(
+		newFlowDependencies(
+			t,
+			bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementMissing},
+			false,
+			integrationSyncService{},
+		),
+	)
 
 	updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 	model = assertFlowModel(t, updated)
@@ -149,7 +215,14 @@ func TestFocusedCustomOriginInputEnterReturnsToSavePath(t *testing.T) {
 func TestFocusedCustomOriginInputPasteDoesNotTriggerWorkflowNavigation(t *testing.T) {
 	t.Parallel()
 
-	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementMissing}, false, integrationSyncService{}))
+	var model = flow.NewModel(
+		newFlowDependencies(
+			t,
+			bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementMissing},
+			false,
+			integrationSyncService{},
+		),
+	)
 
 	updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 	model = assertFlowModel(t, updated)
@@ -193,7 +266,14 @@ func replaceSetupOriginInput(t *testing.T, model *flow.Model, origin string) *fl
 func TestReplaceSetupOriginInputReplacesPrefilledOrigin(t *testing.T) {
 	t.Parallel()
 
-	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementMissing}, false, integrationSyncService{}))
+	var model = flow.NewModel(
+		newFlowDependencies(
+			t,
+			bootstrap.StartupState{NeedsSetup: true, SetupRequirementReason: bootstrap.SetupRequirementMissing},
+			false,
+			integrationSyncService{},
+		),
+	)
 
 	updated, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 	model = assertFlowModel(t, updated)

@@ -1,5 +1,5 @@
 // Package integration verifies black-box workflow behavior for the current
-// slice, including sync-validation journeys that execute the production
+// slice, including sync-entry journeys that execute the production
 // Ghostfolio runtime path against mocked HTTP servers.
 // Authored by: OpenCode
 package integration
@@ -22,57 +22,81 @@ import (
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	ghostfolioclient "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/client"
+	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	syncnormalize "github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
+	syncvalidate "github.com/benizzio/ghostfolio-cryptogains/internal/sync/validate"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 )
 
 // ghostfolioScenario describes the mocked Ghostfolio HTTP behavior that one
-// production-path sync-validation integration test should exercise.
+// production-path sync-entry integration test should exercise.
 // Authored by: OpenCode
 type ghostfolioScenario struct {
 	authStatus            int
 	authContentType       string
 	authBody              string
 	authDelay             time.Duration
+	userStatus            int
+	userContentType       string
+	userBody              string
+	userDelay             time.Duration
 	activitiesStatus      int
 	activitiesContentType string
 	activitiesBody        string
 	activitiesDelay       time.Duration
 }
 
-// syncValidationFixture wires a remembered config to the production sync
+// syncEntryFixture wires a remembered config to the production sync
 // service that the integration workflow should execute.
 // Authored by: OpenCode
-type syncValidationFixture struct {
+type syncEntryFixture struct {
 	config  configmodel.AppSetupConfig
 	service runtime.SyncService
 }
 
-func TestSyncValidationSuccessUsesProductionRuntimePath(t *testing.T) {
+// TestSyncEntrySuccessUsesProductionRuntimePath verifies the successful sync
+// entry journey through the production runtime path.
+// Authored by: OpenCode
+func TestSyncEntrySuccessUsesProductionRuntimePath(t *testing.T) {
 	t.Parallel()
 
+	var tempDir = t.TempDir()
 	var server = newGhostfolioScenarioServer(t, ghostfolioScenario{
-		activitiesBody: `{"activities":[{"id":"activity-1","date":"2026-01-31T10:00:00Z","type":"BUY"}],"count":1}`,
+		activitiesBody: `{"activities":[{"id":"activity-1","date":"2026-01-31T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":10,"unitPriceInAssetProfileCurrency":10,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}],"count":1}`,
 	})
-	var fixture = newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
-	var model = newSyncValidationModel(t, fixture)
+	var fixture = syncEntryFixture{
+		config: mustCustomSetupConfig(t, server.URL),
+		service: runtime.NewSyncService(
+			ghostfolioclient.New(server.Client()),
+			time.Second,
+			tempDir,
+			true,
+			decimalsupport.NewService(),
+			syncnormalize.NewNormalizer(),
+			syncvalidate.NewValidator(),
+			snapshotstore.NewEncryptedStore(tempDir, nil),
+		),
+	}
+	var model = newSyncEntryModel(t, fixture)
 
-	model = openSyncValidation(t, model)
+	model = openSyncEntry(t, model)
 	model = typeToken(t, model, "abc123")
-	model = blurTokenInput(t, model)
+	model = blurTokenInputFromSyncEntry(t, model)
 
-	model, cmd := startSyncValidationAttempt(t, model)
-	model = applyValidationBatch(t, model, cmd)
+	model, cmd := startSyncAttempt(t, model)
+	model = applySyncBatch(t, model, cmd)
 
-	if model.ActiveScreen() != "validation_result" {
-		t.Fatalf("expected validation result screen, got %s", model.ActiveScreen())
+	if model.ActiveScreen() != "sync_result" {
+		t.Fatalf("expected sync result screen, got %s", model.ActiveScreen())
 	}
 
 	var content = model.View().Content
-	if !strings.Contains(content, "Communication with the selected Ghostfolio server is working.") {
-		t.Fatalf("expected successful validation summary, got %q", content)
+	if !strings.Contains(content, "Activity data was stored securely for future use.") {
+		t.Fatalf("expected successful sync summary, got %q", content)
 	}
-	if !strings.Contains(content, "No Ghostfolio data was stored locally, and reporting is not available in this slice.") {
+	if !strings.Contains(content, "No report-generation") || !strings.Contains(content, "cached-data browsing workflow") {
 		t.Fatalf("expected success follow-up text, got %q", content)
 	}
 	if strings.Contains(content, "abc123") || strings.Contains(content, "jwt") {
@@ -80,71 +104,74 @@ func TestSyncValidationSuccessUsesProductionRuntimePath(t *testing.T) {
 	}
 }
 
-func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
+// TestSyncEntryFailureCategoriesUseProductionRuntimePath verifies the supported
+// failure categories exposed by the production sync workflow.
+// Authored by: OpenCode
+func TestSyncEntryFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 	t.Parallel()
 
 	var testCases = []struct {
 		name           string
-		buildFixture   func(*testing.T) syncValidationFixture
-		wantCategory   runtime.ValidationFailureReason
+		buildFixture   func(*testing.T) syncEntryFixture
+		wantCategory   runtime.SyncFailureReason
 		wantFollowUp   string
 		wantSecretSafe bool
 	}{
 		{
 			name: "rejected token",
-			buildFixture: func(t *testing.T) syncValidationFixture {
+			buildFixture: func(t *testing.T) syncEntryFixture {
 				t.Helper()
 				var server = newGhostfolioScenarioServer(t, ghostfolioScenario{authStatus: http.StatusForbidden})
-				return newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
+				return newSyncEntryFixture(t, server.Client(), server.URL, time.Second)
 			},
-			wantCategory:   runtime.ValidationFailureRejectedToken,
-			wantFollowUp:   "Validate again or return to the main menu. No Ghostfolio data was stored locally.",
+			wantCategory:   runtime.SyncFailureRejectedToken,
+			wantFollowUp:   "The supplied token was rejected. Try again with a valid Ghostfolio security token.",
 			wantSecretSafe: true,
 		},
 		{
 			name: "timeout",
-			buildFixture: func(t *testing.T) syncValidationFixture {
+			buildFixture: func(t *testing.T) syncEntryFixture {
 				t.Helper()
 				var server = newGhostfolioScenarioServer(t, ghostfolioScenario{activitiesDelay: 200 * time.Millisecond})
-				return newSyncValidationFixture(t, server.Client(), server.URL, 20*time.Millisecond)
+				return newSyncEntryFixture(t, server.Client(), server.URL, 20*time.Millisecond)
 			},
-			wantCategory:   runtime.ValidationFailureTimeout,
-			wantFollowUp:   "Validate again or return to the main menu. No Ghostfolio data was stored locally.",
+			wantCategory:   runtime.SyncFailureTimeout,
+			wantFollowUp:   "Sync again or return to the main menu. No protected activity data was stored.",
 			wantSecretSafe: true,
 		},
 		{
 			name: "connectivity problem",
-			buildFixture: func(t *testing.T) syncValidationFixture {
+			buildFixture: func(t *testing.T) syncEntryFixture {
 				t.Helper()
 				var server = httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 				var origin = server.URL
 				var client = server.Client()
 				server.Close()
-				return newSyncValidationFixture(t, client, origin, time.Second)
+				return newSyncEntryFixture(t, client, origin, time.Second)
 			},
-			wantCategory:   runtime.ValidationFailureConnectivityProblem,
-			wantFollowUp:   "Validate again or return to the main menu. No Ghostfolio data was stored locally.",
+			wantCategory:   runtime.SyncFailureConnectivityProblem,
+			wantFollowUp:   "Sync again or return to the main menu. No protected activity data was stored.",
 			wantSecretSafe: true,
 		},
 		{
 			name: "unsuccessful server response",
-			buildFixture: func(t *testing.T) syncValidationFixture {
+			buildFixture: func(t *testing.T) syncEntryFixture {
 				t.Helper()
 				var server = newGhostfolioScenarioServer(t, ghostfolioScenario{activitiesStatus: http.StatusUnauthorized})
-				return newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
+				return newSyncEntryFixture(t, server.Client(), server.URL, time.Second)
 			},
-			wantCategory:   runtime.ValidationFailureUnsuccessfulServerResponse,
-			wantFollowUp:   "Validate again or return to the main menu. No Ghostfolio data was stored locally.",
+			wantCategory:   runtime.SyncFailureUnsuccessfulServerResponse,
+			wantFollowUp:   "Sync again or return to the main menu. No protected activity data was stored.",
 			wantSecretSafe: true,
 		},
 		{
 			name: "incompatible server contract",
-			buildFixture: func(t *testing.T) syncValidationFixture {
+			buildFixture: func(t *testing.T) syncEntryFixture {
 				t.Helper()
 				var server = newGhostfolioScenarioServer(t, ghostfolioScenario{activitiesStatus: http.StatusBadRequest})
-				return newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
+				return newSyncEntryFixture(t, server.Client(), server.URL, time.Second)
 			},
-			wantCategory:   runtime.ValidationFailureIncompatibleServerContract,
+			wantCategory:   runtime.SyncFailureIncompatibleServerContract,
 			wantFollowUp:   "The selected server responded, but it did not satisfy the supported contract",
 			wantSecretSafe: true,
 		},
@@ -155,17 +182,17 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 			t.Parallel()
 
 			var fixture = testCase.buildFixture(t)
-			var model = newSyncValidationModel(t, fixture)
+			var model = newSyncEntryModel(t, fixture)
 
-			model = openSyncValidation(t, model)
+			model = openSyncEntry(t, model)
 			model = typeToken(t, model, "abc123")
-			model = blurTokenInput(t, model)
+			model = blurTokenInputFromSyncEntry(t, model)
 
-			model, cmd := startSyncValidationAttempt(t, model)
-			model = applyValidationBatch(t, model, cmd)
+			model, cmd := startSyncAttempt(t, model)
+			model = applySyncBatch(t, model, cmd)
 
-			if model.ActiveScreen() != "validation_result" {
-				t.Fatalf("expected validation result screen, got %s", model.ActiveScreen())
+			if model.ActiveScreen() != "sync_result" {
+				t.Fatalf("expected sync result screen, got %s", model.ActiveScreen())
 			}
 
 			var content = model.View().Content
@@ -183,61 +210,70 @@ func TestSyncValidationFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 	}
 }
 
-func TestFailedValidationDefaultActionRetriesValidation(t *testing.T) {
+// TestFailedSyncResultDefaultActionStartsSyncAgain verifies the default result
+// action after a failed sync.
+// Authored by: OpenCode
+func TestFailedSyncResultDefaultActionStartsSyncAgain(t *testing.T) {
 	t.Parallel()
 
 	var server = newGhostfolioScenarioServer(t, ghostfolioScenario{authStatus: http.StatusForbidden})
-	var fixture = newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
-	var model = newSyncValidationModel(t, fixture)
+	var fixture = newSyncEntryFixture(t, server.Client(), server.URL, time.Second)
+	var model = newSyncEntryModel(t, fixture)
 
-	model = openSyncValidation(t, model)
+	model = openSyncEntry(t, model)
 	model = typeToken(t, model, "abc123")
-	model = blurTokenInput(t, model)
-	model, cmd := startSyncValidationAttempt(t, model)
-	model = applyValidationBatch(t, model, cmd)
+	model = blurTokenInputFromSyncEntry(t, model)
+	model, cmd := startSyncAttempt(t, model)
+	model = applySyncBatch(t, model, cmd)
 
 	var updated, focusCmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	_ = testutil.RunCmd(focusCmd)
 	model = assertFlowModel(t, updated)
 
-	if model.ActiveScreen() != "sync_validation" {
-		t.Fatalf("expected Validate Again to reopen sync validation, got %s", model.ActiveScreen())
+	if model.ActiveScreen() != "sync" {
+		t.Fatalf("expected Sync Again to reopen sync, got %s", model.ActiveScreen())
 	}
 }
 
-func TestSuccessfulValidationDefaultActionReturnsToMainMenu(t *testing.T) {
+// TestSuccessfulSyncResultDefaultActionReturnsToMainMenu verifies the default
+// result action after a successful sync.
+// Authored by: OpenCode
+func TestSuccessfulSyncResultDefaultActionReturnsToMainMenu(t *testing.T) {
 	t.Parallel()
 
 	var server = newGhostfolioScenarioServer(t, ghostfolioScenario{})
-	var fixture = newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
-	var model = newSyncValidationModel(t, fixture)
+	var fixture = newSyncEntryFixture(t, server.Client(), server.URL, time.Second)
+	var model = newSyncEntryModel(t, fixture)
 
-	model = openSyncValidation(t, model)
+	model = openSyncEntry(t, model)
 	model = typeToken(t, model, "abc123")
-	model = blurTokenInput(t, model)
-	model, cmd := startSyncValidationAttempt(t, model)
-	model = applyValidationBatch(t, model, cmd)
+	model = blurTokenInputFromSyncEntry(t, model)
+	model, cmd := startSyncAttempt(t, model)
+	model = applySyncBatch(t, model, cmd)
 
 	var updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = assertFlowModel(t, updated)
 
 	if model.ActiveScreen() != "main_menu" {
-		t.Fatalf("expected successful validation to return to the main menu by default, got %s", model.ActiveScreen())
+		t.Fatalf("expected successful sync to return to the main menu by default, got %s", model.ActiveScreen())
 	}
 }
 
-func TestSyncValidationBusyStateStillHandlesResizeBeforeCompletion(t *testing.T) {
+// TestSyncEntryBusyStateStillHandlesResizeBeforeCompletion verifies that the
+// sync busy state continues to render during resize events.
+// Authored by: OpenCode
+func TestSyncEntryBusyStateStillHandlesResizeBeforeCompletion(t *testing.T) {
 	t.Parallel()
 
 	var server = newGhostfolioScenarioServer(t, ghostfolioScenario{})
-	var fixture = newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
-	var model = newSyncValidationModel(t, fixture)
+	var fixture = newSyncEntryFixture(t, server.Client(), server.URL, time.Second)
+	var model = newSyncEntryModel(t, fixture)
 
-	model = openSyncValidation(t, model)
+	model = openSyncEntry(t, model)
 	model = typeToken(t, model, "abc123")
-	model = blurTokenInput(t, model)
+	model = blurTokenInputFromSyncEntry(t, model)
 
-	model, cmd := startSyncValidationAttempt(t, model)
+	model, cmd := startSyncAttempt(t, model)
 
 	var updated, _ = model.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	model = assertFlowModel(t, updated)
@@ -245,39 +281,62 @@ func TestSyncValidationBusyStateStillHandlesResizeBeforeCompletion(t *testing.T)
 		t.Fatalf("expected rendered content after resize")
 	}
 
-	model = applyValidationBatch(t, model, cmd)
-	if model.ActiveScreen() != "validation_result" {
-		t.Fatalf("expected validation result screen after the delayed batch completed, got %s", model.ActiveScreen())
+	model = applySyncBatch(t, model, cmd)
+	if model.ActiveScreen() != "sync_result" {
+		t.Fatalf("expected sync result screen after the delayed batch completed, got %s", model.ActiveScreen())
 	}
 }
 
-func TestSyncValidationNoPersistenceBeyondSetup(t *testing.T) {
+// TestSyncEntryNoPersistenceBeyondSetup verifies that the workflow persists
+// only the expected bootstrap and protected-storage artifacts.
+// Authored by: OpenCode
+func TestSyncEntryNoPersistenceBeyondSetup(t *testing.T) {
 	t.Parallel()
 
 	var tempDir = t.TempDir()
 	var store = configstore.NewJSONStore(tempDir)
 	var server = newGhostfolioScenarioServer(t, ghostfolioScenario{})
-	var fixture = newSyncValidationFixture(t, server.Client(), server.URL, time.Second)
+	var fixture = syncEntryFixture{
+		config: mustCustomSetupConfig(t, server.URL),
+		service: runtime.NewSyncService(
+			ghostfolioclient.New(server.Client()),
+			time.Second,
+			tempDir,
+			true,
+			decimalsupport.NewService(),
+			syncnormalize.NewNormalizer(),
+			syncvalidate.NewValidator(),
+			snapshotstore.NewEncryptedStore(tempDir, nil),
+		),
+	}
 	if err := store.Save(context.Background(), fixture.config); err != nil {
 		t.Fatalf("save config: %v", err)
 	}
 
 	var model = flow.NewModel(newFlowDependenciesWithStore(t, bootstrap.StartupState{ActiveConfig: &fixture.config}, true, fixture.service, store))
 
-	model = openSyncValidation(t, model)
+	model = openSyncEntry(t, model)
 	model = typeToken(t, model, "abc123")
-	model = blurTokenInput(t, model)
-	model, cmd := startSyncValidationAttempt(t, model)
-	model = applyValidationBatch(t, model, cmd)
+	model = blurTokenInputFromSyncEntry(t, model)
+	model, cmd := startSyncAttempt(t, model)
+	model = applySyncBatch(t, model, cmd)
 
 	var entries []os.DirEntry
 	var err error
-	entries, err = os.ReadDir(filepath.Dir(store.Path()))
+	entries, err = os.ReadDir(tempDir)
 	if err != nil {
 		t.Fatalf("read config directory: %v", err)
 	}
-	if len(entries) != 1 || entries[0].Name() != "setup.json" {
+	if len(entries) != 1 || entries[0].Name() != "ghostfolio-cryptogains" {
 		t.Fatalf("unexpected persisted files: %#v", entries)
+	}
+
+	var appEntries, readErr = os.ReadDir(filepath.Join(tempDir, "ghostfolio-cryptogains"))
+	if readErr != nil {
+		t.Fatalf("read app directory: %v", readErr)
+	}
+	if len(appEntries) != 2 {
+		t.Fatalf("expected setup plus snapshots directory, got %#v", appEntries)
 	}
 	if got := model.View().Content; strings.Contains(got, "abc123") || strings.Contains(got, "jwt") {
 		t.Fatalf("expected result screen to remain secret-safe, got %q", got)
@@ -285,7 +344,7 @@ func TestSyncValidationNoPersistenceBeyondSetup(t *testing.T) {
 }
 
 // newGhostfolioScenarioServer creates one deterministic httptest server for the
-// sync-validation runtime path.
+// sync-entry runtime path.
 // Authored by: OpenCode
 func newGhostfolioScenarioServer(t *testing.T, scenario ghostfolioScenario) *httptest.Server {
 	t.Helper()
@@ -298,6 +357,15 @@ func newGhostfolioScenarioServer(t *testing.T, scenario ghostfolioScenario) *htt
 	}
 	if scenario.authBody == "" {
 		scenario.authBody = `{"authToken":"jwt"}`
+	}
+	if scenario.userStatus == 0 {
+		scenario.userStatus = http.StatusOK
+	}
+	if scenario.userContentType == "" && scenario.userStatus >= http.StatusOK && scenario.userStatus < http.StatusMultipleChoices {
+		scenario.userContentType = "application/json"
+	}
+	if scenario.userBody == "" {
+		scenario.userBody = `{"settings":{"baseCurrency":"USD"}}`
 	}
 	if scenario.activitiesStatus == 0 {
 		scenario.activitiesStatus = http.StatusOK
@@ -320,6 +388,15 @@ func newGhostfolioScenarioServer(t *testing.T, scenario ghostfolioScenario) *htt
 			}
 			writer.WriteHeader(scenario.authStatus)
 			_, _ = writer.Write([]byte(scenario.authBody))
+		case "/api/v1/user":
+			if scenario.userDelay > 0 {
+				time.Sleep(scenario.userDelay)
+			}
+			if scenario.userContentType != "" {
+				writer.Header().Set("Content-Type", scenario.userContentType)
+			}
+			writer.WriteHeader(scenario.userStatus)
+			_, _ = writer.Write([]byte(scenario.userBody))
 		case "/api/v1/activities":
 			if scenario.activitiesDelay > 0 {
 				time.Sleep(scenario.activitiesDelay)
@@ -338,55 +415,58 @@ func newGhostfolioScenarioServer(t *testing.T, scenario ghostfolioScenario) *htt
 	return server
 }
 
-// newSyncValidationFixture constructs a production runtime sync service and a
+// newSyncEntryFixture constructs a production runtime sync service and a
 // remembered custom-origin config for one integration test.
 // Authored by: OpenCode
-func newSyncValidationFixture(t *testing.T, client *http.Client, origin string, requestTimeout time.Duration) syncValidationFixture {
+func newSyncEntryFixture(t *testing.T, client *http.Client, origin string, requestTimeout time.Duration) syncEntryFixture {
 	t.Helper()
 
-	return syncValidationFixture{
-		config:  mustCustomSetupConfig(t, origin),
-		service: runtime.NewSyncService(ghostfolioclient.New(client), requestTimeout),
+	return syncEntryFixture{
+		config: mustCustomSetupConfig(t, origin),
+		service: func() runtime.SyncService {
+			var tempDir = t.TempDir()
+			return runtime.NewSyncService(ghostfolioclient.New(client), requestTimeout, tempDir, true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(tempDir, nil))
+		}(),
 	}
 }
 
-// newSyncValidationModel constructs the root flow model for sync-validation
+// newSyncEntryModel constructs the root flow model for sync-entry
 // integration tests that should execute the production runtime path.
 // Authored by: OpenCode
-func newSyncValidationModel(t *testing.T, fixture syncValidationFixture) *flow.Model {
+func newSyncEntryModel(t *testing.T, fixture syncEntryFixture) *flow.Model {
 	t.Helper()
 
 	return flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &fixture.config}, fixture.config.AllowDevHTTP, fixture.service))
 }
 
-// startSyncValidationAttempt submits the current token value and returns the
-// batch command that will deliver the async validation messages.
+// startSyncAttempt submits the current token value and returns the
+// batch command that will deliver the async sync messages.
 // Authored by: OpenCode
-func startSyncValidationAttempt(t *testing.T, model *flow.Model) (*flow.Model, tea.Cmd) {
+func startSyncAttempt(t *testing.T, model *flow.Model) (*flow.Model, tea.Cmd) {
 	t.Helper()
 
 	var updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = assertFlowModel(t, updated)
 	if cmd == nil {
-		t.Fatalf("expected validation batch command")
+		t.Fatalf("expected sync batch command")
 	}
-	if got := model.View().Content; !strings.Contains(got, "Validating Ghostfolio communication") {
+	if got := model.View().Content; !strings.Contains(got, "Syncing and storing activity history") {
 		t.Fatalf("expected busy state after submit, got %q", got)
 	}
 
 	return model, cmd
 }
 
-// applyValidationBatch runs the asynchronous validation batch to completion and
+// applySyncBatch runs the asynchronous sync batch to completion and
 // applies each resulting message to the flow model.
 // Authored by: OpenCode
-func applyValidationBatch(t *testing.T, model *flow.Model, cmd tea.Cmd) *flow.Model {
+func applySyncBatch(t *testing.T, model *flow.Model, cmd tea.Cmd) *flow.Model {
 	t.Helper()
 
 	var message = testutil.RunCmd(cmd)
 	var batch, ok = message.(tea.BatchMsg)
 	if !ok {
-		t.Fatalf("expected validation command to return tea.BatchMsg, got %T", message)
+		t.Fatalf("expected sync command to return tea.BatchMsg, got %T", message)
 	}
 
 	for _, batchCmd := range batch {
@@ -416,9 +496,9 @@ func mustCustomSetupConfig(t *testing.T, origin string) configmodel.AppSetupConf
 	return config
 }
 
-// openSyncValidation enters the sync-validation workflow from the main menu.
+// openSyncEntry enters the sync workflow from the main menu.
 // Authored by: OpenCode
-func openSyncValidation(t *testing.T, model *flow.Model) *flow.Model {
+func openSyncEntry(t *testing.T, model *flow.Model) *flow.Model {
 	t.Helper()
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	_ = testutil.RunCmd(cmd)
@@ -438,9 +518,10 @@ func typeToken(t *testing.T, model *flow.Model, token string) *flow.Model {
 	return model
 }
 
-// blurTokenInput returns focus from the token input to the sync-validation menu.
+// blurTokenInputFromSyncEntry returns focus from the token input to the sync
+// entry menu.
 // Authored by: OpenCode
-func blurTokenInput(t *testing.T, model *flow.Model) *flow.Model {
+func blurTokenInputFromSyncEntry(t *testing.T, model *flow.Model) *flow.Model {
 	t.Helper()
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
 	_ = testutil.RunCmd(cmd)

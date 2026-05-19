@@ -1,6 +1,7 @@
 .DS_Store
 .idea/
 .vscode/
+.cache
 Thumbs.db
 .env*
 *.exe
@@ -9,7 +10,9 @@ Thumbs.db
 *.swp
 *.test
 *.tmp
+*.class
 build/
 dist/coverage/
 node_modules/
 vendor/
+coverage/

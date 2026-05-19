@@ -1,0 +1,33 @@
+// Package contract verifies rendered workflow and Ghostfolio-boundary contracts
+// for the sync-and-storage slice.
+// Authored by: OpenCode
+package contract
+
+import (
+	"testing"
+
+	"github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/dto"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/validator"
+)
+
+// TestGhostfolioSyncProbeContract verifies the focused single-page probe
+// contract that remains available for validator branch coverage.
+// Authored by: OpenCode
+func TestGhostfolioSyncProbeContract(t *testing.T) {
+	t.Parallel()
+
+	if err := validator.ValidateAuthResponse(dto.AuthResponse{AuthToken: "jwt"}); err != nil {
+		t.Fatalf("expected auth response to satisfy contract: %v", err)
+	}
+
+	if err := validator.ValidateUserResponse(dto.UserResponse{Settings: &dto.UserSettings{BaseCurrency: "USD"}}); err != nil {
+		t.Fatalf("expected user response to satisfy contract: %v", err)
+	}
+
+	if err := validator.ValidateSingleActivityPageResponse(dto.ActivityPageResponse{
+		Count:      1,
+		Activities: []dto.ActivityPageEntry{{ID: "activity-id", Date: "2026-01-31T10:00:00Z", Type: "BUY"}},
+	}); err != nil {
+		t.Fatalf("expected single-page activities response to satisfy contract: %v", err)
+	}
+}
