@@ -137,9 +137,6 @@ func redactDiagnosticContext(context syncmodel.DiagnosticContext) syncmodel.Diag
 	var records = make([]syncmodel.DiagnosticRecord, 0, len(context.Records))
 	for _, record := range context.Records {
 		record.Quantity = ""
-		record.UnitPrice = ""
-		record.GrossValue = ""
-		record.FeeAmount = ""
 		record.OrderUnitPrice = ""
 		record.OrderGrossValue = ""
 		record.OrderFeeAmount = ""

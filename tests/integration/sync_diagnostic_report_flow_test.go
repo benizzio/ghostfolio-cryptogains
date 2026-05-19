@@ -92,7 +92,7 @@ func TestSyncDiagnosticReportFlowPromptsInProductionAndWritesOnExplicitChoice(t 
 	if len(records) == 0 {
 		t.Fatalf("expected production diagnostic report records")
 	}
-	if records[0].Quantity == "1" || records[0].UnitPrice == "100" || records[0].GrossValue == "100" {
+	if records[0].Quantity == "1" || records[0].AssetProfileUnitPrice == "100" || records[0].BaseGrossValue == "100" {
 		t.Fatalf("expected production report to redact financial values, got %q", reportText)
 	}
 }
@@ -151,8 +151,8 @@ func TestSyncDiagnosticReportFlowGeneratesAutomaticallyInExplicitDevelopmentMode
 	if len(records) == 0 {
 		t.Fatalf("expected development diagnostic report records")
 	}
-	if records[0].Quantity != "1" || records[0].UnitPrice != "100" || records[0].GrossValue != "100" {
-		t.Fatalf("expected development report to retain allowed financial context, got %q", reportText)
+	if records[0].Quantity != "1" || records[0].AssetProfileUnitPrice != "100" || records[0].BaseGrossValue != "100" {
+		t.Fatalf("expected development report to retain source financial context, got %q", reportText)
 	}
 }
 
@@ -232,8 +232,6 @@ func mustDiagnosticFiles(t *testing.T, baseDir string) []string {
 
 type diagnosticReportRecord struct {
 	Quantity              string `json:"quantity"`
-	UnitPrice             string `json:"unit_price"`
-	GrossValue            string `json:"gross_value"`
 	OrderUnitPrice        string `json:"order_unit_price"`
 	OrderGrossValue       string `json:"order_gross_value"`
 	AssetProfileUnitPrice string `json:"asset_profile_unit_price"`
