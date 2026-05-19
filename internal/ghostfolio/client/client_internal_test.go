@@ -213,16 +213,18 @@ func TestFetchUserHandlesTransportAndBuildErrors(t *testing.T) {
 	})
 
 	t.Run("success", func(t *testing.T) {
+		var authHeader string
 		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			writer.Header().Set("Content-Type", "application/json")
-			if request.Header.Get("Authorization") != "Bearer jwt" {
-				t.Fatalf("unexpected auth header: %q", request.Header.Get("Authorization"))
-			}
+			authHeader = request.Header.Get("Authorization")
 			_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":"USD"}}`))
 		}))
 		defer server.Close()
 
 		var response, err = New(server.Client()).FetchUser(context.Background(), server.URL, "jwt")
+		if authHeader != "Bearer jwt" {
+			t.Fatalf("unexpected auth header: %q", authHeader)
+		}
 		if err != nil || response.Settings == nil || response.Settings.BaseCurrency != "USD" {
 			t.Fatalf("expected successful user fetch, response=%#v err=%v", response, err)
 		}
@@ -323,15 +325,15 @@ func TestFetchActivitiesHistoryCoversPaginationBranches(t *testing.T) {
 
 	t.Run("multi page success", func(t *testing.T) {
 		var requestCount int
+		var unexpectedPaginationQuery string
+		var authHeader string
 		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			requestCount++
 			writer.Header().Set("Content-Type", "application/json")
 			if request.URL.Query().Get("take") != "250" || request.URL.Query().Get("sortColumn") != "date" || request.URL.Query().Get("sortDirection") != "asc" {
-				t.Fatalf("unexpected pagination query: %s", request.URL.RawQuery)
+				unexpectedPaginationQuery = request.URL.RawQuery
 			}
-			if request.Header.Get("Authorization") != "Bearer jwt" {
-				t.Fatalf("unexpected auth header: %q", request.Header.Get("Authorization"))
-			}
+			authHeader = request.Header.Get("Authorization")
 
 			switch request.URL.Query().Get("skip") {
 			case "0":
@@ -347,6 +349,12 @@ func TestFetchActivitiesHistoryCoversPaginationBranches(t *testing.T) {
 		var response, err = New(server.Client()).FetchActivitiesHistory(context.Background(), server.URL, "jwt")
 		if err != nil {
 			t.Fatalf("fetch activities history: %v", err)
+		}
+		if unexpectedPaginationQuery != "" {
+			t.Fatalf("unexpected pagination query: %s", unexpectedPaginationQuery)
+		}
+		if authHeader != "Bearer jwt" {
+			t.Fatalf("unexpected auth header: %q", authHeader)
 		}
 		if response.Count != 3 || len(response.Activities) != 3 {
 			t.Fatalf("unexpected paginated response: %#v", response)
