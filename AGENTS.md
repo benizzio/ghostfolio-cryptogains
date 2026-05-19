@@ -44,13 +44,79 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
 
 ### Tech Stack
 
-TO BE DEFINED
+- Language: Go 1.26.3
+- Application type: single-module terminal UI application
+- UI stack: `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`
+- Domain and precision: `github.com/cockroachdb/apd/v3` for exact decimal handling
+- Security and storage: Go standard library crypto plus `golang.org/x/crypto/argon2` for token-derived protected snapshots
+- Transport: Go standard library `net/http` and `encoding/json` against Ghostfolio `api/v1`
+- Testing: Go standard `testing` with contract, integration, and unit suites under `tests/`
+- Coverage tooling: `github.com/Fabianexe/gocoverageplus` plus repository-local tools in `tools/coveragegate` and `tools/coverpkg`
+- CI: GitHub Actions workflow `.github/workflows/`
 
 ### Project/repo structure and extended agent instructions
 
 <CodeStructure>
 
-TO BE DEFINED
+- Entrypoint:
+  - `cmd/ghostfolio-cryptogains/main.go` parses CLI options, assembles the runtime, loads startup state, and starts the Bubble Tea program.
+
+- Application assembly:
+  - `internal/app/bootstrap/` owns process options and startup routing decisions before the TUI starts.
+  - `internal/app/runtime/` wires concrete services and coordinates the end-to-end sync workflow, snapshot lifecycle, and diagnostic report generation.
+  - Put cross-package orchestration here, not in `cmd/` and not in `internal/tui/`.
+
+- Bootstrap setup persistence:
+  - `internal/config/model/` defines the persisted `setup.json` model and origin normalization rules.
+  - `internal/config/store/` owns machine-local bootstrap file IO, directory creation, atomic replacement, and permission handling.
+  - Keep `setup.json` bootstrap-only. Do not move synced activity data or reporting state into this area.
+
+- Ghostfolio boundary:
+  - `internal/ghostfolio/client/` owns HTTP requests, pagination, status classification, and transport-level error shaping.
+  - `internal/ghostfolio/dto/` defines upstream response DTOs.
+  - `internal/ghostfolio/mapper/` converts DTOs into internal normalized activity inputs.
+  - `internal/ghostfolio/validator/` validates upstream contract expectations before normalization.
+  - Keep Ghostfolio-specific response knowledge here. Do not leak DTOs into TUI or snapshot packages.
+
+- Sync domain:
+  - `internal/sync/model/` defines normalized activity records, ordering keys, diagnostic context, and protected cache structures.
+  - `internal/sync/normalize/` owns deterministic ordering, duplicate removal, year derivation, and scope-reliability derivation.
+  - `internal/sync/validate/` owns supported-history validation, currency-context checks, and running-holdings defensibility rules.
+  - Put business rules for normalized activity history here before considering changes in runtime or UI.
+
+- Protected snapshot storage:
+  - `internal/snapshot/model/` defines encrypted payload and compatibility versions.
+  - `internal/snapshot/envelope/` owns envelope encoding and cryptographic sealing/opening helpers.
+  - `internal/snapshot/store/` owns snapshot discovery, compatibility checks, decrypt/read, encrypt/write, and atomic replacement on disk.
+  - Treat this package as the only persistence boundary for synced protected data.
+
+- Shared support:
+  - `internal/support/decimal/` centralizes exact-decimal parsing and canonical formatting.
+  - `internal/support/redact/` centralizes safe error and diagnostic redaction.
+  - Prefer reusing these helpers instead of duplicating formatting or redaction logic in runtime packages.
+
+- TUI:
+  - `internal/tui/flow/` owns the root Bubble Tea model, screen routing, async command wiring, and workflow state transitions.
+  - `internal/tui/screen/` renders full-screen views for setup, main menu, sync entry, server replacement, and sync result flows.
+  - `internal/tui/component/` contains reusable layout, theme, and help-rendering primitives.
+  - Keep rendering and interaction state here. Do not move HTTP, crypto, or normalization rules into the TUI layer.
+
+- Tests:
+  - `tests/contract/` verifies externally visible workflow and storage contracts.
+  - `tests/integration/` verifies end-to-end runtime flows across packages.
+  - `tests/unit/` targets isolated domain and storage behavior.
+  - `tests/testutil/` contains shared test fixtures and helpers.
+  - Many packages also keep package-local `_internal_test.go` files for narrower behavior checks.
+
+- Tools and operational files:
+  - `tools/coverpkg/` computes the production package set used by coverage runs.
+  - `tools/coveragegate/` enforces the repository coverage gate from generated reports.
+  - `specs/` contains feature plans, contracts, checklists, and research. Read the active spec before making non-trivial changes.
+  - `.cov.json` defines maintained coverage expectations.
+
+- Working rules for this repository related to code structure:
+  - When changing sync behavior, check matching coverage in `tests/contract/`, `tests/integration/`, and `tests/unit/` before considering the work complete.
+  - The `dist/` directory is generated output. Prefer editing source under `cmd/`, `internal/`, `tests/`, `tools/`, and `specs/`.
 
 </CodeStructure>
 
