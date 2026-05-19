@@ -33,4 +33,4 @@
 
 - Validation completed on 2026-05-19 against `specs/005-generate-gains-report/spec.md`.
 - No clarification markers remain.
-- The yearly scope, cost basis definitions, and temporary no-conversion currency rule are defined in domain terms for planning.
+- Revalidated after the `spec-fixes.md` updates: the workflow now centers on the unlocked `Sync and Reports` context, the report structure is defined explicitly, and single-activity currency-context rules are separated from exact-decimal rules.

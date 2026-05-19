@@ -1,44 +1,57 @@
-# Feature Specification: Generate Yearly Gains Report
+# Feature Specification: Generate Yearly Gains And Losses Report
 
 **Feature Branch**: `[005-generate-gains-report]`  
 **Created**: 2026-05-19  
 **Status**: Draft  
-**Input**: User description: "Use previously synced activity data to add yearly capital gains report generation to the main menu, show the last successful sync time beside the sync option, require year selection and cost basis method selection before generation, save the report as a timestamped Markdown file in the user's Documents folder, open it in the operating system's default application, keep no report history, protect report contents until the final file is saved, and for this slice choose the first available currency tier in order `order -> asset -> base` while treating all chosen currencies as equal-value inputs without conversion."
+**Input**: User description: "Use previously synced activity data to add yearly capital gains and losses report generation inside a token-unlocked `Sync and Reports` workflow, show the last successful sync time beside the sync option, require year selection and cost basis method selection before generation, save the report as a timestamped Markdown file in the user's Documents folder, open it in the operating system's default application, keep no report history, protect report contents until the final file is saved, and for this slice choose one single-activity currency context in priority order `order -> asset -> base` while treating all selected activity values as equal-value inputs without conversion once they enter cross-activity calculations."
+
+## Terms Used In This Spec
+
+- **Sync and Reports context**: The token-unlocked workflow reached from the main menu. While this context remains active, the user can run `Sync Data` and `Generate Capital Gains Report` without informing the token again.
+- **Single-activity currency context**: The one currency tier selected for one activity before any cross-activity basis or gains-and-losses calculation begins.
+- **Report-wide no-currency context**: The report's calculation context after monetary values leave their single-activity currency context. In this slice, the report-wide label is `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`.
+- **Full liquidation**: A point where the quantity for an asset, or for that asset inside the applicable scope when a scope-local method is active, reaches zero.
+- **Full liquidation count**: The number of full liquidations completed for an asset on or before the end of the selected year.
+- **Reference report template**: The section structure established by the earlier reporting specification and reused here in Markdown form.
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - See Report Readiness From The Home Menu (Priority: P1)
+### User Story 1 - Enter The Sync And Reports Context (Priority: P1)
 
-After unlocking the application, the user can tell from the home menu whether synced data is ready for reporting, when it was last refreshed, and whether report generation is currently available.
+After setup is complete, the user can open `Sync and Reports`, unlock the token-scoped working context once, and then choose between `Sync Data` and `Generate Capital Gains Report` while seeing whether synced data is ready for reporting.
 
-**Why this priority**: The user must be able to judge report readiness before starting a financial calculation workflow.
+**Why this priority**: This keeps the existing application flow closer to earlier slices while still introducing reporting without forcing the user to re-enter the token between related actions.
 
-**Independent Test**: Open the home menu once with no synced data and once with synced data, then verify that the last-sync information and report-generation availability are shown correctly in each state.
+**Independent Test**: Start from the main menu with completed setup, open `Sync and Reports`, provide the token once, and verify that the contextual menu shows `Sync Data`, `Generate Capital Gains Report`, and the correct synced-data readiness state.
 
 **Acceptance Scenarios**:
 
-1. **Given** no synced activity data exists, **When** the home menu is shown, **Then** both `Sync Data` and `Generate Capital Gains Report` are visible, and report generation is unavailable with a clear reason.
-2. **Given** synced activity data exists, **When** the home menu is shown, **Then** the `Sync Data` option shows the last successful sync date and time and `Generate Capital Gains Report` is available.
-3. **Given** a sync has just completed successfully, **When** the user returns to the home menu, **Then** the displayed last-sync timestamp reflects that completed sync.
+1. **Given** setup is complete and the user is on the main menu, **When** the user selects `Sync and Reports`, **Then** the system requires the Ghostfolio security token before exposing sync or reporting actions.
+2. **Given** the token unlocks the active context and no synced activity data exists for that token and selected server, **When** the `Sync and Reports` menu is shown, **Then** both `Sync Data` and `Generate Capital Gains Report` are visible, `Sync Data` is available, and report generation is unavailable with a clear reason.
+3. **Given** the token unlocks the active context and synced activity data exists, **When** the `Sync and Reports` menu is shown, **Then** `Sync Data` shows the last successful sync date and time and `Generate Capital Gains Report` is available.
+4. **Given** the user completes a sync or report-generation workflow and remains inside the active unlocked context, **When** that workflow ends, **Then** the system returns to the `Sync and Reports` menu without requiring the token again.
 
 ---
 
-### User Story 2 - Obtain Year For Synced Data Markdown Report (Priority: P1)
+### User Story 2 - Generate A Yearly Gains And Losses Markdown Report (Priority: P1)
 
-With synced data available, the user can start report generation, choose a year and cost basis method, generate a yearly capital gains report, have it saved to the user's Documents folder, and return to the home menu after the file is opened or an opening failure is explained.
+With synced data available in the active unlocked context, the user can choose a year and cost basis method, generate a yearly gains-and-losses report, save it to the user's Documents folder, ask the operating system to open it, and return to the `Sync and Reports` menu.
 
-**Why this priority**: Producing the yearly capital gains report from already synced data is the core user outcome of this slice.
+**Why this priority**: Producing the yearly gains-and-losses report from already synced data is the core user outcome of this slice.
 
-**Independent Test**: Using a deterministic multi-year synced dataset, select an available year and a supported cost basis method, generate the report, verify the output file contents and location, and confirm that the workflow returns to the home menu.
+**Independent Test**: Using a deterministic multi-year synced dataset, select an available year and a supported cost basis method, generate the report, verify the output file contents and location, and confirm that the workflow returns to `Sync and Reports` without asking for the token again.
 
 **Acceptance Scenarios**:
 
-1. **Given** synced data contains at least one reportable year, **When** the user selects a year and cost basis method and confirms generation, **Then** the system creates a yearly capital gains report as a Markdown file in the user's Documents folder, requests the operating system to open it, and returns the user to the home menu.
-2. **Given** the selected year has activity before and after it, **When** the report is calculated, **Then** earlier activity is used to establish holdings and basis and later activity is ignored.
-3. **Given** an asset has an open position at the end of the selected year or is fully liquidated during the selected year, **When** the report is generated, **Then** that asset appears in the main report sections.
-4. **Given** an asset was fully liquidated before the selected year and was not reopened later, **When** the report is generated, **Then** that asset is excluded from the main sections and shown only in the reference section.
-5. **Given** an included asset has a zero net result for the selected year, **When** the report is generated, **Then** that asset still appears in the gains-and-losses summary with a zero result.
-6. **Given** the report file is saved successfully but the operating system cannot open it automatically, **When** the workflow completes, **Then** the saved file remains in the Documents folder, the user is told where it was saved and that automatic opening failed, and the application returns to the home menu.
+1. **Given** synced data contains at least one reportable year, **When** the user selects a year and cost basis method and confirms generation, **Then** the system creates a yearly capital gains and losses report as a Markdown file in the user's Documents folder, requests the operating system to open it, and returns the user to the `Sync and Reports` menu.
+2. **Given** the selected year has activity before, within, and after it, **When** the report is calculated, **Then** earlier activity is used to establish holdings and basis, only liquidations inside the selected year contribute gains and losses, and later activity is ignored.
+3. **Given** an asset's first acquisition occurs after the selected year, **When** the report is generated, **Then** that asset is ignored completely for that report run.
+4. **Given** an asset has an open position at the end of the selected year or is fully liquidated during the selected year, **When** the report is generated, **Then** that asset appears in the main report sections.
+5. **Given** an asset was fully liquidated before the selected year and was not reopened on or before the end of that selected year, **When** the report is generated, **Then** that asset is excluded from the main sections and shown only in the reference section.
+6. **Given** an asset is fully liquidated before or within the selected year and a new position in that asset is opened before or within that same selected year, **When** the report is generated, **Then** only liquidations inside the selected year contribute gains and losses and the reference section shows the full-liquidation count reached by the end of the selected year for that asset.
+7. **Given** an included asset has a zero net result for the selected year, **When** the report is generated, **Then** that asset still appears in the gains-and-losses summary with a zero result.
+8. **Given** an included asset or a report total results in a loss, **When** the report is generated, **Then** that loss is shown with a negative sign.
+9. **Given** the report file is saved successfully but the operating system cannot open it automatically, **When** the workflow completes, **Then** the saved file remains in the Documents folder, the user is told where it was saved and that automatic opening failed, and the application returns to the `Sync and Reports` menu.
 
 ---
 
@@ -46,14 +59,14 @@ With synced data available, the user can start report generation, choose a year 
 
 Before generating the report, the user can review the available cost basis methods, read a short explanation of each one, and choose the method that should govern that report run.
 
-**Why this priority**: Different cost basis methods can materially change reported gains or losses, so the user needs an understandable and deliberate selection step.
+**Why this priority**: Different cost basis methods can materially change reported gains and losses, so the user needs an understandable and deliberate selection step.
 
 **Independent Test**: Open the report-generation workflow with synced multi-year data, move through each method choice, verify the explanatory text, and compare method-specific outcomes against controlled expected ledgers.
 
 **Acceptance Scenarios**:
 
-1. **Given** the user is on the cost basis selection step, **When** the highlighted method changes, **Then** a short explanation describes how disposals are matched or pooled and whether scope-specific fallback rules apply.
-2. **Given** any supported cost basis method is selected, **When** the yearly report is generated, **Then** that one method is applied consistently to every included disposal in that report run.
+1. **Given** the user is on the cost basis selection step, **When** the highlighted method changes, **Then** a short explanation describes how acquisitions and liquidations are matched or pooled and whether scope-specific fallback rules apply.
+2. **Given** any supported cost basis method is selected, **When** the yearly report is generated, **Then** that one method is applied consistently to every included liquidation in that report run.
 3. **Given** the scope-local hybrid method is selected and reliable scope information is unavailable for an asset, **When** the report is calculated, **Then** the method broadens to the whole asset instead of failing the report solely because scope detail is missing.
 
 ---
@@ -62,11 +75,11 @@ Before generating the report, the user can review the available cost basis metho
 
 - Synced activity data exists but contains no reportable year, so report generation remains unavailable with a clear reason.
 - Two reports are generated within the same second, so filenames must stay unique without losing alphabetical date ordering.
-- A selected year contains acquisitions and holding reductions but no taxable disposals, producing a valid report with zero realized gain or loss.
-- A selected year contains only zero-priced disposal records that reduce holdings without realizing gain or loss.
+- A selected year contains acquisitions and holding reductions but no liquidations, producing a valid report with zero realized gain or loss.
+- A selected year contains only zero-priced disposal records that reduce holdings and basis without creating gain or loss.
 - The user's Documents location is unavailable or not writable at generation time.
-- The synced dataset contains mixed currency labels across activities; for this slice the report must still choose the first available currency tier per activity and treat the chosen values as equal without conversion.
-- The user generates a report and immediately starts another one; the application shows no report history or previously generated report list.
+- The synced dataset contains mixed currency labels across activities. For this slice, each activity must still use one single-activity currency context, and the final report must show the report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`.
+- The user generates a report and immediately starts another one inside the same unlocked context; the application shows no report history or previously generated report list.
 
 ## Requirements *(mandatory)*
 
@@ -76,75 +89,277 @@ impacts when the feature touches those areas.
 
 ### Functional Requirements
 
-- **FR-001**: The system MUST present `Sync Data` and `Generate Capital Gains Report` as separate primary actions on the home menu.
-- **FR-002**: The system MUST show the last successful sync date and time alongside `Sync Data` when synced activity data exists, and MUST indicate when no synced data is available.
-- **FR-003**: The system MUST keep `Generate Capital Gains Report` unavailable until synced data exists and at least one reportable year can be derived from that data.
-- **FR-004**: The system MUST open a dedicated report-generation workflow when the user selects `Generate Capital Gains Report`.
-- **FR-005**: The system MUST allow the user to choose only from years present in the synced activity data.
-- **FR-006**: The system MUST allow the user to choose one cost basis method from this set for each report run: FIFO, LIFO, HIFO, Average Cost Basis, and Scope-Local Exact Unit Matching, otherwise Scope-Local Average Cost with Oldest-Acquired Deemed-Disposal Order.
-- **FR-007**: The system MUST show a short plain-language explanation for the highlighted or selected cost basis method before the report is generated.
-- **FR-008**: The system MUST calculate the report from the currently synced dataset and MUST not require a new sync to begin report generation.
-- **FR-009**: The system MUST use activity before and within the selected year to establish holdings and basis for that year and MUST ignore activity after that year.
-- **FR-010**: The system MUST follow the reference report template structure with sections in this order: gains-and-losses summary, reference section for previously liquidated assets, then per-asset detail sections.
-- **FR-011**: The system MUST include in the main report sections every asset that has an open position at the end of the selected year or is fully liquidated during the selected year.
-- **FR-012**: The system MUST keep an included asset in the gains-and-losses summary even when that asset's net result for the selected year is zero.
-- **FR-013**: The system MUST exclude from the main report sections any asset fully liquidated before the selected year and not reopened later, and MUST list that asset only in the reference section.
-- **FR-014**: The system MUST show each asset detail section as the opening position carried into the selected year followed by the activity that occurs within the selected year, without including later activity.
-- **FR-015**: The system MUST generate the report only as a plain Markdown document in this slice.
-- **FR-016**: The system MUST name the output file with a human-readable local timestamp in `YYYY-MM-DD_HH-MM-SS` order so filenames sort alphabetically by creation time.
-- **FR-017**: The system MUST avoid overwriting an existing report file by preserving the timestamped name and adding a disambiguating suffix when needed.
-- **FR-018**: The system MUST save the generated report into the current user's personal Documents folder for the operating system in use.
-- **FR-019**: The system MUST request the operating system to open the saved Markdown file in the default application associated with that file type.
-- **FR-020**: The system MUST return the user to the home menu after report generation completes and MUST show a transient result message that confirms the saved file path or explains why automatic opening failed.
-- **FR-021**: The system MUST NOT keep an in-application history, catalog, or reopen list of previously generated reports, and MUST NOT store the final report content back into protected synced-data storage after the file is saved.
-- **FR-022**: The system MUST define FIFO as allocating disposal basis from the oldest still-open acquisitions first.
-- **FR-023**: The system MUST define LIFO as allocating disposal basis from the newest still-open acquisitions first.
-- **FR-024**: The system MUST define HIFO as allocating disposal basis from the still-open acquisitions with the highest unit cost first, and when two candidate acquisitions have the same unit cost, the older acquisition MUST take precedence.
-- **FR-025**: The system MUST define Average Cost Basis as one moving weighted-average cost pool per asset across all activity for that asset, where each disposal uses the average unit cost immediately before that disposal and a new pool begins only after the asset quantity returns to zero.
-- **FR-026**: The system MUST define Scope-Local Exact Unit Matching, otherwise Scope-Local Average Cost with Oldest-Acquired Deemed-Disposal Order as first choosing the most reliable available scope for an asset, then using exact unit matching within that scope when outgoing units can be defensibly identified, otherwise using average cost within that same scope and deeming the oldest remaining acquisitions in that scope as disposed first for provenance.
-- **FR-027**: The system MUST broaden the scope-local hybrid method to the whole asset when reliable scope information is unavailable, instead of failing the report solely because scope detail is missing.
-- **FR-028**: The system MUST continue using the pooled average-cost state within an open scope after the scope-local hybrid method first falls back to average cost there, until the quantity for that scope returns to zero.
-- **FR-029**: The system MUST treat zero-priced disposal records that represent fees or transfers out as holding reductions that remove basis under the selected cost basis method without creating realized gain or loss entries in the report.
-- **FR-030**: The system MUST apply the one selected cost basis method consistently to every included disposal in a single report run.
-- **FR-031**: When monetary amounts are needed for reporting, the system MUST choose the first available currency context for each activity in this priority order: transaction order currency, asset currency, then portfolio base currency.
-- **FR-032**: For this slice, the system MUST treat amounts chosen from different currency contexts as equal-value inputs and MUST NOT perform currency conversion or exchange-rate lookup.
-- **FR-033**: If report generation cannot complete because the output location is unavailable, not writable, or the synced data cannot support the selected calculation, the system MUST show an actionable error without exposing secrets or unprotected financial details and MUST NOT leave partial cleartext report artifacts behind.
+- **FR-001**: The system MUST present `Sync and Reports` as the main-menu workflow entry for token-unlocked sync and reporting actions.
+- **FR-002**: Selecting `Sync and Reports` MUST require the user to inform the Ghostfolio security token before the system exposes `Sync Data` or `Generate Capital Gains Report`.
+- **FR-003**: While the active `Sync and Reports` context remains unlocked, the system MUST present `Sync Data` and `Generate Capital Gains Report` as separate actions and MUST allow the user to move between them without informing the token again.
+- **FR-004**: The system MUST show the last successful sync date and time beside `Sync Data` within the `Sync and Reports` context when synced data exists for the active token and selected server, and MUST indicate when no synced data is available.
+- **FR-005**: The system MUST keep `Generate Capital Gains Report` unavailable until synced data exists and at least one reportable year can be derived from that data for the active `Sync and Reports` context.
+- **FR-006**: The system MUST allow the user to choose only from years present in the synced activity data.
+- **FR-007**: The system MUST allow the user to choose one cost basis method from this set for each report run: FIFO, LIFO, HIFO, Average Cost Basis, and Scope-Local Exact Unit Matching, otherwise Scope-Local Average Cost with Oldest-Acquired Deemed-Disposal Order.
+- **FR-008**: The system MUST show a short plain-language explanation for the highlighted or selected cost basis method before the report is generated.
+- **FR-009**: The system MUST calculate the report from the currently synced dataset in the active `Sync and Reports` context and MUST not require a new sync to begin report generation.
+- **FR-010**: The system MUST generate the report according to the section definitions in `Report Structure Definitions`.
+- **FR-011**: The system MUST show gains as positive values, losses with a negative sign, and zero results as zero in the gains-and-losses summary and any report totals.
+- **FR-012**: The system MUST include in the main report sections every asset that has an open position at the end of the selected year or at least one full liquidation during the selected year.
+- **FR-013**: The system MUST calculate yearly gains and losses using only liquidations that occur inside the selected year.
+- **FR-014**: The system MUST ignore an asset completely when that asset's first acquisition occurs after the selected year.
+- **FR-015**: The system MUST use activity before and within the selected year to establish holdings and basis for that year and MUST ignore activity after the selected year.
+- **FR-016**: The system MUST exclude from the main report sections any asset fully liquidated before the selected year and not reopened on or before the end of the selected year, and MUST show that asset only in the reference section.
+- **FR-017**: The system MUST, for an asset fully liquidated before or within the selected year and reopened before or within that same selected year, include only the selected year's liquidations in gains-and-losses results and MUST show that asset's full-liquidation count through the end of the selected year in the reference section.
+- **FR-018**: The system MUST show each included asset detail section as the opening position at the start of the selected year, the in-year activity, and the closing position at the end of the selected year, without including later activity.
+- **FR-019**: The system MUST generate the report only as a plain Markdown document in this slice.
+- **FR-020**: The system MUST name the output file with a human-readable local timestamp in `YYYY-MM-DD_HH-MM-SS` order so filenames sort alphabetically by creation time, MUST save the file into the current user's personal Documents folder for the operating system in use, and MUST avoid overwriting an existing report file by adding a disambiguating suffix when needed.
+- **FR-021**: The system MUST request the operating system to open the saved Markdown file in the default application associated with that file type, MUST return the user to the unlocked `Sync and Reports` context after report generation completes, MUST show a transient result message that confirms the saved file path or explains why automatic opening failed, and MUST NOT keep an in-application history, catalog, or reopen list of previously generated reports or store the final report content back into protected synced-data storage after the file is saved.
+- **FR-022**: The system MUST define FIFO by the mathematical rules in `Cost Basis Method Definitions`.
+- **FR-023**: The system MUST define LIFO by the mathematical rules in `Cost Basis Method Definitions`.
+- **FR-024**: The system MUST define HIFO by the mathematical rules in `Cost Basis Method Definitions`.
+- **FR-025**: The system MUST define Average Cost Basis by the mathematical rules in `Cost Basis Method Definitions`.
+- **FR-026**: The system MUST define Scope-Local Exact Unit Matching, otherwise Scope-Local Average Cost with Oldest-Acquired Deemed-Disposal Order by the mathematical rules in `Cost Basis Method Definitions`.
+- **FR-027**: The system MUST apply the selected cost basis method consistently to every included liquidation in a single report run.
+- **FR-028**: The system MUST use the report-wide monetary label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` for this slice's generated report.
+- **FR-029**: The system MUST treat zero-priced disposal records that were admitted into synced data by the explained zero-priced `SELL` rule from `specs/003-store-activity-data/spec.md` as holding reductions that remove quantity and basis under the selected cost basis method without creating gain or loss entries in the report.
+- **FR-030**: The system MUST apply `Single-Activity Currency Context Definitions` whenever monetary amounts are needed for calculations from one activity.
+- **FR-031**: When monetary amounts are needed for calculations within one activity, the system MUST choose the first available currency context in this priority order: transaction order currency, asset currency, then portfolio base currency.
+- **FR-032**: After one activity's currency context is chosen, the system MUST use that one chosen context consistently for every monetary value needed from that activity and MUST NOT mix currency tiers within the same activity calculation input.
+- **FR-033**: After monetary values leave the single-activity currency context and enter cost basis and gains-and-losses calculations, the system MUST treat all selected values as equal-value inputs, MUST NOT perform currency conversion or exchange-rate lookup, and MUST carry the report-wide label defined by `FR-028`.
+- **FR-034**: If the chosen single-activity currency context cannot supply the complete set of monetary values needed for a calculation, the system MUST fail the report generation attempt with an actionable error instead of mixing currency tiers within that activity.
+- **FR-035**: If report generation cannot complete because the output location is unavailable, not writable, or the synced data cannot support the selected calculation, the system MUST show an actionable error without exposing secrets or unprotected financial details and MUST NOT leave partial cleartext report artifacts behind.
+
+### Report Structure Definitions
+
+#### Gains-And-Losses Summary
+
+This is the first section of the report.
+
+It contains one entry for each asset that is included in the main report sections for the selected year.
+
+Each entry MUST show:
+
+- the asset identity used in the report
+- the asset's net gain, net loss, or zero result for the selected year only
+- gains as positive values
+- losses with a negative sign
+- the report-wide monetary label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`
+
+#### Reference Section
+
+This is the second section of the report.
+
+It provides a reference-only view of full-liquidation history through the end of the selected year.
+
+For each asset that reaches zero quantity at least once on or before the end of the selected year, this section MUST show the full-liquidation count reached by that cutoff.
+
+Assets that were fully liquidated before the selected year and were not reopened on or before the end of the selected year appear only in this section and not in the main report sections.
+
+#### Per-Asset Detail Sections
+
+These sections appear after the reference section.
+
+There is one detail section for each asset included in the main report sections.
+
+Each detail section MUST show:
+
+- the opening position at the start of the selected year
+- the activity that occurs within the selected year
+- the closing position at the end of the selected year
+
+Activity after the selected year is excluded from these sections.
+
+### Cost Basis Method Definitions
+
+#### Shared Calculation Rules
+
+These formulas apply to all supported methods unless a method definition narrows them.
+
+Acquisition:
+
+```text
+acquisition_basis = gross_acquisition_value + acquisition_fee
+unit_cost = acquisition_basis / acquired_quantity
+```
+
+Liquidation:
+
+```text
+net_liquidation_proceeds = gross_liquidation_value - liquidation_fee
+gain_or_loss = net_liquidation_proceeds - allocated_basis
+```
+
+If one liquidation draws from multiple matched acquisition fragments, net liquidation proceeds are allocated proportionally by matched quantity:
+
+```text
+proceeds_per_unit = net_liquidation_proceeds / liquidated_quantity
+matched_proceeds_i = proceeds_per_unit * matched_quantity_i
+matched_gain_or_loss_i = matched_proceeds_i - matched_basis_i
+```
+
+#### FIFO
+
+FIFO allocates liquidation basis from the oldest still-open acquisitions first.
+
+Partial-acquisition consumption follows this rule:
+
+```text
+lot_unit_cost = lot_basis / lot_quantity
+matched_basis = lot_unit_cost * matched_quantity
+remaining_quantity' = remaining_quantity - matched_quantity
+remaining_basis' = remaining_basis - matched_basis
+```
+
+#### LIFO
+
+LIFO allocates liquidation basis from the newest still-open acquisitions first.
+
+It uses the same partial-acquisition formulas as FIFO after the newest acquisition is selected.
+
+#### HIFO
+
+HIFO allocates liquidation basis from the still-open acquisitions with the highest unit cost first.
+
+If two still-open acquisitions have the same unit cost, the older acquisition takes precedence. If a stable tie-break is still needed after that comparison, the deterministic order already established in synced history is used.
+
+It uses the same partial-acquisition formulas as FIFO after the highest-cost acquisition is selected.
+
+#### Average Cost Basis
+
+Average Cost Basis maintains one moving weighted-average pool per asset using all activity for that asset.
+
+Pool state:
+
+```text
+pool_quantity
+pool_basis
+average_unit_cost = pool_basis / pool_quantity
+```
+
+On acquisition:
+
+```text
+pool_quantity' = pool_quantity + acquired_quantity
+pool_basis' = pool_basis + acquisition_basis
+average_unit_cost' = pool_basis' / pool_quantity'
+```
+
+On liquidation:
+
+```text
+allocated_basis = liquidated_quantity * average_unit_cost
+pool_quantity' = pool_quantity - liquidated_quantity
+pool_basis' = pool_basis - allocated_basis
+gain_or_loss = net_liquidation_proceeds - allocated_basis
+```
+
+When pool quantity reaches zero, the next acquisition starts a new pool for that asset.
+
+#### Scope-Local Exact Unit Matching, otherwise Scope-Local Average Cost with Oldest-Acquired Deemed-Disposal Order
+
+This method first chooses the most reliable available scope for an asset:
+
+```text
+applicable_scope = reliable wallet or account scope when available and defensible
+otherwise applicable_scope = the asset as a whole
+```
+
+Within that applicable scope:
+
+1. If the outgoing units can be defensibly identified exactly, allocate basis from those exact units.
+2. Otherwise, use average cost within that same scope.
+3. After the first average-cost fallback in an open scope, continue using pooled average cost in that scope until its quantity returns to zero.
+4. While pooled average cost is active in that scope, provenance is still deemed to leave in oldest-acquired order within that same scope.
+
+Exact-unit basis:
+
+```text
+allocated_basis = sum(matched_quantity_i * matched_unit_cost_i)
+matched_unit_cost_i = matched_basis_i / matched_quantity_i
+```
+
+Scope-local average-cost fallback:
+
+```text
+scope_quantity = sum(remaining_quantity_i)
+scope_basis = sum(remaining_basis_i)
+average_unit_cost = scope_basis / scope_quantity
+allocated_basis = liquidated_quantity * average_unit_cost
+scope_quantity' = scope_quantity - liquidated_quantity
+scope_basis' = scope_basis - allocated_basis
+gain_or_loss = net_liquidation_proceeds - allocated_basis
+```
+
+#### Zero-Priced Holding Reduction Rule Carried Forward From Synced Data
+
+This report slice reuses the earlier synced-data rule from `specs/003-store-activity-data/spec.md` that allows an explained zero-priced `SELL` record to exist in stored history.
+
+When such a record is encountered during report generation:
+
+```text
+allocated_basis = method_specific_basis_for_removed_quantity
+remaining_quantity' = remaining_quantity - removed_quantity
+remaining_basis' = remaining_basis - allocated_basis
+gain_or_loss = 0
+```
+
+The quantity and basis are reduced according to the active cost basis method, but the event produces no gain or loss entry in the report.
+
+### Single-Activity Currency Context Definitions
+
+Within one activity, the system chooses exactly one currency context before using that activity's monetary values in calculations.
+
+The selection priority is:
+
+```text
+transaction order currency
+then asset currency
+then portfolio base currency
+```
+
+Once one context is chosen for that activity:
+
+- every monetary value needed from that activity, such as unit price, fee, gross acquisition value, gross liquidation value, and activity totals, must come from that one chosen context
+- the system must not combine different currency tiers inside that same activity
+- if the chosen context cannot provide every monetary value needed from that activity, the report-generation attempt fails instead of mixing tiers
+
+After values from multiple activities enter cost basis and gains-and-losses calculations, the report no longer applies a working currency distinction for this slice. It treats those selected values as equal-value inputs without conversion and shows the report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`.
 
 ### Security, Precision, and Integration Constraints
 
-- **SEC-001**: Before the final Markdown file is saved to the user's Documents folder, report inputs, intermediate calculations, rendered content, and any temporary storage MUST remain inside the same security boundary and protection level used for synced financial and user-linked data, and they MUST be kept out of logs, diagnostics, and unprotected temporary locations.
-- **SEC-002**: The final Markdown file saved in the Documents folder is intentionally outside the application's protected-storage boundary. After that file is saved and handed to the operating system, the application MUST retain no additional cleartext copy of the report and MUST leave no recoverable cleartext temporary residue under application-managed storage.
-- **FIN-001**: All quantities, proceeds, fees, allocated basis, and gains or losses MUST use exact decimal arithmetic, preserve source precision until final rendering, include fees in acquisition basis or disposal proceeds as applicable, honor zero-priced holding reductions as zero-gain and zero-loss events, choose currency context per activity using the `order -> asset -> base` priority, and perform no currency conversion in this slice.
-- **QUAL-001**: Automated validation MUST cover home-menu gating with and without synced data, last-sync timestamp display, available-year selection, each supported cost basis method, yearly boundary handling, report section ordering and inclusion rules, zero-result assets, zero-priced holding reductions, Documents-folder save behavior, filename uniqueness and alphabetical sortability, automatic-open success and failure behavior, absence of report history, protected handling of pre-save report content, and the repository's full coverage gates using integration-first tests and only targeted unit tests for complex calculation rules.
-- **INT-001**: The feature depends on an existing synced activity dataset from earlier slices and on operating-system services that provide a writable personal Documents location and a default Markdown-file association. This slice introduces no new external currency-conversion dependency.
+- **SEC-001**: The Ghostfolio security token MUST be informed explicitly by the user to enter `Sync and Reports`, kept only for the active unlocked context, reusable for sync and reporting actions while that context remains open, cleared when the user leaves that context or the application ends, and excluded/unreadable from logs, output, diagnostics, and persisted artifacts.
+- **SEC-002**: Before the final Markdown file is saved to the user's Documents folder, report inputs, intermediate calculations, rendered content, and any temporary storage MUST remain inside the same security boundary and protection level used for synced financial and user-linked data, and they MUST be kept out of unprotected temporary locations.
+- **SEC-003**: The final Markdown file saved in the Documents folder is intentionally outside the application's protected-storage boundary. After that file is saved and handed to the operating system, the application MUST retain no additional cleartext copy of the report and MUST leave no recoverable cleartext temporary residue under application-managed storage.
+- **FIN-001**: All quantities, proceeds, fees, allocated basis, gains, and losses MUST use exact decimal arithmetic, preserve source precision until final rendering, include fees in acquisition basis or liquidation proceeds as applicable, treat explained zero-priced holding reductions as zero-gain and zero-loss events, and show losses with a negative sign in final report output.
+- **FIN-002**: Within one activity, calculations MUST use the single-activity currency context defined in `Single-Activity Currency Context Definitions`, including the priority `order -> asset -> base`, the rule against mixing currency tiers inside one activity, and the requirement to fail instead of mixing tiers when one chosen context is incomplete. After values enter cross-activity cost basis and gains-and-losses calculations, the system MUST treat them as equal-value inputs under the report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` and MUST perform no currency conversion in this slice.
+- **QUAL-001**: Automated validation MUST cover main-menu entry into `Sync and Reports`, token gating and token reuse within the active unlocked context, last-sync timestamp display beside `Sync Data`, available-year selection, each supported cost basis method, yearly gains-and-losses calculations that count only liquidations inside the selected year, ignoring assets first acquired after the selected year, reference-section liquidation counts for reopened assets, report section ordering and definitions, negative-sign rendering for losses, zero-result assets, zero-priced holding reductions carried forward from the synced-data rules, single-activity currency-context selection and no cross-tier mixing, the report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`, Documents-folder save behavior, filename uniqueness and alphabetical sortability, automatic-open success and failure behavior, absence of report history, protected handling of pre-save report content, and the repository's full coverage gates using integration-first tests and only targeted unit tests for complex calculation rules.
+- **INT-001**: The feature depends on the existing synced activity dataset from earlier slices, including available report years, scope reliability, and the explained zero-priced `SELL` records admitted by `specs/003-store-activity-data/spec.md`, and on operating-system services that provide a writable personal Documents location and a default Markdown-file association. This slice introduces no external currency-conversion dependency.
 
 ### Key Entities *(include if feature involves data)*
 
-- **Synced Activity Snapshot**: The protected local activity history and sync metadata used as the sole reporting input, including available report years and the last successful sync moment.
+- **Sync and Reports Context**: The active token-unlocked workflow state for one selected server and one token-scoped protected dataset, exposing `Sync Data` and `Generate Capital Gains Report` without repeated token entry while the context stays open.
 - **Report Request**: The user's selection of one report year and one cost basis method for a single generation run.
-- **Cost Basis Method**: The domain rule set that decides how disposal basis is allocated across still-open holdings.
-- **Yearly Capital Gains Report**: The generated yearly statement containing the gains-and-losses summary, the reference section for previously liquidated assets, and per-asset detail sections.
+- **Single-Activity Currency Context**: The chosen monetary context for one activity, selected in `order -> asset -> base` priority and used consistently for every monetary value needed from that activity.
+- **Reference Section Entry**: The per-asset reference record that shows whether an asset is reference-only for the selected year and how many full liquidations it has completed by the end of that year.
+- **Yearly Capital Gains And Losses Report**: The generated yearly statement containing the gains-and-losses summary, the reference section, and the per-asset detail sections.
 - **Report Output File**: The clear Markdown file saved in the user's Documents folder after generation, with a timestamped name and no continuing application ownership after save.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: 100% of home-menu states show both primary actions, and 100% of states without reportable synced data keep report generation unavailable with a clear reason.
-- **SC-002**: 100% of users with synced data can reach the year-and-method selection step from the home menu in one action.
-- **SC-003**: For controlled multi-year ledgers with known expected outcomes, 100% of yearly per-asset results and yearly totals match the expected values across all five supported cost basis methods, including zero-priced holding reductions and zero-result assets.
-- **SC-004**: 100% of successful report runs create one Markdown file in the user's Documents folder with a timestamped name that sorts chronologically when listed alphabetically, and no successful run overwrites an earlier report file.
-- **SC-005**: When a default Markdown-file association exists, at least 95% of successful report runs open the saved file automatically and return the user to the home menu without additional manual navigation.
-- **SC-006**: For synced histories of up to 10,000 activities spanning at least 5 calendar years, at least 95% of yearly report runs complete and save the report in under 2 minutes on a supported installation.
-- **SC-007**: 100% of inspected application-managed storage and temporary artifacts created during report generation keep cleartext report content out of persistent application storage before final save and leave no leftover cleartext temporary files after success or failure.
+- **SC-001**: 100% of active `Sync and Reports` menu states show both `Sync Data` and `Generate Capital Gains Report`, and 100% of states without reportable synced data keep report generation unavailable with a clear reason.
+- **SC-002**: 100% of users with synced data can reach the year-and-method selection step from `Sync and Reports` in one action and can return to `Sync and Reports` after report generation without re-entering the token while the unlocked context remains active.
+- **SC-003**: For controlled multi-year ledgers with known expected outcomes, 100% of yearly per-asset results and yearly totals match the expected values across all five supported cost basis methods, count only liquidations inside the selected year, ignore assets first acquired after the selected year, and show losses with a negative sign.
+- **SC-004**: 100% of generated reports follow the three defined section types in the required order and display the report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`.
+- **SC-005**: 100% of successful report runs create one Markdown file in the user's Documents folder with a timestamped name that sorts chronologically when listed alphabetically, and no successful run overwrites an earlier report file.
+- **SC-006**: When a default Markdown-file association exists, at least 95% of successful report runs open the saved file automatically and return the user to the `Sync and Reports` context without additional manual navigation.
+- **SC-007**: For synced histories of up to 10,000 activities spanning at least 5 calendar years, at least 95% of yearly report runs complete and save the report in under 2 minutes on a supported installation.
+- **SC-008**: 100% of inspected application-managed storage and temporary artifacts created during report generation keep cleartext report content out of persistent application storage before final save and leave no leftover cleartext temporary files after success or failure.
 
 ## Assumptions
 
-- This slice reuses the protected synced activity data and sync metadata produced by earlier slices; extending data-sync rules beyond the home-menu status label is out of scope here.
-- Reports remain yearly only in this slice; combined multi-year, quarter-based, and custom date-range reports are out of scope.
+- The main menu uses `Sync and Reports` as the entry point for both sync and report actions in this slice, and those actions run inside one active token-unlocked context.
+- Reports remain yearly only in this slice. Combined multi-year, quarter-based, and custom date-range reports are out of scope.
 - The reference report structure from the earlier reporting specification remains the required content template for this slice, even though the output format is Markdown instead of PDF.
 - Markdown is the only report document format in scope for this slice. PDF and other document types are deferred to later slices.
 - The final file saved in the user's Documents folder is intentionally cleartext and outside the application's protected-storage responsibility after save.
-- When multiple currency contexts are available for one activity, the report chooses the first available tier in this order: transaction order currency, asset currency, then portfolio base currency.
-- Until a later slice defines real conversion rules, the report treats chosen monetary values from different currency contexts as equal-value inputs in calculations.
-- The synced dataset already carries the scope detail and reliability information needed to decide whether a scope-local calculation can remain narrow or must broaden to the whole asset.
+- The earlier synced-data slice already supplies the protected history, available report years, scope reliability, and explained zero-priced `SELL` records needed by this slice.
+- If one chosen single-activity currency context cannot provide every monetary value needed from an activity, report generation fails instead of mixing currency tiers inside that activity.
+- Until a later slice defines real conversion rules, the report treats selected monetary values from different activities as equal-value inputs and shows the report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`.
