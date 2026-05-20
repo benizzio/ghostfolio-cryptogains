@@ -346,9 +346,10 @@ Fields:
 | `occurred_at` | timestamp | Activity timestamp |
 | `activity_type` | enum | `BUY` or `SELL` |
 | `quantity` | decimal | Activity quantity |
-| `gross_value` | decimal nullable | Selected gross value for acquisitions and priced liquidations |
-| `fee_amount` | decimal nullable | Selected fee |
-| `calculation_currency` | string nullable | Currency code selected for this activity row before values entered report-wide calculation |
+| `gross_value` | decimal nullable | Selected gross value for acquisitions and priced liquidations, rendered in the row's activity currency |
+| `fee_amount` | decimal nullable | Selected fee, rendered in the row's activity currency |
+| `activity_currency` | string nullable | Explicit currency code from the row's single-activity currency context |
+| `calculation_currency` | string | Always `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` for calculated row values in this slice |
 | `basis_after_row` | decimal | Remaining basis after applying row |
 | `quantity_after_row` | decimal | Remaining quantity after applying row |
 | `holding_reduction_explanation` | string nullable | Present for zero-priced holding reductions |
@@ -362,7 +363,8 @@ Validation rules:
 
 - Every in-year activity for an included asset appears as one row.
 - Zero-priced holding reductions show basis and quantity effects without realized gain or loss.
-- `calculation_currency` records the activity-local selected currency code even though the report-wide calculation currency label later becomes no-currency.
+- `activity_currency` records the explicit currency code used for `gross_value` and `fee_amount` in that row.
+- `calculation_currency` records the report-wide no-currency label used for calculated row values such as `basis_after_row`.
 
 ## LiquidationCalculation
 
@@ -377,7 +379,7 @@ Fields:
 | `allocated_basis` | decimal | Basis consumed by the selected method |
 | `net_liquidation_proceeds` | decimal | Gross liquidation value minus liquidation fee |
 | `gain_or_loss` | decimal | Net proceeds minus allocated basis |
-| `calculation_currency` | string | Currency code selected for this liquidation activity before values entered report-wide calculation |
+| `calculation_currency` | string | Always `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` for liquidation calculation values in this slice |
 | `matches` | `BasisMatch[]` | Lot or pool fragments used by the selected method |
 
 Relationships:

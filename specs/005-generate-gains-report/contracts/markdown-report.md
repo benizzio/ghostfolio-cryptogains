@@ -209,15 +209,16 @@ Required activity table columns:
 ```markdown
 ### In-Year Activity
 
-| Date | Source ID | Type | Quantity | Gross Value | Fee | Selected Activity Currency | Basis After Row | Quantity After Row | Note |
-|------|-----------|------|----------|-------------|-----|----------------------------|-----------------|--------------------|------|
+| Date | Source ID | Type | Quantity | Gross Value | Fee | Activity Currency | Basis After Row | Calculation Currency | Quantity After Row | Note |
+|------|-----------|------|----------|-------------|-----|-------------------|-----------------|----------------------|--------------------|------|
 ```
 
 Rules:
 
 - Every in-year activity for the included asset appears in this table.
 - The table includes acquisitions, priced liquidations, and explained zero-priced holding reductions.
-- `Selected Activity Currency` shows the explicit currency code from which that row's values were selected before they entered the report-wide no-currency calculation context.
+- `Activity Currency` shows the explicit currency code from which that row's `Gross Value` and `Fee` were taken.
+- `Calculation Currency` shows `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` for calculated row values such as `Basis After Row` in this slice.
 - `Note` explains zero-priced holding reductions as holding reductions with zero gain and zero loss.
 - The table does not include later activity.
 
