@@ -111,7 +111,7 @@ tests/
 - Include an asset in main report sections when it has an open position at the selected year end or at least one full liquidation during the selected year. Assets fully liquidated before the selected year and not reopened on or before year end appear only in the reference section when they have at least one full liquidation before the cutoff.
 - Maintain full-liquidation counts through the selected year end. A full liquidation is counted whenever the asset or applicable scope reaches zero quantity after applying an event.
 - Resolve monetary inputs per activity using a strict `order -> asset -> base` context selection. One selected context must supply the complete monetary value set needed for that activity. The calculator must not fill missing gross value, fee, or unit price from a different tier.
-- Compute acquisition basis as `gross_acquisition_value + acquisition_fee` and liquidation proceeds as `gross_liquidation_value - liquidation_fee` after the single-activity context is selected.
+- Compute acquisition basis from `ActivityCalculationInput.gross_value + ActivityCalculationInput.fee_amount`, and compute liquidation proceeds from `ActivityCalculationInput.gross_value - ActivityCalculationInput.fee_amount`, after the single-activity context is selected for that activity.
 - Keep all calculation state in `apd.Decimal`. HIFO lot comparison should use cross multiplication where possible to avoid unnecessary division. Required divisions must be checked for exactness; if no finite exact decimal exists, generation fails with an actionable calculation error because this slice defines no rounding policy.
 - Treat explained zero-priced `SELL` records as holding reductions. They consume quantity and remove basis according to the selected method, appear in detail rows, and do not contribute proceeds, realized gains, realized losses, or summary totals.
 - Render all quantities and monetary values with canonical exact-decimal formatting, trimming only non-significant formatting and rendering zero as `0`.
@@ -129,7 +129,7 @@ tests/
 ## Output Design
 
 - Use one final Markdown document per successful report run. No PDF, HTML, or secondary export format is in scope.
-- Resolve the Documents directory from the current OS user's home directory plus `Documents`. If that path is unavailable or not writable, fail with an actionable non-secret error and leave no partial report file.
+- Resolve the Documents directory using OS-appropriate user-document conventions first: on Linux, honor XDG user directories when configured and otherwise fall back to `$HOME/Documents`; on macOS, use the per-user Documents directory under the user's home as defined by the platform conventions; on Windows, target the per-user Documents known folder rather than assuming a literal folder name. If the resolved path is unavailable or not writable, fail with an actionable non-secret error and leave no partial report file.
 - Name files with a local timestamp prefix in `YYYY-MM-DD_HH-MM-SS` order and a stable report descriptor. If the target path exists, append `-2`, `-3`, and so on before `.md`.
 - Reserve the final path using exclusive creation where supported. If writing fails after file creation, close and remove the partial file. If saving succeeds but OS-open fails, keep the file and report the open failure.
 - Request OS default-app open after save through a platform-specific standard-library command adapter. Opener failure does not turn the saved report into a failed save.

@@ -215,7 +215,7 @@ Expected content:
 
 - one summary row per included asset
 - one `Overall Yearly Net Total` row
-- report-wide monetary label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`
+- report calculation currency `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`
 - canonical exact-decimal values with no rounding
 - losses shown with negative sign
 - opening position, in-year rows, liquidation calculations, and closing position in each detail section
@@ -250,9 +250,9 @@ Protected snapshot directory remains from `003`:
 
 Report output location for this slice:
 
-- Linux: `~/Documents/`
+- Linux: configured XDG Documents directory when present, otherwise `~/Documents/`
 - macOS: `~/Documents/`
-- Windows: `%USERPROFILE%\Documents\`
+- Windows: per-user Documents known folder, with documented default `%USERPROFILE%\Documents\`
 
 Removal behavior:
 

@@ -13,8 +13,24 @@ The application saves successful reports in the current OS user's personal Docum
 Resolution rule:
 
 ```text
-documents_directory = filepath.Join(os.UserHomeDir(), "Documents")
+linux:
+  1. if xdg-user-dirs configuration defines a Documents directory in user-dirs.dirs, use it
+  2. otherwise use $HOME/Documents
+
+macOS:
+  use the current user's Documents directory under the user's home directory
+
+Windows:
+  target the per-user Documents known folder (FOLDERID_Documents)
+  whose documented default path is %USERPROFILE%\Documents
 ```
+
+Best-practice notes:
+
+- Linux user directories can be user-configured; a literal `$HOME/Documents` fallback is only the secondary rule.
+- Windows should be treated as a known-folder lookup problem, not just a string concatenation problem.
+- macOS Documents is conventionally the per-user `Documents` directory under the home directory.
+- If the implementation cannot resolve the OS-appropriate Documents directory using the available standard-library-only rules, it fails instead of guessing another cleartext location.
 
 Failure rules:
 
@@ -82,7 +98,7 @@ Rules:
 - The first section is `Gains-And-Losses Summary`.
 - The second section is `Reference Section`.
 - Per-asset detail sections follow the reference section.
-- The report-wide monetary label is exactly `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`.
+- The report calculation currency label is exactly `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`.
 - Quantities and monetary values use canonical exact-decimal strings with no rounding and only non-significant formatting trimmed.
 - Zero is rendered as `0`.
 - Losses render with a leading negative sign.
@@ -99,7 +115,7 @@ The document starts with:
 - Year: <year>
 - Cost Basis Method: <method label>
 - Generated At: <local timestamp>
-- Monetary Label: NO CURRENCY APPLIES, ALL CONSIDERED EQUAL
+- Report Calculation Currency: NO CURRENCY APPLIES, ALL CONSIDERED EQUAL
 ```
 
 Rules:
@@ -118,8 +134,8 @@ Section heading:
 Required table columns:
 
 ```markdown
-| Asset | Net Gain Or Loss | Monetary Label |
-|-------|------------------|----------------|
+| Asset | Net Gain Or Loss | Report Calculation Currency |
+|-------|------------------|-----------------------------|
 ```
 
 Rows:
@@ -133,13 +149,13 @@ Rules:
 - Assets with zero selected-year result are included when they meet main-section inclusion rules.
 - Net values use selected-year liquidations only.
 - The total row label is `Overall Yearly Net Total`.
-- Every row uses `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` in the monetary label column.
+- Every row uses `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` in the report calculation currency column.
 
 Example:
 
 ```markdown
-| Asset | Net Gain Or Loss | Monetary Label |
-|-------|------------------|----------------|
+| Asset | Net Gain Or Loss | Report Calculation Currency |
+|-------|------------------|-----------------------------|
 | BTC | 1250.5 | NO CURRENCY APPLIES, ALL CONSIDERED EQUAL |
 | ETH | -10 | NO CURRENCY APPLIES, ALL CONSIDERED EQUAL |
 | Overall Yearly Net Total | 1240.5 | NO CURRENCY APPLIES, ALL CONSIDERED EQUAL |
@@ -185,7 +201,7 @@ Required opening block:
 
 - Quantity: <quantity>
 - Cost Basis: <basis>
-- Monetary Label: NO CURRENCY APPLIES, ALL CONSIDERED EQUAL
+- Calculation Currency: NO CURRENCY APPLIES, ALL CONSIDERED EQUAL
 ```
 
 Required activity table columns:
@@ -193,14 +209,15 @@ Required activity table columns:
 ```markdown
 ### In-Year Activity
 
-| Date | Source ID | Type | Quantity | Gross Value | Fee | Basis After Row | Quantity After Row | Note |
-|------|-----------|------|----------|-------------|-----|-----------------|--------------------|------|
+| Date | Source ID | Type | Quantity | Gross Value | Fee | Selected Activity Currency | Basis After Row | Quantity After Row | Note |
+|------|-----------|------|----------|-------------|-----|----------------------------|-----------------|--------------------|------|
 ```
 
 Rules:
 
 - Every in-year activity for the included asset appears in this table.
 - The table includes acquisitions, priced liquidations, and explained zero-priced holding reductions.
+- `Selected Activity Currency` shows the explicit currency code from which that row's values were selected before they entered the report-wide no-currency calculation context.
 - `Note` explains zero-priced holding reductions as holding reductions with zero gain and zero loss.
 - The table does not include later activity.
 
@@ -209,8 +226,8 @@ Required liquidation table when the asset has priced in-year liquidations:
 ```markdown
 ### Liquidation Calculations
 
-| Date | Source ID | Disposed Quantity | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss |
-|------|-----------|-------------------|-----------------|--------------------------|--------------|
+| Date | Source ID | Disposed Quantity | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |
+|------|-----------|-------------------|-----------------|--------------------------|--------------|----------------------|
 ```
 
 Rules:
@@ -218,6 +235,7 @@ Rules:
 - Only priced liquidations inside the selected year appear.
 - Zero-priced holding reductions do not appear as gain/loss rows.
 - `Gain Or Loss` is negative for losses and `0` for zero result.
+- `Calculation Currency` shows the explicit selected activity currency code for that liquidation before it entered the report-wide no-currency calculation context.
 
 Required closing block:
 
@@ -226,7 +244,7 @@ Required closing block:
 
 - Quantity: <quantity>
 - Cost Basis: <basis>
-- Monetary Label: NO CURRENCY APPLIES, ALL CONSIDERED EQUAL
+- Calculation Currency: NO CURRENCY APPLIES, ALL CONSIDERED EQUAL
 ```
 
 ## Calculation Boundary Contract
@@ -240,7 +258,7 @@ Before Markdown rendering, the calculator supplies a complete `CapitalGainsRepor
 - yearly net total
 - reference entries
 - detail sections
-- report-wide monetary label
+- report calculation currency label
 
 Markdown rendering must not:
 

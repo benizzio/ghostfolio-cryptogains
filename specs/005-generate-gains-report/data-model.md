@@ -116,7 +116,7 @@ Fields:
 |-------|------|-------------|-------|
 | `server_origin` | string | runtime only | Canonical selected Ghostfolio server |
 | `security_token` | secret string | runtime only | User-entered token reused only while this context is active |
-| `unlocked_snapshot` | snapshot reference nullable | runtime only | Protected snapshot unlocked by token when available |
+| `active_readable_snapshot` | `ActiveReadableSnapshot` nullable | runtime only | Current run's decrypted protected snapshot, as defined by the existing `003` derived runtime concept |
 | `protected_activity_cache` | `ProtectedActivityCache` nullable | runtime only | Current readable cache after unlock or sync |
 | `entered_at` | timestamp | runtime only | Context creation time |
 
@@ -212,6 +212,7 @@ Fields:
 | `fee_amount` | decimal | Selected from the same activity currency context, defaulting to zero only when absent and allowed by stored data rules |
 | `unit_price` | decimal | Selected or derived within the same activity context when exact |
 | `selected_currency_context` | enum | `order`, `asset_profile`, or `base` |
+| `selected_currency_code` | string | Explicit currency code carried from the selected activity context |
 | `source_scope` | `SourceScope` nullable | Preserved source scope |
 | `is_zero_priced_holding_reduction` | boolean | True only for explained zero-priced `SELL` rows |
 | `comment` | string nullable | Explanation shown for holding reductions when present |
@@ -225,6 +226,7 @@ Validation rules:
 
 - The selected context must provide the complete monetary values needed by the activity.
 - Values from different tiers must not be mixed inside one input.
+- `selected_currency_code` must match the chosen tier and remain explicit even though cross-activity calculation later uses the report-wide no-currency label.
 - After input creation, currency identity is not used for conversion and report output uses the report-wide no-currency label.
 
 ## ApplicableScope
@@ -346,6 +348,7 @@ Fields:
 | `quantity` | decimal | Activity quantity |
 | `gross_value` | decimal nullable | Selected gross value for acquisitions and priced liquidations |
 | `fee_amount` | decimal nullable | Selected fee |
+| `calculation_currency` | string nullable | Currency code selected for this activity row before values entered report-wide calculation |
 | `basis_after_row` | decimal | Remaining basis after applying row |
 | `quantity_after_row` | decimal | Remaining quantity after applying row |
 | `holding_reduction_explanation` | string nullable | Present for zero-priced holding reductions |
@@ -359,6 +362,7 @@ Validation rules:
 
 - Every in-year activity for an included asset appears as one row.
 - Zero-priced holding reductions show basis and quantity effects without realized gain or loss.
+- `calculation_currency` records the activity-local selected currency code even though the report-wide calculation currency label later becomes no-currency.
 
 ## LiquidationCalculation
 
@@ -373,6 +377,7 @@ Fields:
 | `allocated_basis` | decimal | Basis consumed by the selected method |
 | `net_liquidation_proceeds` | decimal | Gross liquidation value minus liquidation fee |
 | `gain_or_loss` | decimal | Net proceeds minus allocated basis |
+| `calculation_currency` | string | Currency code selected for this liquidation activity before values entered report-wide calculation |
 | `matches` | `BasisMatch[]` | Lot or pool fragments used by the selected method |
 
 Relationships:
@@ -397,7 +402,7 @@ Fields:
 | `display_label` | string | Label shown to the user |
 | `net_gain_or_loss` | decimal | Selected-year result for the asset |
 | `result_kind` | enum | `gain`, `loss`, or `zero` |
-| `report_wide_monetary_label` | string | Always `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` |
+| `report_calculation_currency` | string | Always `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` |
 
 Relationships:
 
@@ -442,7 +447,7 @@ Fields:
 | `year` | integer | Selected report year |
 | `cost_basis_method` | enum | Method used for the whole run |
 | `generated_at` | timestamp | Local generation time |
-| `report_wide_monetary_label` | string | Always `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` |
+| `report_calculation_currency` | string | Always `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` |
 | `summary_entries` | `AssetSummaryEntry[]` | First report section rows |
 | `yearly_net_total` | decimal | Sum of included assets' yearly results |
 | `reference_entries` | `ReferenceLiquidationEntry[]` | Second report section rows |
@@ -451,23 +456,39 @@ Fields:
 Relationships:
 
 - Derived from one `ReportRequest` and one `ProtectedActivityCache`.
-- Rendered into one `MarkdownReportDocument`.
+- Rendered into one `ReportDocument`.
 
 Validation rules:
 
 - Section order is summary, reference, then per-asset details.
-- The report-wide monetary label appears in required monetary contexts.
+- The report calculation currency label appears in required report-wide contexts.
 - Report contains no activity after the selected year.
 
-## MarkdownReportDocument
+## ReportDocumentType
 
-Purpose: Rendered Markdown content before final save.
+Purpose: Enumeration that defines the generated report document format.
+
+Values:
+
+| Value | Notes |
+|-------|-------|
+| `markdown` | The only supported value in this slice |
+
+Validation rules:
+
+- This slice supports only `markdown`.
+- Adding future report formats extends this enum without renaming the document entity.
+
+## ReportDocument
+
+Purpose: Rendered report content before final save.
 
 Fields:
 
 | Field | Type | Persistence | Notes |
 |-------|------|-------------|-------|
-| `content` | string or bytes | runtime only until final save | Plain Markdown report body |
+| `document_type` | `ReportDocumentType` | runtime only until final save | `markdown` in this slice |
+| `content` | string | runtime only until final save | Rendered report body |
 | `year` | integer | runtime only | Used for filename descriptor |
 | `cost_basis_method` | enum | runtime only | Used for filename descriptor |
 | `generated_at` | timestamp | runtime only | Used for filename timestamp |
@@ -481,6 +502,7 @@ Validation rules:
 
 - Content must not be written to app-managed storage or OS temp locations.
 - Content must not include the Ghostfolio token or JWT.
+- `document_type` must be `markdown` in this slice.
 
 ## ReportOutputFile
 
@@ -499,7 +521,7 @@ Fields:
 
 Relationships:
 
-- Created from one `MarkdownReportDocument`.
+- Created from one `ReportDocument`.
 - Reported back through one transient `ReportGenerationOutcome`.
 
 Validation rules:

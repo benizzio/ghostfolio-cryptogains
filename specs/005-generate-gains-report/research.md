@@ -130,15 +130,22 @@ Render one `.md` file using standard-library string or buffer builders. Do not a
 - HTML output: rejected because Markdown is the only required output format.
 - Markdown rendering library: rejected because deterministic Markdown text is simple enough with standard library code.
 
-## Decision: Save Final Output In The User's Documents Folder
+## Decision: Resolve The User Documents Directory With OS-Specific Conventions First
 
-Resolve Documents as the current user's home directory plus `Documents`, using `os.UserHomeDir` and `filepath.Join`. If the folder is unavailable or not writable, fail with an actionable error and remove any partial file created by the attempt.
+Resolve the final report directory with platform conventions instead of assuming one literal path on every OS:
 
-**Rationale**: The Go standard library has no full cross-platform known-folder API. The dependency-free home-plus-Documents convention satisfies the requirement for supported installations while allowing clear failure when the location is unavailable.
+- Linux: prefer the XDG user-dirs configured Documents location when available, then fall back to `$HOME/Documents`
+- macOS: use the current user's Documents directory under the home directory as defined by platform conventions
+- Windows: target the per-user Documents known folder, whose documented default path is `%USERPROFILE%\Documents`
+
+If the resolved folder is unavailable or not writable, fail with an actionable error and remove any partial file created by the attempt.
+
+**Rationale**: The Go standard library does not expose a cross-platform known-folder resolver. The smallest correct implementation is to follow the documented OS conventions as closely as possible without adding a new dependency. Windows documents the per-user Documents known folder (`FOLDERID_Documents`) with default path `%USERPROFILE%\Documents`. Linux commonly exposes a user-configurable XDG documents directory, so a pure `$HOME/Documents` assumption is weaker there.
 
 **Alternatives considered**:
 
 - Add a platform known-folder dependency: rejected because this slice can satisfy requirements without a new dependency.
+- Always use `filepath.Join(os.UserHomeDir(), "Documents")`: rejected because it ignores configurable Linux XDG user-dirs and documents the Windows path less precisely than the platform known-folder model.
 - Write to the current working directory: rejected because the spec requires Documents.
 - Fall back silently to app-data or temp directories: rejected because it would violate the output-location requirement and cleartext temp constraints.
 
