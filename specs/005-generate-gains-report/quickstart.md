@@ -54,7 +54,7 @@ Expected automated coverage scope for this slice includes:
 - negative loss rendering
 - zero-priced holding reductions
 - single-activity currency context priority and no tier mixing
-- report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`
+- explicit shared report calculation currency `NOT APPLICABLE` for this slice
 - empty-main-section report rendering with yearly total `0`
 - incomplete activity monetary-context failure after year and method selection
 - same-calendar-date reopening and selected-year boundary classification
@@ -140,8 +140,9 @@ Expected result:
 - report generation does not run a new sync
 - one Markdown file is created in the user's Documents folder
 - the filename contains a local `YYYY-MM-DD_HH-MM-SS` timestamp and does not overwrite existing files
-- the application requests the OS to open the file
+- the application requests the OS to open the file exactly once after save
 - the result shows the saved path
+- the saved path is sufficient for the user to delete the cleartext report later from Documents
 - the workflow returns to `Sync and Reports` without asking for the token again
 
 ## Reportable Year With No Main-Section Assets
@@ -169,6 +170,18 @@ Expected result:
 - the error is actionable and identifies only non-secret references such as asset label and source ID
 - the unlocked `Sync and Reports` context remains active
 - no partial Markdown file remains
+
+## Mixed Selected-Currency
+
+1. Use a deterministic fixture where priced activities that would contribute to rendered cross-activity monetary outputs resolve to more than one selected activity currency code.
+2. Select that year and any method.
+3. Start report generation.
+
+Expected result:
+
+- generation is successful
+- the generated report contains calculated row values like cost-basis related or gain or loss related values equivalent to all activity currencies being the same
+- the generated report contains `NOT APPLICABLE` in Calculation Currency related columns
 
 ## Automatic Open Failure Path
 
@@ -256,12 +269,12 @@ Expected content:
 
 - one summary row per included asset
 - one `Overall Yearly Net Total` row
-- report calculation currency `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`
+- report calculation currency equal to the shared explicit currency code for the report, or `NOT APPLICABLE` for this slice
 - canonical exact-decimal values with no rounding
 - losses shown with negative sign
 - opening position, in-year rows, liquidation calculations, and closing position in each detail section
 - liquidation tables show both `Activity Currency` and `Calculation Currency`
-- `Net Liquidation Proceeds` stays in the liquidation row's activity currency, while `Allocated Basis` and `Gain Or Loss` use `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`
+- `Net Liquidation Proceeds` stays in the liquidation row's activity currency, while `Allocated Basis` and `Gain Or Loss` use the shared explicit report calculation currency
 - no activity after the selected year
 
 ## No Report History Check
@@ -331,4 +344,4 @@ Expected result:
 - the command uses a deterministic 10,000-activity fixture spanning at least 5 calendar years
 - the fixture includes worst-case supported HIFO lot fragmentation and scope-local fallback fragmentation
 - the timed path includes report request validation, basis calculation, Markdown rendering, final save, and opener stub invocation
-- at least 95% of measured report runs complete under 2 minutes on supported hardware
+- the timed run completes under 2 minutes

@@ -236,8 +236,8 @@ Validation rules:
 - Priced activity quantity must be greater than zero.
 - If unit price is not stored explicitly for a priced activity, it may be derived only when the needed division terminates exactly.
 - Values from different tiers must not be mixed inside one input.
-- `selected_currency_code` must match the chosen tier and remain explicit when a chosen tier exists, even though cross-activity calculation later uses the report-wide no-currency label.
-- After input creation, currency identity is not used for conversion and report output uses the report-wide no-currency label.
+- `selected_currency_code` must match the chosen tier and remain explicit when a chosen tier exists.
+- After input creation, currency identity remains explicit for priced rows. No conversion occurs, and successful rendered cross-activity monetary outputs require one shared report calculation currency.
 
 ## ApplicableScope
 
@@ -353,20 +353,20 @@ Purpose: One rendered in-year activity row in an included per-asset section.
 
 Fields:
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `source_id` | string | Source activity identifier |
-| `occurred_at` | timestamp | Activity timestamp |
-| `activity_type` | enum | `BUY` or `SELL` |
-| `quantity` | decimal | Activity quantity |
-| `gross_value` | decimal nullable | Selected gross value for acquisitions and priced liquidations, rendered in the row's activity currency |
-| `fee_amount` | decimal nullable | Selected fee, rendered in the row's activity currency |
-| `activity_currency` | string nullable | Explicit currency code from the row's single-activity currency context |
-| `calculation_currency` | string | Always `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` for calculated row values in this slice |
-| `basis_after_row` | decimal | Remaining basis after applying row |
-| `quantity_after_row` | decimal | Remaining quantity after applying row |
-| `holding_reduction_explanation` | string nullable | Present for zero-priced holding reductions |
-| `liquidation_calculation` | `LiquidationCalculation` nullable | Present for priced in-year liquidations |
+| Field                           | Type                              | Notes                                                                                                    |
+|---------------------------------|-----------------------------------|----------------------------------------------------------------------------------------------------------|
+| `source_id`                     | string                            | Source activity identifier                                                                               |
+| `occurred_at`                   | timestamp                         | Activity timestamp                                                                                       |
+| `activity_type`                 | enum                              | `BUY` or `SELL`                                                                                          |
+| `quantity`                      | decimal                           | Activity quantity                                                                                        |
+| `gross_value`                   | decimal nullable                  | Selected gross value for acquisitions and priced liquidations, rendered in the row's activity currency   |
+| `fee_amount`                    | decimal nullable                  | Selected fee, rendered in the row's activity currency                                                    |
+| `activity_currency`             | string nullable                   | Explicit currency code from the row's single-activity currency context                                   |
+| `calculation_currency`          | string                            | Explicit shared report calculation currency for calculated row values, or `NOT APPLICABLE` in this slice |
+| `basis_after_row`               | decimal                           | Remaining basis after applying row                                                                       |
+| `quantity_after_row`            | decimal                           | Remaining quantity after applying row                                                                    |
+| `holding_reduction_explanation` | string nullable                   | Present for zero-priced holding reductions                                                               |
+| `liquidation_calculation`       | `LiquidationCalculation` nullable | Present for priced in-year liquidations                                                                  |
 
 Relationships:
 
@@ -378,7 +378,7 @@ Validation rules:
 - Zero-priced holding reductions show basis and quantity effects without realized gain or loss.
 - For priced rows, `activity_currency` records the explicit currency code used for `gross_value` and `fee_amount` in that row.
 - For explained zero-priced holding reductions, `gross_value`, `fee_amount`, and `activity_currency` are blank.
-- `calculation_currency` records the report-wide no-currency label used for calculated row values such as `basis_after_row`.
+- `calculation_currency` records the explicit shared report calculation currency used for calculated row values such as `basis_after_row`.
 
 ## LiquidationCalculation
 
@@ -386,16 +386,16 @@ Purpose: Per-liquidation calculation details for priced in-year liquidations.
 
 Fields:
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `source_id` | string | Liquidation source identifier |
-| `disposed_quantity` | decimal | Liquidated quantity |
-| `allocated_basis` | decimal | Basis consumed by the selected method |
-| `net_liquidation_proceeds` | decimal | Gross liquidation value minus liquidation fee |
-| `gain_or_loss` | decimal | Net proceeds minus allocated basis |
-| `activity_currency` | string | Explicit currency code selected for that liquidation activity |
-| `calculation_currency` | string | Always `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` for liquidation calculation values in this slice |
-| `matches` | `BasisMatch[]` | Lot or pool fragments used by the selected method |
+| Field                      | Type           | Notes                                                                                                            |
+|----------------------------|----------------|------------------------------------------------------------------------------------------------------------------|
+| `source_id`                | string         | Liquidation source identifier                                                                                    |
+| `disposed_quantity`        | decimal        | Liquidated quantity                                                                                              |
+| `allocated_basis`          | decimal        | Basis consumed by the selected method                                                                            |
+| `net_liquidation_proceeds` | decimal        | Gross liquidation value minus liquidation fee                                                                    |
+| `gain_or_loss`             | decimal        | Net proceeds minus allocated basis                                                                               |
+| `activity_currency`        | string         | Explicit currency code selected for that liquidation activity                                                    |
+| `calculation_currency`     | string         | Explicit shared report calculation currency for liquidation calculation values or `NOT APPLICABLE` in this slice |
+| `matches`                  | `BasisMatch[]` | Lot or pool fragments used by the selected method                                                                |
 
 Relationships:
 
@@ -415,13 +415,13 @@ Purpose: One row in the first report section.
 
 Fields:
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `asset_identity_key` | string | Grouping key, not necessarily rendered |
-| `display_label` | string | Label shown to the user |
-| `net_gain_or_loss` | decimal | Selected-year result for the asset |
-| `result_kind` | enum | `gain`, `loss`, or `zero` |
-| `report_calculation_currency` | string | Always `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` |
+| Field                         | Type    | Notes                                                                      |
+|-------------------------------|---------|----------------------------------------------------------------------------|
+| `asset_identity_key`          | string  | Grouping key, not necessarily rendered                                     |
+| `display_label`               | string  | Label shown to the user                                                    |
+| `net_gain_or_loss`            | decimal | Selected-year result for the asset                                         |
+| `result_kind`                 | enum    | `gain`, `loss`, or `zero`                                                  |
+| `report_calculation_currency` | string  | Explicit shared report calculation currency `NOT APPLICABLE` in this slice |
 
 Relationships:
 
@@ -463,16 +463,16 @@ Purpose: Final calculated yearly report before Markdown rendering.
 
 Fields:
 
-| Field | Type | Notes |
-|-------|------|-------|
-| `year` | integer | Selected report year |
-| `cost_basis_method` | enum | Method used for the whole run |
-| `generated_at` | timestamp | Local generation time |
-| `report_calculation_currency` | string | Always `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` |
-| `summary_entries` | `AssetSummaryEntry[]` | First report section rows |
-| `yearly_net_total` | decimal | Sum of included assets' yearly results |
-| `reference_entries` | `ReferenceLiquidationEntry[]` | Second report section rows |
-| `detail_sections` | `AssetPositionTimeline[]` | Per-asset detail sections |
+| Field                         | Type                          | Notes                                                                      |
+|-------------------------------|-------------------------------|----------------------------------------------------------------------------|
+| `year`                        | integer                       | Selected report year                                                       |
+| `cost_basis_method`           | enum                          | Method used for the whole run                                              |
+| `generated_at`                | timestamp                     | Local generation time                                                      |
+| `report_calculation_currency` | string                        | Explicit shared report calculation currency `NOT APPLICABLE` in this slice |
+| `summary_entries`             | `AssetSummaryEntry[]`         | First report section rows                                                  |
+| `yearly_net_total`            | decimal                       | Sum of included assets' yearly results                                     |
+| `reference_entries`           | `ReferenceLiquidationEntry[]` | Second report section rows                                                 |
+| `detail_sections`             | `AssetPositionTimeline[]`     | Per-asset detail sections                                                  |
 
 Relationships:
 

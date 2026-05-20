@@ -98,7 +98,7 @@ Rules:
 - The first section is `Gains-And-Losses Summary`.
 - The second section is `Reference Section`.
 - Per-asset detail sections follow the reference section.
-- The report calculation currency label is exactly `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`.
+- The report calculation currency label is the explicit shared report calculation currency for the run, or `NOT APPLICABLE` for this slice.
 - Quantities and monetary values use canonical exact-decimal strings with no rounding and only non-significant formatting trimmed.
 - Zero is rendered as `0`.
 - Losses render with a leading negative sign.
@@ -115,13 +115,14 @@ The document starts with:
 - Year: <year>
 - Cost Basis Method: <method label>
 - Generated At: <local timestamp>
-- Report Calculation Currency: NO CURRENCY APPLIES, ALL CONSIDERED EQUAL
+- Report Calculation Currency: <shared currency code or NOT APPLICABLE>
 ```
 
 Rules:
 
 - `Generated At` uses a local timestamp format that includes date and time.
 - The method label matches the user's selected method.
+- `Report Calculation Currency` matches the explicit shared report calculation currency for the run, or `NOT APPLICABLE` for this slice.
 
 ### Gains-And-Losses Summary
 
@@ -149,7 +150,7 @@ Rules:
 - Assets with zero selected-year result are included when they meet main-section inclusion rules.
 - Net values use selected-year liquidations only.
 - The total row label is `Overall Yearly Net Total`.
-- Every row uses `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` in the report calculation currency column.
+- Every row uses the report's explicit shared report calculation currency `NOT APPLICABLE` for this slice.
 - If no asset qualifies for the main report sections, render a clear empty-state sentence before the total row and still render `Overall Yearly Net Total` with value `0`.
 
 Example:
@@ -157,9 +158,9 @@ Example:
 ```markdown
 | Asset | Net Gain Or Loss | Report Calculation Currency |
 |-------|------------------|-----------------------------|
-| BTC | 1250.5 | NO CURRENCY APPLIES, ALL CONSIDERED EQUAL |
-| ETH | -10 | NO CURRENCY APPLIES, ALL CONSIDERED EQUAL |
-| Overall Yearly Net Total | 1240.5 | NO CURRENCY APPLIES, ALL CONSIDERED EQUAL |
+| BTC | 1250.5 | NOT APPLICABLE |
+| ETH | -10 | NOT APPLICABLE |
+| Overall Yearly Net Total | 1240.5 | NOT APPLICABLE |
 ```
 
 ### Reference Section
@@ -203,7 +204,7 @@ Required opening block:
 
 - Quantity: <quantity>
 - Cost Basis: <basis>
-- Calculation Currency: NO CURRENCY APPLIES, ALL CONSIDERED EQUAL
+- Calculation Currency: <shared currency code or NOT APPLICABLE>
 ```
 
 Required activity table columns:
@@ -221,7 +222,7 @@ Rules:
 - The table includes acquisitions, priced liquidations, and explained zero-priced holding reductions.
 - `Activity Currency` shows the explicit currency code from which that row's `Gross Value` and `Fee` were taken for priced activity rows.
 - For explained zero-priced holding reductions, `Gross Value`, `Fee`, and `Activity Currency` are left blank because no activity monetary context is required from that row.
-- `Calculation Currency` shows `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` for calculated row values such as `Basis After Row` in this slice.
+- `Calculation Currency` shows the report's explicit shared report calculation currency for calculated row values such as `Basis After Row`.
 - `Note` explains zero-priced holding reductions as holding reductions with zero gain and zero loss.
 - The table does not include later activity.
 - If an included asset has no in-year activity, render a clear no-in-year-activity sentence instead of this table and omit the liquidation table.
@@ -242,7 +243,7 @@ Rules:
 - `Gain Or Loss` is negative for losses and `0` for zero result.
 - `Activity Currency` shows the explicit selected activity currency code used for the matching in-year liquidation row's `Gross Value` and `Fee`.
 - `Net Liquidation Proceeds` is rendered in that `Activity Currency` because it is derived from one activity before cross-activity calculation begins.
-- `Calculation Currency` shows `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` because `Allocated Basis` and `Gain Or Loss` are cross-activity calculation outputs in this slice.
+- `Calculation Currency` shows the report's explicit shared report calculation currency because `Allocated Basis` and `Gain Or Loss` are cross-activity calculation outputs in this slice.
 
 Required closing block:
 
@@ -251,7 +252,7 @@ Required closing block:
 
 - Quantity: <quantity>
 - Cost Basis: <basis>
-- Calculation Currency: NO CURRENCY APPLIES, ALL CONSIDERED EQUAL
+- Calculation Currency: <shared currency code or NOT APPLICABLE>
 ```
 
 If no asset qualifies for the main report sections, no `Asset Detail: <display label>` sections are rendered.

@@ -50,9 +50,9 @@ Implement FIFO, LIFO, HIFO, Average Cost Basis, and Scope-Local Exact Unit Match
 
 ## Decision: Select One Complete Activity Currency Context Before Calculation
 
-For each activity, resolve monetary inputs using this priority: order currency, then asset-profile currency, then base currency. A tier is usable only when it supplies the complete monetary value set needed for that activity. After selection, the calculation treats selected values from all activities as equal-value inputs and uses the report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`.
+For each activity, resolve monetary inputs using this priority: order currency, then asset-profile currency, then base currency. A tier is usable only when it supplies the complete monetary value set needed for that activity. After selection, the calculation treats selected values from all activities as equal-value inputs and uses the report-wide label `NOT APPLICABLE`.
 
-**Rationale**: This directly follows the feature's single-activity currency context rule and avoids undocumented currency conversion. It also preserves the constitution rule that values stay explicitly tied to currency until the feature-defined boundary.
+**Rationale**: This directly follows the feature's single-activity currency context rule, avoids undocumented currency conversion, and preserves the constitution rule that currency-denominated values remain explicitly tied to currency throughout calculation and rendering.
 
 **Alternatives considered**:
 

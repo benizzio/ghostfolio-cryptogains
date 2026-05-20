@@ -3,7 +3,7 @@
 **Feature Branch**: `[005-generate-gains-report]`  
 **Created**: 2026-05-19  
 **Status**: Draft  
-**Input**: User description: "Use previously synced activity data to add yearly capital gains and losses report generation inside a token-unlocked `Sync and Reports` workflow, show the last successful sync time beside the sync option, require year selection and cost basis method selection before generation, save the report as a timestamped Markdown file in the user's Documents folder, open it in the operating system's default application, keep no report history, protect report contents until the final file is saved, and for this slice choose one single-activity currency context in priority order `order -> asset -> base` while treating all selected activity values as equal-value inputs without conversion once they enter cross-activity calculations."
+**Input**: User description: "Use previously synced activity data to add yearly capital gains and losses report generation inside a token-unlocked `Sync and Reports` workflow, show the last successful sync time beside the sync option, require year selection and cost basis method selection before generation, save the report as a timestamped Markdown file in the user's Documents folder, open it in the operating system's default application, keep no report history, protect report contents until the final file is saved, and for this slice choose one single-activity currency context in priority order `order -> asset -> base` while treating all selected activity values as equal-value inputs without conversion once they enter cross-activity calculations, and showing `NOT APPLICABLE` as this slice's shared report calculation currency for calculated row values"
 
 ## Clarifications
 
@@ -13,12 +13,13 @@
 - Q: How should yearly totals be shown in the report? → A: Include one overall yearly net total row at the end of `Gains-And-Losses Summary`.
 - Q: How should assets be grouped for calculations and report sections? → A: Group by the stored Ghostfolio asset identity key, with display label used only for rendering.
 - Q: How should numeric values be rendered in the Markdown report for this slice? → A: Render canonical exact-decimal values with no rounding in this slice, trimming only non-significant formatting.
+- Q: How should rendered cross-activity monetary outputs handle currency in this slice? → A: A successful report uses one explicit shared report calculation currency that will be defined as `NOT APPLICABLE` for this slice while considering all currencies used in the calculation as equal.
 
 ## Terms Used In This Spec
 
 - **Sync and Reports context**: The token-unlocked workflow reached from the main menu. While this context remains active, the user can run `Sync Data` and `Generate Capital Gains Report` without informing the token again.
 - **Single-activity currency context**: The one currency tier selected for one activity before any cross-activity basis or gains-and-losses calculation begins.
-- **Report-wide no-currency context**: The report's calculation context after monetary values leave their single-activity currency context. In this slice, the report-wide label is `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`.
+- **Report calculation currency**: The explicit currency code used for rendered cross-activity monetary outputs in one successful report run. Will be defined as `NOT APPLICABLE` for this slice while considering all currencies used in the calculation as equal.
 - **Source calendar year**: The calendar year read from an activity's preserved `occurred_at` timestamp using the offset embedded in that timestamp, without converting it to machine-local time or forced UTC.
 - **Reportable year**: A source calendar year present in the protected cache's `available_report_years`. A year remains reportable even when its in-year activity contains only acquisitions or only explained zero-priced holding reductions.
 - **Inside the selected year**: An activity is inside the selected year when its source calendar year equals the chosen report year. Activity with a smaller source calendar year is earlier activity. Activity with a larger source calendar year is later activity.
@@ -70,8 +71,9 @@ With synced data available in the active unlocked context, the user can choose a
 7. **Given** an included asset has a zero net result for the selected year, **When** the report is generated, **Then** that asset still appears in the gains-and-losses summary with a zero result.
 8. **Given** an included asset or a report total results in a loss, **When** the report is generated, **Then** that loss is shown with a negative sign.
 9. **Given** the report file is saved successfully but the operating system cannot open it automatically, **When** the workflow completes, **Then** the saved file remains in the Documents folder, the user is told where it was saved and that automatic opening failed, and the application returns to the `Sync and Reports` menu.
-10. **Given** a selected year remains reportable but no asset qualifies for the main report sections after all inclusion and exclusion rules are applied, **When** the report is generated, **Then** the report still succeeds, the gains-and-losses summary shows the documented empty state and an overall yearly net total of `0`, the reference section follows its own rules, and no per-asset detail sections are rendered.
+10. **Given** a selected year remains reportable but no asset qualifies for the main report sections after all inclusion and exclusion rules are applied, **When** the report is generated, **Then** the report still succeeds, the gains-and-losses summary shows the documented empty state and an overall yearly net total of `0`, the report calculation currency label is `NOT APPLICABLE`, the reference section follows its own rules, and no per-asset detail sections are rendered.
 11. **Given** the selected year and method require one priced activity whose monetary values cannot be supplied completely by any one activity currency context, **When** the user starts generation, **Then** the attempt fails before any file is saved, the error is actionable and non-secret, and the user remains inside the unlocked `Sync and Reports` context.
+12. **Given** the selected year and method would render cross-activity monetary outputs from priced activities whose selected activity currency codes are not all the same, **When** the user starts generation, **Then** the calculations consider all currencies used in the calculation as equal and defines the shared report calculation currency as `NOT APPLICABLE` for this slice.
 
 ---
 
@@ -105,7 +107,7 @@ Before generating the report, the user can review the available cost basis metho
 - A priced activity has an explicit fee value of `0`, which remains valid, while an absent fee value remains incomplete and causes context selection to continue or the report attempt to fail.
 - Scope-local exact matching falls back mid-scope, remains in fallback until that scope reaches zero, and later reacquisition in another scope does not reset the already-open scope.
 - The user's Documents location is unavailable or not writable at generation time.
-- The synced dataset contains mixed currency labels across activities. For this slice, each activity must still use one single-activity currency context, and the final report must show the report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`.
+- The synced dataset contains mixed currency labels across activities. For this slice, each activity must still use one single-activity currency context, and report generation must consider all currencies used in the calculation as equal and define the shared report calculation currency as `NOT APPLICABLE` for this slice.
 - The user generates a report and immediately starts another one inside the same unlocked context; the application shows no report history or previously generated report list.
 
 ## Requirements *(mandatory)*
@@ -130,6 +132,7 @@ impacts when the feature touches those areas.
 - **FR-011**: The system MUST show gains as positive values, losses with a negative sign, and zero results as zero in the gains-and-losses summary and any report totals.
 - **FR-012**: The system MUST include in the main report sections every asset that has an open position at the end of the selected year or at least one full liquidation during the selected year.
 - **FR-012a**: The system MUST group activity, holdings, liquidations, reopening checks, and report sections by the stored Ghostfolio asset identity key, and MUST use any asset symbol or name text only as a rendering label.
+- **FR-012b**: For this slice, the stored Ghostfolio asset identity key MUST be the non-empty normalized string preserved from Ghostfolio symbol-profile identity, specifically `symbolProfileId` from the upstream activity contract already reviewed in `specs/003-store-activity-data/`. If a stored activity record required for reporting lacks that non-empty key, report generation MUST fail safely or require a refresh that rebuilds the protected cache with that key.
 - **FR-013**: The system MUST calculate yearly gains and losses using only liquidations that occur inside the selected year.
 - **FR-013a**: The system MUST classify activity as earlier than, inside, or later than the selected year by comparing the selected year with the activity's source calendar year from the preserved `occurred_at` timestamp and that timestamp's own stored offset.
 - **FR-014**: The system MUST ignore an asset completely when that asset's first acquisition occurs after the selected year.
@@ -145,7 +148,7 @@ impacts when the feature touches those areas.
 - **FR-019**: The system MUST generate the report only as a plain Markdown document in this slice.
 - **FR-019a**: The system MUST, for this slice, render report quantities and monetary values as canonical exact-decimal strings with no report-boundary rounding, trimming only non-significant formatting.
 - **FR-020**: The system MUST name the output file with a human-readable local timestamp in `YYYY-MM-DD_HH-MM-SS` order so filenames sort alphabetically by creation time, MUST save the file into the current user's personal Documents folder for the operating system in use, and MUST avoid overwriting an existing report file by adding a disambiguating suffix when needed.
-- **FR-021**: The system MUST request the operating system to open the saved Markdown file in the default application associated with that file type, MUST return the user to the unlocked `Sync and Reports` context after report generation completes, MUST show a transient result message that confirms the saved file path or explains why automatic opening failed, and MUST NOT keep an in-application history, catalog, or reopen list of previously generated reports or store the final report content back into protected synced-data storage after the file is saved.
+- **FR-021**: The system MUST request the operating system to open the saved Markdown file in the default application associated with that file type, MUST return the user to the unlocked `Sync and Reports` context after report generation completes, MUST show a transient result message that confirms the saved file path or explains why automatic opening failed, MUST tell the user the saved file path so the user can later remove that cleartext report by deleting the file from the Documents folder, and MUST NOT keep an in-application history, catalog, or reopen list of previously generated reports or store the final report content back into protected synced-data storage after the file is saved.
 - **FR-022**: The system MUST define FIFO by the mathematical rules in `Cost Basis Method Definitions`.
 - **FR-023**: The system MUST define LIFO by the mathematical rules in `Cost Basis Method Definitions`.
 - **FR-024**: The system MUST define HIFO by the mathematical rules in `Cost Basis Method Definitions`.
@@ -157,7 +160,7 @@ impacts when the feature touches those areas.
 - **FR-027a**: For the Scope-Local Exact Unit Matching method, the system MUST apply the selected exact-identification or fallback treatment consistently per `(asset, applicable_scope)` until that asset's quantity in that applicable scope reaches zero.
 - **FR-027b**: In the scope-local hybrid method, the first liquidation or holding reduction in one applicable scope that lacks defensible exact identification MUST activate scope-local average-cost fallback for that scope only, MUST keep that fallback active for later disposals in that same scope until that scope reaches zero, and MUST NOT change the state of other scopes for the same asset.
 - **FR-027c**: After an applicable scope reaches zero under the scope-local hybrid method, a later reacquisition in that same scope MUST start a new open-scope state whose exact-identification eligibility is evaluated again from that reacquisition forward. Reacquisition in a different applicable scope MUST start or continue only that different scope's own state.
-- **FR-028**: The system MUST use the report-wide monetary label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` for this slice's generated report.
+- **FR-028**: The system MUST determine one report calculation currency for each successful report run. When priced activities contribute to rendered cross-activity monetary outputs, the calculations will consider all currencies used in the calculation as equal and defines the shared report calculation currency as `NOT APPLICABLE` for this slice.
 - **FR-029**: The system MUST treat zero-priced disposal records that were admitted into synced data by the explained zero-priced `SELL` rule from `specs/003-store-activity-data/spec.md` as holding reductions that remove quantity and basis under the selected cost basis method without creating gain or loss entries in the report.
 - **FR-030**: The system MUST apply `Single-Activity Currency Context Definitions` whenever monetary amounts are needed for calculations from one activity.
 - **FR-031**: When monetary amounts are needed for calculations within one activity, the system MUST evaluate currency contexts in this priority order: transaction order currency, asset currency, then portfolio base currency, and select the first context that provides the complete required monetary value set for that activity.
@@ -165,13 +168,25 @@ impacts when the feature touches those areas.
 - **FR-031b**: An explicit fee value of `0` satisfies the fee requirement for `FR-031a`. A missing fee value does not count as zero. A priced `BUY` or priced `SELL` with quantity less than or equal to `0` cannot support report calculation and MUST fail the report attempt under `FR-035`.
 - **FR-031c**: When a complete chosen context for a priced activity lacks an explicit unit price but contains gross value, fee, and positive quantity, the system MAY derive unit price only when that division terminates exactly under `FIN-001`; otherwise the report attempt MUST fail.
 - **FR-032**: After one activity's currency context is chosen, the system MUST use that one chosen context consistently for every monetary value needed from that activity and MUST NOT mix currency tiers within the same activity calculation input.
-- **FR-033**: After monetary values leave the single-activity currency context and enter cost basis and gains-and-losses calculations, the system MUST treat all selected values as equal-value inputs, MUST NOT perform currency conversion or exchange-rate lookup, and MUST carry the report-wide label defined by `FR-028`.
+- **FR-033**: After monetary values leave the single-activity currency context and enter cost basis and gains-and-losses calculations, the system MUST carry forward the selected activity currency code with each priced activity input, MUST NOT perform currency conversion or exchange-rate lookup, and MUST use the report calculation currency defined by `FR-028` for rendered cross-activity monetary outputs.
 - **FR-034**: If no context in the priority order can supply the complete set of monetary values needed for a calculation, the system MUST fail the report generation attempt with an actionable error instead of mixing currency tiers within that activity.
 - **FR-034a**: If an incomplete monetary context is discovered after the user already selected year and method, the failed attempt MUST leave the user inside the unlocked `Sync and Reports` context, MUST produce no output file, and MUST identify the offending activity only by non-secret reference such as display label and source ID.
 - **FR-035**: If report generation cannot complete because the output location is unavailable, not writable, or the synced data cannot support the selected calculation, the system MUST show an actionable error without exposing secrets or unprotected financial details and MUST NOT leave partial cleartext report artifacts behind.
-- **FR-035a**: Report generation MUST revalidate report-slice calculation preconditions that earlier sync may not have guaranteed, including positive quantity for priced activity rows, exact-division termination where required by the selected method, chosen-context completeness, and the selected method's ability to allocate basis through the selected-year cutoff. If any such precondition fails, report generation MUST fail safely under `FR-035`.
+- **FR-035a**: Report generation MUST revalidate report-slice calculation preconditions that earlier sync may not have guaranteed, including positive quantity for priced activity rows, exact-division termination where required by the selected method, chosen-context completeness, shared report-calculation-currency availability where rendered cross-activity monetary outputs are required, and the selected method's ability to allocate basis through the selected-year cutoff. If any such precondition fails, report generation MUST fail safely under `FR-035`.
 
 ### Report Structure Definitions
+
+#### Report Header
+
+This content appears before the first section heading.
+
+It MUST show:
+
+- the title `Ghostfolio Capital Gains And Losses Report`
+- the selected year
+- the selected cost basis method label
+- the local generated-at timestamp
+- the report calculation currency from `FR-028`
 
 #### Gains-And-Losses Summary
 
@@ -190,7 +205,7 @@ Each entry MUST show:
 - gains as positive values
 - losses with a negative sign
 - canonical exact-decimal rendering with no rounding in this slice, trimming only non-significant formatting
-- the report-wide monetary label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`
+- the report calculation currency from `FR-028`
 
 The overall yearly net total row MUST show:
 
@@ -199,7 +214,7 @@ The overall yearly net total row MUST show:
 - losses with a negative sign
 - zero as `0`
 - canonical exact-decimal rendering with no rounding in this slice, trimming only non-significant formatting
-- the report-wide monetary label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`
+- the report calculation currency from `FR-028`
 
 #### Reference Section
 
@@ -228,7 +243,7 @@ Each detail section MUST show:
 - for each in-year liquidation, the disposed quantity, allocated basis, net liquidation proceeds, and gain or loss
 - the closing position at the end of the selected year together with the cost basis at that closing moment
 
-For priced in-year rows, the detail section may show that row's selected activity currency for gross value, fee, and net liquidation proceeds. The report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` remains the label for cross-activity calculation outputs such as carried basis, allocated basis, gain, and loss.
+For priced in-year rows, the detail section may show that row's selected activity currency for gross value, fee, and net liquidation proceeds. The report calculation currency from `FR-028` remains the explicit currency for cross-activity calculation outputs such as carried basis, allocated basis, gain, and loss.
 
 If an included asset has no in-year activity, the section shows an explicit empty-state sentence instead of in-year activity and liquidation tables.
 
@@ -419,19 +434,19 @@ explained zero-priced holding reduction: no activity monetary values are require
 
 An explicit fee value of `0` is valid. A missing fee value is not equivalent to zero. For priced `BUY` and priced `SELL` activity, quantity must be greater than zero.
 
-After values from multiple activities enter cost basis and gains-and-losses calculations, the report no longer applies a working currency distinction for this slice. It treats those selected values as equal-value inputs without conversion and shows the report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`.
+After values from multiple activities enter cost basis and gains-and-losses calculations, the report continues to carry forward the selected activity currency code from each priced activity. A successful report may render cross-activity monetary outputs with currency under `FR-028`. The system performs no conversion.
 
 ### Security, Precision, and Integration Constraints
 
 - **SEC-001**: The Ghostfolio security token MUST be informed explicitly by the user to enter `Sync and Reports`, kept only for the active unlocked context, reusable for sync and reporting actions while that context remains open, cleared when the user leaves that context or the application ends, and excluded/unreadable from logs, output, diagnostics, and persisted artifacts.
 - **SEC-002**: Before the final Markdown file is saved to the user's Documents folder, report inputs, intermediate calculations, rendered content, and any temporary storage MUST remain inside the same security boundary and protection level used for synced financial and user-linked data, and they MUST be kept out of unprotected temporary locations.
-- **SEC-003**: The final Markdown file saved in the Documents folder is intentionally outside the application's protected-storage boundary. After that file is saved and handed to the operating system, the application MUST retain no additional cleartext copy of the report and MUST leave no recoverable cleartext temporary residue under application-managed storage.
+- **SEC-003**: The final Markdown file saved in the Documents folder is intentionally outside the application's protected-storage boundary. After that file is saved and handed to the operating system, the application MUST retain no additional cleartext copy of the report and MUST leave no recoverable cleartext temporary residue under application-managed storage. User removal of that persisted cleartext output is by deleting the saved Markdown file from the Documents folder because this slice keeps no report catalog or additional retained copy.
 - **FIN-001**: All quantities, proceeds, fees, allocated basis, gains, and losses MUST use exact decimal arithmetic, preserve source precision until final rendering, include fees in acquisition basis or liquidation proceeds as applicable, treat explained zero-priced holding reductions as zero-gain and zero-loss events, show losses with a negative sign in final report output, and, for this slice, render report values as canonical exact-decimal strings with no report-boundary rounding and only non-significant formatting trimmed.
-- **FIN-002**: Within one activity, calculations MUST use the single-activity currency context defined in `Single-Activity Currency Context Definitions`, including the priority `order -> asset -> base`, the rule against mixing currency tiers inside one activity, and the requirement to fail instead of mixing tiers when one chosen context is incomplete. After values enter cross-activity cost basis and gains-and-losses calculations, the system MUST treat them as equal-value inputs under the report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` and MUST perform no currency conversion in this slice.
-- **QUAL-001**: Automated validation MUST cover main-menu entry into `Sync and Reports`, token gating and token reuse within the active unlocked context, last-sync timestamp display beside `Sync Data`, available-year selection, each supported cost basis method, yearly gains-and-losses calculations that count only liquidations inside the selected year, ignoring assets first acquired after the selected year, reference-section liquidation counts for reopened assets, report section ordering and definitions, negative-sign rendering for losses, zero-result assets, zero-priced holding reductions carried forward from the synced-data rules, single-activity currency-context selection and no cross-tier mixing, the report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`, Documents-folder save behavior, filename uniqueness and alphabetical sortability, automatic-open success and failure behavior, absence of report history, protected handling of pre-save report content, and the repository's full coverage gates using integration-first tests and only targeted unit tests for complex calculation rules.
+- **FIN-002**: Within one activity, calculations MUST use the single-activity currency context defined in `Single-Activity Currency Context Definitions`, including the priority `order -> asset -> base`, the rule against mixing currency tiers inside one activity, and the requirement to fail instead of mixing tiers when one chosen context is incomplete. After values enter cross-activity cost basis and gains-and-losses calculations, the system MUST preserve the selected activity currency code for priced activity inputs, MUST require one shared report calculation currency under `FR-028` for rendered cross-activity monetary outputs, and MUST perform no currency conversion in this slice.
+- **QUAL-001**: Automated validation MUST cover main-menu entry into `Sync and Reports`, token gating and token reuse within the active unlocked context, last-sync timestamp display beside `Sync Data`, available-year selection, each supported cost basis method, yearly gains-and-losses calculations that count only liquidations inside the selected year, ignoring assets first acquired after the selected year, reference-section liquidation counts for reopened assets, report section ordering and definitions, negative-sign rendering for losses, zero-result assets, zero-priced holding reductions carried forward from the synced-data rules, single-activity currency-context selection, no cross-tier mixing, report-calculation-currency determination, Documents-folder save behavior, filename uniqueness and alphabetical sortability, automatic-open request success and failure behavior, absence of report history, protected handling of pre-save report content, and the repository's full coverage gates using integration-first tests and only targeted unit tests for complex calculation rules.
 - **INT-001**: The feature depends on the existing synced activity dataset from earlier slices, including available report years, scope reliability, and the explained zero-priced `SELL` records admitted by `specs/003-store-activity-data/spec.md`, and on operating-system services that provide a writable personal Documents location and a default Markdown-file association. This slice introduces no external currency-conversion dependency.
 - **INT-001a**: Report generation MAY trust from the earlier synced-data slice only these invariants: supported activity types already limited to `BUY` and `SELL`, stable stored asset identity keys, `available_report_years` already derived from source timestamps, deterministic same-asset order already established from source calendar date then `BUY` before `SELL` then `source_id`, explained zero-priced `SELL` rows already carrying their required explanation, running quantity already validated not to drop below zero during synced-data replay, and scope reliability already classified.
-- **INT-001b**: Report generation MUST still validate report-run preconditions that are method-specific or output-specific, including selected-year membership, positive priced-activity quantity, chosen-context completeness, exact-division termination, method-specific basis-allocation ability, and output-path writability.
+- **INT-001b**: Report generation MUST still validate report-run preconditions that are method-specific or output-specific, including selected-year membership, positive priced-activity quantity, chosen-context completeness, exact-division termination, shared report-calculation-currency availability where rendered cross-activity monetary outputs are required, method-specific basis-allocation ability, and output-path writability.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -441,9 +456,10 @@ After values from multiple activities enter cost basis and gains-and-losses calc
 - **Activity Record**: One normalized `BUY` or `SELL` event from the protected activity cache, carrying the quantity, monetary tiers, explanatory comment, and source-scope details needed for basis allocation and yearly gains-and-losses calculations.
 - **Asset Identity Key**: The stable stored Ghostfolio asset identity used to group activity records into one asset timeline and one report section set, independent of the display label shown to the user.
 - **Single-Activity Currency Context**: The chosen monetary context for one activity, selected in tiers `order -> asset -> base` priority and used consistently for every monetary value needed from that activity.
+- **Report Calculation Currency**: The explicit shared currency code rendered for cross-activity monetary outputs in one successful report run, or `NOT APPLICABLE` in this slice.
 - **Source Scope**: The optional preserved account, wallet, or equivalent grouping attached to an activity record. It determines whether the scope-local hybrid method can remain narrow or must broaden to the asset as a whole.
 - **Asset Position Timeline**: The derived per-asset chronological view used to establish opening position, in-year activity, closing position, report-section inclusion, and full-liquidation counting through the end of the selected year.
-- **Capital Gains Report**: The generated yearly report that contains the gains-and-losses summary, the reference section, the per-asset detail sections, the report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`, and the generated Markdown output path.
+- **Capital Gains Report**: The generated yearly report that contains the gains-and-losses summary, the reference section, the per-asset detail sections, the report calculation currency from `FR-028`, and the generated Markdown output path.
 - **Report Output File**: The clear Markdown file saved in the user's Documents folder after generation, with a timestamped name and no continuing application ownership after save.
 
 ## Success Criteria *(mandatory)*
@@ -453,10 +469,10 @@ After values from multiple activities enter cost basis and gains-and-losses calc
 - **SC-001**: 100% of active `Sync and Reports` menu states show both `Sync Data` and `Generate Capital Gains Report`, and 100% of states without reportable synced data keep report generation unavailable with a clear reason.
 - **SC-002**: 100% of users with synced data can reach the year-and-method selection step from `Sync and Reports` in one action and can return to `Sync and Reports` after report generation without re-entering the token while the unlocked context remains active.
 - **SC-003**: For controlled multi-year ledgers with known expected outcomes, 100% of yearly per-asset results and yearly totals match the expected values across all five supported cost basis methods, count only liquidations inside the selected year, ignore assets first acquired after the selected year, show losses with a negative sign, and include scope-local hybrid scenarios covering exact matching that remains exact, first fallback activation in one applicable scope, continued fallback until that scope reaches zero, and same-scope post-liquidation reset after later reacquisition.
-- **SC-004**: 100% of generated reports follow the three defined section types in the required order and display the report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`.
+- **SC-004**: 100% of generated reports follow the defined header and the three defined section types in the required order and display either the explicit report calculation currency from `FR-028`.
 - **SC-005**: 100% of successful report runs create one Markdown file in the user's Documents folder with a timestamped name that sorts chronologically when listed alphabetically, and no successful run overwrites an earlier report file.
-- **SC-006**: When a default Markdown-file association exists, at least 95% of successful report runs open the saved file automatically and return the user to the `Sync and Reports` context without additional manual navigation.
-- **SC-007**: For synced histories of up to 10,000 activities spanning at least 5 calendar years, including worst-case supported lot-fragmentation scenarios for HIFO and scope-local fallback, at least 95% of yearly report runs complete and save the report in under 2 minutes on a supported installation.
+- **SC-006**: 100% of successful report runs request one operating-system default-app open attempt after the final save, preserve the saved file when that open attempt fails, and return the user to the `Sync and Reports` context without additional manual navigation.
+- **SC-007**: In the opt-in local verification path driven by `GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1` with a deterministic 10,000-activity fixture spanning at least 5 calendar years and a stub opener, one yearly report run completes request validation, calculation, Markdown rendering, final save, and opener invocation in under 2 minutes.
 - **SC-008**: 100% of inspected application-managed storage and temporary artifacts created during report generation keep cleartext report content out of persistent application storage before final save and leave no leftover cleartext temporary files after success or failure.
 
 ## Assumptions
@@ -465,8 +481,8 @@ After values from multiple activities enter cost basis and gains-and-losses calc
 - Reports remain yearly only in this slice. Combined multi-year, quarter-based, and custom date-range reports are out of scope.
 - The reference report structure from the earlier reporting specification remains the required content template for this slice, even though the output format is Markdown instead of PDF.
 - Markdown is the only report document format in scope for this slice. PDF and other document types are deferred to later slices.
-- The final file saved in the user's Documents folder is intentionally cleartext and outside the application's protected-storage responsibility after save.
+- The final file saved in the user's Documents folder is intentionally cleartext and outside the application's protected-storage responsibility after save. The user removes that cleartext output later by deleting the saved Markdown file from Documents.
 - The earlier synced-data slice already supplies the protected history, available report years, scope reliability, and explained zero-priced `SELL` records needed by this slice.
 - Report generation trusts only the earlier-slice invariants listed in `INT-001a` and revalidates report-run preconditions listed in `INT-001b`.
 - If one chosen single-activity currency context cannot provide every monetary value needed from an activity, report generation fails instead of mixing currency tiers inside that activity.
-- Until a later slice defines real conversion rules, the report treats selected monetary values from different activities as equal-value inputs and shows the report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`.
+- Until a later slice defines real conversion rules, report generation carries forward each priced activity's selected currency code, requires one shared report calculation currency for rendered cross-activity monetary outputs using `NOT APPLICABLE` for this slice and considers all currencies equal during the calculations.

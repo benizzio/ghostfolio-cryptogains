@@ -26,7 +26,7 @@
 ## Requirement Consistency
 
 - [x] CHK012 Do asset-inclusion rules stay consistent between `FR-012`, `FR-016`, `FR-017`, and the detail-section requirement to show every in-year activity row for each included asset? [Consistency, Spec FR-012, Spec FR-016, Spec FR-017, Spec FR-018]
-- [x] CHK013 Do the report-wide no-currency rules align with the per-activity currency-row requirement without implying cross-activity conversion? [Consistency, Spec FR-028, Spec FR-030, Spec FR-033]
+- [x] CHK013 Do the explicit shared report-calculation-currency rules align with the per-activity currency-row requirement without implying cross-activity conversion or mixed-currency aggregation? [Consistency, Spec FR-028, Spec FR-030, Spec FR-033]
 - [x] CHK014 Are the zero-priced holding-reduction rules consistent between `FR-029`, the carried-forward formula, and the edge case for years containing only zero-priced disposals? [Consistency, Spec FR-029, Spec Zero-Priced Holding Reduction Rule Carried Forward From Synced Data, Spec Edge Cases]
 - [x] CHK015 Do the mathematical method definitions align with the success criterion that controlled ledgers can validate all five supported methods against expected yearly results? [Consistency, Spec FR-022, Spec FR-027a, Spec SC-003]
 - [x] CHK016 Are assumptions about earlier synced-data guarantees consistent with the requirement to fail report generation when one activity lacks a complete monetary context? [Consistency, Spec FR-034, Spec INT-001, Spec Assumptions]

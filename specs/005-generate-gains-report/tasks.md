@@ -39,14 +39,14 @@ description: "Task list for Generate Yearly Gains And Losses Report implementati
 
 **Critical**: Finish this phase before starting user story work.
 
-- [ ] T004 [P] Persist a stable Ghostfolio asset identity key from `symbolProfileId` into normalized activities in `internal/ghostfolio/dto/activity_page_response.go`, `internal/ghostfolio/mapper/activity_mapper.go`, and `internal/sync/model/activity_record.go`
+- [ ] T004 [P] Persist a stable Ghostfolio asset identity key from non-empty Ghostfolio `symbolProfileId` into normalized activities and fail safe when required reporting rows lack that key in `internal/ghostfolio/dto/activity_page_response.go`, `internal/ghostfolio/mapper/activity_mapper.go`, and `internal/sync/model/activity_record.go`
 - [ ] T005 Update snapshot compatibility for the asset identity model change by bumping `ActivityModelVersion` and older-snapshot expectations in `internal/snapshot/model/payload.go`, `tests/unit/stored_data_version_test.go`, and `tests/integration/snapshot_compatibility_flow_test.go`
 - [ ] T006 [P] Update shared synced-activity test fixtures to include non-display `AssetIdentityKey` values in `tests/testutil/testutil.go`
 - [ ] T007 Extend readable protected-data summaries with activity count, last successful sync timestamp, available report years, and unlocked cache access in `internal/app/runtime/sync_types.go`, `internal/app/runtime/active_snapshot_state.go`, and `internal/app/runtime/snapshot_lifecycle.go`
 - [ ] T008 [P] Define report runtime request, outcome, failure reason, and service interface types in `internal/app/runtime/report_types.go`
 - [ ] T009 [P] Define report request, document, output file, summary, reference, detail, activity row, and liquidation calculation models in `internal/report/model/report.go`
 - [ ] T010 [P] Define activity calculation input, selected currency context, and cost basis method enum skeleton in `internal/report/model/activity_input.go` and `internal/report/model/cost_basis_method.go`
-- [ ] T011 [P] Implement report-local exact decimal helpers for exact multiplication, exact division, zero checks, comparisons, and canonical formatting in `internal/report/calculate/decimal_math.go`
+- [ ] T011 [P] Reuse `internal/support/decimal` for exact division and canonical formatting, then add only report-specific decimal helpers for multiplication, zero checks, and comparisons in `internal/report/calculate/decimal_math.go`
 - [ ] T012 Add `ReportService` dependency slots to runtime and TUI dependency assembly without enabling report generation yet in `internal/app/runtime/runtime.go` and `internal/tui/flow/model.go`
 
 **Checkpoint**: Stored activity data has report-safe asset identity, and runtime/TUI code can receive report services without exposing report workflows.
@@ -91,27 +91,27 @@ description: "Task list for Generate Yearly Gains And Losses Report implementati
 
 - [ ] T025 [P] [US2] Add Markdown document and output-file contract coverage from `contracts/markdown-report.md` in `tests/contract/markdown_report_contract_test.go`
 - [ ] T026 [P] [US2] Add report selection, busy, result, and failure workflow contract coverage from `contracts/tui-workflows.md` in `tests/contract/report_generation_workflow_contract_test.go`
-- [ ] T027 [P] [US2] Add integration coverage for deterministic multi-year report generation, available-year selection, Documents save, opener success, opener failure warning, and return to unlocked context in `tests/integration/report_generation_flow_test.go`
-- [ ] T028 [P] [US2] Add integration coverage for empty-main-section reports, incomplete monetary context failure, Documents unavailable failure, partial-file cleanup, and app-managed storage leakage checks in `tests/integration/report_failure_flow_test.go`
-- [ ] T029 [P] [US2] Add unit coverage for selected-year cutoffs, first-acquisition exclusion, main-section inclusion, reference-only exclusion, full-liquidation counts, zero-result included assets, negative losses, and zero-priced holding reductions in `tests/unit/report_calculation_test.go`
+- [ ] T027 [P] [US2] Add integration coverage for deterministic multi-year report generation, available-year selection, Documents save, one opener request on success, opener failure warning, and return to unlocked context in `tests/integration/report_generation_flow_test.go`
+- [ ] T028 [P] [US2] Add integration coverage for empty-main-section reports with `NOT APPLICABLE` calculation currency, mixed-selected-currency failure, incomplete monetary context failure, Documents unavailable failure, partial-file cleanup, and app-managed storage leakage checks in `tests/integration/report_failure_flow_test.go`
+- [ ] T029 [P] [US2] Add unit coverage for selected-year cutoffs, first-acquisition exclusion, main-section inclusion, reference-only exclusion, same-source-calendar-date BUY-before-SELL reopening behavior, full-liquidation counts, zero-result included assets, negative losses, and zero-priced holding reductions in `tests/unit/report_calculation_test.go`
 - [ ] T030 [P] [US2] Add unit coverage for Documents directory resolution, timestamped filename slugs, same-second suffixes, exclusive creation, write cleanup, and platform opener commands in `tests/unit/report_output_test.go`
-- [ ] T031 [P] [US2] Add unit coverage for Markdown section order, required tables, empty states, canonical exact decimal rendering, report-wide currency label, activity currency columns, and secret exclusion in `tests/unit/report_markdown_test.go`
-- [ ] T032 [P] [US2] Add unit coverage for single-activity currency context priority, explicit zero fee, missing fee, positive priced quantity, exact unit-price derivation, and no cross-tier mixing in `tests/unit/report_activity_input_test.go`
+- [ ] T031 [P] [US2] Add unit coverage for Markdown header and section order, required tables, empty states, canonical exact decimal rendering, explicit report calculation currency label or `NOT APPLICABLE`, activity currency columns, and secret exclusion in `tests/unit/report_markdown_test.go`
+- [ ] T032 [P] [US2] Add unit coverage for single-activity currency context priority, explicit zero fee, missing fee, positive priced quantity, exact unit-price derivation, no cross-tier mixing, and mixed-selected-currency failure in `tests/unit/report_activity_input_test.go`
 
 ### Implementation for User Story 2
 
-- [ ] T033 [P] [US2] Implement single-activity currency context selection and calculation-input validation in `internal/report/calculate/activity_input.go`
+- [ ] T033 [P] [US2] Implement single-activity currency context selection, selected-currency tracking, and calculation-input validation in `internal/report/calculate/activity_input.go`
 - [ ] T034 [P] [US2] Implement report model constructors and validation helpers for request, report, summary, reference, detail, document, and output outcome structures in `internal/report/model/report.go`
 - [ ] T035 [P] [US2] Implement FIFO, LIFO, and HIFO lot basis state with exact arithmetic and deterministic lot ordering in `internal/report/basis/lot_methods.go`
 - [ ] T036 [P] [US2] Implement Average Cost Basis pool state and zero-quantity pool reset in `internal/report/basis/average_cost.go`
-- [ ] T037 [US2] Implement report calculation engine for asset timelines, source-year cutoff, opening and closing basis, inclusion rules, reference entries, summary entries, and yearly net total in `internal/report/calculate/calculator.go`
+- [ ] T037 [US2] Implement report calculation engine for asset timelines, source-year cutoff, opening and closing basis, inclusion rules, same-date reopening behavior, reference entries, summary entries, yearly net total, and shared report-calculation-currency enforcement in `internal/report/calculate/calculator.go`
 - [ ] T038 [US2] Implement priced liquidation proceeds, proportional allocation, explained zero-priced holding reductions, and basis removal details in `internal/report/calculate/calculator.go`
 - [ ] T039 [US2] Implement non-secret report calculation error taxonomy with offending activity source ID and display label references in `internal/report/model/errors.go` and `internal/report/calculate/calculator.go`
-- [ ] T040 [P] [US2] Implement Markdown rendering for the required header, summary, reference section, per-asset detail sections, activity rows, liquidation tables, empty states, and canonical decimals in `internal/report/markdown/renderer.go`
+- [ ] T040 [P] [US2] Implement Markdown rendering for the required header, summary, reference section, per-asset detail sections, activity rows, liquidation tables, empty states, explicit report-calculation-currency labels, and canonical decimals in `internal/report/markdown/renderer.go`
 - [ ] T041 [P] [US2] Implement Documents directory resolution using Linux XDG user-dirs, macOS home Documents, and Windows user Documents conventions in `internal/report/output/documents.go`
 - [ ] T042 [P] [US2] Implement timestamped filename slugging, suffix reservation, exclusive final write, and failed-write cleanup in `internal/report/output/writer.go`
-- [ ] T043 [P] [US2] Implement OS default-app opener command adapter for Linux, macOS, and Windows in `internal/report/output/opener.go`
-- [ ] T044 [US2] Implement runtime report service orchestration for request validation, calculation, rendering, save, opener warning, failure cleanup, and transient outcome creation in `internal/app/runtime/report_service.go`
+- [ ] T043 [P] [US2] Implement OS default-app opener command adapter for Linux, macOS, and Windows with one post-save open request per successful run in `internal/report/output/opener.go`
+- [ ] T044 [US2] Implement runtime report service orchestration for request validation, calculation, rendering, save, opener warning, failure cleanup, saved-path removal guidance, and transient outcome creation in `internal/app/runtime/report_service.go`
 - [ ] T045 [US2] Wire the concrete report service into application assembly and TUI dependencies in `internal/app/runtime/runtime.go` and `internal/tui/flow/model.go`
 - [ ] T046 [P] [US2] Add report selection, report generation busy, and report result screen renderers in `internal/tui/screen/report_screen.go`
 - [ ] T047 [US2] Implement report year selection, method selection shell, async generation command, result routing, `Generate Another Report`, and `Back To Sync and Reports` behavior in `internal/tui/flow/report_flow.go`
@@ -140,7 +140,7 @@ description: "Task list for Generate Yearly Gains And Losses Report implementati
 - [ ] T054 [P] [US3] Implement applicable-scope resolution for reliable wallet or account scope and broaden-to-asset fallback in `internal/report/calculate/scope.go`
 - [ ] T055 [US3] Implement scope-local exact unit matching, scope-local average-cost fallback, oldest-acquired deemed-disposal order, fallback carry-forward until scope reaches zero, and same-scope post-zero reset in `internal/report/basis/scope_local_hybrid.go`
 - [ ] T056 [US3] Implement HIFO cross-multiplication comparison and deterministic older-lot tie-breaks without unnecessary division in `internal/report/basis/lot_methods.go`
-- [ ] T057 [US3] Extend deterministic report fixtures with expected per-method summaries, reference counts, and detail ledgers for all five supported methods in `tests/testutil/report_fixtures.go`
+- [ ] T057 [US3] Extend deterministic report fixtures with expected per-method summaries, reference counts, detail ledgers, and shared report-calculation-currency expectations for all five supported methods in `tests/testutil/report_fixtures.go`
 
 **Checkpoint**: All supported methods are visible, explained, selectable, and validated against controlled method-specific expected outcomes.
 
@@ -150,12 +150,12 @@ description: "Task list for Generate Yearly Gains And Losses Report implementati
 
 **Purpose**: Finish documentation, security review, performance evidence, and release-level verification across all stories.
 
-- [ ] T058 [P] Update report workflow, protected-storage boundary, Documents output behavior, and no report history documentation in `README.md`
-- [ ] T059 [P] Reconcile implemented commands, manual scenarios, failure paths, artifact inspection, and output layout in `specs/005-generate-gains-report/quickstart.md`
+- [ ] T058 [P] Update report workflow, protected-storage boundary, Documents output behavior, user file-removal guidance, and no report history documentation in `README.md`
+- [ ] T059 [P] Reconcile implemented commands, manual scenarios, mixed-currency, user file-removal guidance, artifact inspection, and output layout in `specs/005-generate-gains-report/quickstart.md`
 - [ ] T060 [P] Add OWASP Top 10, cryptographic-storage boundary, report cleartext output, and dependency/API review evidence in `specs/005-generate-gains-report/checklists/requirements.md`
-- [ ] T061 [P] Add opt-in 10,000-activity report performance coverage for calculation, Markdown rendering, save, and opener stub invocation in `tests/integration/report_performance_flow_test.go`
+- [ ] T061 [P] Add opt-in deterministic 10,000-activity report performance coverage for one timed run of request validation, calculation, Markdown rendering, save, and opener stub invocation in `tests/integration/report_performance_flow_test.go`
 - [ ] T062 Run `make test` and `make coverage`, then verify report-feature coverage artifacts in `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`
-- [ ] T063 Run `GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1 go test ./tests/integration -run TestReportPerformanceFlowLargeHistoryFixture -count=1 -v` and record the outcome in `specs/005-generate-gains-report/quickstart.md`
+- [ ] T063 Run `GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1 go test ./tests/integration -run TestReportPerformanceFlowLargeHistoryFixture -count=1 -v` and record the single-run outcome in `specs/005-generate-gains-report/quickstart.md`
 - [ ] T064 Inspect generated test artifacts and application-managed storage for cleartext report leakage, then document the result in `specs/005-generate-gains-report/checklists/requirements.md`
 
 ---
