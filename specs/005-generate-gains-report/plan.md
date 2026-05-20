@@ -133,7 +133,7 @@ tests/
 
 - Use one final Markdown document per successful report run. No PDF, HTML, or secondary export format is in scope.
 - Resolve the Documents directory using OS-appropriate user-document conventions first: on Linux, honor XDG user directories when configured and otherwise fall back to `$HOME/Documents`; on macOS, use the per-user Documents directory under the user's home as defined by the platform conventions; on Windows, target the per-user Documents known folder rather than assuming a literal folder name. If the resolved path is unavailable or not writable, fail with an actionable non-secret error and leave no partial report file.
-- Name files with a local timestamp prefix in `YYYY-MM-DD_HH-MM-SS` order and a stable report descriptor. If the target path exists, append `-2`, `-3`, and so on before `.md`.
+- Name files as `ghostfolio-capital-gains-<year>-<method>-<YYYY-MM-DD_HH-MM-SS>.md`. Keep `YYYY-MM-DD_HH-MM-SS` ordering for deterministic sorting. If the target path exists, append `-2`, `-3`, and so on before `.md`.
 - Reserve the final path using exclusive creation where supported. If writing fails after file creation, close and remove the partial file. If saving succeeds but OS-open fails, keep the file and report the open failure.
 - Request OS default-app open after save through a platform-specific standard-library command adapter. Opener failure does not turn the saved report into a failed save.
 
