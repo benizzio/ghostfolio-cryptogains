@@ -8,10 +8,10 @@
 
 ## Requirement Completeness
 
-- [ ] CHK001 Are report-inclusion requirements complete for assets that have opening holdings, no in-year activity, and still remain open at year end? [Completeness, Spec FR-012, Spec FR-018]
-- [ ] CHK002 Are reportable-year requirements explicit about whether years containing only acquisitions or only zero-priced holding reductions count as selectable years? [Completeness, Spec FR-005, Spec FR-006, Spec Edge Cases]
-- [ ] CHK003 Does the spec define how reporting should behave when an older protected snapshot lacks newly required report inputs such as a stable asset identity key? [Gap, Plan Reporting Domain Design]
-- [ ] CHK004 Are failure-path requirements complete for histories that make basis allocation impossible, or is that responsibility explicitly delegated to earlier synced-data guarantees? [Completeness, Assumption, Spec FR-035, Spec INT-001]
+- [x] CHK001 Are report-inclusion requirements complete for assets that have opening holdings, no in-year activity, and still remain open at year end? [Completeness, Spec FR-012, Spec FR-018]
+- [x] CHK002 Are reportable-year requirements explicit about whether years containing only acquisitions or only zero-priced holding reductions count as selectable years? [Completeness, Spec FR-005, Spec FR-006, Spec Edge Cases]
+- [x] CHK003 Does the spec define how reporting should behave when an older protected snapshot lacks newly required report inputs such as a stable asset identity key? [Gap, Plan Reporting Domain Design]
+- [x] CHK004 Are failure-path requirements complete for histories that make basis allocation impossible, or is that responsibility explicitly delegated to earlier synced-data guarantees? [Completeness, Assumption, Spec FR-035, Spec INT-001]
 - [ ] CHK005 Are requirements defined for a selected year that yields no qualifying main-section assets after all inclusion and exclusion rules are applied? [Gap, Spec FR-012, Spec FR-016]
 
 ## Requirement Clarity
@@ -21,26 +21,26 @@
 - [ ] CHK008 Is `full liquidation count through the end of the selected year` precise about whether the count is per asset or per `(asset, applicable_scope)` when the scope-local hybrid method is active? [Ambiguity, Spec FR-017, Spec FR-027a]
 - [ ] CHK009 Are `reliable` and `defensible` scope criteria defined concretely enough to decide when the scope-local method stays narrow versus broadens to the whole asset? [Clarity, Spec Cost Basis Method Definitions, Spec INT-001]
 - [ ] CHK010 Is `complete required monetary value set` specified per activity type so it is clear which fields must exist for acquisitions, priced liquidations, and zero-priced holding reductions? [Clarity, Spec FR-031, Spec FR-034, Spec Single-Activity Currency Context Definitions]
-- [ ] CHK011 Are exact-division failure conditions described clearly enough to know which divisions must terminate exactly and which comparisons can avoid division altogether? [Clarity, Spec FIN-001, Plan Reporting Domain Design]
+- [x] CHK011 Are exact-division failure conditions described clearly enough to know which divisions must terminate exactly and which comparisons can avoid division altogether? [Clarity, Spec FIN-001, Plan Reporting Domain Design]
 
 ## Requirement Consistency
 
-- [ ] CHK012 Do asset-inclusion rules stay consistent between `FR-012`, `FR-016`, `FR-017`, and the detail-section requirement to show every in-year activity row for each included asset? [Consistency, Spec FR-012, Spec FR-016, Spec FR-017, Spec FR-018]
+- [x] CHK012 Do asset-inclusion rules stay consistent between `FR-012`, `FR-016`, `FR-017`, and the detail-section requirement to show every in-year activity row for each included asset? [Consistency, Spec FR-012, Spec FR-016, Spec FR-017, Spec FR-018]
 - [ ] CHK013 Do the report-wide no-currency rules align with the per-activity currency-row requirement without implying cross-activity conversion? [Consistency, Spec FR-028, Spec FR-030, Spec FR-033]
-- [ ] CHK014 Are the zero-priced holding-reduction rules consistent between `FR-029`, the carried-forward formula, and the edge case for years containing only zero-priced disposals? [Consistency, Spec FR-029, Spec Zero-Priced Holding Reduction Rule Carried Forward From Synced Data, Spec Edge Cases]
-- [ ] CHK015 Do the mathematical method definitions align with the success criterion that controlled ledgers can validate all five supported methods against expected yearly results? [Consistency, Spec FR-022, Spec FR-027a, Spec SC-003]
-- [ ] CHK016 Are assumptions about earlier synced-data guarantees consistent with the requirement to fail report generation when one activity lacks a complete monetary context? [Consistency, Spec FR-034, Spec INT-001, Spec Assumptions]
+- [x] CHK014 Are the zero-priced holding-reduction rules consistent between `FR-029`, the carried-forward formula, and the edge case for years containing only zero-priced disposals? [Consistency, Spec FR-029, Spec Zero-Priced Holding Reduction Rule Carried Forward From Synced Data, Spec Edge Cases]
+- [x] CHK015 Do the mathematical method definitions align with the success criterion that controlled ledgers can validate all five supported methods against expected yearly results? [Consistency, Spec FR-022, Spec FR-027a, Spec SC-003]
+- [x] CHK016 Are assumptions about earlier synced-data guarantees consistent with the requirement to fail report generation when one activity lacks a complete monetary context? [Consistency, Spec FR-034, Spec INT-001, Spec Assumptions]
 
 ## Acceptance Criteria Quality
 
 - [ ] CHK017 Can a reviewer objectively determine whether a liquidation is `inside the selected year`, or does the spec need a written cutoff rule for date and timestamp boundaries? [Measurability, Spec FR-013, Spec FR-015]
 - [ ] CHK018 Can a reviewer objectively tell when an asset is `reopened on or before year end`, especially if liquidation and reacquisition occur on the same date or timestamp? [Measurability, Spec FR-016, Spec FR-017]
 - [ ] CHK019 Are success criteria measurable for the scope-local hybrid method, including scenario coverage for exact matching, fallback activation, and post-liquidation reset behavior? [Acceptance Criteria, Spec SC-003, Spec FR-026, Spec FR-027a]
-- [ ] CHK020 Can negative-sign, zero-result, and exact-decimal rendering requirements be verified from the written spec without guessing additional formatting rules? [Measurability, Spec FR-011, Spec FR-019a, Spec FIN-001]
+- [x] CHK020 Can negative-sign, zero-result, and exact-decimal rendering requirements be verified from the written spec without guessing additional formatting rules? [Measurability, Spec FR-011, Spec FR-019a, Spec FIN-001]
 
 ## Scenario Coverage
 
-- [ ] CHK021 Are alternate-scenario requirements defined for liquidations that draw from multiple matched acquisition fragments within the same selected year? [Coverage, Spec Shared Calculation Rules]
+- [x] CHK021 Are alternate-scenario requirements defined for liquidations that draw from multiple matched acquisition fragments within the same selected year? [Coverage, Spec Shared Calculation Rules]
 - [ ] CHK022 Are recovery-path requirements defined for a report attempt that fails because one activity has an incomplete monetary context after year and method selection? [Coverage, Gap, Spec FR-034, Spec FR-035]
 - [ ] CHK023 Are scenario requirements complete for switching from exact-unit matching to scope-local average cost mid-scope and then carrying that fallback until full liquidation? [Coverage, Spec FR-026, Spec FR-027a, Spec Cost Basis Method Definitions]
 - [ ] CHK024 Are requirements defined for the first acquisition after a full liquidation in the same scope versus a different scope, so method reset behavior is unambiguous? [Coverage, Ambiguity, Spec FR-017, Spec FR-027a]
@@ -54,7 +54,7 @@
 ## Non-Functional Requirements
 
 - [ ] CHK028 Are performance requirements tied specifically to the most calculation-intensive method and highest fragmentation scenarios, or is the 10,000-activity target too aggregate to judge worst-case behavior? [Non-Functional, Spec SC-007, Plan Performance Goals]
-- [ ] CHK029 Are secrecy requirements specific enough to prevent calculation-error messages from exposing raw monetary tiers or other unprotected financial detail when `FR-034` or `FR-035` failures occur? [Non-Functional, Security, Spec SEC-001, Spec SEC-003, Spec FR-035]
+- [x] CHK029 Are secrecy requirements specific enough to prevent calculation-error messages from exposing raw monetary tiers or other unprotected financial detail when `FR-034` or `FR-035` failures occur? [Non-Functional, Security, Spec SEC-001, Spec SEC-003, Spec FR-035]
 
 ## Dependencies & Assumptions
 
@@ -63,7 +63,7 @@
 
 ## Ambiguities & Conflicts
 
-- [ ] CHK032 Is there any conflict between grouping by stored asset identity key and method definitions that refer to the `same asset` or `same scope` without restating that grouping key? [Conflict, Spec FR-012a, Spec FR-026]
+- [x] CHK032 Is there any conflict between grouping by stored asset identity key and method definitions that refer to the `same asset` or `same scope` without restating that grouping key? [Conflict, Spec FR-012a, Spec FR-026]
 - [ ] CHK033 Is there any unresolved ambiguity about whether reference-section full-liquidation counts are report-level asset counts or method-dependent scope counts when a scope-local method is selected? [Ambiguity, Spec Reference Section, Spec FR-017, Spec FR-027a]
 
 ## Notes
