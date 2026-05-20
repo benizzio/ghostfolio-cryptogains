@@ -5,6 +5,15 @@
 **Status**: Draft  
 **Input**: User description: "Use previously synced activity data to add yearly capital gains and losses report generation inside a token-unlocked `Sync and Reports` workflow, show the last successful sync time beside the sync option, require year selection and cost basis method selection before generation, save the report as a timestamped Markdown file in the user's Documents folder, open it in the operating system's default application, keep no report history, protect report contents until the final file is saved, and for this slice choose one single-activity currency context in priority order `order -> asset -> base` while treating all selected activity values as equal-value inputs without conversion once they enter cross-activity calculations."
 
+## Clarifications
+
+### Session 2026-05-20
+
+- Q: What should each per-asset detail section contain beyond opening/in-year/closing blocks? → A: Show every in-year activity row, including acquisitions and non-taxable holding reductions, plus liquidation calculations.
+- Q: How should yearly totals be shown in the report? → A: Include one overall yearly net total row at the end of `Gains-And-Losses Summary`.
+- Q: How should assets be grouped for calculations and report sections? → A: Group by the stored Ghostfolio asset identity key, with display label used only for rendering.
+- Q: How should numeric values be rendered in the Markdown report for this slice? → A: Render canonical exact-decimal values with no rounding in this slice, trimming only non-significant formatting.
+
 ## Terms Used In This Spec
 
 - **Sync and Reports context**: The token-unlocked workflow reached from the main menu. While this context remains active, the user can run `Sync Data` and `Generate Capital Gains Report` without informing the token again.
@@ -13,6 +22,7 @@
 - **Full liquidation**: A point where the quantity for an asset, or for that asset inside the applicable scope when a scope-local method is active, reaches zero.
 - **Full liquidation count**: The number of full liquidations completed for an asset on or before the end of the selected year.
 - **Reference report template**: The section structure established by the earlier reporting specification and reused here in Markdown form.
+- **Asset identity key**: The stable stored Ghostfolio asset identity preserved in synced data and used to group activity, holdings, liquidations, and report sections for one asset. Display labels do not change this grouping key.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -101,13 +111,15 @@ impacts when the feature touches those areas.
 - **FR-010**: The system MUST generate the report according to the section definitions in `Report Structure Definitions`.
 - **FR-011**: The system MUST show gains as positive values, losses with a negative sign, and zero results as zero in the gains-and-losses summary and any report totals.
 - **FR-012**: The system MUST include in the main report sections every asset that has an open position at the end of the selected year or at least one full liquidation during the selected year.
+- **FR-012a**: The system MUST group activity, holdings, liquidations, reopening checks, and report sections by the stored Ghostfolio asset identity key, and MUST use any asset symbol or name text only as a rendering label.
 - **FR-013**: The system MUST calculate yearly gains and losses using only liquidations that occur inside the selected year.
 - **FR-014**: The system MUST ignore an asset completely when that asset's first acquisition occurs after the selected year.
 - **FR-015**: The system MUST use activity before and within the selected year to establish holdings and basis for that year and MUST ignore activity after the selected year.
 - **FR-016**: The system MUST exclude from the main report sections any asset fully liquidated before the selected year and not reopened on or before the end of the selected year, and MUST show that asset only in the reference section.
 - **FR-017**: The system MUST, for an asset fully liquidated before or within the selected year and reopened before or within that same selected year, include only the selected year's liquidations in gains-and-losses results and MUST show that asset's full-liquidation count through the end of the selected year in the reference section.
-- **FR-018**: The system MUST show each included asset detail section as the opening position at the start of the selected year, the in-year activity, and the closing position at the end of the selected year, without including later activity.
+- **FR-018**: The system MUST show each included asset detail section as the opening position at the start of the selected year, every in-year activity row including acquisitions, liquidations, and explained zero-priced holding reductions, the liquidation calculations for each in-year liquidation, and the closing position at the end of the selected year, without including later activity.
 - **FR-019**: The system MUST generate the report only as a plain Markdown document in this slice.
+- **FR-019a**: The system MUST, for this slice, render report quantities and monetary values as canonical exact-decimal strings with no report-boundary rounding, trimming only non-significant formatting.
 - **FR-020**: The system MUST name the output file with a human-readable local timestamp in `YYYY-MM-DD_HH-MM-SS` order so filenames sort alphabetically by creation time, MUST save the file into the current user's personal Documents folder for the operating system in use, and MUST avoid overwriting an existing report file by adding a disambiguating suffix when needed.
 - **FR-021**: The system MUST request the operating system to open the saved Markdown file in the default application associated with that file type, MUST return the user to the unlocked `Sync and Reports` context after report generation completes, MUST show a transient result message that confirms the saved file path or explains why automatic opening failed, and MUST NOT keep an in-application history, catalog, or reopen list of previously generated reports or store the final report content back into protected synced-data storage after the file is saved.
 - **FR-022**: The system MUST define FIFO by the mathematical rules in `Cost Basis Method Definitions`.
@@ -134,12 +146,24 @@ This is the first section of the report.
 
 It contains one entry for each asset that is included in the main report sections for the selected year.
 
+It ends with one overall yearly net total row for the selected year.
+
 Each entry MUST show:
 
-- the asset identity used in the report
+- the rendering label for the grouped asset identity key used in the report
 - the asset's net gain, net loss, or zero result for the selected year only
 - gains as positive values
 - losses with a negative sign
+- canonical exact-decimal rendering with no rounding in this slice, trimming only non-significant formatting
+- the report-wide monetary label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`
+
+The overall yearly net total row MUST show:
+
+- the net sum of the included assets' yearly gains and losses
+- gains as positive values
+- losses with a negative sign
+- zero as `0`
+- canonical exact-decimal rendering with no rounding in this slice, trimming only non-significant formatting
 - the report-wide monetary label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`
 
 #### Reference Section
@@ -158,11 +182,16 @@ These sections appear after the reference section.
 
 There is one detail section for each asset included in the main report sections.
 
+Each detail section is grouped by one stored Ghostfolio asset identity key and may render a user-facing symbol or name label for that grouped asset.
+
 Each detail section MUST show:
 
 - the opening position at the start of the selected year
-- the activity that occurs within the selected year
+- every activity row that occurs within the selected year, including acquisitions, liquidations, and explained zero-priced holding reductions
+- for each in-year liquidation, the disposed quantity, allocated basis, net liquidation proceeds, and gain or loss
 - the closing position at the end of the selected year
+
+All rendered quantities and monetary values in these sections use canonical exact-decimal rendering with no rounding in this slice, trimming only non-significant formatting.
 
 Activity after the selected year is excluded from these sections.
 
@@ -330,7 +359,7 @@ After values from multiple activities enter cost basis and gains-and-losses calc
 - **SEC-001**: The Ghostfolio security token MUST be informed explicitly by the user to enter `Sync and Reports`, kept only for the active unlocked context, reusable for sync and reporting actions while that context remains open, cleared when the user leaves that context or the application ends, and excluded/unreadable from logs, output, diagnostics, and persisted artifacts.
 - **SEC-002**: Before the final Markdown file is saved to the user's Documents folder, report inputs, intermediate calculations, rendered content, and any temporary storage MUST remain inside the same security boundary and protection level used for synced financial and user-linked data, and they MUST be kept out of unprotected temporary locations.
 - **SEC-003**: The final Markdown file saved in the Documents folder is intentionally outside the application's protected-storage boundary. After that file is saved and handed to the operating system, the application MUST retain no additional cleartext copy of the report and MUST leave no recoverable cleartext temporary residue under application-managed storage.
-- **FIN-001**: All quantities, proceeds, fees, allocated basis, gains, and losses MUST use exact decimal arithmetic, preserve source precision until final rendering, include fees in acquisition basis or liquidation proceeds as applicable, treat explained zero-priced holding reductions as zero-gain and zero-loss events, and show losses with a negative sign in final report output.
+- **FIN-001**: All quantities, proceeds, fees, allocated basis, gains, and losses MUST use exact decimal arithmetic, preserve source precision until final rendering, include fees in acquisition basis or liquidation proceeds as applicable, treat explained zero-priced holding reductions as zero-gain and zero-loss events, show losses with a negative sign in final report output, and, for this slice, render report values as canonical exact-decimal strings with no report-boundary rounding and only non-significant formatting trimmed.
 - **FIN-002**: Within one activity, calculations MUST use the single-activity currency context defined in `Single-Activity Currency Context Definitions`, including the priority `order -> asset -> base`, the rule against mixing currency tiers inside one activity, and the requirement to fail instead of mixing tiers when one chosen context is incomplete. After values enter cross-activity cost basis and gains-and-losses calculations, the system MUST treat them as equal-value inputs under the report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` and MUST perform no currency conversion in this slice.
 - **QUAL-001**: Automated validation MUST cover main-menu entry into `Sync and Reports`, token gating and token reuse within the active unlocked context, last-sync timestamp display beside `Sync Data`, available-year selection, each supported cost basis method, yearly gains-and-losses calculations that count only liquidations inside the selected year, ignoring assets first acquired after the selected year, reference-section liquidation counts for reopened assets, report section ordering and definitions, negative-sign rendering for losses, zero-result assets, zero-priced holding reductions carried forward from the synced-data rules, single-activity currency-context selection and no cross-tier mixing, the report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`, Documents-folder save behavior, filename uniqueness and alphabetical sortability, automatic-open success and failure behavior, absence of report history, protected handling of pre-save report content, and the repository's full coverage gates using integration-first tests and only targeted unit tests for complex calculation rules.
 - **INT-001**: The feature depends on the existing synced activity dataset from earlier slices, including available report years, scope reliability, and the explained zero-priced `SELL` records admitted by `specs/003-store-activity-data/spec.md`, and on operating-system services that provide a writable personal Documents location and a default Markdown-file association. This slice introduces no external currency-conversion dependency.
@@ -341,6 +370,7 @@ After values from multiple activities enter cost basis and gains-and-losses calc
 - **Sync and Reports Context**: The active token-unlocked workflow state for one selected server and one token-scoped protected dataset, exposing `Sync Data` and `Generate Capital Gains Report` without repeated token entry while the context stays open.
 - **Report Request**: The user's selected report year and cost basis method for one report-generation run.
 - **Activity Record**: One normalized `BUY` or `SELL` event from the protected activity cache, carrying the quantity, monetary tiers, explanatory comment, and source-scope details needed for basis allocation and yearly gains-and-losses calculations.
+- **Asset Identity Key**: The stable stored Ghostfolio asset identity used to group activity records into one asset timeline and one report section set, independent of the display label shown to the user.
 - **Single-Activity Currency Context**: The chosen monetary context for one activity, selected in tiers `order -> asset -> base` priority and used consistently for every monetary value needed from that activity.
 - **Source Scope**: The optional preserved account, wallet, or equivalent grouping attached to an activity record. It determines whether the scope-local hybrid method can remain narrow or must broaden to the asset as a whole.
 - **Asset Position Timeline**: The derived per-asset chronological view used to establish opening position, in-year activity, closing position, report-section inclusion, and full-liquidation counting through the end of the selected year.
