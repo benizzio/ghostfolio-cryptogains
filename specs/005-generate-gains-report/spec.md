@@ -117,7 +117,7 @@ impacts when the feature touches those areas.
 - **FR-015**: The system MUST use activity before and within the selected year to establish holdings and basis for that year and MUST ignore activity after the selected year.
 - **FR-016**: The system MUST exclude from the main report sections any asset fully liquidated before the selected year and not reopened on or before the end of the selected year, and MUST show that asset only in the reference section.
 - **FR-017**: The system MUST, for an asset fully liquidated before or within the selected year and reopened before or within that same selected year, include only the selected year's liquidations in gains-and-losses results and MUST show that asset's full-liquidation count through the end of the selected year in the reference section.
-- **FR-018**: The system MUST show each included asset detail section as the opening position at the start of the selected year, every in-year activity row including acquisitions, liquidations, and explained zero-priced holding reductions, the liquidation calculations for each in-year liquidation, and the closing position at the end of the selected year, without including later activity.
+- **FR-018**: The system MUST show each included asset detail section as the opening position at the start of the selected year together with the cost basis carried into that moment under the selected method, every in-year activity row including acquisitions, liquidations, and explained zero-priced holding reductions together with the cost basis after that row is applied, the liquidation calculations for each in-year liquidation, and the closing position at the end of the selected year together with the cost basis at that closing moment, without including later activity.
 - **FR-019**: The system MUST generate the report only as a plain Markdown document in this slice.
 - **FR-019a**: The system MUST, for this slice, render report quantities and monetary values as canonical exact-decimal strings with no report-boundary rounding, trimming only non-significant formatting.
 - **FR-020**: The system MUST name the output file with a human-readable local timestamp in `YYYY-MM-DD_HH-MM-SS` order so filenames sort alphabetically by creation time, MUST save the file into the current user's personal Documents folder for the operating system in use, and MUST avoid overwriting an existing report file by adding a disambiguating suffix when needed.
@@ -186,10 +186,10 @@ Each detail section is grouped by one stored Ghostfolio asset identity key and m
 
 Each detail section MUST show:
 
-- the opening position at the start of the selected year
-- every activity row that occurs within the selected year, including acquisitions, liquidations, and explained zero-priced holding reductions
+- the opening position at the start of the selected year together with the cost basis carried into that moment under the selected method
+- every activity row that occurs within the selected year, including acquisitions, liquidations, and explained zero-priced holding reductions, together with the cost basis after that row is applied
 - for each in-year liquidation, the disposed quantity, allocated basis, net liquidation proceeds, and gain or loss
-- the closing position at the end of the selected year
+- the closing position at the end of the selected year together with the cost basis at that closing moment
 
 All rendered quantities and monetary values in these sections use canonical exact-decimal rendering with no rounding in this slice, trimming only non-significant formatting.
 
