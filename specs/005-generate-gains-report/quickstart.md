@@ -55,6 +55,10 @@ Expected automated coverage scope for this slice includes:
 - zero-priced holding reductions
 - single-activity currency context priority and no tier mixing
 - report-wide label `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`
+- empty-main-section report rendering with yearly total `0`
+- incomplete activity monetary-context failure after year and method selection
+- same-calendar-date reopening and selected-year boundary classification
+- scope-local fallback activation, carry-forward until zero, and same-scope reset after reacquisition
 - Markdown section order and required detail rows
 - Documents-folder save
 - filename uniqueness within the same second
@@ -140,6 +144,32 @@ Expected result:
 - the result shows the saved path
 - the workflow returns to `Sync and Reports` without asking for the token again
 
+## Reportable Year With No Main-Section Assets
+
+1. Use a deterministic fixture where `available_report_years` includes one year whose in-year activity contains acquisitions or explained zero-priced holding reductions but, after applying inclusion and exclusion rules, no asset qualifies for the main report sections.
+2. Generate the report for that year.
+
+Expected result:
+
+- report generation still succeeds
+- `Gains-And-Losses Summary` renders a clear empty-state sentence
+- `Overall Yearly Net Total` is `0`
+- the reference section still follows its own inclusion rules
+- no `Asset Detail: <label>` sections are rendered
+
+## Incomplete Monetary Context Failure After Selection
+
+1. Use a deterministic fixture where one priced `BUY` or priced `SELL` inside the selected year lacks a complete `order`, `asset`, and `base` monetary context for the required gross value and fee pair.
+2. Select that year and any method.
+3. Start report generation.
+
+Expected result:
+
+- generation fails before any file is saved
+- the error is actionable and identifies only non-secret references such as asset label and source ID
+- the unlocked `Sync and Reports` context remains active
+- no partial Markdown file remains
+
 ## Automatic Open Failure Path
 
 1. Configure the test opener to fail, or test on a system without a Markdown default-app association.
@@ -181,24 +211,35 @@ Expected result:
 Use deterministic fixtures that include:
 
 - multi-year activity before, within, and after the selected year
+- activity exactly at source-calendar year boundaries across differing timestamp offsets
+- same-asset same-source-calendar-date `BUY` and `SELL` rows that rely on synced deterministic ordering
 - an asset first acquired after the selected year
 - an asset fully liquidated before the selected year and not reopened
 - an asset fully liquidated and reopened before or within the selected year
+- a reportable year that yields no main-section assets
 - at least one zero-result included asset
 - at least one realized loss
 - an explained zero-priced `SELL` holding reduction
+- a priced activity with explicit fee `0`
+- a priced activity with incomplete monetary context
 - mixed available monetary tiers for single-activity currency context selection
 - unreliable or missing source scope for scope-local fallback
+- scope-local exact matching that falls back mid-scope and later resets after same-scope reacquisition
 
 Expected result:
 
 - only selected-year priced liquidations contribute gains and losses
+- source calendar year with preserved timestamp offset decides year membership
+- synced deterministic same-asset order decides same-date reopening behavior
 - prior activity establishes opening basis
 - later activity is ignored
 - assets are grouped by stored Ghostfolio asset identity key
 - display labels do not affect grouping
 - zero-priced holding reductions reduce holdings and basis but produce no gain or loss
+- explicit fee `0` is accepted, while incomplete priced-activity monetary context fails the attempt
 - reference-section liquidation counts are correct through selected year end
+- scope-local fallback remains active only for the affected open scope until that scope reaches zero
+- later reacquisition in the same scope re-evaluates exact matching, while other scopes keep independent state
 - report totals match controlled expected values for all five methods
 
 ## Generated Markdown Inspection
@@ -219,6 +260,8 @@ Expected content:
 - canonical exact-decimal values with no rounding
 - losses shown with negative sign
 - opening position, in-year rows, liquidation calculations, and closing position in each detail section
+- liquidation tables show both `Activity Currency` and `Calculation Currency`
+- `Net Liquidation Proceeds` stays in the liquidation row's activity currency, while `Allocated Basis` and `Gain Or Loss` use `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL`
 - no activity after the selected year
 
 ## No Report History Check
@@ -286,5 +329,6 @@ GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1 go test ./tests/integration -run TestRe
 Expected result:
 
 - the command uses a deterministic 10,000-activity fixture spanning at least 5 calendar years
+- the fixture includes worst-case supported HIFO lot fragmentation and scope-local fallback fragmentation
 - the timed path includes report request validation, basis calculation, Markdown rendering, final save, and opener stub invocation
 - at least 95% of measured report runs complete under 2 minutes on supported hardware

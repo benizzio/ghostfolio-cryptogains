@@ -30,6 +30,8 @@ Relationships:
 Validation rules:
 
 - Report generation is unavailable when the cache is absent or `available_report_years` is empty.
+- `available_report_years` contains source calendar years derived from each stored `occurred_at` timestamp using that timestamp's own offset.
+- A source calendar year remains reportable even when that year's in-scope activity contains only acquisitions or only explained zero-priced holding reductions.
 - Cache contents remain protected until `Sync and Reports` is unlocked by token.
 - Cache data is read for reports but not modified by report generation.
 
@@ -79,7 +81,7 @@ Validation rules:
 - `asset_identity_key` is mandatory for report generation. Symbol or name must not replace it as a grouping key.
 - Only `BUY` and `SELL` are supported.
 - `BUY` records create acquisitions and require a positive selected unit price.
-- Priced `SELL` records create liquidations.
+- Priced `SELL` records create liquidations and require positive quantity.
 - Explained zero-priced `SELL` records create holding reductions with zero gain and zero loss.
 - Activity after the selected year is ignored for the report run.
 
@@ -105,6 +107,7 @@ Validation rules:
 
 - Reliable scope data can narrow scope-local reporting.
 - Missing, partial, or contradictory scope data broadens the scope-local method to the whole asset instead of failing solely for missing scope detail.
+- Report generation reuses this reliability classification and does not try to infer a narrower scope from contradictory or partial rows.
 
 ## SyncAndReportsContext
 
@@ -163,6 +166,7 @@ Validation rules:
 - The year must be selected from synced data, not free text.
 - The method must be one of the supported methods.
 - One method applies consistently to all included liquidations in the run.
+- Generation may still succeed when the chosen year later yields no main-section assets, in which case the report uses the documented empty states.
 
 State transitions:
 
@@ -192,6 +196,7 @@ Validation rules:
 
 - Explanation text must be visible before generation.
 - Scope-local fallback consistency is tracked per `(asset_identity_key, applicable_scope)` until quantity reaches zero.
+- Once one applicable scope reaches zero, a later reacquisition in that same scope starts a new scope-local state whose exact-identification eligibility is evaluated again.
 
 ## ActivityCalculationInput
 
@@ -208,11 +213,11 @@ Fields:
 | `asset_identity_key` | string | Calculation grouping key |
 | `display_label` | string | Symbol or name used for rendering only |
 | `quantity` | decimal | Exact activity quantity |
-| `gross_value` | decimal | Selected from one complete activity currency context |
-| `fee_amount` | decimal | Selected from the same activity currency context, defaulting to zero only when absent and allowed by stored data rules |
-| `unit_price` | decimal | Selected or derived within the same activity context when exact |
-| `selected_currency_context` | enum | `order`, `asset_profile`, or `base` |
-| `selected_currency_code` | string | Explicit currency code carried from the selected activity context |
+| `gross_value` | decimal nullable | Selected from one complete activity currency context for priced activities |
+| `fee_amount` | decimal nullable | Selected from the same activity currency context for priced activities |
+| `unit_price` | decimal nullable | Selected or derived within the same activity context when exact for priced activities |
+| `selected_currency_context` | enum nullable | `order`, `asset_profile`, or `base` when a priced activity requires one |
+| `selected_currency_code` | string nullable | Explicit currency code carried from the selected activity context when one is required |
 | `source_scope` | `SourceScope` nullable | Preserved source scope |
 | `is_zero_priced_holding_reduction` | boolean | True only for explained zero-priced `SELL` rows |
 | `comment` | string nullable | Explanation shown for holding reductions when present |
@@ -224,9 +229,14 @@ Relationships:
 
 Validation rules:
 
-- The selected context must provide the complete monetary values needed by the activity.
+- A `BUY` requires gross acquisition value and fee from one chosen context.
+- A priced `SELL` requires gross liquidation value and fee from one chosen context.
+- An explained zero-priced holding reduction requires no activity monetary inputs and therefore no selected currency context.
+- An explicit fee value of `0` is valid. A missing fee is not equivalent to zero.
+- Priced activity quantity must be greater than zero.
+- If unit price is not stored explicitly for a priced activity, it may be derived only when the needed division terminates exactly.
 - Values from different tiers must not be mixed inside one input.
-- `selected_currency_code` must match the chosen tier and remain explicit even though cross-activity calculation later uses the report-wide no-currency label.
+- `selected_currency_code` must match the chosen tier and remain explicit when a chosen tier exists, even though cross-activity calculation later uses the report-wide no-currency label.
 - After input creation, currency identity is not used for conversion and report output uses the report-wide no-currency label.
 
 ## ApplicableScope
@@ -251,6 +261,7 @@ Validation rules:
 
 - A missing or unreliable source scope broadens to asset-level scope.
 - Once scope-local average fallback occurs in an open scope, later disposals in that scope use fallback until quantity reaches zero.
+- Reacquisition in a different applicable scope does not alter another open scope's state.
 
 ## BasisLot
 
@@ -321,6 +332,7 @@ Fields:
 | `full_liquidation_count_through_year_end` | integer | Count used by reference section |
 | `had_in_year_full_liquidation` | boolean | Main-section inclusion criterion |
 | `reopened_on_or_before_year_end` | boolean | Reference-only exclusion decision |
+| `has_in_year_activity` | boolean | Whether any activity for the asset occurs inside the selected year |
 
 Relationships:
 
@@ -333,6 +345,7 @@ Validation rules:
 - Activity after the selected year is excluded.
 - Activity before the selected year may affect opening quantity and basis.
 - Main section inclusion requires an open year-end position or a full liquidation during the selected year.
+- The timeline may still be included when `has_in_year_activity` is false, in which case the rendered section uses the documented empty-state instead of in-year tables.
 
 ## AssetActivityDetailRow
 
@@ -363,7 +376,8 @@ Validation rules:
 
 - Every in-year activity for an included asset appears as one row.
 - Zero-priced holding reductions show basis and quantity effects without realized gain or loss.
-- `activity_currency` records the explicit currency code used for `gross_value` and `fee_amount` in that row.
+- For priced rows, `activity_currency` records the explicit currency code used for `gross_value` and `fee_amount` in that row.
+- For explained zero-priced holding reductions, `gross_value`, `fee_amount`, and `activity_currency` are blank.
 - `calculation_currency` records the report-wide no-currency label used for calculated row values such as `basis_after_row`.
 
 ## LiquidationCalculation
@@ -379,6 +393,7 @@ Fields:
 | `allocated_basis` | decimal | Basis consumed by the selected method |
 | `net_liquidation_proceeds` | decimal | Gross liquidation value minus liquidation fee |
 | `gain_or_loss` | decimal | Net proceeds minus allocated basis |
+| `activity_currency` | string | Explicit currency code selected for that liquidation activity |
 | `calculation_currency` | string | Always `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` for liquidation calculation values in this slice |
 | `matches` | `BasisMatch[]` | Lot or pool fragments used by the selected method |
 
@@ -390,6 +405,8 @@ Relationships:
 Validation rules:
 
 - Only liquidations inside the selected year contribute to gains and losses.
+- `net_liquidation_proceeds` remains rendered in `activity_currency` because it is derived from one activity before cross-activity calculations.
+- `allocated_basis` and `gain_or_loss` remain rendered in `calculation_currency` because they are cross-activity calculation outputs.
 - Losses are negative values and zero is rendered as `0`.
 
 ## AssetSummaryEntry
@@ -415,6 +432,7 @@ Validation rules:
 
 - Include zero-result assets when they meet main-section inclusion rules.
 - Summary order must be deterministic.
+- The report may contain zero `AssetSummaryEntry` rows when the selected year remains reportable but no asset qualifies for main sections.
 
 ## ReferenceLiquidationEntry
 
@@ -437,6 +455,7 @@ Validation rules:
 
 - Every asset with at least one full liquidation on or before year end appears here.
 - Assets fully liquidated before the selected year and not reopened on or before year end are reference-only.
+- For the scope-local hybrid method, one entry's count is the sum of applicable-scope transitions to zero for that asset.
 
 ## CapitalGainsReport
 
@@ -465,6 +484,7 @@ Validation rules:
 - Section order is summary, reference, then per-asset details.
 - The report calculation currency label appears in required report-wide contexts.
 - Report contains no activity after the selected year.
+- The report may contain no detail sections when no asset qualifies for the main report sections.
 
 ## ReportDocumentType
 

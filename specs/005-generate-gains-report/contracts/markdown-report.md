@@ -150,6 +150,7 @@ Rules:
 - Net values use selected-year liquidations only.
 - The total row label is `Overall Yearly Net Total`.
 - Every row uses `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` in the report calculation currency column.
+- If no asset qualifies for the main report sections, render a clear empty-state sentence before the total row and still render `Overall Yearly Net Total` with value `0`.
 
 Example:
 
@@ -184,6 +185,7 @@ Rules:
 
 - Assets fully liquidated before the selected year and not reopened on or before selected year end are marked `reference only`.
 - Assets also included in main sections are marked `included in main sections`.
+- For the scope-local hybrid method, the count shown in one asset row is the sum of applicable-scope transitions to zero for that asset through the selected-year cutoff.
 - If no asset reached full liquidation by year end, render a clear empty-state sentence after the heading instead of a table.
 
 ### Per-Asset Detail Sections
@@ -217,18 +219,20 @@ Rules:
 
 - Every in-year activity for the included asset appears in this table.
 - The table includes acquisitions, priced liquidations, and explained zero-priced holding reductions.
-- `Activity Currency` shows the explicit currency code from which that row's `Gross Value` and `Fee` were taken.
+- `Activity Currency` shows the explicit currency code from which that row's `Gross Value` and `Fee` were taken for priced activity rows.
+- For explained zero-priced holding reductions, `Gross Value`, `Fee`, and `Activity Currency` are left blank because no activity monetary context is required from that row.
 - `Calculation Currency` shows `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` for calculated row values such as `Basis After Row` in this slice.
 - `Note` explains zero-priced holding reductions as holding reductions with zero gain and zero loss.
 - The table does not include later activity.
+- If an included asset has no in-year activity, render a clear no-in-year-activity sentence instead of this table and omit the liquidation table.
 
 Required liquidation table when the asset has priced in-year liquidations:
 
 ```markdown
 ### Liquidation Calculations
 
-| Date | Source ID | Disposed Quantity | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |
-|------|-----------|-------------------|-----------------|--------------------------|--------------|----------------------|
+| Date | Source ID | Disposed Quantity | Activity Currency | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |
+|------|-----------|-------------------|-------------------|-----------------|--------------------------|--------------|----------------------|
 ```
 
 Rules:
@@ -236,7 +240,9 @@ Rules:
 - Only priced liquidations inside the selected year appear.
 - Zero-priced holding reductions do not appear as gain/loss rows.
 - `Gain Or Loss` is negative for losses and `0` for zero result.
-- `Calculation Currency` shows the explicit selected activity currency code for that liquidation before it entered the report-wide no-currency calculation context.
+- `Activity Currency` shows the explicit selected activity currency code used for the matching in-year liquidation row's `Gross Value` and `Fee`.
+- `Net Liquidation Proceeds` is rendered in that `Activity Currency` because it is derived from one activity before cross-activity calculation begins.
+- `Calculation Currency` shows `NO CURRENCY APPLIES, ALL CONSIDERED EQUAL` because `Allocated Basis` and `Gain Or Loss` are cross-activity calculation outputs in this slice.
 
 Required closing block:
 
@@ -247,6 +253,8 @@ Required closing block:
 - Cost Basis: <basis>
 - Calculation Currency: NO CURRENCY APPLIES, ALL CONSIDERED EQUAL
 ```
+
+If no asset qualifies for the main report sections, no `Asset Detail: <display label>` sections are rendered.
 
 ## Calculation Boundary Contract
 
