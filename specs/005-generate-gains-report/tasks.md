@@ -8,6 +8,8 @@ description: "Task list for Generate Yearly Gains And Losses Report implementati
 **Input**: Design documents from `/specs/005-generate-gains-report/`
 **Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`
 
+**Bugfix**: 2026-05-22 — [BUG-001] Updated from bugfix patch
+
 **Tests**: Automated tests are mandatory for this feature. The feature specification marks User Scenarios & Testing as mandatory and `plan.md` requires integration-first coverage, targeted unit tests for calculation and IO rules, `make test`, `make coverage`, and an opt-in large-history performance path.
 
 **Organization**: Tasks are grouped by user story so each story can be implemented and verified independently.
@@ -89,25 +91,27 @@ description: "Task list for Generate Yearly Gains And Losses Report implementati
 
 ### Tests for User Story 2
 
-- [X] T025 [P] [US2] Add Markdown document and output-file contract coverage from `contracts/markdown-report.md` in `tests/contract/markdown_report_contract_test.go`
+- [ ] T025 [P] [US2] ⚠️ Reopened Add Markdown document and output-file contract coverage from `contracts/markdown-report.md` in `tests/contract/markdown_report_contract_test.go` to distinguish preserved explicit zero-valued explained zero-priced holding-reduction fields from blank values (reopened — BUG-001)
 - [X] T026 [P] [US2] Add report selection, busy, result, and failure workflow contract coverage from `contracts/tui-workflows.md` in `tests/contract/report_generation_workflow_contract_test.go`
 - [X] T027 [P] [US2] Add integration coverage for deterministic multi-year report generation, available-year selection, Documents save, one opener request on success, opener failure warning, and return to unlocked context in `tests/integration/report_generation_flow_test.go`
 - [X] T028 [P] [US2] Add integration coverage for empty-main-section reports with `NOT APPLICABLE` calculation currency, incomplete monetary context failure, Documents unavailable failure, partial-file cleanup, and app-managed storage leakage checks in `tests/integration/report_failure_flow_test.go`
-- [X] T029 [P] [US2] Add unit coverage for selected-year cutoffs, first-acquisition exclusion, main-section inclusion, reference-only exclusion, same-source-calendar-date BUY-before-SELL reopening behavior, full-liquidation counts, zero-result included assets, negative losses, and zero-priced holding reductions in `tests/unit/report_calculation_test.go`
+- [ ] T029 [P] [US2] ⚠️ Reopened Add unit coverage for selected-year cutoffs, first-acquisition exclusion, main-section inclusion, reference-only exclusion, same-source-calendar-date BUY-before-SELL reopening behavior, full-liquidation counts, zero-result included assets, negative losses, zero-priced holding reductions, and production-shaped explained zero-priced `SELL` rows with explicit zero `unit_price`, `gross_value`, and `fee_amount` in `tests/unit/report_calculation_test.go` (reopened — BUG-001)
 - [X] T030 [P] [US2] Add unit coverage for Documents directory resolution, timestamped filename slugs, same-second suffixes, exclusive creation, write cleanup, and platform opener commands in `tests/unit/report_output_test.go`
-- [X] T031 [P] [US2] Add unit coverage for Markdown header and section order, required tables, empty states, canonical exact decimal rendering, explicit report calculation currency label or `NOT APPLICABLE`, activity currency columns, and secret exclusion in `tests/unit/report_markdown_test.go`
-- [x] T032 [P] [US2] Add unit coverage for single-activity currency context priority, explicit zero fee, missing fee, positive priced quantity, exact unit-price derivation, no cross-tier mixing `tests/unit/report_activity_input_test.go`
+- [ ] T031 [P] [US2] ⚠️ Reopened Add unit coverage for Markdown header and section order, required tables, empty states, canonical exact decimal rendering, explicit report calculation currency label or `NOT APPLICABLE`, activity currency columns, secret exclusion, and explicit `0` rendering for preserved explained zero-priced holding-reduction fields in `tests/unit/report_markdown_test.go` (reopened — BUG-001)
+- [ ] T032 [P] [US2] ⚠️ Reopened Add unit coverage for single-activity currency context priority, explicit zero fee, missing fee, positive priced quantity, exact unit-price derivation, no cross-tier mixing, and explained zero-priced rows with preserved explicit zero-valued source fields in `tests/unit/report_activity_input_test.go` (reopened — BUG-001)
+- [ ] T065 [P] [US2] Add reusable report fixtures for production-shaped explained zero-priced `SELL` rows that preserve explicit zero `unit_price`, `gross_value`, and `fee_amount` in `tests/testutil/report_fixtures.go`
 
 ### Implementation for User Story 2
 
-- [x] T033 [P] [US2] Implement single-activity currency context selection, selected-currency tracking, and calculation-input validation in `internal/report/calculate/activity_input.go`
+- [ ] T033 [P] [US2] ⚠️ Reopened Implement single-activity currency context selection, selected-currency tracking, and calculation-input validation in `internal/report/calculate/activity_input.go` so explained zero-priced holding reductions can preserve explicit zero-valued source fields without becoming priced inputs or requiring activity currency context (reopened — BUG-001)
 - [X] T034 [P] [US2] Implement report model constructors and validation helpers for request, report, summary, reference, detail, document, and output outcome structures in `internal/report/model/report.go`
+- [ ] T066 [P] [US2] Extend report activity-row models to distinguish missing values from preserved explicit zero-valued `unit_price`, `gross_value`, and `fee_amount` for explained zero-priced holding reductions in `internal/report/model/report.go`
 - [X] T035 [P] [US2] Implement FIFO, LIFO, and HIFO lot basis state with exact arithmetic and deterministic lot ordering in `internal/report/basis/lot_methods.go`
 - [X] T036 [P] [US2] Implement Average Cost Basis pool state and zero-quantity pool reset in `internal/report/basis/average_cost.go`
 - [X] T037 [US2] Implement report calculation engine for asset timelines, source-year cutoff, opening and closing basis, inclusion rules, same-date reopening behavior, reference entries, summary entries, yearly net total, and shared report-calculation-currency enforcement in `internal/report/calculate/calculator.go`
-- [X] T038 [US2] Implement priced liquidation proceeds, proportional allocation, explained zero-priced holding reductions, and basis removal details in `internal/report/calculate/calculator.go`
+- [ ] T038 [US2] ⚠️ Reopened Implement priced liquidation proceeds, proportional allocation, explained zero-priced holding reductions, and basis removal details in `internal/report/calculate/calculator.go`, preserving explicit zero-valued source fields without creating proceeds, gains, losses, or priced-liquidation behavior (reopened — BUG-001)
 - [X] T039 [US2] Implement non-secret report calculation error taxonomy with offending activity source ID and display label references in `internal/report/model/errors.go` and `internal/report/calculate/calculator.go`
-- [X] T040 [P] [US2] Implement Markdown rendering for the required header, summary, reference section, per-asset detail sections, activity rows, liquidation tables, empty states, explicit report-calculation-currency labels, and canonical decimals in `internal/report/markdown/renderer.go`
+- [ ] T040 [P] [US2] ⚠️ Reopened Implement Markdown rendering for the required header, summary, reference section, per-asset detail sections, activity rows, liquidation tables, empty states, explicit report-calculation-currency labels, canonical decimals, and preserved explicit zero-valued explained zero-priced holding-reduction fields in `internal/report/markdown/renderer.go` (reopened — BUG-001)
 - [X] T041 [P] [US2] Implement Documents directory resolution using Linux XDG user-dirs, macOS home Documents, and Windows user Documents conventions in `internal/report/output/documents.go`
 - [X] T042 [P] [US2] Implement timestamped filename slugging, suffix reservation, exclusive final write, and failed-write cleanup in `internal/report/output/writer.go`
 - [X] T043 [P] [US2] Implement OS default-app opener command adapter for Linux, macOS, and Windows with one post-save open request per successful run in `internal/report/output/opener.go`
@@ -205,7 +209,7 @@ Parallel-capable after Phase 2:
 - T001, T002, and T003 can run in parallel.
 - T004, T006, T008, T009, T010, and T011 can run in parallel after Phase 1; T005, T007, and T012 close after the related model and runtime types exist.
 - T013, T014, and T015 can run in parallel for US1 before T016 through T024.
-- T025 through T032 can run in parallel for US2; T033 through T036 and T040 through T043 can then run in parallel before T037, T038, T044, T045, T047, and T048.
+- T025 through T032 and T065 can run in parallel for US2; T033 through T036, T040 through T043, and T066 can then run in parallel before T037, T038, T044, T045, T047, and T048.
 - T049 through T051 can run in parallel for US3; T052, T054, and T056 can run in parallel before T053, T055, and T057 close the story.
 - T058, T059, T060, and T061 can run in parallel after story implementation; T062, T063, and T064 run after documentation and performance fixtures are in place.
 
@@ -231,8 +235,10 @@ Task: T029 Add report calculation unit coverage in tests/unit/report_calculation
 Task: T030 Add report output unit coverage in tests/unit/report_output_test.go
 Task: T031 Add report Markdown unit coverage in tests/unit/report_markdown_test.go
 Task: T032 Add activity input unit coverage in tests/unit/report_activity_input_test.go
+Task: T065 Add explicit-zero explained SELL fixtures in tests/testutil/report_fixtures.go
 
 Task: T033 Implement activity input selection in internal/report/calculate/activity_input.go
+Task: T066 Extend report activity-row models in internal/report/model/report.go
 Task: T035 Implement lot basis methods in internal/report/basis/lot_methods.go
 Task: T036 Implement average cost basis in internal/report/basis/average_cost.go
 Task: T040 Implement Markdown renderer in internal/report/markdown/renderer.go
