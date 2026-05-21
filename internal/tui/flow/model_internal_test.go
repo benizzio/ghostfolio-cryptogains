@@ -208,16 +208,10 @@ func TestModelInitAndHelpers(t *testing.T) {
 	if model.syncReports.ReportResult != (runtime.ReportOutcome{}) {
 		t.Fatalf("expected main menu entry to clear sync and reports report scratch state")
 	}
-	if model.syncReports.ReportSavedPath != "" || model.syncReports.ReportRendered != "" {
-		t.Fatalf("expected main menu entry to clear transient report output state")
-	}
 	_ = model.enterSetup("invalid", bootstrap.SetupRequirementNone)
 	_ = model.enterSyncReportsUnlock()
 	_ = model.enterSync()
 	_ = model.enterSyncWithToken("token")
-	if !model.syncReports.NoReportHistory {
-		t.Fatalf("expected no report history flag to stay enabled")
-	}
 	_ = model.selectedSetupOrigin()
 	_ = model.setupCanSave()
 	if reportMethodForIndex(-1) != "" {
@@ -824,9 +818,6 @@ func TestUpdateReportCoversSelectionBusyAndResultBranches(t *testing.T) {
 	if model.active != reportResultScreenKey {
 		t.Fatalf("expected report result screen, got %s", model.active)
 	}
-	if model.syncReports.ReportSavedPath != "/tmp/report.md" || model.syncReports.ReportRendered == "" {
-		t.Fatalf("expected transient report result state, got %#v", model.syncReports)
-	}
 	if reportService.request.Request.Year != 2025 || reportService.request.Request.CostBasisMethod != reportmodel.CostBasisMethodLIFO {
 		t.Fatalf("expected report service request to use selected year and method, got %#v", reportService.request.Request)
 	}
@@ -838,7 +829,7 @@ func TestUpdateReportCoversSelectionBusyAndResultBranches(t *testing.T) {
 	if model.active != reportSelectionScreenKey {
 		t.Fatalf("expected Generate Another Report to reopen selection, got %s", model.active)
 	}
-	if model.syncReports.ReportResult != (runtime.ReportOutcome{}) || model.syncReports.ReportSavedPath != "" || model.syncReports.ReportRendered != "" {
+	if model.syncReports.ReportResult != (runtime.ReportOutcome{}) {
 		t.Fatalf("expected Generate Another Report to clear transient report state, got %#v", model.syncReports)
 	}
 
@@ -848,11 +839,11 @@ func TestUpdateReportCoversSelectionBusyAndResultBranches(t *testing.T) {
 	if model.active != syncReportsMenuScreenKey {
 		t.Fatalf("expected Back To Sync and Reports to return to context menu, got %s", model.active)
 	}
-	if model.syncReports.ReportResult != (runtime.ReportOutcome{}) || model.syncReports.ReportSavedPath != "" || model.syncReports.ReportRendered != "" {
+	if model.syncReports.ReportResult != (runtime.ReportOutcome{}) {
 		t.Fatalf("expected result dismissal to clear transient report state, got %#v", model.syncReports)
 	}
 	model.enterMainMenu()
-	if model.syncReports.ReportResult != (runtime.ReportOutcome{}) || model.syncReports.ReportSavedPath != "" || model.syncReports.ReportRendered != "" {
+	if model.syncReports.ReportResult != (runtime.ReportOutcome{}) {
 		t.Fatalf("expected context exit to clear report history state, got %#v", model.syncReports)
 	}
 }

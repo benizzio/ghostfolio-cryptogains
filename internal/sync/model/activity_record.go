@@ -15,9 +15,6 @@ const (
 
 	// SourceScopeKindWallet identifies a wallet-scoped activity source.
 	SourceScopeKindWallet SourceScopeKind = "wallet"
-
-	// SourceScopeKindUnknown identifies source scope data whose kind is not known.
-	SourceScopeKindUnknown SourceScopeKind = "unknown"
 )
 
 // ActivityType identifies one normalized Ghostfolio activity type supported by

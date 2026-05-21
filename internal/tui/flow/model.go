@@ -122,9 +122,6 @@ type syncReportsContextState struct {
 	SyncResult           syncContextResultState
 	ReportUnavailable    runtime.ReportFailureReason
 	ReportResult         runtime.ReportOutcome
-	ReportSavedPath      string
-	ReportRendered       string
-	NoReportHistory      bool
 }
 
 // syncContextResultState holds transient sync-failure feedback rendered inside
@@ -140,15 +137,14 @@ type syncContextResultState struct {
 // and result routing.
 // Authored by: OpenCode
 type reportState struct {
-	FocusArea      int
-	YearIndex      int
-	MethodIndex    int
-	ActionIndex    int
-	Busy           bool
-	BusyText       string
-	AttemptID      string
-	SelectedYear   int
-	SelectedMethod string
+	FocusArea    int
+	YearIndex    int
+	MethodIndex  int
+	ActionIndex  int
+	Busy         bool
+	BusyText     string
+	AttemptID    string
+	SelectedYear int
 }
 
 // serverReplacementState holds transient UI state for server-mismatch confirmation.
@@ -741,7 +737,6 @@ func newSyncReportsContextState(serverOrigin string, protectedData runtime.Prote
 		SelectedServerOrigin: serverOrigin,
 		ProtectedData:        protectedData,
 		ReportUnavailable:    runtime.ReportFailureNoSyncedDataAvailable,
-		NoReportHistory:      true,
 	}
 }
 
@@ -752,7 +747,6 @@ func newReportState(years []int) reportState {
 	if len(years) > 0 {
 		state.SelectedYear = years[0]
 	}
-	state.SelectedMethod = string(reportMethodForIndex(state.MethodIndex))
 	return state
 }
 
@@ -829,10 +823,6 @@ func (m *Model) enterReportResult(outcome runtime.ReportOutcome) {
 	m.report.AttemptID = ""
 	m.report.ActionIndex = 0
 	m.syncReports.ReportResult = outcome
-	m.syncReports.ReportSavedPath = outcome.OutputFile.Path
-	if outcome.Success {
-		m.syncReports.ReportRendered = "generated"
-	}
 }
 
 // enterSync routes the application to the sync entry screen.

@@ -113,7 +113,6 @@ func (m *Model) handleReportSelectionKey(message tea.KeyPressMsg) (tea.Model, te
 	if yearCount > 0 && m.report.YearIndex >= 0 && m.report.YearIndex < yearCount {
 		m.report.SelectedYear = m.syncReports.ProtectedData.AvailableReportYears[m.report.YearIndex]
 	}
-	m.report.SelectedMethod = string(reportMethodForIndex(m.report.MethodIndex))
 	return m, nil
 }
 
@@ -205,7 +204,5 @@ func (m *Model) handleReportResultKey(message tea.KeyPressMsg) (tea.Model, tea.C
 // Authored by: OpenCode
 func (m *Model) clearTransientReportState() {
 	m.syncReports.ReportResult = runtime.ReportOutcome{}
-	m.syncReports.ReportSavedPath = ""
-	m.syncReports.ReportRendered = ""
 	m.report = newReportState(m.syncReports.ProtectedData.AvailableReportYears)
 }

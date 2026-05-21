@@ -50,17 +50,8 @@ const (
 type AttemptStatus string
 
 const (
-	// AttemptStatusIdle indicates that no sync attempt is currently running.
-	AttemptStatusIdle AttemptStatus = "idle"
-
-	// AttemptStatusStarted indicates that a sync attempt has started.
-	AttemptStatusStarted AttemptStatus = "started"
-
 	// AttemptStatusDiscoveringSnapshot indicates that local snapshot discovery is in flight.
 	AttemptStatusDiscoveringSnapshot AttemptStatus = "discovering_snapshot"
-
-	// AttemptStatusUnlockingSnapshot indicates that a selected-server snapshot unlock attempt is in flight.
-	AttemptStatusUnlockingSnapshot AttemptStatus = "unlocking_snapshot"
 
 	// AttemptStatusAuthenticating indicates that anonymous auth is in flight.
 	AttemptStatusAuthenticating AttemptStatus = "authenticating"

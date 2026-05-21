@@ -41,17 +41,3 @@ func ErrorText(err error, secrets ...string) string {
 	}
 	return Text(err.Error(), secrets...)
 }
-
-// Mask returns a fixed redaction marker for secret input fields.
-//
-// Example:
-//
-//	_ = redact.Mask("abc123")
-//
-// Authored by: OpenCode
-func Mask(secret string) string {
-	if secret == "" {
-		return ""
-	}
-	return replacement
-}

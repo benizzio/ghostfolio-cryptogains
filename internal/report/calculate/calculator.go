@@ -242,24 +242,6 @@ type basisDisposalResult struct {
 	ReachedZero    bool
 }
 
-// requireImplementedCostBasisMethod rejects supported model methods that are
-// not yet implemented by the calculator package.
-// Authored by: OpenCode
-func requireImplementedCostBasisMethod(method reportmodel.CostBasisMethod) error {
-	switch method {
-	case reportmodel.CostBasisMethodFIFO, reportmodel.CostBasisMethodLIFO, reportmodel.CostBasisMethodHIFO, reportmodel.CostBasisMethodAverageCost, reportmodel.CostBasisMethodScopeLocalHybrid:
-		return nil
-	default:
-		return reportmodel.NewCalculationError(
-			reportmodel.CalculationErrorKindUnsupportedCostBasisMethod,
-			fmt.Sprintf("unsupported cost basis method %q", method),
-			"",
-			"",
-			nil,
-		)
-	}
-}
-
 // reportYearAvailable verifies that the selected year is present in the synced
 // protected-cache metadata.
 // Authored by: OpenCode

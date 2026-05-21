@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 )
 
 // ReportIOFixture provides one controlled home-directory layout for report
@@ -94,38 +93,6 @@ func (fixture ReportIOFixture) SetXDGDocumentsDir(t *testing.T, documentsDir str
 	if err != nil {
 		t.Fatalf("write XDG user-dirs config: %v", err)
 	}
-}
-
-// StaticClock provides one deterministic Now function for report tests that
-// need stable filenames or generated-at timestamps.
-// Authored by: OpenCode
-type StaticClock struct {
-	now time.Time
-}
-
-// NewStaticClock returns one deterministic clock that always reports the same
-// instant.
-//
-// Example usage:
-//
-//	clock := testutil.NewStaticClock(time.Date(2026, time.May, 20, 15, 4, 5, 0, time.Local))
-//	timestamp := clock.Now()
-//
-// Authored by: OpenCode
-func NewStaticClock(now time.Time) StaticClock {
-	return StaticClock{now: now}
-}
-
-// Now returns the deterministic instant carried by the static clock.
-//
-// Example usage:
-//
-//	clock := testutil.NewStaticClock(time.Now())
-//	_ = clock.Now()
-//
-// Authored by: OpenCode
-func (clock StaticClock) Now() time.Time {
-	return clock.now
 }
 
 // OpenPathSpy records opener requests and can be configured to return one
@@ -236,26 +203,6 @@ func AssertRegularFile(t *testing.T, path string) {
 	}
 	if !info.Mode().IsRegular() {
 		t.Fatalf("expected %q to be a regular file, got mode %s", path, info.Mode())
-	}
-}
-
-// AssertPathMissing verifies that one path does not exist so tests can assert
-// failed-write cleanup behavior.
-//
-// Example usage:
-//
-//	testutil.AssertPathMissing(t, reportPath)
-//
-// Authored by: OpenCode
-func AssertPathMissing(t *testing.T, path string) {
-	t.Helper()
-
-	var _, err = os.Stat(path)
-	if err == nil {
-		t.Fatalf("expected %q to be absent", path)
-	}
-	if !os.IsNotExist(err) {
-		t.Fatalf("expected %q lookup to return not-exist, got %v", path, err)
 	}
 }
 

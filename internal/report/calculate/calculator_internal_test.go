@@ -82,14 +82,6 @@ func TestCalculateRejectsInvalidRequestAndUnavailableYear(t *testing.T) {
 	if !strings.Contains(calcErr.Error(), "report year 2024 is not available") {
 		t.Fatalf("expected unavailable year detail, got %q", calcErr.Error())
 	}
-
-	if err := requireImplementedCostBasisMethod(reportmodel.CostBasisMethodFIFO); err != nil {
-		t.Fatalf("expected supported cost basis method to be accepted, got %v", err)
-	}
-	calcErr = requireCalculationError(t, requireImplementedCostBasisMethod(reportmodel.CostBasisMethod("unsupported")), reportmodel.CalculationErrorKindUnsupportedCostBasisMethod)
-	if !strings.Contains(calcErr.Error(), "unsupported cost basis method") {
-		t.Fatalf("expected unsupported cost basis method detail, got %q", calcErr.Error())
-	}
 }
 
 // TestCalculatePropagatesActivitySelectionFailures verifies that grouped input

@@ -25,7 +25,6 @@ type Theme struct {
 	InputLabel     lipgloss.Style
 	SuccessStatus  lipgloss.Style
 	FailureStatus  lipgloss.Style
-	NeutralStatus  lipgloss.Style
 	HelpText       lipgloss.Style
 	SummaryPanel   lipgloss.Style
 }
@@ -70,8 +69,7 @@ func DefaultTheme() Theme {
 		FailureStatus: lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#dc3545")),
-		NeutralStatus: lipgloss.NewStyle().Foreground(lipgloss.Color("#3686cf")),
-		HelpText:      lipgloss.NewStyle().Faint(true),
-		SummaryPanel:  panel.BorderForeground(lipgloss.Color("#36cfcc")),
+		HelpText:     lipgloss.NewStyle().Faint(true),
+		SummaryPanel: panel.BorderForeground(lipgloss.Color("#36cfcc")),
 	}
 }
