@@ -35,9 +35,9 @@ func TestSyncStorageFlowCreatesProtectedSnapshotAfterSuccessfulMultiPageSync(t *
 	var tempDir = t.TempDir()
 	var store = configstore.NewJSONStore(tempDir)
 	var server = newGhostfolioStorageServer(t, []storagePageFixture{
-		{Count: 3, ActivitiesJSON: `[{"id":"activity-1","date":"2024-12-31T23:30:00-02:00","type":"BUY","quantity":1.25,"valueInBaseCurrency":62500,"feeInBaseCurrency":25,"unitPriceInAssetProfileCurrency":50000,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"},"account":{"id":"account-1","name":"Main"}}]`},
-		{Count: 3, ActivitiesJSON: `[{"id":"activity-2","date":"2025-01-01T00:15:00+02:00","type":"BUY","quantity":0.50,"valueInBaseCurrency":25000,"unitPriceInAssetProfileCurrency":50000,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`},
-		{Count: 3, ActivitiesJSON: `[{"id":"activity-3","date":"2026-05-01T09:00:00Z","type":"SELL","quantity":0.25,"valueInBaseCurrency":15000,"unitPriceInAssetProfileCurrency":60000,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`},
+		{Count: 3, ActivitiesJSON: `[{"id":"activity-1","date":"2024-12-31T23:30:00-02:00","type":"BUY","quantity":1.25,"valueInBaseCurrency":62500,"feeInBaseCurrency":25,"unitPriceInAssetProfileCurrency":50000,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD","symbolProfileId":"asset-btc-storage-001"},"account":{"id":"account-1","name":"Main"}}]`},
+		{Count: 3, ActivitiesJSON: `[{"id":"activity-2","date":"2025-01-01T00:15:00+02:00","type":"BUY","quantity":0.50,"valueInBaseCurrency":25000,"unitPriceInAssetProfileCurrency":50000,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD","symbolProfileId":"asset-btc-storage-001"}}]`},
+		{Count: 3, ActivitiesJSON: `[{"id":"activity-3","date":"2026-05-01T09:00:00Z","type":"SELL","quantity":0.25,"valueInBaseCurrency":15000,"unitPriceInAssetProfileCurrency":60000,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD","symbolProfileId":"asset-btc-storage-001"}}]`},
 	})
 	var fixture = newSyncStorageFixture(t, tempDir, server.Client(), server.URL, time.Second)
 	if err := store.Save(context.Background(), fixture.config); err != nil {
@@ -51,8 +51,8 @@ func TestSyncStorageFlowCreatesProtectedSnapshotAfterSuccessfulMultiPageSync(t *
 	model, cmd := startSyncAttempt(t, model)
 	model = applySyncBatch(t, model, cmd)
 
-	if model.ActiveScreen() != "sync_result" {
-		t.Fatalf("expected sync result screen, got %s", model.ActiveScreen())
+	if model.ActiveScreen() != "sync_reports_menu" {
+		t.Fatalf("expected sync and reports menu, got %s", model.ActiveScreen())
 	}
 	var content = model.View().Content
 	if !strings.Contains(content, "Activity data was stored securely for future use.") {
@@ -85,6 +85,9 @@ func TestSyncStorageFlowHandlesEmptyHistoryAsSuccessfulStoredState(t *testing.T)
 	model, cmd := startSyncAttempt(t, model)
 	model = applySyncBatch(t, model, cmd)
 
+	if model.ActiveScreen() != "sync_reports_menu" {
+		t.Fatalf("expected sync and reports menu, got %s", model.ActiveScreen())
+	}
 	var content = model.View().Content
 	if !strings.Contains(content, "Activity data was stored securely for future use.") {
 		t.Fatalf("expected empty-history sync to remain successful, got %q", content)

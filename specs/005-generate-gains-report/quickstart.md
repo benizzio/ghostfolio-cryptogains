@@ -34,7 +34,13 @@ make coverage
 GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1 go test ./tests/integration -run TestReportPerformanceFlowLargeHistoryFixture -count=1 -v
 ```
 
-Expected automated coverage scope for this slice includes:
+Expected result:
+
+- `make test` passes across the maintained contract, integration, and unit suites
+- `make coverage` regenerates `dist/coverage/coverage.out` and `dist/coverage/coverage.xml` and passes the repository coverage gate
+- the explicit performance command runs the deterministic `SC-007` verification path for one 10,000-activity yearly report generation and completes within the 2-minute threshold
+
+Expected implemented automated coverage scope for this slice includes:
 
 - `Sync and Reports` main-menu entry
 - masked token unlock for the active context
@@ -145,6 +151,19 @@ Expected result:
 - the saved path is sufficient for the user to delete the cleartext report later from Documents
 - the workflow returns to `Sync and Reports` without asking for the token again
 
+## Manual Verification Scenarios
+
+Verify at least these scenarios when checking the implemented workflow manually:
+
+- unlock `Sync and Reports` with no readable snapshot and confirm report generation stays visible but unavailable
+- run `Sync Data` inside the unlocked context and confirm last successful sync metadata appears without another token prompt
+- generate one report successfully and confirm the saved path points into Documents
+- generate another report from the same unlocked context and confirm no previous report path is retained as history
+- trigger an automatic-open failure and confirm the saved file remains in Documents with manual deletion guidance
+- trigger a Documents-directory failure and confirm no partial Markdown file remains
+- use a fixture or server history that yields a reportable year with no main-section assets and confirm the empty-state report still saves
+- use a fixture with mixed selected activity currencies and confirm the report still renders `NOT APPLICABLE` for report calculation currency columns
+
 ## Reportable Year With No Main-Section Assets
 
 1. Use a deterministic fixture where `available_report_years` includes one year whose in-year activity contains acquisitions or explained zero-priced holding reductions but, after applying inclusion and exclusion rules, no asset qualifies for the main report sections.
@@ -180,8 +199,9 @@ Expected result:
 Expected result:
 
 - generation is successful
-- the generated report contains calculated row values like cost-basis related or gain or loss related values equivalent to all activity currencies being the same
-- the generated report contains `NOT APPLICABLE` in Calculation Currency related columns
+- the generated report keeps per-row `Activity Currency` values from the selected activity context for priced rows
+- the generated report contains `NOT APPLICABLE` in report calculation currency columns
+- no currency conversion or exchange-rate lookup occurs during report generation
 
 ## Automatic Open Failure Path
 
@@ -277,6 +297,14 @@ Expected content:
 - `Net Liquidation Proceeds` stays in the liquidation row's activity currency, while `Allocated Basis` and `Gain Or Loss` use the shared explicit report calculation currency
 - no activity after the selected year
 
+Expected output layout details:
+
+- header block with `Year`, `Cost Basis Method`, `Generated At`, and `Report Calculation Currency`
+- `Gains-And-Losses Summary` first
+- `Reference Section` second
+- each `Asset Detail: <label>` section after the reference section
+- each detail section ordered as `Opening Position`, `In-Year Activity`, optional `Liquidation Calculations`, then `Closing Position`
+
 ## No Report History Check
 
 1. Generate a report successfully.
@@ -314,7 +342,7 @@ Removal behavior:
 
 - deleting `setup.json` resets bootstrap setup on next launch
 - deleting `snapshots/` removes protected synced activity data
-- deleting generated Markdown files from Documents removes report outputs
+- deleting generated Markdown files from Documents removes report outputs; this is the only user-managed cleartext report removal path
 - none of these deletion paths reveals or recovers the Ghostfolio security token
 
 ## Persisted Artifact Inspection
@@ -331,7 +359,7 @@ Expected result:
 - failed output attempts leave no partial Markdown file
 - no persisted artifact stores the Ghostfolio security token or JWT
 
-## Large-History Performance Verification
+## Performance Verification
 
 Run:
 
@@ -341,7 +369,5 @@ GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1 go test ./tests/integration -run TestRe
 
 Expected result:
 
-- the command uses a deterministic 10,000-activity fixture spanning at least 5 calendar years
-- the fixture includes worst-case supported HIFO lot fragmentation and scope-local fallback fragmentation
-- the timed path includes report request validation, basis calculation, Markdown rendering, final save, and opener stub invocation
-- the timed run completes under 2 minutes
+- the run exercises request validation, calculation, Markdown rendering, final save, and opener invocation against the deterministic large-history fixture
+- the logged runtime stays under the `SC-007` threshold of 2 minutes

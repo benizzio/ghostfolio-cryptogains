@@ -42,7 +42,7 @@ func TestSyncPerformanceFlowLargeHistoryFixture(t *testing.T) {
 
 	server.SetTokenPages(token, []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"baseline-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
+		ActivitiesJSON: `[{"id":"baseline-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD","symbolProfileId":"asset-btc-performance-001"}}]`,
 	}})
 	var baselineOutcome = service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: token})
 	if !baselineOutcome.Success {
@@ -140,7 +140,7 @@ func buildLargeHistoryPages(activityCount int, pageSize int) []storagePageFixtur
 
 			var occurredAt = startedAt.Add(time.Duration(index) * 5 * time.Hour).Format(time.RFC3339)
 			_, _ = fmt.Fprintf(&builder,
-				`{"id":"activity-%05d","date":"%s","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}`,
+				`{"id":"activity-%05d","date":"%s","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD","symbolProfileId":"asset-btc-performance-001"}}`,
 				index+1,
 				occurredAt,
 			)

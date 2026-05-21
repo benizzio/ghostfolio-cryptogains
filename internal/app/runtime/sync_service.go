@@ -32,13 +32,6 @@ type SyncRequest struct {
 	ConfirmServerReplacement bool
 }
 
-// ProtectedDataState summarizes whether readable protected data is active in memory for this run.
-// Authored by: OpenCode
-type ProtectedDataState struct {
-	HasReadableSnapshot bool
-	ServerOrigin        string
-}
-
 // ServerReplacementCheck reports whether the selected server would replace the active readable snapshot.
 // Authored by: OpenCode
 type ServerReplacementCheck struct {
@@ -66,6 +59,11 @@ type SyncService interface {
 	// ProtectedDataState reports whether a readable protected snapshot is active for this run.
 	// Authored by: OpenCode
 	ProtectedDataState() ProtectedDataState
+
+	// UnlockSelectedServerSnapshot tries to unlock one selected-server protected
+	// snapshot for the active Sync and Reports context without forcing a new sync.
+	// Authored by: OpenCode
+	UnlockSelectedServerSnapshot(context.Context, configmodel.AppSetupConfig, string) SyncReportsContextResult
 
 	// CheckServerReplacement compares the selected setup server with the active readable snapshot.
 	// Authored by: OpenCode
@@ -106,6 +104,22 @@ func NewSyncService(
 	validatorService syncvalidate.Validator,
 	snapshots snapshotstore.Store,
 ) SyncService {
+	return newSyncService(client, requestTimeout, baseConfigDir, allowDevHTTP, decimalService, normalizer, validatorService, newSnapshotLifecycle(snapshots, newActiveSnapshotState(), protectedPayloadBuilder{}))
+}
+
+// newSyncService creates the runtime sync service around one shared snapshot
+// lifecycle.
+// Authored by: OpenCode
+func newSyncService(
+	client *ghostfolioclient.Client,
+	requestTimeout time.Duration,
+	baseConfigDir string,
+	allowDevHTTP bool,
+	decimalService decimalsupport.Service,
+	normalizer syncnormalize.Normalizer,
+	validatorService syncvalidate.Validator,
+	snapshots *snapshotLifecycle,
+) SyncService {
 	if client == nil {
 		client = ghostfolioclient.New(nil)
 	}
@@ -126,7 +140,7 @@ func NewSyncService(
 		decimalService:    decimalService,
 		normalizer:        normalizer,
 		validator:         validatorService,
-		snapshots:         newSnapshotLifecycle(snapshots, newActiveSnapshotState(), protectedPayloadBuilder{}),
+		snapshots:         snapshots,
 		diagnosticReports: newDiagnosticReportService(baseConfigDir),
 	}
 }
@@ -524,6 +538,19 @@ func clearSessionSecrets(session *GhostfolioSession) {
 	session.UserBaseCurrency = ""
 }
 
+// syncReportsUnavailableReasonFromProtectedData derives the current report
+// availability gate from the readable selected-server protected-data summary.
+// Authored by: OpenCode
+func syncReportsUnavailableReasonFromProtectedData(state ProtectedDataState) ReportFailureReason {
+	if !state.HasReadableSnapshot {
+		return ReportFailureNoSyncedDataAvailable
+	}
+	if len(state.AvailableReportYears) == 0 {
+		return ReportFailureNoReportableYearsAvailable
+	}
+	return ReportFailureNone
+}
+
 // ProtectedDataState reports whether a readable protected snapshot is active for this run.
 // Authored by: OpenCode
 func (s *syncService) ProtectedDataState() ProtectedDataState {
@@ -532,6 +559,21 @@ func (s *syncService) ProtectedDataState() ProtectedDataState {
 	}
 
 	return s.snapshots.ProtectedDataState()
+}
+
+// UnlockSelectedServerSnapshot tries to unlock one selected-server protected
+// snapshot for the active Sync and Reports context without forcing a new sync.
+// Authored by: OpenCode
+func (s *syncService) UnlockSelectedServerSnapshot(
+	ctx context.Context,
+	config configmodel.AppSetupConfig,
+	securityToken string,
+) SyncReportsContextResult {
+	if s.snapshots == nil {
+		return SyncReportsContextResult{ReportUnavailableReason: ReportFailureNoSyncedDataAvailable}
+	}
+
+	return s.snapshots.UnlockSelectedServerSnapshot(ctx, config.ServerOrigin, securityToken)
 }
 
 // CheckServerReplacement compares the selected server against the active readable snapshot.

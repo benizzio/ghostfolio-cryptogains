@@ -87,7 +87,7 @@ Success transitions:
 Entry conditions:
 
 - A `Sync and Reports` context is active and has a runtime token.
-- A sync attempt completed and returned to the active context.
+- A user just successfully unlocked the sync and reports context with or without existing synced data or a sync attempt completed and returned to the active context.
 - A report-generation attempt completed and returned to the active context.
 
 Visible content:

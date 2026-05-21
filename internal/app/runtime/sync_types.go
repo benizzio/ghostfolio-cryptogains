@@ -119,6 +119,17 @@ type SyncOutcome struct {
 	Diagnostic    DiagnosticReportState
 }
 
+// ProtectedDataState summarizes whether readable protected data is active in
+// memory for this run and which report-related metadata is available from it.
+// Authored by: OpenCode
+type ProtectedDataState struct {
+	HasReadableSnapshot  bool
+	ServerOrigin         string
+	ActivityCount        int
+	LastSuccessfulSyncAt time.Time
+	AvailableReportYears []int
+}
+
 // DiagnosticReportRequest stores the structured data needed to write one local
 // synced-data diagnostic report.
 // Authored by: OpenCode

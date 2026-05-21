@@ -18,14 +18,13 @@ import (
 //
 // Authored by: OpenCode
 type MainMenuScreenParams struct {
-	Theme               component.Theme
-	Width               int
-	Height              int
-	MenuItems           []component.MenuItem
-	SelectedIndex       int
-	ServerOrigin        string
-	ProtectedDataExists bool
-	HelpText            string
+	Theme         component.Theme
+	Width         int
+	Height        int
+	MenuItems     []component.MenuItem
+	SelectedIndex int
+	ServerOrigin  string
+	HelpText      string
 }
 
 // MainMenuScreenView renders the main menu for the current slice.
@@ -38,14 +37,13 @@ type MainMenuScreenParams struct {
 // `MainMenuScreenView` formats the startup-complete state, the selected server
 // summary, the primary menu, and the footer help into the shared full-screen
 // layout. Use it after setup has completed and the application should expose
-// `Sync Data` as the only available business workflow.
+// `Sync and Reports` as the business workflow entry.
 //
 // Authored by: OpenCode
 func MainMenuScreenView(params MainMenuScreenParams) string {
 	var body = fmt.Sprintf(
-		"Selected Server: %s\nSetup Status: complete\nProtected Data: %s\n\n%s",
+		"Selected Server: %s\nSetup Status: complete\n\n%s",
 		params.ServerOrigin,
-		protectedDataStatusLabel(params.ProtectedDataExists),
 		component.RenderMenu(params.Theme, params.MenuItems, params.SelectedIndex),
 	)
 
@@ -54,18 +52,9 @@ func MainMenuScreenView(params MainMenuScreenParams) string {
 		params.Width,
 		params.Height,
 		"Main Menu",
-		"Sync Data is the only business workflow available in this release.",
+		"Sync and Reports is the business workflow entry for this slice.",
 		body,
-		"Choose Sync Data to authenticate, retrieve, validate, and store protected activity history. Protected-data presence may be shown, but no cached activity details are exposed in this slice.",
+		"Choose Sync and Reports to enter the token-unlocked workflow context. Protected sync metadata and reporting readiness stay hidden on the main menu.",
 		params.HelpText,
 	)
-}
-
-// protectedDataStatusLabel formats the active readable-protected-data summary without exposing activity details.
-// Authored by: OpenCode
-func protectedDataStatusLabel(present bool) string {
-	if present {
-		return "readable snapshot loaded for this run"
-	}
-	return "none loaded for this run"
 }

@@ -6,7 +6,6 @@ package integration
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -64,7 +63,7 @@ func TestSyncEntrySuccessUsesProductionRuntimePath(t *testing.T) {
 
 	var tempDir = t.TempDir()
 	var server = newGhostfolioScenarioServer(t, ghostfolioScenario{
-		activitiesBody: `{"activities":[{"id":"activity-1","date":"2026-01-31T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":10,"unitPriceInAssetProfileCurrency":10,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}],"count":1}`,
+		activitiesBody: `{"activities":[{"id":"activity-1","date":"2026-01-31T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":10,"unitPriceInAssetProfileCurrency":10,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD","symbolProfileId":"asset-btc-entry-001"}}],"count":1}`,
 	})
 	var fixture = syncEntryFixture{
 		config: mustCustomSetupConfig(t, server.URL),
@@ -88,16 +87,13 @@ func TestSyncEntrySuccessUsesProductionRuntimePath(t *testing.T) {
 	model, cmd := startSyncAttempt(t, model)
 	model = applySyncBatch(t, model, cmd)
 
-	if model.ActiveScreen() != "sync_result" {
-		t.Fatalf("expected sync result screen, got %s", model.ActiveScreen())
+	if model.ActiveScreen() != "sync_reports_menu" {
+		t.Fatalf("expected sync and reports menu after context sync, got %s", model.ActiveScreen())
 	}
 
 	var content = model.View().Content
-	if !strings.Contains(content, "Activity data was stored securely for future use.") {
-		t.Fatalf("expected successful sync summary, got %q", content)
-	}
-	if !strings.Contains(content, "No report-generation") || !strings.Contains(content, "cached-data browsing workflow") {
-		t.Fatalf("expected success follow-up text, got %q", content)
+	if !strings.Contains(content, "Sync Data") || !strings.Contains(content, "Generate Capital Gains Report") {
+		t.Fatalf("expected unlocked context actions after successful sync, got %q", content)
 	}
 	if strings.Contains(content, "abc123") || strings.Contains(content, "jwt") {
 		t.Fatalf("expected transient secrets to stay out of the rendered result, got %q", content)
@@ -191,17 +187,13 @@ func TestSyncEntryFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 			model, cmd := startSyncAttempt(t, model)
 			model = applySyncBatch(t, model, cmd)
 
-			if model.ActiveScreen() != "sync_result" {
-				t.Fatalf("expected sync result screen, got %s", model.ActiveScreen())
+			if model.ActiveScreen() != "sync_reports_menu" {
+				t.Fatalf("expected sync and reports menu after context sync, got %s", model.ActiveScreen())
 			}
 
 			var content = model.View().Content
-			var expectedCategory = fmt.Sprintf("Failure Category: %s", testCase.wantCategory)
-			if !strings.Contains(content, expectedCategory) {
-				t.Fatalf("expected failure category %q, got %q", expectedCategory, content)
-			}
-			if !strings.Contains(content, testCase.wantFollowUp) {
-				t.Fatalf("expected follow-up text %q, got %q", testCase.wantFollowUp, content)
+			if !strings.Contains(content, "Sync Data") || !strings.Contains(content, "Generate Capital Gains Report") {
+				t.Fatalf("expected unlocked context after failed sync, got %q", content)
 			}
 			if testCase.wantSecretSafe && (strings.Contains(content, "abc123") || strings.Contains(content, "jwt")) {
 				t.Fatalf("expected transient secrets to stay out of the rendered result, got %q", content)
@@ -235,10 +227,10 @@ func TestFailedSyncResultDefaultActionStartsSyncAgain(t *testing.T) {
 	}
 }
 
-// TestSuccessfulSyncResultDefaultActionReturnsToMainMenu verifies the default
-// result action after a successful sync.
+// TestSuccessfulContextSyncDefaultActionReopensSyncData verifies the default
+// action after a successful sync inside the active Sync and Reports context.
 // Authored by: OpenCode
-func TestSuccessfulSyncResultDefaultActionReturnsToMainMenu(t *testing.T) {
+func TestSuccessfulContextSyncDefaultActionReopensSyncData(t *testing.T) {
 	t.Parallel()
 
 	var server = newGhostfolioScenarioServer(t, ghostfolioScenario{})
@@ -254,8 +246,8 @@ func TestSuccessfulSyncResultDefaultActionReturnsToMainMenu(t *testing.T) {
 	var updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = assertFlowModel(t, updated)
 
-	if model.ActiveScreen() != "main_menu" {
-		t.Fatalf("expected successful sync to return to the main menu by default, got %s", model.ActiveScreen())
+	if model.ActiveScreen() != "sync" {
+		t.Fatalf("expected successful context sync to reopen Sync Data by default, got %s", model.ActiveScreen())
 	}
 }
 
@@ -282,8 +274,8 @@ func TestSyncEntryBusyStateStillHandlesResizeBeforeCompletion(t *testing.T) {
 	}
 
 	model = applySyncBatch(t, model, cmd)
-	if model.ActiveScreen() != "sync_result" {
-		t.Fatalf("expected sync result screen after the delayed batch completed, got %s", model.ActiveScreen())
+	if model.ActiveScreen() != "sync_reports_menu" {
+		t.Fatalf("expected sync and reports menu after the delayed batch completed, got %s", model.ActiveScreen())
 	}
 }
 
@@ -445,6 +437,22 @@ func newSyncEntryModel(t *testing.T, fixture syncEntryFixture) *flow.Model {
 func startSyncAttempt(t *testing.T, model *flow.Model) (*flow.Model, tea.Cmd) {
 	t.Helper()
 
+	if model.ActiveScreen() == "sync_reports_unlock" {
+		var updated tea.Model
+		var unlockCmd tea.Cmd
+		updated, unlockCmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+		_ = testutil.RunCmd(unlockCmd)
+		model = assertFlowModel(t, updated)
+		if model.ActiveScreen() != "sync_reports_menu" {
+			t.Fatalf("expected unlock submit to route to sync and reports menu, got %s", model.ActiveScreen())
+		}
+		updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+		model = assertFlowModel(t, updated)
+		if model.ActiveScreen() != "sync" {
+			t.Fatalf("expected Sync Data action to route to sync screen, got %s", model.ActiveScreen())
+		}
+	}
+
 	var updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = assertFlowModel(t, updated)
 	if cmd == nil {
@@ -496,13 +504,18 @@ func mustCustomSetupConfig(t *testing.T, origin string) configmodel.AppSetupConf
 	return config
 }
 
-// openSyncEntry enters the sync workflow from the main menu.
+// openSyncEntry enters the sync workflow from the main menu through the first
+// `Sync and Reports` unlock step.
 // Authored by: OpenCode
 func openSyncEntry(t *testing.T, model *flow.Model) *flow.Model {
 	t.Helper()
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	_ = testutil.RunCmd(cmd)
-	return updated.(*flow.Model)
+	model = updated.(*flow.Model)
+	if model.ActiveScreen() != "sync_reports_unlock" {
+		t.Fatalf("expected sync and reports unlock screen, got %s", model.ActiveScreen())
+	}
+	return model
 }
 
 // typeToken types one token value into the focused Ghostfolio security-token
@@ -518,8 +531,8 @@ func typeToken(t *testing.T, model *flow.Model, token string) *flow.Model {
 	return model
 }
 
-// blurTokenInputFromSyncEntry returns focus from the token input to the sync
-// entry menu.
+// blurTokenInputFromSyncEntry returns focus from the token input to the unlock
+// or sync-entry menu.
 // Authored by: OpenCode
 func blurTokenInputFromSyncEntry(t *testing.T, model *flow.Model) *flow.Model {
 	t.Helper()

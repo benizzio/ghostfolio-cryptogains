@@ -49,6 +49,9 @@ func TestMapActivityHandlesOptionalValuesAndScopeBranches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("map activity: %v", err)
 	}
+	if record.AssetIdentityKey != "asset-btc-001" {
+		t.Fatalf("expected persisted asset identity key, got %#v", record.AssetIdentityKey)
+	}
 	orderGrossValue, err := decimalsupport.CanonicalStringPointer(record.OrderGrossValue)
 	if err != nil {
 		t.Fatalf("canonical order gross value: %v", err)
@@ -104,13 +107,24 @@ func TestMapActivityHandlesOptionalValuesAndScopeBranches(t *testing.T) {
 	}
 
 	entry = validActivityPageEntry()
+	entry.SymbolProfile.SymbolProfileID = ""
+	record, err = MapActivity(entry, "USD", decimalsupport.NewService())
+	if err != nil {
+		t.Fatalf("map activity with missing asset identity key: %v", err)
+	}
+	if record.AssetIdentityKey != "" {
+		t.Fatalf("expected missing symbolProfileId not to fall back to display fields, got %#v", record.AssetIdentityKey)
+	}
+
+	entry = validActivityPageEntry()
 	entry.ID = "  activity-2  "
 	entry.Date = "  2024-01-01T10:00:00Z  "
+	entry.SymbolProfile.SymbolProfileID = "  asset-btc-002  "
 	record, err = MapActivity(entry, "USD", decimalsupport.NewService())
 	if err != nil {
 		t.Fatalf("map activity with padded identifiers: %v", err)
 	}
-	if record.SourceID != "activity-2" || record.OccurredAt != "2024-01-01T10:00:00Z" {
+	if record.SourceID != "activity-2" || record.OccurredAt != "2024-01-01T10:00:00Z" || record.AssetIdentityKey != "asset-btc-002" {
 		t.Fatalf("expected stored identity fields to be trimmed, got %#v", record)
 	}
 }
@@ -298,7 +312,7 @@ func validActivityPageEntry() dto.ActivityPageEntry {
 		FeeInBaseCurrency:               json.Number("0.25"),
 		UnitPriceInAssetProfileCurrency: json.Number("82.3"),
 		Comment:                         "comment",
-		SymbolProfile:                   dto.ActivitySymbolProfile{Symbol: "BTC", Name: "Bitcoin", Currency: "EUR"},
+		SymbolProfile:                   dto.ActivitySymbolProfile{Symbol: "BTC", Name: "Bitcoin", Currency: "EUR", SymbolProfileID: "asset-btc-001"},
 		Account:                         &dto.ActivityAccountScope{ID: "account-1", Name: "Main Account"},
 		DataSource:                      "ghostfolio",
 	}

@@ -306,7 +306,7 @@ func TestFetchActivitiesHistoryHandlesTransportAndBuildErrors(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			writer.Header().Set("Content-Type", "application/json")
-			_, _ = writer.Write([]byte(`{"activities":[{"id":"a","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"currency":null,"value":90,"unitPrice":90,"fee":2,"unitPriceInAssetProfileCurrency":95,"feeInAssetProfileCurrency":1.8,"valueInBaseCurrency":100,"feeInBaseCurrency":2.2,"comment":null,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"EUR"}}],"count":1}`))
+			_, _ = writer.Write([]byte(`{"activities":[{"id":"a","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"currency":null,"value":90,"unitPrice":90,"fee":2,"unitPriceInAssetProfileCurrency":95,"feeInAssetProfileCurrency":1.8,"valueInBaseCurrency":100,"feeInBaseCurrency":2.2,"comment":null,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"EUR","symbolProfileId":"asset-btc-client-001"}}],"count":1}`))
 		}))
 		defer server.Close()
 

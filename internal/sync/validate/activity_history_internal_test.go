@@ -57,6 +57,7 @@ func TestValidationErrorHelpersAndValidationBranches(t *testing.T) {
 		cache syncmodel.ProtectedActivityCache
 	}{
 		{name: "missing identity", cache: syncmodel.ProtectedActivityCache{ActivityCount: 1, Activities: []syncmodel.ActivityRecord{{OccurredAt: "2024-01-01T10:00:00Z"}}}},
+		{name: "missing asset identity key", cache: syncmodel.ProtectedActivityCache{ActivityCount: 1, Activities: []syncmodel.ActivityRecord{func() syncmodel.ActivityRecord { record := buy; record.AssetIdentityKey = ""; return record }()}}},
 		{name: "non-positive quantity", cache: syncmodel.ProtectedActivityCache{ActivityCount: 1, Activities: []syncmodel.ActivityRecord{func() syncmodel.ActivityRecord { record := buy; record.Quantity = zeroPrice; return record }()}}},
 		{name: "negative gross value", cache: syncmodel.ProtectedActivityCache{ActivityCount: 1, Activities: []syncmodel.ActivityRecord{func() syncmodel.ActivityRecord { record := buy; record.OrderGrossValue = &negativeValue; return record }()}}},
 		{name: "negative fee", cache: syncmodel.ProtectedActivityCache{ActivityCount: 1, Activities: []syncmodel.ActivityRecord{func() syncmodel.ActivityRecord { record := buy; record.OrderFeeAmount = &negativeValue; return record }()}}},
@@ -343,15 +344,16 @@ func validationTestRecord(t *testing.T, sourceID string, activityType syncmodel.
 	}
 
 	return syncmodel.ActivityRecord{
-		SourceID:        sourceID,
-		OccurredAt:      "2024-01-01T10:00:00Z",
-		ActivityType:    activityType,
-		AssetSymbol:     "BTC",
-		OrderCurrency:   "USD",
-		BaseCurrency:    "USD",
-		Quantity:        quantity,
-		OrderUnitPrice:  &unitPrice,
-		OrderGrossValue: &grossValue,
-		RawHash:         sourceID,
+		SourceID:         sourceID,
+		OccurredAt:       "2024-01-01T10:00:00Z",
+		ActivityType:     activityType,
+		AssetIdentityKey: "asset-btc-validation-001",
+		AssetSymbol:      "BTC",
+		OrderCurrency:    "USD",
+		BaseCurrency:     "USD",
+		Quantity:         quantity,
+		OrderUnitPrice:   &unitPrice,
+		OrderGrossValue:  &grossValue,
+		RawHash:          sourceID,
 	}
 }

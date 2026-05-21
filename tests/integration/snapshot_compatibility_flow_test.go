@@ -87,7 +87,8 @@ func TestSnapshotCompatibilityFlowRejectsUnsupportedPayloadVersion(t *testing.T)
 }
 
 // TestSnapshotCompatibilityFlowRejectsUnsupportedActivityModelVersion verifies
-// that pre-BUG-003 snapshots fail safely without an explicit migration path.
+// that pre-asset-identity snapshots fail safely without an explicit migration
+// path.
 // Authored by: OpenCode
 func TestSnapshotCompatibilityFlowRejectsUnsupportedActivityModelVersion(t *testing.T) {
 	t.Parallel()
@@ -131,7 +132,7 @@ func TestSnapshotCompatibilityFlowRetainsReadableSnapshotWhenNewWriteIsIncompati
 	server := newTokenAwareStorageServer(t)
 	server.SetTokenPages("token-one", []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
+		ActivitiesJSON: `[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD","symbolProfileId":"asset-btc-compat-001"}}]`,
 	}})
 	baseStore := snapshotstore.NewEncryptedStore(baseDir, nil)
 	wrappingStore := &failingCompatibilityWriteStore{Store: baseStore}
@@ -173,7 +174,7 @@ func TestSnapshotCompatibilityFlowRetainsReadableSnapshotWhenNewWriteIsIncompati
 	wrappingStore.failWrites = true
 	server.SetTokenPages("token-one", []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"activity-2","date":"2025-01-01T10:00:00Z","type":"BUY","quantity":2,"valueInBaseCurrency":200,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
+		ActivitiesJSON: `[{"id":"activity-2","date":"2025-01-01T10:00:00Z","type":"BUY","quantity":2,"valueInBaseCurrency":200,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD","symbolProfileId":"asset-btc-compat-001"}}]`,
 	}})
 	outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
 	if outcome.FailureReason != runtime.SyncFailureIncompatibleNewSyncData {

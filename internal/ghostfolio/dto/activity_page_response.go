@@ -41,9 +41,10 @@ type ActivityPageEntry struct {
 // for normalization.
 // Authored by: OpenCode
 type ActivitySymbolProfile struct {
-	Symbol   string `json:"symbol"`
-	Name     string `json:"name"`
-	Currency string `json:"currency"`
+	Symbol          string `json:"symbol"`
+	Name            string `json:"name"`
+	Currency        string `json:"currency"`
+	SymbolProfileID string `json:"symbolProfileId"`
 }
 
 // ActivityAccountScope preserves optional source account metadata that may

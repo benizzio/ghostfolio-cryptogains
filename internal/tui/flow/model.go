@@ -17,6 +17,7 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
+	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/component"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/screen"
 )
@@ -30,6 +31,11 @@ type activeScreen string
 const (
 	setupScreenKey             activeScreen = "setup"
 	mainMenuScreenKey          activeScreen = "main_menu"
+	syncReportsUnlockScreenKey activeScreen = "sync_reports_unlock"
+	syncReportsMenuScreenKey   activeScreen = "sync_reports_menu"
+	reportSelectionScreenKey   activeScreen = "report_selection"
+	reportBusyScreenKey        activeScreen = "report_busy"
+	reportResultScreenKey      activeScreen = "report_result"
 	syncScreenKey              activeScreen = "sync"
 	serverReplacementScreenKey activeScreen = "server_replacement"
 	syncResultScreenKey        activeScreen = "sync_result"
@@ -61,15 +67,24 @@ type diagnosticReportFinishedMsg struct {
 	Err  error
 }
 
+// reportFinishedMsg reports the result of one asynchronous report-generation
+// run.
+// Authored by: OpenCode
+type reportFinishedMsg struct {
+	Outcome runtime.ReportOutcome
+	Attempt string
+}
+
 // Dependencies contains the runtime services required by the root Bubble Tea
 // model.
 //
 // Authored by: OpenCode
 type Dependencies struct {
-	Options      bootstrap.Options
-	Startup      bootstrap.StartupState
-	SetupService runtime.SetupService
-	SyncService  runtime.SyncService
+	Options       bootstrap.Options
+	Startup       bootstrap.StartupState
+	SetupService  runtime.SetupService
+	SyncService   runtime.SyncService
+	ReportService runtime.ReportService
 }
 
 // setupState holds transient UI state for the setup workflow.
@@ -94,6 +109,46 @@ type syncState struct {
 	BusyText          string
 	AttemptID         string
 	Cancel            context.CancelFunc
+}
+
+// syncReportsContextState holds the active unlock-context shell that later
+// slices will reuse across sync and report actions.
+// Authored by: OpenCode
+type syncReportsContextState struct {
+	Active               bool
+	RuntimeToken         string
+	SelectedServerOrigin string
+	ProtectedData        runtime.ProtectedDataState
+	SyncResult           syncContextResultState
+	ReportUnavailable    runtime.ReportFailureReason
+	ReportResult         runtime.ReportOutcome
+	ReportSavedPath      string
+	ReportRendered       string
+	NoReportHistory      bool
+}
+
+// syncContextResultState holds transient sync-failure feedback rendered inside
+// the active `Sync and Reports` context.
+// Authored by: OpenCode
+type syncContextResultState struct {
+	Outcome       runtime.SyncOutcome
+	Busy          bool
+	StatusMessage string
+}
+
+// reportState holds transient UI state for report selection, busy execution,
+// and result routing.
+// Authored by: OpenCode
+type reportState struct {
+	FocusArea      int
+	YearIndex      int
+	MethodIndex    int
+	ActionIndex    int
+	Busy           bool
+	BusyText       string
+	AttemptID      string
+	SelectedYear   int
+	SelectedMethod string
 }
 
 // serverReplacementState holds transient UI state for server-mismatch confirmation.
@@ -126,8 +181,10 @@ type Model struct {
 	currentConfig *configmodel.AppSetupConfig
 	setup         setupState
 	sync          syncState
+	syncReports   syncReportsContextState
 	replacement   serverReplacementState
 	result        resultState
+	report        reportState
 	spinner       spinner.Model
 }
 
@@ -157,6 +214,8 @@ func NewModel(deps Dependencies) *Model {
 	} else {
 		model.active = setupScreenKey
 	}
+	model.syncReports = newSyncReportsContextState(model.currentServerOrigin(), deps.SyncService.ProtectedDataState())
+	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
 
 	return model
 }
@@ -191,6 +250,7 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		if typedMessage.String() == "ctrl+c" {
 			m.cancelActiveSync()
 			m.sync.TokenInput.Reset()
+			m.clearSyncReportsRuntimeState()
 			return m, quitCmd
 		}
 	}
@@ -200,6 +260,12 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateSetup(message)
 	case mainMenuScreenKey:
 		return m.updateMainMenu(message)
+	case syncReportsUnlockScreenKey:
+		return m.updateSync(message)
+	case syncReportsMenuScreenKey:
+		return m.updateSyncReportsMenu(message)
+	case reportSelectionScreenKey, reportBusyScreenKey, reportResultScreenKey:
+		return m.updateReport(message)
 	case syncScreenKey:
 		return m.updateSync(message)
 	case serverReplacementScreenKey:
@@ -241,31 +307,116 @@ func (m *Model) View() tea.View {
 	case mainMenuScreenKey:
 		rendered = screen.MainMenuScreenView(
 			screen.MainMenuScreenParams{
-				Theme:               m.theme,
-				Width:               m.width,
-				Height:              m.height,
-				MenuItems:           m.mainMenuItems(),
-				SelectedIndex:       0,
-				ServerOrigin:        m.currentServerOrigin(),
-				ProtectedDataExists: m.deps.SyncService.ProtectedDataState().HasReadableSnapshot,
-				HelpText:            m.mainMenuHelpText(),
+				Theme:         m.theme,
+				Width:         m.width,
+				Height:        m.height,
+				MenuItems:     m.mainMenuItems(),
+				SelectedIndex: 0,
+				ServerOrigin:  m.currentServerOrigin(),
+				HelpText:      m.mainMenuHelpText(),
+			},
+		)
+	case syncReportsUnlockScreenKey:
+		rendered = screen.SyncEntryScreenView(
+			screen.SyncEntryScreenParams{
+				Theme:                   m.theme,
+				Width:                   m.width,
+				Height:                  m.height,
+				ScreenTitle:             "Sync and Reports",
+				ScreenSubtitle:          "Unlock the active sync and reporting context.",
+				IntroText:               "Enter the Ghostfolio security token once to unlock Sync Data and future reporting actions for this run.",
+				IdleStatusText:          "Enter the Ghostfolio security token to unlock Sync and Reports for this run.",
+				ShowProtectedDataStatus: false,
+				MenuItems:               m.syncMenuItems(),
+				SelectedIndex:           m.sync.MenuIndex,
+				TokenInput:              m.sync.TokenInput.View(),
+				ValidationMessage:       m.sync.ValidationMessage,
+				HelpText:                m.syncHelpText(),
+				Busy:                    m.sync.Busy,
+				BusyText:                m.sync.BusyText,
+				SpinnerFrame:            m.spinner.View(),
+				ProtectedDataExists:     m.deps.SyncService.ProtectedDataState().HasReadableSnapshot,
 			},
 		)
 	case syncScreenKey:
 		rendered = screen.SyncEntryScreenView(
 			screen.SyncEntryScreenParams{
-				Theme:               m.theme,
-				Width:               m.width,
-				Height:              m.height,
-				MenuItems:           m.syncMenuItems(),
-				SelectedIndex:       m.sync.MenuIndex,
-				TokenInput:          m.sync.TokenInput.View(),
-				ValidationMessage:   m.sync.ValidationMessage,
-				HelpText:            m.syncHelpText(),
-				Busy:                m.sync.Busy,
-				BusyText:            m.sync.BusyText,
-				SpinnerFrame:        m.spinner.View(),
-				ProtectedDataExists: m.deps.SyncService.ProtectedDataState().HasReadableSnapshot,
+				Theme:                   m.theme,
+				Width:                   m.width,
+				Height:                  m.height,
+				ScreenTitle:             "Sync Data",
+				ScreenSubtitle:          "Retrieve, validate, and securely store supported activity history.",
+				IntroText:               "The application will authenticate, retrieve activity history, validate it, and store it securely for future use only.",
+				IdleStatusText:          "Enter the Ghostfolio security token only when starting Sync Data.",
+				ShowProtectedDataStatus: true,
+				MenuItems:               m.syncMenuItems(),
+				SelectedIndex:           m.sync.MenuIndex,
+				TokenInput:              m.sync.TokenInput.View(),
+				ValidationMessage:       m.sync.ValidationMessage,
+				HelpText:                m.syncHelpText(),
+				Busy:                    m.sync.Busy,
+				BusyText:                m.sync.BusyText,
+				SpinnerFrame:            m.spinner.View(),
+				ProtectedDataExists:     m.deps.SyncService.ProtectedDataState().HasReadableSnapshot,
+			},
+		)
+	case syncReportsMenuScreenKey:
+		rendered = screen.SyncReportsScreenView(
+			screen.SyncReportsScreenParams{
+				Theme:              m.theme,
+				Width:              m.width,
+				Height:             m.height,
+				ServerOrigin:       m.syncReports.SelectedServerOrigin,
+				SelectedIndex:      m.sync.MenuIndex,
+				MenuItems:          m.syncReportsMenuItems(),
+				ProtectedDataState: m.syncReports.ProtectedData,
+				SyncOutcome:        m.syncReports.SyncResult.Outcome,
+				Busy:               m.syncReports.SyncResult.Busy,
+				StatusMessage:      m.syncReports.SyncResult.StatusMessage,
+				UnavailableMessage: string(m.syncReports.ReportUnavailable),
+				HelpText:           m.syncReportsHelpText(),
+			},
+		)
+	case reportSelectionScreenKey:
+		rendered = screen.ReportSelectionScreenView(
+			screen.ReportSelectionScreenParams{
+				Theme:             m.theme,
+				Width:             m.width,
+				Height:            m.height,
+				AvailableYears:    m.syncReports.ProtectedData.AvailableReportYears,
+				SelectedYearIndex: m.report.YearIndex,
+				MethodItems:       m.reportMethodItems(),
+				SelectedMethod:    m.report.MethodIndex,
+				MethodExplanation: reportMethodForIndex(m.report.MethodIndex).Explanation(),
+				MenuItems:         m.reportSelectionMenuItems(),
+				SelectedAction:    m.report.ActionIndex,
+				HelpText:          m.reportSelectionHelpText(),
+			},
+		)
+	case reportBusyScreenKey:
+		rendered = screen.ReportBusyScreenView(
+			screen.ReportBusyScreenParams{
+				Theme:        m.theme,
+				Width:        m.width,
+				Height:       m.height,
+				SelectedYear: m.report.SelectedYear,
+				MethodLabel:  reportMethodForIndex(m.report.MethodIndex).Label(),
+				BusyText:     m.report.BusyText,
+				SpinnerFrame: m.spinner.View(),
+				HelpText:     m.reportBusyHelpText(),
+			},
+		)
+	case reportResultScreenKey:
+		rendered = screen.ReportResultScreenView(
+			screen.ReportResultScreenParams{
+				Theme:         m.theme,
+				Width:         m.width,
+				Height:        m.height,
+				Outcome:       m.syncReports.ReportResult,
+				MethodLabel:   m.syncReports.ReportResult.Request.CostBasisMethod.Label(),
+				MenuItems:     m.reportResultMenuItems(),
+				SelectedIndex: m.report.ActionIndex,
+				HelpText:      m.reportResultHelpText(),
 			},
 		)
 	case serverReplacementScreenKey:
@@ -348,7 +499,7 @@ func (m *Model) setupMenuItems() []component.MenuItem {
 // mainMenuItems builds the primary main-menu actions for the current render.
 // Authored by: OpenCode
 func (m *Model) mainMenuItems() []component.MenuItem {
-	return []component.MenuItem{{Label: "Sync Data", Enabled: true}}
+	return []component.MenuItem{{Label: "Sync and Reports", Enabled: true}}
 }
 
 // syncMenuItems builds the primary sync-entry actions for the current render.
@@ -356,6 +507,12 @@ func (m *Model) mainMenuItems() []component.MenuItem {
 func (m *Model) syncMenuItems() []component.MenuItem {
 	if m.sync.Busy {
 		return nil
+	}
+	if m.active == syncReportsUnlockScreenKey {
+		return []component.MenuItem{
+			{Label: "Unlock", Enabled: true},
+			{Label: "Back", Enabled: true},
+		}
 	}
 	return []component.MenuItem{
 		{Label: "Start Sync", Enabled: true},
@@ -385,6 +542,49 @@ func (m *Model) resultMenuItems() []component.MenuItem {
 		{Label: "Sync Again", Enabled: true},
 		{Label: "Back To Main Menu", Enabled: true},
 	}
+}
+
+// syncReportsMenuItems builds the primary unlocked-context actions.
+// Authored by: OpenCode
+func (m *Model) syncReportsMenuItems() []component.MenuItem {
+	var reportEnabled = m.syncReports.ProtectedData.HasReadableSnapshot && len(m.syncReports.ProtectedData.AvailableReportYears) > 0
+	var contextBusy = m.syncReports.SyncResult.Busy
+	var items = []component.MenuItem{
+		{Label: "Sync Data", Enabled: !contextBusy},
+		{Label: "Generate Capital Gains Report", Enabled: reportEnabled && !contextBusy},
+	}
+	if m.syncReportsHasPendingDiagnostic() {
+		items = append(items, component.MenuItem{Label: "Generate Diagnostic Report", Enabled: !contextBusy})
+	}
+	items = append(items, component.MenuItem{Label: "Back To Main Menu", Enabled: !contextBusy})
+	return items
+}
+
+// reportMethodItems builds the supported report method menu.
+// Authored by: OpenCode
+func (m *Model) reportMethodItems() []component.MenuItem {
+	var methods = reportmodel.SupportedCostBasisMethods()
+	var items = make([]component.MenuItem, 0, len(methods))
+	for _, method := range methods {
+		items = append(items, component.MenuItem{Label: method.Label(), Enabled: true})
+	}
+	return items
+}
+
+// reportSelectionMenuItems builds the report-selection action menu.
+// Authored by: OpenCode
+func (m *Model) reportSelectionMenuItems() []component.MenuItem {
+	return []component.MenuItem{{Label: "Generate Report", Enabled: true}, {Label: "Back", Enabled: true}}
+}
+
+// reportResultMenuItems builds the completed report-result action menu.
+// Authored by: OpenCode
+func (m *Model) reportResultMenuItems() []component.MenuItem {
+	var items = []component.MenuItem{{Label: "Back To Sync and Reports", Enabled: true}}
+	if m.syncReports.ProtectedData.HasReadableSnapshot && len(m.syncReports.ProtectedData.AvailableReportYears) > 0 {
+		items = append(items, component.MenuItem{Label: "Generate Another Report", Enabled: true})
+	}
+	return items
 }
 
 // serverReplacementMenuItems builds the primary server-replacement confirmation actions.
@@ -428,6 +628,42 @@ func (m *Model) syncHelpText() string {
 				quitBinding(),
 			},
 		},
+	)
+}
+
+// syncReportsHelpText renders the visible hotkeys for the unlocked Sync and Reports menu.
+// Authored by: OpenCode
+func (m *Model) syncReportsHelpText() string {
+	return component.RenderHelp(
+		component.ContentWidthForScreen(m.width),
+		component.Bindings{Short: []key.Binding{upBinding(), downBinding(), enterBinding(), quitBinding()}},
+	)
+}
+
+// reportSelectionHelpText renders the visible hotkeys for report selection.
+// Authored by: OpenCode
+func (m *Model) reportSelectionHelpText() string {
+	return component.RenderHelp(
+		component.ContentWidthForScreen(m.width),
+		component.Bindings{Short: []key.Binding{upBinding(), downBinding(), enterBinding(), focusBinding(), quitBinding()}},
+	)
+}
+
+// reportBusyHelpText renders the visible hotkeys for report busy state.
+// Authored by: OpenCode
+func (m *Model) reportBusyHelpText() string {
+	return component.RenderHelp(
+		component.ContentWidthForScreen(m.width),
+		component.Bindings{Short: []key.Binding{quitBinding()}},
+	)
+}
+
+// reportResultHelpText renders the visible hotkeys for report result navigation.
+// Authored by: OpenCode
+func (m *Model) reportResultHelpText() string {
+	return component.RenderHelp(
+		component.ContentWidthForScreen(m.width),
+		component.Bindings{Short: []key.Binding{upBinding(), downBinding(), enterBinding(), quitBinding()}},
 	)
 }
 
@@ -497,6 +733,37 @@ func newSyncState() syncState {
 	return syncState{InputFocused: true, TokenInput: input}
 }
 
+// newSyncReportsContextState creates the initial `Sync and Reports` context
+// shell for the currently selected server.
+// Authored by: OpenCode
+func newSyncReportsContextState(serverOrigin string, protectedData runtime.ProtectedDataState) syncReportsContextState {
+	return syncReportsContextState{
+		SelectedServerOrigin: serverOrigin,
+		ProtectedData:        protectedData,
+		ReportUnavailable:    runtime.ReportFailureNoSyncedDataAvailable,
+		NoReportHistory:      true,
+	}
+}
+
+// newReportState creates the initial report workflow state.
+// Authored by: OpenCode
+func newReportState(years []int) reportState {
+	var state = reportState{FocusArea: 0, MethodIndex: 0}
+	if len(years) > 0 {
+		state.SelectedYear = years[0]
+	}
+	state.SelectedMethod = string(reportMethodForIndex(state.MethodIndex))
+	return state
+}
+
+// clearSyncReportsRuntimeState scrubs token and transient report state for the
+// active `Sync and Reports` context.
+// Authored by: OpenCode
+func (m *Model) clearSyncReportsRuntimeState() {
+	m.syncReports = newSyncReportsContextState(m.currentServerOrigin(), m.deps.SyncService.ProtectedDataState())
+	m.report = newReportState(m.syncReports.ProtectedData.AvailableReportYears)
+}
+
 // enterSetup routes the application to the setup workflow.
 // Authored by: OpenCode
 func (m *Model) enterSetup(message string, startupReason bootstrap.SetupRequirementReason) tea.Cmd {
@@ -512,9 +779,60 @@ func (m *Model) enterMainMenu() {
 	m.active = mainMenuScreenKey
 	m.result = resultState{}
 	m.sync = newSyncState()
+	m.clearSyncReportsRuntimeState()
 	m.sync.InputFocused = false
 	m.setup.ValidationMessage = ""
 	m.setup.StartupReason = bootstrap.SetupRequirementNone
+}
+
+// enterSyncReportsUnlock routes the application to the token-unlock entry
+// screen for the active `Sync and Reports` context.
+// Authored by: OpenCode
+func (m *Model) enterSyncReportsUnlock() tea.Cmd {
+	m.active = syncReportsUnlockScreenKey
+	m.sync = newSyncState()
+	m.clearSyncReportsRuntimeState()
+	return m.sync.TokenInput.Focus()
+}
+
+// enterSyncReportsMenu routes the application to the unlocked Sync and Reports context menu.
+// Authored by: OpenCode
+func (m *Model) enterSyncReportsMenu(unlocked runtime.SyncReportsContextResult, token string) tea.Cmd {
+	m.active = syncReportsMenuScreenKey
+	m.sync = newSyncState()
+	m.sync.InputFocused = false
+	m.sync.TokenInput.Blur()
+	m.sync.MenuIndex = 0
+	m.syncReports.Active = true
+	m.syncReports.RuntimeToken = token
+	m.syncReports.SelectedServerOrigin = m.currentServerOrigin()
+	m.syncReports.ProtectedData = unlocked.ProtectedData
+	m.syncReports.ReportUnavailable = unlocked.ReportUnavailableReason
+	m.report = newReportState(unlocked.ProtectedData.AvailableReportYears)
+	return nil
+}
+
+// enterReportSelection routes the application to the report-selection screen.
+// Authored by: OpenCode
+func (m *Model) enterReportSelection() {
+	m.active = reportSelectionScreenKey
+	m.report = newReportState(m.syncReports.ProtectedData.AvailableReportYears)
+	m.report.ActionIndex = 0
+}
+
+// enterReportResult routes the application to the report result screen.
+// Authored by: OpenCode
+func (m *Model) enterReportResult(outcome runtime.ReportOutcome) {
+	m.active = reportResultScreenKey
+	m.report.Busy = false
+	m.report.BusyText = ""
+	m.report.AttemptID = ""
+	m.report.ActionIndex = 0
+	m.syncReports.ReportResult = outcome
+	m.syncReports.ReportSavedPath = outcome.OutputFile.Path
+	if outcome.Success {
+		m.syncReports.ReportRendered = "generated"
+	}
 }
 
 // enterSync routes the application to the sync entry screen.
@@ -523,6 +841,19 @@ func (m *Model) enterSync() tea.Cmd {
 	m.active = syncScreenKey
 	m.sync = newSyncState()
 	return m.sync.TokenInput.Focus()
+}
+
+// enterSyncWithToken routes the application to the sync entry screen with the
+// active context token already loaded into the masked input.
+// Authored by: OpenCode
+func (m *Model) enterSyncWithToken(token string) tea.Cmd {
+	m.active = syncScreenKey
+	m.sync = newSyncState()
+	m.sync.TokenInput.SetValue(token)
+	m.sync.InputFocused = false
+	m.sync.TokenInput.Blur()
+	m.sync.MenuIndex = 0
+	return nil
 }
 
 // enterServerReplacement routes the application to the server-mismatch confirmation screen.
@@ -556,6 +887,24 @@ func (m *Model) generateDiagnosticReportCmd(request runtime.DiagnosticReportRequ
 	}
 }
 
+// syncReportsHasPendingDiagnostic reports whether the active Sync and Reports
+// context should offer explicit synced-data diagnostic generation.
+// Authored by: OpenCode
+func (m *Model) syncReportsHasPendingDiagnostic() bool {
+	return m.syncReports.SyncResult.Outcome.Diagnostic.Eligible && m.syncReports.SyncResult.Outcome.Diagnostic.Path == ""
+}
+
+// syncReportsDefaultMenuIndex returns the preferred unlocked-context selection
+// after one sync attempt completes.
+// Authored by: OpenCode
+func (m *Model) syncReportsDefaultMenuIndex() int {
+	if m.syncReportsHasPendingDiagnostic() {
+		return 2
+	}
+
+	return 0
+}
+
 // quitCmd returns a Bubble Tea quit message.
 // Authored by: OpenCode
 func quitCmd() tea.Msg {
@@ -582,10 +931,32 @@ func (m *Model) syncCmd(ctx context.Context, attemptID string, request runtime.S
 	}
 }
 
+// reportCmd delegates one report-generation attempt to the runtime report
+// service.
+// Authored by: OpenCode
+func (m *Model) reportCmd(ctx context.Context, attemptID string, request runtime.ReportGenerationRequest) tea.Cmd {
+	return func() tea.Msg {
+		return reportFinishedMsg{
+			Outcome: m.deps.ReportService.Generate(ctx, request),
+			Attempt: attemptID,
+		}
+	}
+}
+
 // nextAttemptID returns a process-local identifier for the next sync attempt.
 // Authored by: OpenCode
 func nextAttemptID() string {
 	return fmt.Sprintf("attempt-%d", time.Now().UnixNano())
+}
+
+// reportMethodForIndex returns the supported method for one stable menu index.
+// Authored by: OpenCode
+func reportMethodForIndex(index int) reportmodel.CostBasisMethod {
+	var methods = reportmodel.SupportedCostBasisMethods()
+	if index < 0 || index >= len(methods) {
+		return ""
+	}
+	return methods[index]
 }
 
 // selectedSetupOrigin returns the currently selected setup origin.

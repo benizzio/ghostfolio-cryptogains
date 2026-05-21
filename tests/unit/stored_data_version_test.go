@@ -46,7 +46,7 @@ func TestValidatePayloadCompatibilityRejectsUnsupportedPayloadAndActivityVersion
 			},
 		},
 		{
-			name: "previous activity model",
+			name: "previous activity model without asset identity key",
 			mutate: func(version snapshotmodel.StoredDataVersion) snapshotmodel.StoredDataVersion {
 				version.ActivityModelVersion--
 				return version

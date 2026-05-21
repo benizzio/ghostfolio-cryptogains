@@ -34,6 +34,7 @@ type App struct {
 	SnapshotStore  snapshotstore.Store
 	SetupService   SetupService
 	SyncService    SyncService
+	ReportService  ReportService
 }
 
 // New assembles the runtime dependencies required by the application.
@@ -65,8 +66,9 @@ func New(options bootstrap.Options) (*App, error) {
 	var syncValidator = syncvalidate.NewValidator()
 	var snapshotCodec = snapshotenvelope.NewJSONCodec()
 	var protectedSnapshotStore = snapshotstore.NewEncryptedStore(baseConfigDir, snapshotCodec)
+	var sharedSnapshots = newSnapshotLifecycle(protectedSnapshotStore, newActiveSnapshotState(), protectedPayloadBuilder{})
 	var setupService = NewSetupService(bootstrapStore, options.AllowDevHTTP)
-	var syncService = NewSyncService(
+	var syncService = newSyncService(
 		ghostfolioclient.New(&http.Client{Timeout: options.RequestTimeout}),
 		options.RequestTimeout,
 		baseConfigDir,
@@ -74,8 +76,9 @@ func New(options bootstrap.Options) (*App, error) {
 		decimalService,
 		syncNormalizer,
 		syncValidator,
-		protectedSnapshotStore,
+		sharedSnapshots,
 	)
+	var reportService = newReportService(sharedSnapshots)
 
 	return &App{
 		Options:        options,
@@ -87,5 +90,6 @@ func New(options bootstrap.Options) (*App, error) {
 		SnapshotStore:  protectedSnapshotStore,
 		SetupService:   setupService,
 		SyncService:    syncService,
+		ReportService:  reportService,
 	}, nil
 }

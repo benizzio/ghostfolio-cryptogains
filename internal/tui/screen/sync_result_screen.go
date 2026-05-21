@@ -89,7 +89,7 @@ func syncSummaryText(outcome runtime.SyncOutcome) string {
 // Authored by: OpenCode
 func syncFollowUpText(outcome runtime.SyncOutcome, busy bool) string {
 	if outcome.Success {
-		return "No report-generation, report-preview, or cached-data browsing workflow is available in this slice."
+		return "Return to Sync and Reports to generate a capital gains report from the newly stored protected data."
 	}
 	if busy {
 		return "Generating a local synced-data diagnostic report for this failure."

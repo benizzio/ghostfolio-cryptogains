@@ -14,7 +14,7 @@ const (
 	PayloadSchemaVersion = 1
 
 	// ActivityModelVersion is the supported normalized protected-activity model version.
-	ActivityModelVersion = 3
+	ActivityModelVersion = 4
 )
 
 // Payload stores the encrypted protected snapshot document.

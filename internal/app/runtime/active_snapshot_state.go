@@ -8,6 +8,7 @@ import (
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
+	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
 
 // activeReadableSnapshot stores the current run's successfully unlocked local
@@ -59,10 +60,37 @@ func (s *activeSnapshotState) ProtectedDataState() ProtectedDataState {
 		return ProtectedDataState{}
 	}
 
-	return ProtectedDataState{
-		HasReadableSnapshot: true,
-		ServerOrigin:        s.snapshot.Payload.SetupProfile.ServerOrigin,
+	var cache = s.snapshot.Payload.ProtectedActivityCache
+	var lastSuccessfulSyncAt = cache.SyncedAt
+	if lastSuccessfulSyncAt.IsZero() {
+		lastSuccessfulSyncAt = s.snapshot.Payload.RegisteredLocalUser.LastSuccessfulSyncAt
 	}
+
+	return ProtectedDataState{
+		HasReadableSnapshot:  true,
+		ServerOrigin:         s.snapshot.Payload.SetupProfile.ServerOrigin,
+		ActivityCount:        cache.ActivityCount,
+		LastSuccessfulSyncAt: lastSuccessfulSyncAt,
+		AvailableReportYears: append([]int(nil), cache.AvailableReportYears...),
+	}
+}
+
+// ReadableProtectedActivityCache returns the currently unlocked protected
+// activity cache for this run.
+// Authored by: OpenCode
+func (s *activeSnapshotState) ReadableProtectedActivityCache() (syncmodel.ProtectedActivityCache, bool) {
+	if s == nil {
+		return syncmodel.ProtectedActivityCache{}, false
+	}
+
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if !s.snapshot.Present {
+		return syncmodel.ProtectedActivityCache{}, false
+	}
+
+	return cloneProtectedActivityCache(s.snapshot.Payload.ProtectedActivityCache), true
 }
 
 // CheckServerReplacement compares the selected server against the active readable snapshot.
@@ -78,4 +106,12 @@ func (s *activeSnapshotState) CheckServerReplacement(config configmodel.AppSetup
 		ActiveServerOrigin:   state.ServerOrigin,
 		SelectedServerOrigin: config.ServerOrigin,
 	}
+}
+
+// cloneProtectedActivityCache copies slice-backed cache fields for read access.
+// Authored by: OpenCode
+func cloneProtectedActivityCache(cache syncmodel.ProtectedActivityCache) syncmodel.ProtectedActivityCache {
+	cache.AvailableReportYears = append([]int(nil), cache.AvailableReportYears...)
+	cache.Activities = append([]syncmodel.ActivityRecord(nil), cache.Activities...)
+	return cache
 }

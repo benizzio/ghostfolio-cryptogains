@@ -141,6 +141,9 @@ func validateActivityFields(record syncmodel.ActivityRecord, zero *apd.Decimal) 
 	if strings.TrimSpace(record.SourceID) == "" || strings.TrimSpace(record.AssetSymbol) == "" {
 		return newValidationError("normalized activity identity is incomplete", record)
 	}
+	if strings.TrimSpace(record.AssetIdentityKey) == "" {
+		return newValidationError("normalized activity asset identity key is incomplete", record)
+	}
 	if record.Quantity.Cmp(zero) <= 0 {
 		return newValidationError(fmt.Sprintf("activity %q quantity must be greater than zero", record.SourceID), record)
 	}

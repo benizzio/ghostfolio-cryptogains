@@ -612,7 +612,7 @@ func TestRunCoversMappingNormalizationAndValidationFailures(t *testing.T) {
 			case "/api/v1/user":
 				_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":"USD"}}`))
 			case "/api/v1/activities":
-				_, _ = writer.Write([]byte(`{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"symbol":"BTC","name":"Bitcoin"},"quantity":1,"unitPriceInAssetProfileCurrency":1,"value":1,"feeInBaseCurrency":0}],"count":1}`))
+				_, _ = writer.Write([]byte(`{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","symbolProfileId":"asset-btc-runtime-001"},"quantity":1,"unitPriceInAssetProfileCurrency":1,"value":1,"feeInBaseCurrency":0}],"count":1}`))
 			default:
 				writer.WriteHeader(http.StatusNotFound)
 			}
@@ -628,7 +628,7 @@ func TestRunCoversMappingNormalizationAndValidationFailures(t *testing.T) {
 	})
 
 	t.Run("normalization failure", func(t *testing.T) {
-		service, config := runtimeServiceWithHistoryServer(t, runtimeSnapshotStore{}, true, `{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"symbol":"BTC","name":"Bitcoin"},"quantity":1,"unitPriceInAssetProfileCurrency":1,"value":1,"feeInBaseCurrency":0},{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"symbol":"BTC","name":"Bitcoin"},"quantity":2,"unitPriceInAssetProfileCurrency":1,"value":2,"feeInBaseCurrency":0}],"count":2}`)
+		service, config := runtimeServiceWithHistoryServer(t, runtimeSnapshotStore{}, true, `{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","symbolProfileId":"asset-btc-runtime-001"},"quantity":1,"unitPriceInAssetProfileCurrency":1,"value":1,"feeInBaseCurrency":0},{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","symbolProfileId":"asset-btc-runtime-001"},"quantity":2,"unitPriceInAssetProfileCurrency":1,"value":2,"feeInBaseCurrency":0}],"count":2}`)
 		outcome := service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
 		if outcome.FailureReason != SyncFailureUnsupportedActivityHistory || !outcome.Diagnostic.Eligible {
 			t.Fatalf("expected unsupported-history normalization failure, got %#v", outcome)
@@ -636,7 +636,7 @@ func TestRunCoversMappingNormalizationAndValidationFailures(t *testing.T) {
 	})
 
 	t.Run("validation failure", func(t *testing.T) {
-		service, config := runtimeServiceWithHistoryServer(t, runtimeSnapshotStore{}, true, `{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"symbol":"BTC","name":"Bitcoin"},"quantity":1,"unitPriceInAssetProfileCurrency":0,"value":1,"feeInBaseCurrency":0}],"count":1}`)
+		service, config := runtimeServiceWithHistoryServer(t, runtimeSnapshotStore{}, true, `{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","symbolProfileId":"asset-btc-runtime-001"},"quantity":1,"unitPriceInAssetProfileCurrency":0,"value":1,"feeInBaseCurrency":0}],"count":1}`)
 		outcome := service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
 		if outcome.FailureReason != SyncFailureUnsupportedActivityHistory || !outcome.Diagnostic.Eligible {
 			t.Fatalf("expected unsupported-history validation failure, got %#v", outcome)
@@ -764,22 +764,60 @@ func TestSnapshotLifecycleAndWrapperNilBranches(t *testing.T) {
 
 	var nilActiveState *activeSnapshotState
 	nilActiveState.Set(snapshotstore.Candidate{SnapshotID: "ignored"}, snapshotmodel.Payload{})
-	if state := nilActiveState.ProtectedDataState(); state != (ProtectedDataState{}) {
+	if state := nilActiveState.ProtectedDataState(); state.HasReadableSnapshot || state.ServerOrigin != "" || state.ActivityCount != 0 || !state.LastSuccessfulSyncAt.IsZero() || len(state.AvailableReportYears) != 0 {
 		t.Fatalf("expected nil active snapshot state to report zero value, got %#v", state)
+	}
+	if cache, ok := nilActiveState.ReadableProtectedActivityCache(); ok || cache.ActivityCount != 0 || !cache.SyncedAt.IsZero() || len(cache.AvailableReportYears) != 0 || len(cache.Activities) != 0 {
+		t.Fatalf("expected nil active snapshot state to expose no readable cache, got ok=%v cache=%#v", ok, cache)
+	}
+
+	var emptyActiveState = newActiveSnapshotState()
+	if cache, ok := emptyActiveState.ReadableProtectedActivityCache(); ok || cache.ActivityCount != 0 || !cache.SyncedAt.IsZero() || len(cache.AvailableReportYears) != 0 || len(cache.Activities) != 0 {
+		t.Fatalf("expected present-but-empty active snapshot state to expose no readable cache, got ok=%v cache=%#v", ok, cache)
 	}
 
 	lifecycle := newSnapshotLifecycle(runtimeSnapshotStore{}, nil, protectedPayloadBuilder{})
 	if lifecycle == nil || lifecycle.state == nil {
 		t.Fatalf("expected new snapshot lifecycle to create default state, got %#v", lifecycle)
 	}
-	lifecycle.SetActiveSnapshot(snapshotstore.Candidate{SnapshotID: "active"}, snapshotmodel.Payload{SetupProfile: snapshotmodel.SetupProfile{ServerOrigin: "https://ghostfol.io"}})
-	if state := lifecycle.ProtectedDataState(); !state.HasReadableSnapshot || state.ServerOrigin != "https://ghostfol.io" {
+	var activePayload = snapshotmodel.Payload{
+		RegisteredLocalUser: snapshotmodel.RegisteredLocalUser{LastSuccessfulSyncAt: time.Unix(11, 0).UTC()},
+		SetupProfile:        snapshotmodel.SetupProfile{ServerOrigin: "https://ghostfol.io"},
+		ProtectedActivityCache: syncmodel.ProtectedActivityCache{
+			SyncedAt:             time.Unix(10, 0).UTC(),
+			ActivityCount:        2,
+			AvailableReportYears: []int{2024, 2025},
+			Activities: []syncmodel.ActivityRecord{
+				{SourceID: "buy-1", AssetIdentityKey: "asset-1", RawHash: "buy-1"},
+			},
+		},
+	}
+	lifecycle.SetActiveSnapshot(snapshotstore.Candidate{SnapshotID: "active"}, activePayload)
+	if state := lifecycle.ProtectedDataState(); !state.HasReadableSnapshot || state.ServerOrigin != "https://ghostfol.io" || state.ActivityCount != 2 || !state.LastSuccessfulSyncAt.Equal(time.Unix(10, 0).UTC()) || len(state.AvailableReportYears) != 2 || state.AvailableReportYears[0] != 2024 || state.AvailableReportYears[1] != 2025 {
 		t.Fatalf("expected non-nil snapshot lifecycle state, got %#v", state)
+	}
+	state := lifecycle.ProtectedDataState()
+	state.AvailableReportYears[0] = 1900
+	if copiedState := lifecycle.ProtectedDataState(); copiedState.AvailableReportYears[0] != 2024 {
+		t.Fatalf("expected protected data summary report years to be copied, got %#v", copiedState)
+	}
+	cache, ok := lifecycle.ReadableProtectedActivityCache()
+	if !ok || cache.ActivityCount != 2 || !cache.SyncedAt.Equal(time.Unix(10, 0).UTC()) || len(cache.AvailableReportYears) != 2 || len(cache.Activities) != 1 {
+		t.Fatalf("expected readable protected cache from snapshot lifecycle, got ok=%v cache=%#v", ok, cache)
+	}
+	cache.AvailableReportYears[0] = 1900
+	cache.Activities[0].SourceID = "mutated"
+	var copiedCache, copiedOK = lifecycle.ReadableProtectedActivityCache()
+	if !copiedOK || copiedCache.AvailableReportYears[0] != 2024 || copiedCache.Activities[0].SourceID != "buy-1" {
+		t.Fatalf("expected readable protected cache slices to be copied, got ok=%v cache=%#v", copiedOK, copiedCache)
 	}
 
 	var nilLifecycle *snapshotLifecycle
-	if state := nilLifecycle.ProtectedDataState(); state != (ProtectedDataState{}) {
+	if state := nilLifecycle.ProtectedDataState(); state.HasReadableSnapshot || state.ServerOrigin != "" || state.ActivityCount != 0 || !state.LastSuccessfulSyncAt.IsZero() || len(state.AvailableReportYears) != 0 {
 		t.Fatalf("expected nil snapshot lifecycle to report zero protected data state, got %#v", state)
+	}
+	if cache, ok := nilLifecycle.ReadableProtectedActivityCache(); ok || cache.ActivityCount != 0 || !cache.SyncedAt.IsZero() || len(cache.AvailableReportYears) != 0 || len(cache.Activities) != 0 {
+		t.Fatalf("expected nil snapshot lifecycle to expose no readable cache, got ok=%v cache=%#v", ok, cache)
 	}
 	if check := nilLifecycle.CheckServerReplacement(runtimeSetupConfigFixture(t, "https://ghostfol.io", true)); check != (ServerReplacementCheck{}) {
 		t.Fatalf("expected nil snapshot lifecycle to report no replacement requirement, got %#v", check)
@@ -807,6 +845,24 @@ func TestSnapshotLifecycleAndWrapperNilBranches(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "build protected payload local user id") {
 		t.Fatalf("expected payload build failure from random identifier error, got %v", err)
 	}
+
+	var nilUnlockLifecycle *snapshotLifecycle
+	var nilUnlockResult = nilUnlockLifecycle.UnlockSelectedServerSnapshot(context.Background(), "https://ghostfol.io", "token")
+	if nilUnlockResult.ReportUnavailableReason != ReportFailureNoSyncedDataAvailable || nilUnlockResult.ProtectedData.HasReadableSnapshot || nilUnlockResult.ProtectedData.ServerOrigin != "" || nilUnlockResult.ProtectedData.ActivityCount != 0 || !nilUnlockResult.ProtectedData.LastSuccessfulSyncAt.IsZero() || len(nilUnlockResult.ProtectedData.AvailableReportYears) != 0 {
+		t.Fatalf("expected nil unlock lifecycle to report no synced data, got %#v", nilUnlockResult)
+	}
+
+	var unsupportedStore = runtimeSnapshotStore{
+		candidates: []snapshotstore.Candidate{runtimeSnapshotCandidateFixture("https://ghostfol.io", "snapshot-1")},
+		read: func(context.Context, snapshotstore.ReadRequest) (snapshotmodel.Payload, error) {
+			return snapshotmodel.Payload{}, snapshotstore.ErrUnsupportedStoredDataVersion
+		},
+	}
+	var unsupportedLifecycle = newSnapshotLifecycle(unsupportedStore, newActiveSnapshotState(), protectedPayloadBuilder{})
+	var unsupportedUnlockResult = unsupportedLifecycle.UnlockSelectedServerSnapshot(context.Background(), "https://ghostfol.io", "token")
+	if unsupportedUnlockResult.ReportUnavailableReason != ReportFailureUnsupportedStoredDataVersion {
+		t.Fatalf("expected unsupported stored-data version result, got %#v", unsupportedUnlockResult)
+	}
 }
 
 // TestSyncServiceUserFetchAndSnapshotWrapperBranches verifies the remaining
@@ -819,8 +875,15 @@ func TestSyncServiceUserFetchAndSnapshotWrapperBranches(t *testing.T) {
 		config := runtimeSetupConfigFixture(t, "https://ghostfol.io", true)
 		service := &syncService{}
 		lifecycle := newSnapshotLifecycle(runtimeSnapshotStore{}, newActiveSnapshotState(), protectedPayloadBuilder{})
-		lifecycle.SetActiveSnapshot(snapshotstore.Candidate{SnapshotID: "active"}, snapshotmodel.Payload{SetupProfile: snapshotmodel.SetupProfile{ServerOrigin: "https://ghostfol.io"}})
-		if state := service.ProtectedDataState(); state != (ProtectedDataState{}) {
+		lifecycle.SetActiveSnapshot(snapshotstore.Candidate{SnapshotID: "active"}, snapshotmodel.Payload{
+			SetupProfile: snapshotmodel.SetupProfile{ServerOrigin: "https://ghostfol.io"},
+			ProtectedActivityCache: syncmodel.ProtectedActivityCache{
+				SyncedAt:             time.Unix(12, 0).UTC(),
+				ActivityCount:        3,
+				AvailableReportYears: []int{2024},
+			},
+		})
+		if state := service.ProtectedDataState(); state.HasReadableSnapshot || state.ServerOrigin != "" || state.ActivityCount != 0 || !state.LastSuccessfulSyncAt.IsZero() || len(state.AvailableReportYears) != 0 {
 			t.Fatalf("expected zero protected data state when snapshots are absent, got %#v", state)
 		}
 		if check := service.CheckServerReplacement(config); check != (ServerReplacementCheck{}) {
@@ -834,7 +897,7 @@ func TestSyncServiceUserFetchAndSnapshotWrapperBranches(t *testing.T) {
 		}
 
 		service.snapshots = lifecycle
-		if state := service.ProtectedDataState(); !state.HasReadableSnapshot || state.ServerOrigin != "https://ghostfol.io" {
+		if state := service.ProtectedDataState(); !state.HasReadableSnapshot || state.ServerOrigin != "https://ghostfol.io" || state.ActivityCount != 3 || !state.LastSuccessfulSyncAt.Equal(time.Unix(12, 0).UTC()) || len(state.AvailableReportYears) != 1 || state.AvailableReportYears[0] != 2024 {
 			t.Fatalf("expected sync-service wrapper to delegate protected data state, got %#v", state)
 		}
 	})
@@ -880,6 +943,48 @@ func TestSyncServiceUserFetchAndSnapshotWrapperBranches(t *testing.T) {
 			t.Fatalf("expected user-response contract failure, got %#v", outcome)
 		}
 	})
+}
+
+// TestSyncReportsProtectedDataAvailabilityHelpers verifies direct report
+// availability mapping and selected-server unlock delegation branches.
+// Authored by: OpenCode
+func TestSyncReportsProtectedDataAvailabilityHelpers(t *testing.T) {
+	t.Parallel()
+
+	if reason := syncReportsUnavailableReasonFromProtectedData(ProtectedDataState{}); reason != ReportFailureNoSyncedDataAvailable {
+		t.Fatalf("expected missing readable snapshot to report no synced data, got %q", reason)
+	}
+	if reason := syncReportsUnavailableReasonFromProtectedData(ProtectedDataState{HasReadableSnapshot: true}); reason != ReportFailureNoReportableYearsAvailable {
+		t.Fatalf("expected readable snapshot without years to report no reportable years, got %q", reason)
+	}
+	if reason := syncReportsUnavailableReasonFromProtectedData(ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}); reason != ReportFailureNone {
+		t.Fatalf("expected readable snapshot with years to report availability, got %q", reason)
+	}
+
+	var lifecycle = newSnapshotLifecycle(runtimeSnapshotStore{
+		candidates: []snapshotstore.Candidate{runtimeSnapshotCandidateFixture("https://ghostfol.io", "snapshot-1")},
+		read: func(context.Context, snapshotstore.ReadRequest) (snapshotmodel.Payload, error) {
+			return snapshotmodel.Payload{
+				SetupProfile: snapshotmodel.SetupProfile{ServerOrigin: "https://ghostfol.io"},
+				ProtectedActivityCache: syncmodel.ProtectedActivityCache{
+					AvailableReportYears: []int{2024},
+					ActivityCount:        1,
+				},
+			}, nil
+		},
+	}, newActiveSnapshotState(), protectedPayloadBuilder{})
+	var service = &syncService{snapshots: lifecycle}
+	var config = runtimeSetupConfigFixture(t, "https://ghostfol.io", true)
+	var result = service.UnlockSelectedServerSnapshot(context.Background(), config, "token")
+	if !result.ProtectedData.HasReadableSnapshot || result.ReportUnavailableReason != ReportFailureNone {
+		t.Fatalf("expected sync-service unlock delegation to expose readable report data, got %#v", result)
+	}
+
+	var nilSnapshotService = &syncService{}
+	result = nilSnapshotService.UnlockSelectedServerSnapshot(context.Background(), config, "token")
+	if result.ReportUnavailableReason != ReportFailureNoSyncedDataAvailable {
+		t.Fatalf("expected nil snapshot lifecycle unlock to report no synced data, got %#v", result)
+	}
 }
 
 // runtimeDiagnosticRequestFixture returns one structured diagnostic-report
@@ -951,6 +1056,7 @@ func runtimeCurrencyMismatchRecordFixture(t *testing.T) syncmodel.ActivityRecord
 		SourceID:              "buy-1",
 		OccurredAt:            "2024-01-01T10:00:00Z",
 		ActivityType:          syncmodel.ActivityTypeBuy,
+		AssetIdentityKey:      "asset-btc-runtime-currency-mismatch-001",
 		AssetSymbol:           "BTC",
 		AssetName:             "Bitcoin",
 		OrderCurrency:         "",

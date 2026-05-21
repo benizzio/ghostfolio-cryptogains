@@ -50,6 +50,7 @@ type ActivityRecord struct {
 	SourceID              string
 	OccurredAt            string
 	ActivityType          ActivityType
+	AssetIdentityKey      string
 	AssetSymbol           string
 	AssetName             string
 	Quantity              apd.Decimal

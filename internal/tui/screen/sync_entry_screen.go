@@ -19,18 +19,23 @@ import (
 //
 // Authored by: OpenCode
 type SyncEntryScreenParams struct {
-	Theme               component.Theme
-	Width               int
-	Height              int
-	MenuItems           []component.MenuItem
-	SelectedIndex       int
-	TokenInput          string
-	ValidationMessage   string
-	HelpText            string
-	Busy                bool
-	BusyText            string
-	SpinnerFrame        string
-	ProtectedDataExists bool
+	Theme                   component.Theme
+	Width                   int
+	Height                  int
+	ScreenTitle             string
+	ScreenSubtitle          string
+	IntroText               string
+	IdleStatusText          string
+	ShowProtectedDataStatus bool
+	MenuItems               []component.MenuItem
+	SelectedIndex           int
+	TokenInput              string
+	ValidationMessage       string
+	HelpText                string
+	Busy                    bool
+	BusyText                string
+	SpinnerFrame            string
+	ProtectedDataExists     bool
 }
 
 // SyncEntryScreenView renders the sync-data entry screen.
@@ -46,12 +51,17 @@ type SyncEntryScreenParams struct {
 //
 // Authored by: OpenCode
 func SyncEntryScreenView(params SyncEntryScreenParams) string {
-	var bodyParts = []string{
-		"The application will authenticate, retrieve activity history, validate it, and store it securely for future use only.",
-		fmt.Sprintf("Protected Data Loaded For This Run: %s", syncProtectedDataStatusLabel(params.ProtectedDataExists)),
-		params.Theme.InputLabel.Render("Ghostfolio Security Token"),
-		params.TokenInput,
+	if params.IntroText == "" {
+		params.IntroText = "The application will authenticate, retrieve activity history, validate it, and store it securely for future use only."
 	}
+	if params.IdleStatusText == "" {
+		params.IdleStatusText = "Enter the Ghostfolio security token only when starting Sync Data."
+	}
+	var bodyParts = []string{params.IntroText}
+	if params.ShowProtectedDataStatus {
+		bodyParts = append(bodyParts, fmt.Sprintf("Protected Data Loaded For This Run: %s", syncProtectedDataStatusLabel(params.ProtectedDataExists)))
+	}
+	bodyParts = append(bodyParts, params.Theme.InputLabel.Render("Ghostfolio Security Token"), params.TokenInput)
 
 	if params.Busy {
 		bodyParts = append(bodyParts, fmt.Sprintf("%s %s", params.SpinnerFrame, params.BusyText))
@@ -59,17 +69,23 @@ func SyncEntryScreenView(params SyncEntryScreenParams) string {
 		bodyParts = append(bodyParts, component.RenderMenu(params.Theme, params.MenuItems, params.SelectedIndex))
 	}
 
-	var status = "Enter the Ghostfolio security token only when starting Sync Data."
+	var status = params.IdleStatusText
 	if params.ValidationMessage != "" {
 		status = params.ValidationMessage
+	}
+	if params.ScreenTitle == "" {
+		params.ScreenTitle = "Sync Data"
+	}
+	if params.ScreenSubtitle == "" {
+		params.ScreenSubtitle = "Retrieve, validate, and securely store supported activity history."
 	}
 
 	return component.RenderScreen(
 		params.Theme,
 		params.Width,
 		params.Height,
-		"Sync Data",
-		"Retrieve, validate, and securely store supported activity history.",
+		params.ScreenTitle,
+		params.ScreenSubtitle,
 		strings.Join(bodyParts, "\n\n"),
 		status,
 		params.HelpText,

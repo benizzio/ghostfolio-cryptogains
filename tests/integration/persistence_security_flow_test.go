@@ -57,7 +57,7 @@ func TestPersistenceSecurityFlowArtifactsStayFreeOfSecretsAndTransientFailureTex
 
 	var successServer = newGhostfolioStorageTLSServer(t, []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"buy-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
+		ActivitiesJSON: `[{"id":"buy-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD","symbolProfileId":"asset-btc-persistence-001"}}]`,
 	}})
 	var successConfig = mustProductionArtifactConfig(t, successServer.URL)
 	if err := setupStore.Save(context.Background(), successConfig); err != nil {
@@ -77,7 +77,7 @@ func TestPersistenceSecurityFlowArtifactsStayFreeOfSecretsAndTransientFailureTex
 
 	var failureServer = newGhostfolioStorageTLSServer(t, []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":123,"valueInBaseCurrency":456,"unitPriceInAssetProfileCurrency":789,"comment":"RAW_NOT_PERSISTED","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
+		ActivitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":123,"valueInBaseCurrency":456,"unitPriceInAssetProfileCurrency":789,"comment":"RAW_NOT_PERSISTED","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD","symbolProfileId":"asset-btc-persistence-001"}}]`,
 	}})
 	var failureConfig = mustProductionArtifactConfig(t, failureServer.URL)
 	if err := setupStore.Save(context.Background(), failureConfig); err != nil {

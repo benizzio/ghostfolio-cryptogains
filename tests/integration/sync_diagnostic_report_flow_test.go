@@ -32,7 +32,7 @@ func TestSyncDiagnosticReportFlowPromptsInProductionAndWritesOnExplicitChoice(t 
 	baseDir := t.TempDir()
 	server := newGhostfolioStorageTLSServer(t, []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
+		ActivitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD","symbolProfileId":"asset-btc-diagnostic-001"}}]`,
 	}})
 	config, err := configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, server.URL, false, time.Now())
 	if err != nil {
@@ -56,6 +56,9 @@ func TestSyncDiagnosticReportFlowPromptsInProductionAndWritesOnExplicitChoice(t 
 	model, cmd := startSyncAttempt(t, model)
 	model = applySyncBatch(t, model, cmd)
 
+	if model.ActiveScreen() != "sync_reports_menu" {
+		t.Fatalf("expected sync and reports menu after context sync failure, got %s", model.ActiveScreen())
+	}
 	content := model.View().Content
 	if !strings.Contains(content, "Generate Diagnostic Report") {
 		t.Fatalf("expected production diagnostic-report prompt, got %q", content)
@@ -103,7 +106,7 @@ func TestSyncDiagnosticReportFlowGeneratesAutomaticallyInExplicitDevelopmentMode
 	baseDir := t.TempDir()
 	server := newGhostfolioStorageServer(t, []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
+		ActivitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD","symbolProfileId":"asset-btc-diagnostic-001"}}]`,
 	}})
 	config, err := configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, server.URL, true, time.Now())
 	if err != nil {
@@ -127,6 +130,9 @@ func TestSyncDiagnosticReportFlowGeneratesAutomaticallyInExplicitDevelopmentMode
 	model, cmd := startSyncAttempt(t, model)
 	model = applySyncBatch(t, model, cmd)
 
+	if model.ActiveScreen() != "sync_reports_menu" {
+		t.Fatalf("expected sync and reports menu after context sync failure, got %s", model.ActiveScreen())
+	}
 	content := model.View().Content
 	if strings.Contains(content, "Generate Diagnostic Report") {
 		t.Fatalf("expected explicit development mode to skip the prompt, got %q", content)

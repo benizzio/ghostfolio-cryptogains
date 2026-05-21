@@ -42,10 +42,28 @@ func (m *Model) handleSyncFinished(message syncFinishedMsg) (tea.Model, tea.Cmd)
 		return m, nil
 	}
 
+	var returnToSyncReports = m.syncReports.Active && m.syncReports.RuntimeToken != ""
 	m.sync.Busy = false
 	m.sync.BusyText = ""
 	m.sync.AttemptID = ""
 	m.sync.Cancel = nil
+	if returnToSyncReports {
+		m.sync.TokenInput.Reset()
+		m.syncReports.SyncResult = syncContextResultState{Outcome: message.Outcome}
+		m.syncReports.ProtectedData = m.deps.SyncService.ProtectedDataState()
+		if m.syncReports.ProtectedData.HasReadableSnapshot && len(m.syncReports.ProtectedData.AvailableReportYears) > 0 {
+			m.syncReports.ReportUnavailable = runtime.ReportFailureNone
+		} else if len(m.syncReports.ProtectedData.AvailableReportYears) == 0 {
+			m.syncReports.ReportUnavailable = runtime.ReportFailureNoReportableYearsAvailable
+			if !m.syncReports.ProtectedData.HasReadableSnapshot {
+				m.syncReports.ReportUnavailable = runtime.ReportFailureNoSyncedDataAvailable
+			}
+		}
+		m.active = syncReportsMenuScreenKey
+		m.sync.MenuIndex = m.syncReportsDefaultMenuIndex()
+		return m, nil
+	}
+
 	m.sync.TokenInput.Reset()
 	m.enterSyncResult(message.Outcome)
 	return m, nil
@@ -175,11 +193,29 @@ func (m *Model) focusSyncTokenInput() (tea.Model, tea.Cmd) {
 // activateSyncSelection runs the currently selected sync menu action.
 // Authored by: OpenCode
 func (m *Model) activateSyncSelection() (tea.Model, tea.Cmd) {
+	if m.active == syncReportsUnlockScreenKey {
+		return m.activateSyncReportsUnlockSelection()
+	}
+
 	switch m.sync.MenuIndex {
 	case 0:
 		return m.startSync()
 	case 1:
 		return m.leaveSync()
+	default:
+		return m, nil
+	}
+}
+
+// activateSyncReportsUnlockSelection runs the currently selected unlock-menu
+// action for the active `Sync and Reports` context shell.
+// Authored by: OpenCode
+func (m *Model) activateSyncReportsUnlockSelection() (tea.Model, tea.Cmd) {
+	switch m.sync.MenuIndex {
+	case 0:
+		return m.unlockSyncReportsContext()
+	case 1:
+		return m.leaveSyncReportsUnlock()
 	default:
 		return m, nil
 	}
@@ -208,6 +244,24 @@ func (m *Model) startSync() (tea.Model, tea.Cmd) {
 	return m.startSyncAttempt(token, false)
 }
 
+// unlockSyncReportsContext validates token input and opens the initial active
+// context shell by reusing the current sync workflow with the captured token.
+// Authored by: OpenCode
+func (m *Model) unlockSyncReportsContext() (tea.Model, tea.Cmd) {
+	if m.currentConfig == nil {
+		return m, m.enterSetup("Complete setup before Sync and Reports can run.", bootstrap.SetupRequirementNone)
+	}
+
+	var token = strings.TrimSpace(m.sync.TokenInput.Value())
+	if token == "" {
+		m.sync.ValidationMessage = "Enter the Ghostfolio security token before unlocking Sync and Reports."
+		return m, nil
+	}
+
+	var unlocked = m.deps.SyncService.UnlockSelectedServerSnapshot(context.Background(), *m.currentConfig, token)
+	return m, m.enterSyncReportsMenu(unlocked, token)
+}
+
 // startSyncAttempt starts one async sync request.
 // Authored by: OpenCode
 func (m *Model) startSyncAttempt(token string, confirmServerReplacement bool) (tea.Model, tea.Cmd) {
@@ -219,6 +273,11 @@ func (m *Model) startSyncAttempt(token string, confirmServerReplacement bool) (t
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.Line))
 
 	var config = *m.currentConfig
+	if m.syncReports.Active {
+		m.syncReports.RuntimeToken = token
+		m.syncReports.SelectedServerOrigin = config.ServerOrigin
+		m.syncReports.ProtectedData = m.deps.SyncService.ProtectedDataState()
+	}
 	m.active = syncScreenKey
 	return m, tea.Batch(
 		m.spinner.Tick,
@@ -234,6 +293,15 @@ func (m *Model) startSyncAttempt(token string, confirmServerReplacement bool) (t
 	)
 }
 
+// leaveSyncReportsUnlock clears the initial unlock prompt and returns to the
+// main menu before any context is activated.
+// Authored by: OpenCode
+func (m *Model) leaveSyncReportsUnlock() (tea.Model, tea.Cmd) {
+	m.sync.TokenInput.Reset()
+	m.enterMainMenu()
+	return m, nil
+}
+
 // startConfirmedServerReplacement resumes sync after explicit server-replacement confirmation.
 // Authored by: OpenCode
 func (m *Model) startConfirmedServerReplacement() (tea.Model, tea.Cmd) {
@@ -246,6 +314,13 @@ func (m *Model) startConfirmedServerReplacement() (tea.Model, tea.Cmd) {
 // menu.
 // Authored by: OpenCode
 func (m *Model) leaveSync() (tea.Model, tea.Cmd) {
+	if m.syncReports.Active {
+		m.sync.TokenInput.Reset()
+		m.active = syncReportsMenuScreenKey
+		m.sync.MenuIndex = 0
+		return m, nil
+	}
+
 	m.sync.TokenInput.Reset()
 	m.enterMainMenu()
 	return m, nil

@@ -75,7 +75,7 @@ func (m *Model) updateMainMenu(message tea.Msg) (tea.Model, tea.Cmd) {
 	case key.Matches(keyMessage, editSetupBinding()):
 		return m, m.enterSetup("", bootstrap.SetupRequirementNone)
 	case key.Matches(keyMessage, enterBinding()):
-		return m, m.enterSync()
+		return m, m.enterSyncReportsUnlock()
 	default:
 		return m, nil
 	}
@@ -114,6 +114,9 @@ func (m *Model) updateSyncResult(message tea.Msg) (tea.Model, tea.Cmd) {
 			case 0:
 				return m.generateDiagnosticReport()
 			case 1:
+				if m.syncReports.Active {
+					return m, m.enterSyncWithToken(m.syncReports.RuntimeToken)
+				}
 				return m, m.enterSync()
 			default:
 				m.enterMainMenu()
@@ -121,9 +124,66 @@ func (m *Model) updateSyncResult(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		if m.result.MenuIndex == 0 {
+			if m.syncReports.Active {
+				return m, m.enterSyncWithToken(m.syncReports.RuntimeToken)
+			}
 			return m, m.enterSync()
 		}
 		m.enterMainMenu()
+	}
+
+	return m, nil
+}
+
+// updateSyncReportsMenu handles unlocked Sync and Reports context navigation.
+// Authored by: OpenCode
+func (m *Model) updateSyncReportsMenu(message tea.Msg) (tea.Model, tea.Cmd) {
+	switch typedMessage := message.(type) {
+	case diagnosticReportFinishedMsg:
+		return m.handleDiagnosticReportFinished(typedMessage)
+	}
+
+	var keyMessage, ok = message.(tea.KeyPressMsg)
+	if !ok {
+		return m, nil
+	}
+	if m.syncReports.SyncResult.Busy {
+		return m, nil
+	}
+
+	var menuItems = m.syncReportsMenuItems()
+
+	switch {
+	case key.Matches(keyMessage, upBinding()):
+		if m.sync.MenuIndex > 0 {
+			m.sync.MenuIndex--
+		}
+	case key.Matches(keyMessage, downBinding()):
+		if m.sync.MenuIndex < len(menuItems)-1 {
+			m.sync.MenuIndex++
+		}
+	case key.Matches(keyMessage, enterBinding()):
+		switch m.sync.MenuIndex {
+		case 0:
+			return m, m.enterSyncWithToken(m.syncReports.RuntimeToken)
+		case 1:
+			if m.syncReports.ProtectedData.HasReadableSnapshot && len(m.syncReports.ProtectedData.AvailableReportYears) > 0 {
+				m.enterReportSelection()
+				return m, nil
+			}
+			return m, nil
+		case 2:
+			if m.syncReportsHasPendingDiagnostic() {
+				return m.generateDiagnosticReport()
+			}
+			m.enterMainMenu()
+			return m, nil
+		case 3:
+			m.enterMainMenu()
+			return m, nil
+		default:
+			return m, nil
+		}
 	}
 
 	return m, nil
@@ -133,15 +193,30 @@ func (m *Model) updateSyncResult(message tea.Msg) (tea.Model, tea.Cmd) {
 // Authored by: OpenCode
 func (m *Model) generateDiagnosticReport() (tea.Model, tea.Cmd) {
 	var request = m.result.Outcome.Diagnostic.Request
+	var useSyncReportsContext = m.active == syncReportsMenuScreenKey
+	if useSyncReportsContext {
+		request = m.syncReports.SyncResult.Outcome.Diagnostic.Request
+	}
 	if request.ServerOrigin == "" && m.currentConfig != nil {
 		request.ServerOrigin = m.currentConfig.ServerOrigin
 	}
 	if request.Attempt.AttemptID == "" {
-		request.Attempt = m.result.Outcome.Attempt
+		if useSyncReportsContext {
+			request.Attempt = m.syncReports.SyncResult.Outcome.Attempt
+		} else {
+			request.Attempt = m.result.Outcome.Attempt
+		}
 	}
-	m.result.Outcome.Diagnostic.Request = request
-	m.result.Busy = true
-	m.result.StatusMessage = "Generating diagnostic report..."
+	if useSyncReportsContext {
+		m.syncReports.SyncResult.Outcome.Diagnostic.Request = request
+		m.syncReports.SyncResult.Busy = true
+		m.syncReports.SyncResult.StatusMessage = "Generating diagnostic report..."
+		m.sync.MenuIndex = m.syncReportsDefaultMenuIndex()
+	} else {
+		m.result.Outcome.Diagnostic.Request = request
+		m.result.Busy = true
+		m.result.StatusMessage = "Generating diagnostic report..."
+	}
 	return m, m.generateDiagnosticReportCmd(request)
 }
 
@@ -149,6 +224,20 @@ func (m *Model) generateDiagnosticReport() (tea.Model, tea.Cmd) {
 // diagnostic-report write request.
 // Authored by: OpenCode
 func (m *Model) handleDiagnosticReportFinished(message diagnosticReportFinishedMsg) (tea.Model, tea.Cmd) {
+	if m.active == syncReportsMenuScreenKey {
+		m.syncReports.SyncResult.Busy = false
+		if message.Err != nil {
+			m.syncReports.SyncResult.StatusMessage = "Diagnostic report generation failed. Try again."
+			m.sync.MenuIndex = m.syncReportsDefaultMenuIndex()
+			return m, nil
+		}
+
+		m.syncReports.SyncResult.Outcome.Diagnostic.Path = message.Path
+		m.syncReports.SyncResult.StatusMessage = "Diagnostic report generated successfully."
+		m.sync.MenuIndex = m.syncReportsDefaultMenuIndex()
+		return m, nil
+	}
+
 	m.result.Busy = false
 	if message.Err != nil {
 		m.result.StatusMessage = "Diagnostic report generation failed. Try again."
@@ -183,6 +272,11 @@ func (m *Model) updateServerReplacement(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.replacement.PendingToken = ""
 		m.sync.TokenInput.Reset()
+		if m.syncReports.Active {
+			m.active = syncReportsMenuScreenKey
+			m.sync.MenuIndex = 0
+			return m, nil
+		}
 		m.enterSyncResult(runtime.SyncOutcome{Success: false, FailureReason: runtime.SyncFailureServerReplacementCancelled, DetailReason: string(runtime.SyncFailureServerReplacementCancelled)})
 	}
 
