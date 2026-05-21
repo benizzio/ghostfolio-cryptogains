@@ -1,6 +1,7 @@
 package calculate
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -106,6 +107,26 @@ func TestReportDecimalMathRejectsNonFiniteInputs(t *testing.T) {
 	}
 	if _, err := multiplyDecimal(mustReportDecimal(t, "1"), invalid); err == nil {
 		t.Fatalf("expected multiply to reject non-finite right decimal")
+	}
+}
+
+// TestReportDecimalMathWrapsMultiplyOperationFailure verifies the direct
+// multiply wrapper branch around the decimal operation seam.
+// Authored by: OpenCode
+func TestReportDecimalMathWrapsMultiplyOperationFailure(t *testing.T) {
+	t.Parallel()
+
+	var previous = reportMultiplyOperation
+	defer func() {
+		reportMultiplyOperation = previous
+	}()
+
+	reportMultiplyOperation = func(*apd.Decimal, *apd.Decimal, *apd.Decimal) (apd.Condition, error) {
+		return 0, errors.New("multiply boom")
+	}
+
+	if _, err := multiplyDecimal(mustReportDecimal(t, "2"), mustReportDecimal(t, "3")); err == nil || !strings.Contains(err.Error(), "multiply report decimals") {
+		t.Fatalf("expected wrapped multiply failure, got %v", err)
 	}
 }
 

@@ -3,6 +3,7 @@
 package basis
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -141,6 +142,69 @@ func TestAverageCostStatePartialDisposalAndFiniteValidation(t *testing.T) {
 	state.basis = invalid
 	if _, err = state.Dispose(decimalFromInt(1)); err == nil {
 		t.Fatalf("expected corrupted basis state to fail disposal")
+	}
+}
+
+// TestAverageCostStateWrapsInjectedDecimalFailures verifies direct wrapper
+// branches through average-cost decimal-operation seams.
+// Authored by: OpenCode
+func TestAverageCostStateWrapsInjectedDecimalFailures(t *testing.T) {
+	var previousAdd = averageCostAddDecimal
+	var previousSubtract = averageCostSubtractDecimal
+	defer func() {
+		averageCostAddDecimal = previousAdd
+		averageCostSubtractDecimal = previousSubtract
+	}()
+
+	averageCostAddDecimal = func(apd.Decimal, apd.Decimal) (apd.Decimal, error) {
+		return apd.Decimal{}, errors.New("add boom")
+	}
+	if err := NewAverageCostState().AddAcquisition(decimalFromInt(1), decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "add boom") {
+		t.Fatalf("expected injected add failure, got %v", err)
+	}
+
+	averageCostAddDecimal = previousAdd
+	averageCostSubtractDecimal = func(apd.Decimal, apd.Decimal) (apd.Decimal, error) {
+		return apd.Decimal{}, errors.New("subtract boom")
+	}
+
+	var state = NewAverageCostState()
+	if err := state.AddAcquisition(decimalFromInt(2), decimalFromInt(10)); err != nil {
+		t.Fatalf("seed average-cost state: %v", err)
+	}
+	if _, err := state.Dispose(decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "subtract boom") {
+		t.Fatalf("expected injected subtract failure, got %v", err)
+	}
+
+	averageCostSubtractDecimal = previousSubtract
+	var addCalls int
+	averageCostAddDecimal = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+		addCalls++
+		if addCalls == 2 {
+			return apd.Decimal{}, errors.New("add second boom")
+		}
+		return previousAdd(left, right)
+	}
+	if err := NewAverageCostState().AddAcquisition(decimalFromInt(1), decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "add second boom") {
+		t.Fatalf("expected injected second add failure, got %v", err)
+	}
+
+	averageCostAddDecimal = previousAdd
+	var subtractCalls int
+	averageCostSubtractDecimal = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+		subtractCalls++
+		if subtractCalls == 2 {
+			return apd.Decimal{}, errors.New("subtract second boom")
+		}
+		return previousSubtract(left, right)
+	}
+
+	state = NewAverageCostState()
+	if err := state.AddAcquisition(decimalFromInt(2), decimalFromInt(10)); err != nil {
+		t.Fatalf("seed average-cost state for second subtract failure: %v", err)
+	}
+	if _, err := state.Dispose(decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "subtract second boom") {
+		t.Fatalf("expected injected second subtract failure, got %v", err)
 	}
 }
 

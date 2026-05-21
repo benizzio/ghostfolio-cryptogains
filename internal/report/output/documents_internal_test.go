@@ -77,6 +77,7 @@ func TestLinuxDocumentsParsingErrors(t *testing.T) {
 		{name: "unquoted path", configBody: `XDG_DOCUMENTS_DIR=/tmp/docs`, wantErr: `quoted path`},
 		{name: "empty path", configBody: `XDG_DOCUMENTS_DIR="   "`, wantErr: `must not be empty`},
 		{name: "relative path", configBody: `XDG_DOCUMENTS_DIR="Documents"`, wantErr: `is not absolute`},
+		{name: "invalid escaped path", configBody: "XDG_DOCUMENTS_DIR=\"$HOME/docs\\\"", wantErr: `incomplete escape`},
 	} {
 		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {

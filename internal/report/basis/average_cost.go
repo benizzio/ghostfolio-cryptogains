@@ -27,6 +27,13 @@ type AverageCostState struct {
 	basis    apd.Decimal
 }
 
+// Test seams keep defensive average-cost wrapper branches directly coverable.
+// Authored by: OpenCode
+var (
+	averageCostAddDecimal      = addDecimal
+	averageCostSubtractDecimal = subtractDecimal
+)
+
 // NewAverageCostState creates one empty moving average-cost basis pool.
 //
 // Example:
@@ -53,12 +60,12 @@ func (state *AverageCostState) AddAcquisition(quantity apd.Decimal, basis apd.De
 		return err
 	}
 
-	var nextQuantity, err = addDecimal(state.quantity, quantity)
+	var nextQuantity, err = averageCostAddDecimal(state.quantity, quantity)
 	if err != nil {
 		return err
 	}
 	var nextBasis apd.Decimal
-	nextBasis, err = addDecimal(state.basis, basis)
+	nextBasis, err = averageCostAddDecimal(state.basis, basis)
 	if err != nil {
 		return err
 	}
@@ -89,11 +96,11 @@ func (state *AverageCostState) Dispose(quantity apd.Decimal) (AverageCostDisposa
 	if err != nil {
 		return AverageCostDisposalResult{}, err
 	}
-	var remainingQuantity, errSubtractQuantity = subtractDecimal(state.quantity, quantity)
+	var remainingQuantity, errSubtractQuantity = averageCostSubtractDecimal(state.quantity, quantity)
 	if errSubtractQuantity != nil {
 		return AverageCostDisposalResult{}, errSubtractQuantity
 	}
-	var remainingBasis, errSubtractBasis = subtractDecimal(state.basis, allocatedBasis)
+	var remainingBasis, errSubtractBasis = averageCostSubtractDecimal(state.basis, allocatedBasis)
 	if errSubtractBasis != nil {
 		return AverageCostDisposalResult{}, errSubtractBasis
 	}

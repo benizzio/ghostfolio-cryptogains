@@ -3,6 +3,7 @@
 package basis
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -55,6 +56,14 @@ func TestLotMethodFallbackAndNilPaths(t *testing.T) {
 	var invalidState = &LotMethodState{method: LotMethod("bad")}
 	if err = invalidState.AddAcquisition(validLotAcquisition()); err == nil {
 		t.Fatalf("expected add acquisition with unsupported method to fail")
+	}
+
+	var validState, stateErr = NewLotMethodState(LotMethodFIFO)
+	if stateErr != nil {
+		t.Fatalf("new FIFO lot method state: %v", stateErr)
+	}
+	if err = validState.AddAcquisition(LotAcquisition{}); err == nil {
+		t.Fatalf("expected invalid lot acquisition to fail")
 	}
 
 	if lotSortsBefore(LotMethod("bad"), validLotAcquisition(), validLotAcquisition()) {
@@ -306,6 +315,113 @@ func TestLotMethodOperationalBranches(t *testing.T) {
 			t.Fatalf("expected corrupted unit-cost comparison to fail, got comparison=%d err=%v", comparison, err)
 		}
 	})
+}
+
+// TestLotMethodWrapsInjectedDecimalFailures verifies direct wrapper branches
+// through lot-method decimal-operation seams.
+// Authored by: OpenCode
+func TestLotMethodWrapsInjectedDecimalFailures(t *testing.T) {
+	var previousAdd = lotAddDecimal
+	var previousSubtract = lotSubtractDecimal
+	var previousMultiply = lotMultiplyDecimal
+	defer func() {
+		lotAddDecimal = previousAdd
+		lotSubtractDecimal = previousSubtract
+		lotMultiplyDecimal = previousMultiply
+	}()
+
+	var state, err = NewLotMethodState(LotMethodFIFO)
+	if err != nil {
+		t.Fatalf("new lot method state: %v", err)
+	}
+	if err = state.AddAcquisition(validLotAcquisition()); err != nil {
+		t.Fatalf("seed lot method state: %v", err)
+	}
+
+	lotSubtractDecimal = func(apd.Decimal, apd.Decimal) (apd.Decimal, error) {
+		return apd.Decimal{}, errors.New("subtract boom")
+	}
+	if _, err = state.Dispose(decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "dispose from lot") {
+		t.Fatalf("expected injected subtract failure, got %v", err)
+	}
+
+	lotSubtractDecimal = previousSubtract
+	lotAddDecimal = func(apd.Decimal, apd.Decimal) (apd.Decimal, error) {
+		return apd.Decimal{}, errors.New("add boom")
+	}
+	state, err = NewLotMethodState(LotMethodFIFO)
+	if err != nil {
+		t.Fatalf("new lot method state for add failure: %v", err)
+	}
+	if err = state.AddAcquisition(validLotAcquisition()); err != nil {
+		t.Fatalf("seed lot method state for add failure: %v", err)
+	}
+	if _, err = state.Dispose(decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "accumulate allocated basis") {
+		t.Fatalf("expected injected add failure, got %v", err)
+	}
+
+	lotAddDecimal = previousAdd
+	var subtractCalls int
+	lotSubtractDecimal = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+		subtractCalls++
+		if subtractCalls == 2 {
+			return apd.Decimal{}, errors.New("subtract basis boom")
+		}
+		return previousSubtract(left, right)
+	}
+	state, err = NewLotMethodState(LotMethodFIFO)
+	if err != nil {
+		t.Fatalf("new lot method state for second subtract failure: %v", err)
+	}
+	if err = state.AddAcquisition(validLotAcquisition()); err != nil {
+		t.Fatalf("seed lot method state for second subtract failure: %v", err)
+	}
+	if _, err = state.Dispose(decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "dispose from lot") || !strings.Contains(err.Error(), "subtract basis boom") {
+		t.Fatalf("expected injected remaining-basis subtraction failure, got %v", err)
+	}
+
+	lotSubtractDecimal = previousSubtract
+	subtractCalls = 0
+	lotSubtractDecimal = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+		subtractCalls++
+		if subtractCalls == 3 {
+			return apd.Decimal{}, errors.New("subtract remaining boom")
+		}
+		return previousSubtract(left, right)
+	}
+	state, err = NewLotMethodState(LotMethodFIFO)
+	if err != nil {
+		t.Fatalf("new lot method state for third subtract failure: %v", err)
+	}
+	if err = state.AddAcquisition(validLotAcquisition()); err != nil {
+		t.Fatalf("seed lot method state for third subtract failure: %v", err)
+	}
+	if _, err = state.Dispose(decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "dispose remaining quantity") || !strings.Contains(err.Error(), "subtract remaining boom") {
+		t.Fatalf("expected injected remaining-quantity subtraction failure, got %v", err)
+	}
+
+	lotMultiplyDecimal = func(apd.Decimal, apd.Decimal) (apd.Decimal, error) {
+		return apd.Decimal{}, errors.New("multiply boom")
+	}
+	if _, err = compareUnitCostsCrossMultiply(validLotAcquisition(), validLotAcquisition()); err == nil || !strings.Contains(err.Error(), "multiply boom") {
+		t.Fatalf("expected injected unit-cost multiply failure, got %v", err)
+	}
+	if _, err = exactProportionalBasis(decimalFromInt(10), decimalFromInt(2), decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "multiply boom") {
+		t.Fatalf("expected injected proportional-basis multiply failure, got %v", err)
+	}
+
+	lotMultiplyDecimal = previousMultiply
+	var multiplyCalls int
+	lotMultiplyDecimal = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+		multiplyCalls++
+		if multiplyCalls == 2 {
+			return apd.Decimal{}, errors.New("multiply second boom")
+		}
+		return previousMultiply(left, right)
+	}
+	if _, err = compareUnitCostsCrossMultiply(validLotAcquisition(), validLotAcquisition()); err == nil || !strings.Contains(err.Error(), "multiply second boom") {
+		t.Fatalf("expected injected second unit-cost multiply failure, got %v", err)
+	}
 }
 
 // validLotAcquisition returns one reusable finite lot fixture for helper tests.

@@ -1508,6 +1508,22 @@ func TestUpdateReportAndSyncHelperBranches(t *testing.T) {
 	}
 
 	model = newTestModel(t, &config)
+	model.active = reportSelectionScreenKey
+	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
+	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
+	model.report.FocusArea = 2
+	model.report.SelectedYear = 0
+	model.deps.ReportService = &testReportService{}
+	updated, cmd = model.startReportGeneration()
+	if cmd != nil {
+		t.Fatalf("expected invalid report request with configured service to fail synchronously")
+	}
+	model = updated.(*Model)
+	if model.active != reportResultScreenKey || model.syncReports.ReportResult.FailureReason != runtime.ReportFailureUnsupportedReportCalculation {
+		t.Fatalf("expected invalid request with configured service to route to report result failure, got active=%s outcome=%#v", model.active, model.syncReports.ReportResult)
+	}
+
+	model = newTestModel(t, &config)
 	model.active = reportResultScreenKey
 	model.report.ActionIndex = 1
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyUp}))

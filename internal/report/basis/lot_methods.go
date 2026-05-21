@@ -66,6 +66,14 @@ type LotMethodState struct {
 	lots   []LotAcquisition
 }
 
+// Test seams keep defensive lot wrapper branches directly coverable.
+// Authored by: OpenCode
+var (
+	lotAddDecimal      = addDecimal
+	lotSubtractDecimal = subtractDecimal
+	lotMultiplyDecimal = multiplyDecimal
+)
+
 // NewLotMethodState creates one empty exact-lot basis state for the requested
 // lot-selection method.
 //
@@ -127,28 +135,25 @@ func (state *LotMethodState) Dispose(quantity apd.Decimal) (LotDisposalResult, e
 
 		var currentLot = &state.lots[index]
 		var matchedQuantity = minimumDecimal(currentLot.RemainingQuantity, remainingQuantity)
-		if matchedQuantity.Sign() == 0 {
-			continue
-		}
 
 		var matchedBasis, err = exactProportionalBasis(currentLot.RemainingBasis, currentLot.RemainingQuantity, matchedQuantity)
 		if err != nil {
 			return LotDisposalResult{}, fmt.Errorf("dispose from lot %q: %w", strings.TrimSpace(currentLot.SourceID), err)
 		}
 
-		var remainingLotQuantity, errSubtractQuantity = subtractDecimal(currentLot.RemainingQuantity, matchedQuantity)
+		var remainingLotQuantity, errSubtractQuantity = lotSubtractDecimal(currentLot.RemainingQuantity, matchedQuantity)
 		if errSubtractQuantity != nil {
 			return LotDisposalResult{}, fmt.Errorf("dispose from lot %q quantity: %w", strings.TrimSpace(currentLot.SourceID), errSubtractQuantity)
 		}
-		var remainingLotBasis, errSubtractBasis = subtractDecimal(currentLot.RemainingBasis, matchedBasis)
+		var remainingLotBasis, errSubtractBasis = lotSubtractDecimal(currentLot.RemainingBasis, matchedBasis)
 		if errSubtractBasis != nil {
 			return LotDisposalResult{}, fmt.Errorf("dispose from lot %q basis: %w", strings.TrimSpace(currentLot.SourceID), errSubtractBasis)
 		}
-		var nextRemainingQuantity, errSubtractRemaining = subtractDecimal(remainingQuantity, matchedQuantity)
+		var nextRemainingQuantity, errSubtractRemaining = lotSubtractDecimal(remainingQuantity, matchedQuantity)
 		if errSubtractRemaining != nil {
 			return LotDisposalResult{}, fmt.Errorf("dispose remaining quantity: %w", errSubtractRemaining)
 		}
-		var nextAllocatedBasis, errAddBasis = addDecimal(allocatedBasis, matchedBasis)
+		var nextAllocatedBasis, errAddBasis = lotAddDecimal(allocatedBasis, matchedBasis)
 		if errAddBasis != nil {
 			return LotDisposalResult{}, fmt.Errorf("accumulate allocated basis: %w", errAddBasis)
 		}
@@ -310,12 +315,12 @@ func compareHIFOPriority(left LotAcquisition, right LotAcquisition) int {
 // multiplication instead of division.
 // Authored by: OpenCode
 func compareUnitCostsCrossMultiply(left LotAcquisition, right LotAcquisition) (int, error) {
-	var leftCross, err = multiplyDecimal(left.RemainingBasis, right.RemainingQuantity)
+	var leftCross, err = lotMultiplyDecimal(left.RemainingBasis, right.RemainingQuantity)
 	if err != nil {
 		return 0, err
 	}
 	var rightCross apd.Decimal
-	rightCross, err = multiplyDecimal(right.RemainingBasis, left.RemainingQuantity)
+	rightCross, err = lotMultiplyDecimal(right.RemainingBasis, left.RemainingQuantity)
 	if err != nil {
 		return 0, err
 	}
@@ -372,7 +377,7 @@ func exactProportionalBasis(totalBasis apd.Decimal, totalQuantity apd.Decimal, m
 		return cloneDecimal(totalBasis), nil
 	}
 
-	var numerator, err = multiplyDecimal(totalBasis, matchedQuantity)
+	var numerator, err = lotMultiplyDecimal(totalBasis, matchedQuantity)
 	if err != nil {
 		return apd.Decimal{}, err
 	}

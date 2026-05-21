@@ -24,6 +24,8 @@ func TestReportPerformanceFlowLargeHistoryFixture(t *testing.T) {
 		t.Skipf("set %s=1 to run the SC-007 performance verification path", performanceVerificationEnvironmentVariable)
 	}
 
+	const minimumActivityCount = 10000
+	const minimumCalendarYearSpan = 5
 	const threshold = 2 * time.Minute
 
 	var fixture = testutil.DeterministicLargeReportPerformanceFixture()
@@ -31,6 +33,13 @@ func TestReportPerformanceFlowLargeHistoryFixture(t *testing.T) {
 	var openLogPath = installOpenCommandRecorder(t, 0)
 	var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
 	var token = "performance-token"
+
+	if fixture.ActivityCount != minimumActivityCount {
+		t.Fatalf("expected deterministic performance fixture to contain %d activities, got %d", minimumActivityCount, fixture.ActivityCount)
+	}
+	if fixture.CalendarYearSpan < minimumCalendarYearSpan {
+		t.Fatalf("expected deterministic performance fixture to span at least %d calendar years, got %d", minimumCalendarYearSpan, fixture.CalendarYearSpan)
+	}
 
 	seedProtectedSnapshot(t, harness, token, fixture.ProtectedActivityCache)
 

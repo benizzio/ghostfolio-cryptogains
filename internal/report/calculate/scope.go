@@ -47,6 +47,10 @@ type scopedActivityInput struct {
 	ApplicableScope applicableScope
 }
 
+// Test seams keep the scope-local wrapper branch directly coverable.
+// Authored by: OpenCode
+var resolveReliableApplicableScopeFunc = resolveReliableApplicableScope
+
 // resolveScopedAssetInputs resolves the applicable scope for each asset input.
 // Authored by: OpenCode
 func resolveScopedAssetInputs(
@@ -70,7 +74,7 @@ func resolveScopedAssetInputs(
 	}
 
 	for _, input := range group.Inputs {
-		var scope, err = resolveReliableApplicableScope(group.AssetIdentityKey, input)
+		var scope, err = resolveReliableApplicableScopeFunc(group.AssetIdentityKey, input)
 		if err != nil {
 			return nil, newInputCalculationError(
 				reportmodel.CalculationErrorKindActivityInput,

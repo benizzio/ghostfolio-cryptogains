@@ -20,9 +20,19 @@ const reportCalculationCurrencyLabel = "NOT APPLICABLE"
 // weakening the production validation flow.
 // Authored by: OpenCode
 var (
-	calculateAssetGroupFunc = calculateAssetGroup
-	newCapitalGainsReport   = reportmodel.NewCapitalGainsReport
-	newLotMethodState       = reportbasis.NewLotMethodState
+	calculateAssetGroupFunc   = calculateAssetGroup
+	newCapitalGainsReport     = reportmodel.NewCapitalGainsReport
+	newLotMethodState         = reportbasis.NewLotMethodState
+	newAssetBasisStateFunc    = newAssetBasisState
+	resolveScopedInputsFunc   = resolveScopedAssetInputs
+	replayAssetInputFunc      = replayAssetInput
+	lotStateTotalOpenQuantity = func(state *reportbasis.LotMethodState) (apd.Decimal, error) { return state.TotalOpenQuantity() }
+	addCalculationOperation   = func(sum *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
+		return apd.BaseContext.Add(sum, left, right)
+	}
+	subtractCalculationOperation = func(difference *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
+		return apd.BaseContext.Sub(difference, left, right)
+	}
 )
 
 // Calculate replays the protected synced activity cache through one selected
@@ -331,7 +341,7 @@ func selectAssetInputGroupsThroughYear(records []syncmodel.ActivityRecord, selec
 // year cutoff and derives its summary, reference, and detail contributions.
 // Authored by: OpenCode
 func calculateAssetGroup(method reportmodel.CostBasisMethod, selectedYear int, cache syncmodel.ProtectedActivityCache, group assetInputGroup) (assetCalculationResult, error) {
-	var basisState, err = newAssetBasisState(method)
+	var basisState, err = newAssetBasisStateFunc(method)
 	if err != nil {
 		return assetCalculationResult{}, reportmodel.NewCalculationError(
 			reportmodel.CalculationErrorKindUnsupportedCostBasisMethod,
@@ -344,7 +354,7 @@ func calculateAssetGroup(method reportmodel.CostBasisMethod, selectedYear int, c
 
 	var replayState assetReplayState
 	var scopedInputs []scopedActivityInput
-	scopedInputs, err = resolveScopedAssetInputs(method, group)
+	scopedInputs, err = resolveScopedInputsFunc(method, group)
 	if err != nil {
 		return assetCalculationResult{}, err
 	}
@@ -361,7 +371,7 @@ func calculateAssetGroup(method reportmodel.CostBasisMethod, selectedYear int, c
 		}
 
 		var replayResult assetInputReplayResult
-		replayResult, err = replayAssetInput(basisState, scopedInput, index+1, selectedYear)
+		replayResult, err = replayAssetInputFunc(basisState, scopedInput, index+1, selectedYear)
 		if err != nil {
 			return assetCalculationResult{}, err
 		}
@@ -830,7 +840,7 @@ func (state lotBasisState) Dispose(input basisDisposalInput) (basisDisposalResul
 		return basisDisposalResult{}, err
 	}
 	var remainingQuantity apd.Decimal
-	remainingQuantity, err = state.state.TotalOpenQuantity()
+	remainingQuantity, err = lotStateTotalOpenQuantity(state.state)
 	if err != nil {
 		return basisDisposalResult{}, err
 	}
@@ -935,7 +945,7 @@ func addCalculationDecimal(left apd.Decimal, right apd.Decimal) (apd.Decimal, er
 	}
 
 	var sum apd.Decimal
-	if _, err := apd.BaseContext.Add(&sum, &left, &right); err != nil {
+	if _, err := addCalculationOperation(&sum, &left, &right); err != nil {
 		return apd.Decimal{}, fmt.Errorf("add calculation decimals: %w", err)
 	}
 
@@ -954,7 +964,7 @@ func subtractCalculationDecimal(left apd.Decimal, right apd.Decimal) (apd.Decima
 	}
 
 	var difference apd.Decimal
-	if _, err := apd.BaseContext.Sub(&difference, &left, &right); err != nil {
+	if _, err := subtractCalculationOperation(&difference, &left, &right); err != nil {
 		return apd.Decimal{}, fmt.Errorf("subtract calculation decimals: %w", err)
 	}
 

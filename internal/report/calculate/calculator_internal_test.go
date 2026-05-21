@@ -233,6 +233,293 @@ func TestCalculateWrapsCalculatedReportValidationFailure(t *testing.T) {
 	}
 }
 
+// TestCalculateAndAssetReplayWrapWrapperFailures verifies the remaining direct
+// calculator wrapper branches through package-local seams.
+// Authored by: OpenCode
+func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
+	t.Run("wraps yearly total accumulation failure", func(t *testing.T) {
+		var originalCalculateAssetGroupFunc = calculateAssetGroupFunc
+		var originalAddCalculationOperation = addCalculationOperation
+		defer func() {
+			calculateAssetGroupFunc = originalCalculateAssetGroupFunc
+			addCalculationOperation = originalAddCalculationOperation
+		}()
+
+		calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ syncmodel.ProtectedActivityCache, _ assetInputGroup) (assetCalculationResult, error) {
+			return assetCalculationResult{
+				IncludeInMain: true,
+				SummaryEntry:  validAssetSummaryEntry(t, "asset-btc", "BTC", "1"),
+				DetailSection: validAssetDetailSection(t, "asset-btc", "BTC"),
+				YearlyNet:     mustReportDecimal(t, "1"),
+			}, nil
+		}
+		addCalculationOperation = func(*apd.Decimal, *apd.Decimal, *apd.Decimal) (apd.Condition, error) {
+			return 0, errors.New("add boom")
+		}
+
+		_, err := Calculate(
+			validReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO),
+			syncmodel.ProtectedActivityCache{
+				AvailableReportYears: []int{2024},
+				Activities: []syncmodel.ActivityRecord{
+					zeroPricedHoldingReductionRecord(t, "btc-sell-1", "2024-01-02T10:00:00Z", "asset-btc", "BTC", "Bitcoin"),
+				},
+			},
+		)
+		var calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+		if !strings.Contains(calcErr.Error(), "could not accumulate the yearly report total") {
+			t.Fatalf("expected wrapped yearly-total accumulation failure, got %q", calcErr.Error())
+		}
+	})
+
+	t.Run("wraps basis-state constructor failure", func(t *testing.T) {
+		var originalNewAssetBasisState = newAssetBasisStateFunc
+		defer func() {
+			newAssetBasisStateFunc = originalNewAssetBasisState
+		}()
+
+		newAssetBasisStateFunc = func(reportmodel.CostBasisMethod) (assetBasisState, error) {
+			return nil, errors.New("basis constructor boom")
+		}
+
+		_, err := calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+			AssetIdentityKey: "asset-btc",
+			DisplayLabel:     "BTC",
+		})
+		var calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindUnsupportedCostBasisMethod)
+		if !strings.Contains(calcErr.Error(), "basis constructor boom") {
+			t.Fatalf("expected wrapped basis constructor failure, got %q", calcErr.Error())
+		}
+	})
+
+	t.Run("wraps scoped-input resolution failure", func(t *testing.T) {
+		var originalResolveScopedInputs = resolveScopedInputsFunc
+		defer func() {
+			resolveScopedInputsFunc = originalResolveScopedInputs
+		}()
+
+		resolveScopedInputsFunc = func(reportmodel.CostBasisMethod, assetInputGroup) ([]scopedActivityInput, error) {
+			return nil, errors.New("scope resolution boom")
+		}
+
+		_, err := calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+			AssetIdentityKey: "asset-btc",
+			DisplayLabel:     "BTC",
+		})
+		if err == nil || !strings.Contains(err.Error(), "scope resolution boom") {
+			t.Fatalf("expected scoped-input failure to propagate, got %v", err)
+		}
+	})
+
+	t.Run("wraps opening position lookup failure", func(t *testing.T) {
+		var originalNewAssetBasisState = newAssetBasisStateFunc
+		var originalResolveScopedInputs = resolveScopedInputsFunc
+		defer func() {
+			newAssetBasisStateFunc = originalNewAssetBasisState
+			resolveScopedInputsFunc = originalResolveScopedInputs
+		}()
+
+		newAssetBasisStateFunc = func(reportmodel.CostBasisMethod) (assetBasisState, error) {
+			return stubAssetBasisState{
+				openQuantityFunc: func() (apd.Decimal, error) { return apd.Decimal{}, errors.New("opening quantity boom") },
+				openBasisFunc:    func() (apd.Decimal, error) { return mustReportDecimal(t, "10"), nil },
+			}, nil
+		}
+
+		resolveScopedInputsFunc = func(reportmodel.CostBasisMethod, assetInputGroup) ([]scopedActivityInput, error) {
+			return []scopedActivityInput{{Input: reportmodel.ActivityCalculationInput{
+				SourceID:         "buy-1",
+				OccurredAt:       time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
+				SourceYear:       2024,
+				ActivityType:     syncmodel.ActivityTypeBuy,
+				AssetIdentityKey: "asset-btc",
+				DisplayLabel:     "BTC",
+				Quantity:         mustReportDecimal(t, "1"),
+			}}}, nil
+		}
+
+		_, err := calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+			AssetIdentityKey: "asset-btc",
+			DisplayLabel:     "BTC",
+		})
+		var calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+		if !strings.Contains(calcErr.Error(), "could not determine the opening position carried into the selected year") {
+			t.Fatalf("expected wrapped opening-position failure, got %q", calcErr.Error())
+		}
+	})
+
+	t.Run("wraps opening basis lookup failure", func(t *testing.T) {
+		var originalNewAssetBasisState = newAssetBasisStateFunc
+		var originalResolveScopedInputs = resolveScopedInputsFunc
+		defer func() {
+			newAssetBasisStateFunc = originalNewAssetBasisState
+			resolveScopedInputsFunc = originalResolveScopedInputs
+		}()
+
+		newAssetBasisStateFunc = func(reportmodel.CostBasisMethod) (assetBasisState, error) {
+			return stubAssetBasisState{
+				openQuantityFunc: func() (apd.Decimal, error) { return mustReportDecimal(t, "1"), nil },
+				openBasisFunc:    func() (apd.Decimal, error) { return apd.Decimal{}, errors.New("opening basis boom") },
+			}, nil
+		}
+
+		resolveScopedInputsFunc = func(reportmodel.CostBasisMethod, assetInputGroup) ([]scopedActivityInput, error) {
+			return []scopedActivityInput{{Input: reportmodel.ActivityCalculationInput{
+				SourceID:         "buy-1",
+				OccurredAt:       time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
+				SourceYear:       2024,
+				ActivityType:     syncmodel.ActivityTypeBuy,
+				AssetIdentityKey: "asset-btc",
+				DisplayLabel:     "BTC",
+				Quantity:         mustReportDecimal(t, "1"),
+			}}}, nil
+		}
+
+		_, err := calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+			AssetIdentityKey: "asset-btc",
+			DisplayLabel:     "BTC",
+		})
+		var calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+		if !strings.Contains(calcErr.Error(), "could not determine the opening position carried into the selected year") {
+			t.Fatalf("expected wrapped opening-basis failure, got %q", calcErr.Error())
+		}
+	})
+
+	t.Run("wraps replay and closing-state failures", func(t *testing.T) {
+		var originalResolveScopedInputs = resolveScopedInputsFunc
+		var originalReplayAssetInput = replayAssetInputFunc
+		var originalNewAssetBasisState = newAssetBasisStateFunc
+		defer func() {
+			resolveScopedInputsFunc = originalResolveScopedInputs
+			replayAssetInputFunc = originalReplayAssetInput
+			newAssetBasisStateFunc = originalNewAssetBasisState
+		}()
+
+		var scopedInputs = []scopedActivityInput{{Input: reportmodel.ActivityCalculationInput{
+			SourceID:         "buy-2",
+			OccurredAt:       time.Date(2023, time.January, 2, 0, 0, 0, 0, time.UTC),
+			SourceYear:       2023,
+			ActivityType:     syncmodel.ActivityTypeBuy,
+			AssetIdentityKey: "asset-btc",
+			DisplayLabel:     "BTC",
+			Quantity:         mustReportDecimal(t, "1"),
+		}}}
+		resolveScopedInputsFunc = func(reportmodel.CostBasisMethod, assetInputGroup) ([]scopedActivityInput, error) {
+			return scopedInputs, nil
+		}
+
+		replayAssetInputFunc = func(assetBasisState, scopedActivityInput, int, int) (assetInputReplayResult, error) {
+			return assetInputReplayResult{}, errors.New("replay boom")
+		}
+		newAssetBasisStateFunc = func(reportmodel.CostBasisMethod) (assetBasisState, error) {
+			return stubAssetBasisState{
+				openQuantityFunc: func() (apd.Decimal, error) { return mustReportDecimal(t, "1"), nil },
+				openBasisFunc:    func() (apd.Decimal, error) { return mustReportDecimal(t, "10"), nil },
+			}, nil
+		}
+		_, err := calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+			AssetIdentityKey: "asset-btc",
+			DisplayLabel:     "BTC",
+		})
+		if err == nil || !strings.Contains(err.Error(), "replay boom") {
+			t.Fatalf("expected replay failure to propagate, got %v", err)
+		}
+
+		replayAssetInputFunc = func(assetBasisState, scopedActivityInput, int, int) (assetInputReplayResult, error) {
+			return assetInputReplayResult{}, nil
+		}
+		newAssetBasisStateFunc = func(reportmodel.CostBasisMethod) (assetBasisState, error) {
+			return stubAssetBasisState{
+				openQuantityFunc: func() (apd.Decimal, error) { return apd.Decimal{}, errors.New("closing quantity boom") },
+				openBasisFunc:    func() (apd.Decimal, error) { return mustReportDecimal(t, "10"), nil },
+			}, nil
+		}
+		_, err = calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+			AssetIdentityKey: "asset-btc",
+			DisplayLabel:     "BTC",
+		})
+		var calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+		if !strings.Contains(calcErr.Error(), "could not determine the asset closing quantity") {
+			t.Fatalf("expected wrapped closing-quantity failure, got %q", calcErr.Error())
+		}
+		if calcErr.DisplayLabel() != "BTC" {
+			t.Fatalf("expected closing-quantity failure to preserve display label, got %#v", calcErr)
+		}
+		newAssetBasisStateFunc = func(reportmodel.CostBasisMethod) (assetBasisState, error) {
+			return stubAssetBasisState{
+				openQuantityFunc: func() (apd.Decimal, error) { return mustReportDecimal(t, "1"), nil },
+				openBasisFunc:    func() (apd.Decimal, error) { return apd.Decimal{}, errors.New("closing basis boom") },
+			}, nil
+		}
+		_, err = calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+			AssetIdentityKey: "asset-btc",
+			DisplayLabel:     "BTC",
+		})
+		calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+		if !strings.Contains(calcErr.Error(), "could not determine the asset closing basis") {
+			t.Fatalf("expected wrapped closing-basis failure, got %q", calcErr.Error())
+		}
+
+		var originalAddCalculationOperation = addCalculationOperation
+		defer func() {
+			addCalculationOperation = originalAddCalculationOperation
+		}()
+		addCalculationOperation = func(*apd.Decimal, *apd.Decimal, *apd.Decimal) (apd.Condition, error) {
+			return 0, errors.New("asset yearly net boom")
+		}
+		replayAssetInputFunc = func(assetBasisState, scopedActivityInput, int, int) (assetInputReplayResult, error) {
+			return assetInputReplayResult{yearlyNetDelta: mustReportDecimal(t, "1")}, nil
+		}
+		newAssetBasisStateFunc = func(reportmodel.CostBasisMethod) (assetBasisState, error) {
+			return stubAssetBasisState{
+				openQuantityFunc: func() (apd.Decimal, error) { return mustReportDecimal(t, "1"), nil },
+				openBasisFunc:    func() (apd.Decimal, error) { return mustReportDecimal(t, "10"), nil },
+			}, nil
+		}
+		_, err = calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+			AssetIdentityKey: "asset-btc",
+			DisplayLabel:     "BTC",
+		})
+		calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+		if !strings.Contains(calcErr.Error(), "could not accumulate the asset yearly gain or loss") {
+			t.Fatalf("expected wrapped asset-yearly-net failure, got %q", calcErr.Error())
+		}
+	})
+
+	t.Run("wraps in-year artifact failure", func(t *testing.T) {
+		_, err := replayAssetInput(stubAssetBasisState{
+			disposeFunc: func(basisDisposalInput) (basisDisposalResult, error) {
+				return basisDisposalResult{AllocatedBasis: mustReportDecimal(t, "5")}, nil
+			},
+			openQuantityFunc: func() (apd.Decimal, error) { return mustReportDecimal(t, "1"), nil },
+			openBasisFunc:    func() (apd.Decimal, error) { return mustReportDecimal(t, "10"), nil },
+		}, scopedActivityInput{Input: reportmodel.ActivityCalculationInput{
+			SourceID:             "buy-3",
+			OccurredAt:           time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
+			SourceYear:           2024,
+			ActivityType:         syncmodel.ActivityTypeSell,
+			AssetIdentityKey:     "asset-btc",
+			DisplayLabel:         "BTC",
+			Quantity:             reportInvalidDecimalForCalculator(),
+			GrossValue:           decimalPointer(t, "10"),
+			FeeAmount:            decimalPointer(t, "0"),
+			SelectedCurrencyCode: "USD",
+		}}, 1, 2024)
+		var calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+		if !strings.Contains(calcErr.Error(), "could not build the in-year activity row") {
+			t.Fatalf("expected wrapped in-year artifact failure, got %q", calcErr.Error())
+		}
+	})
+
+	t.Run("wraps reference entry validation failure", func(t *testing.T) {
+		_, err := buildAssetCalculationResult(assetInputGroup{AssetIdentityKey: " ", DisplayLabel: "BTC"}, assetReplayState{fullLiquidationCount: 1})
+		var calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+		if !strings.Contains(calcErr.Error(), "could not build the reference-section entry") {
+			t.Fatalf("expected wrapped reference-entry failure, got %q", calcErr.Error())
+		}
+	})
+}
+
 // TestSelectAssetInputGroupsThroughYearFiltersAndPreservesOrder verifies replay
 // ordering, future-year filtering, and display-label fallback updates.
 // Authored by: OpenCode
@@ -372,6 +659,33 @@ func TestReplayAssetInputCoversYearBoundariesAndWrappedStateFailures(t *testing.
 	calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
 	if !strings.Contains(calcErr.Error(), "could not determine the asset basis after applying the activity") || postApplyCalls != 2 {
 		t.Fatalf("expected wrapped post-apply basis failure, got %q calls=%d", calcErr.Error(), postApplyCalls)
+	}
+
+	postApplyCalls = 0
+	_, err = replayAssetInput(stubAssetBasisState{
+		addAcquisitionFunc: func(basisAcquisitionInput) error { return nil },
+		openQuantityFunc: func() (apd.Decimal, error) {
+			postApplyCalls++
+			if postApplyCalls == 1 {
+				return mustReportDecimal(t, "1"), nil
+			}
+			return apd.Decimal{}, errors.New("after quantity")
+		},
+		openBasisFunc: func() (apd.Decimal, error) { return mustReportDecimal(t, "10"), nil },
+	}, scopedActivityInput{Input: reportmodel.ActivityCalculationInput{
+		SourceID:         "buy-4",
+		OccurredAt:       time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
+		SourceYear:       2024,
+		ActivityType:     syncmodel.ActivityTypeBuy,
+		AssetIdentityKey: "asset-btc",
+		DisplayLabel:     "BTC",
+		Quantity:         mustReportDecimal(t, "1"),
+		GrossValue:       decimalPointer(t, "10"),
+		FeeAmount:        decimalPointer(t, "0"),
+	}}, 1, 2024)
+	calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+	if !strings.Contains(calcErr.Error(), "could not determine the asset quantity after applying the activity") {
+		t.Fatalf("expected wrapped post-apply quantity failure, got %q", calcErr.Error())
 	}
 }
 
@@ -729,8 +1043,14 @@ func TestBuildAssetCalculationResultCoversReferenceOnlyIncludedAndValidationFail
 // Authored by: OpenCode
 func TestNewAssetBasisStateAndCalculationHelpers(t *testing.T) {
 	var originalNewLotMethodState = newLotMethodState
+	var originalLotStateTotalOpenQuantity = lotStateTotalOpenQuantity
+	var originalAddCalculationOperation = addCalculationOperation
+	var originalSubtractCalculationOperation = subtractCalculationOperation
 	defer func() {
 		newLotMethodState = originalNewLotMethodState
+		lotStateTotalOpenQuantity = originalLotStateTotalOpenQuantity
+		addCalculationOperation = originalAddCalculationOperation
+		subtractCalculationOperation = originalSubtractCalculationOperation
 	}()
 
 	var fifoState, err = newAssetBasisState(reportmodel.CostBasisMethodFIFO)
@@ -823,6 +1143,19 @@ func TestNewAssetBasisStateAndCalculationHelpers(t *testing.T) {
 	if _, err = subtractCalculationDecimal(mustReportDecimal(t, "1"), invalid); err == nil || !strings.Contains(err.Error(), "right calculation decimal") {
 		t.Fatalf("expected invalid right subtrahend to fail, got %v", err)
 	}
+	addCalculationOperation = func(*apd.Decimal, *apd.Decimal, *apd.Decimal) (apd.Condition, error) {
+		return 0, errors.New("add boom")
+	}
+	if _, err = addCalculationDecimal(mustReportDecimal(t, "1"), mustReportDecimal(t, "2")); err == nil || !strings.Contains(err.Error(), "add calculation decimals") {
+		t.Fatalf("expected injected add operation failure, got %v", err)
+	}
+	addCalculationOperation = originalAddCalculationOperation
+	subtractCalculationOperation = func(*apd.Decimal, *apd.Decimal, *apd.Decimal) (apd.Condition, error) {
+		return 0, errors.New("subtract boom")
+	}
+	if _, err = subtractCalculationDecimal(mustReportDecimal(t, "2"), mustReportDecimal(t, "1")); err == nil || !strings.Contains(err.Error(), "subtract calculation decimals") {
+		t.Fatalf("expected injected subtract operation failure, got %v", err)
+	}
 
 	var recordErr = newRecordCalculationError(reportmodel.CalculationErrorKindActivityInput, syncmodel.ActivityRecord{
 		SourceID:    " rec-1 ",
@@ -845,6 +1178,25 @@ func TestNewAssetBasisStateAndCalculationHelpers(t *testing.T) {
 	var lotWrapper = lotBasisState{}
 	if _, err = lotWrapper.Dispose(basisDisposalInput{Quantity: mustReportDecimal(t, "1")}); err == nil {
 		t.Fatalf("expected nil lot wrapper state disposal to fail")
+	}
+	lotStateTotalOpenQuantity = func(*reportbasis.LotMethodState) (apd.Decimal, error) {
+		return apd.Decimal{}, errors.New("total quantity boom")
+	}
+	var concreteLotState, concreteErr = reportbasis.NewLotMethodState(reportbasis.LotMethodFIFO)
+	if concreteErr != nil {
+		t.Fatalf("new concrete FIFO basis state: %v", concreteErr)
+	}
+	if addErr := concreteLotState.AddAcquisition(reportbasis.LotAcquisition{
+		SourceID:           "lot-1",
+		AcquiredAt:         time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
+		DeterministicOrder: 1,
+		RemainingQuantity:  mustReportDecimal(t, "1"),
+		RemainingBasis:     mustReportDecimal(t, "1"),
+	}); addErr != nil {
+		t.Fatalf("seed concrete lot basis state: %v", addErr)
+	}
+	if _, err = (lotBasisState{state: concreteLotState}).Dispose(basisDisposalInput{Quantity: mustReportDecimal(t, "1")}); err == nil || !strings.Contains(err.Error(), "total quantity boom") {
+		t.Fatalf("expected injected lot total-quantity failure, got %v", err)
 	}
 
 	var hybridWrapper = scopeLocalHybridBasisState{}

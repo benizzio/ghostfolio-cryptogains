@@ -371,3 +371,4 @@ Expected result:
 
 - the run exercises request validation, calculation, Markdown rendering, final save, and opener invocation against the deterministic large-history fixture
 - the logged runtime stays under the `SC-007` threshold of 2 minutes
+- verified on 2026-05-21 with `SC-007 verification completed in 6.222988008s for 10000 activities across 6 calendar years`

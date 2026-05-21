@@ -4,6 +4,7 @@
 package basis
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -295,5 +296,209 @@ func TestScopeLocalHybridOperationalBranches(t *testing.T) {
 	state.scopes["scope-b"] = &scopeLocalOpenState{fallbackPool: &AverageCostState{quantity: decimalFromInt(1), basis: invalid}}
 	if _, err := state.TotalOpenBasis(); err == nil {
 		t.Fatalf("expected corrupted fallback basis total to fail")
+	}
+
+	state.scopes["scope-b"] = &scopeLocalOpenState{fallbackPool: &AverageCostState{quantity: invalid, basis: decimalFromInt(1)}}
+	if _, err := state.TotalOpenQuantity(); err == nil {
+		t.Fatalf("expected corrupted fallback quantity total to fail")
+	}
+}
+
+// TestScopeLocalHybridWrapsInjectedHelperFailures verifies direct wrapper
+// branches through scope-local helper seams.
+// Authored by: OpenCode
+func TestScopeLocalHybridWrapsInjectedHelperFailures(t *testing.T) {
+	var previousNewLotMethodState = scopeLocalNewLotMethodState
+	var previousTotalOpenQuantity = scopeLocalLotTotalOpenQuantity
+	var previousTotalOpenBasis = scopeLocalLotTotalOpenBasis
+	var previousSubtract = scopeLocalSubtractDecimal
+	defer func() {
+		scopeLocalNewLotMethodState = previousNewLotMethodState
+		scopeLocalLotTotalOpenQuantity = previousTotalOpenQuantity
+		scopeLocalLotTotalOpenBasis = previousTotalOpenBasis
+		scopeLocalSubtractDecimal = previousSubtract
+	}()
+
+	scopeLocalNewLotMethodState = func(LotMethod) (*LotMethodState, error) {
+		return nil, errors.New("constructor boom")
+	}
+	if _, err := NewScopeLocalHybridState().ensureScopeState("scope-a"); err == nil || !strings.Contains(err.Error(), "constructor boom") {
+		t.Fatalf("expected injected constructor failure, got %v", err)
+	}
+
+	scopeLocalNewLotMethodState = previousNewLotMethodState
+	var invalid apd.Decimal
+	invalid.Form = apd.NaNSignaling
+	fallbackAddState := NewScopeLocalHybridState()
+	fallbackAddState.scopes["scope-a"] = &scopeLocalOpenState{fallbackPool: &AverageCostState{quantity: invalid}}
+	if err := fallbackAddState.AddAcquisition(ScopeLocalHybridAcquisition{
+		SourceID:           "scope-a-fallback-add",
+		ScopeKey:           "scope-a",
+		AcquiredAt:         time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
+		DeterministicOrder: 1,
+		Quantity:           decimalFromInt(1),
+		Basis:              decimalFromInt(1),
+	}); err == nil {
+		t.Fatalf("expected fallback acquisition to surface pool failure")
+	}
+
+	scopeLocalNewLotMethodState = func(LotMethod) (*LotMethodState, error) {
+		return nil, errors.New("constructor boom through add")
+	}
+	if err := NewScopeLocalHybridState().AddAcquisition(ScopeLocalHybridAcquisition{
+		SourceID:           "scope-a-new",
+		ScopeKey:           "scope-a",
+		AcquiredAt:         time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
+		DeterministicOrder: 1,
+		Quantity:           decimalFromInt(1),
+		Basis:              decimalFromInt(1),
+	}); err == nil || !strings.Contains(err.Error(), "constructor boom through add") {
+		t.Fatalf("expected constructor failure through AddAcquisition, got %v", err)
+	}
+	scopeLocalNewLotMethodState = previousNewLotMethodState
+
+	var state = NewScopeLocalHybridState()
+	for _, acquisition := range []ScopeLocalHybridAcquisition{
+		{
+			SourceID:           "scope-a-lot-1",
+			ScopeKey:           "scope-a",
+			AcquiredAt:         time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
+			DeterministicOrder: 1,
+			Quantity:           decimalFromInt(1),
+			Basis:              decimalFromInt(10),
+		},
+		{
+			SourceID:           "scope-a-lot-2",
+			ScopeKey:           "scope-a",
+			AcquiredAt:         time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
+			DeterministicOrder: 2,
+			Quantity:           decimalFromInt(1),
+			Basis:              decimalFromInt(20),
+		},
+	} {
+		if err := state.AddAcquisition(acquisition); err != nil {
+			t.Fatalf("seed scope-local state %q: %v", acquisition.SourceID, err)
+		}
+	}
+
+	scopeLocalLotTotalOpenQuantity = func(*LotMethodState) (apd.Decimal, error) {
+		return apd.Decimal{}, errors.New("quantity boom")
+	}
+	if _, err := state.TotalOpenQuantity(); err == nil || !strings.Contains(err.Error(), "quantity boom") {
+		t.Fatalf("expected injected total-open-quantity failure, got %v", err)
+	}
+
+	scopeLocalLotTotalOpenQuantity = previousTotalOpenQuantity
+	scopeLocalLotTotalOpenBasis = func(*LotMethodState) (apd.Decimal, error) {
+		return apd.Decimal{}, errors.New("basis boom")
+	}
+	if _, err := state.TotalOpenBasis(); err == nil || !strings.Contains(err.Error(), "basis boom") {
+		t.Fatalf("expected injected total-open-basis failure, got %v", err)
+	}
+
+	scopeLocalLotTotalOpenBasis = previousTotalOpenBasis
+	var exactState, err = NewLotMethodState(LotMethodFIFO)
+	if err != nil {
+		t.Fatalf("new FIFO exact state for exact disposal failure: %v", err)
+	}
+	if err = exactState.AddAcquisition(LotAcquisition{
+		SourceID:           "scope-c-lot",
+		AcquiredAt:         time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
+		DeterministicOrder: 1,
+		RemainingQuantity:  decimalFromInt(2),
+		RemainingBasis:     decimalFromInt(10),
+	}); err != nil {
+		t.Fatalf("seed exact scope-local state: %v", err)
+	}
+	var previousLotSubtract = lotSubtractDecimal
+	var lotSubtractCalls int
+	lotSubtractDecimal = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+		lotSubtractCalls++
+		if lotSubtractCalls == 1 {
+			var invalidQuantity apd.Decimal
+			invalidQuantity.Form = apd.NaNSignaling
+			return invalidQuantity, nil
+		}
+		return previousLotSubtract(left, right)
+	}
+	state.scopes = map[string]*scopeLocalOpenState{
+		"scope-c": {exactState: exactState},
+	}
+	if _, err = state.Dispose("scope-c", decimalFromInt(1)); err == nil {
+		t.Fatalf("expected exact one-lot disposal to fail while reading remaining quantity")
+	}
+	lotSubtractDecimal = previousLotSubtract
+
+	exactState, err = NewLotMethodState(LotMethodFIFO)
+	if err != nil {
+		t.Fatalf("new FIFO exact state for fallback activation failure: %v", err)
+	}
+	exactState.lots = []LotAcquisition{{
+		SourceID:           "scope-d-lot-1",
+		AcquiredAt:         time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
+		DeterministicOrder: 1,
+		RemainingQuantity:  decimalFromInt(1),
+		RemainingBasis:     invalid,
+	}, {
+		SourceID:           "scope-d-lot-2",
+		AcquiredAt:         time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
+		DeterministicOrder: 2,
+		RemainingQuantity:  decimalFromInt(1),
+		RemainingBasis:     decimalFromInt(1),
+	}}
+	state.scopes = map[string]*scopeLocalOpenState{
+		"scope-d": {exactState: exactState},
+	}
+	if _, err = state.Dispose("scope-d", decimalFromInt(1)); err == nil {
+		t.Fatalf("expected fallback activation failure to propagate through Dispose")
+	}
+
+	state.scopes = map[string]*scopeLocalOpenState{
+		"scope-e": {fallbackPool: &AverageCostState{quantity: decimalFromInt(1), basis: invalid}, provenanceLots: []scopeLocalProvenanceLot{{RemainingQuantity: decimalFromInt(1)}}},
+	}
+	if _, err = state.Dispose("scope-e", decimalFromInt(1)); err == nil {
+		t.Fatalf("expected fallback pool disposal failure to propagate")
+	}
+
+	scopeLocalSubtractDecimal = func(apd.Decimal, apd.Decimal) (apd.Decimal, error) {
+		return apd.Decimal{}, errors.New("subtract boom")
+	}
+	state.scopes = map[string]*scopeLocalOpenState{
+		"scope-b": {
+			fallbackPool: NewAverageCostState(),
+			provenanceLots: []scopeLocalProvenanceLot{{
+				RemainingQuantity: decimalFromInt(1),
+			}},
+		},
+	}
+	if err := state.scopes["scope-b"].fallbackPool.AddAcquisition(decimalFromInt(1), decimalFromInt(1)); err != nil {
+		t.Fatalf("seed fallback pool: %v", err)
+	}
+	if _, err := state.Dispose("scope-b", decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "subtract boom") {
+		t.Fatalf("expected injected fallback subtraction failure, got %v", err)
+	}
+
+	scopeLocalSubtractDecimal = previousSubtract
+	var subtractCalls int
+	scopeLocalSubtractDecimal = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+		subtractCalls++
+		if subtractCalls == 2 {
+			return apd.Decimal{}, errors.New("subtract second boom")
+		}
+		return previousSubtract(left, right)
+	}
+	state.scopes = map[string]*scopeLocalOpenState{
+		"scope-f": {
+			fallbackPool: NewAverageCostState(),
+			provenanceLots: []scopeLocalProvenanceLot{{
+				RemainingQuantity: decimalFromInt(1),
+			}},
+		},
+	}
+	if err := state.scopes["scope-f"].fallbackPool.AddAcquisition(decimalFromInt(1), decimalFromInt(1)); err != nil {
+		t.Fatalf("seed fallback pool for second subtraction failure: %v", err)
+	}
+	if _, err := state.Dispose("scope-f", decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "subtract second boom") {
+		t.Fatalf("expected injected second fallback subtraction failure, got %v", err)
 	}
 }

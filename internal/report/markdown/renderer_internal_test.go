@@ -4,6 +4,7 @@
 package markdown
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -107,6 +108,26 @@ func TestRendererInternalErrorBranches(t *testing.T) {
 		}
 	})
 
+	t.Run("closing position invalid decimal", func(t *testing.T) {
+		var builder strings.Builder
+		var invalid apd.Decimal
+		invalid.Form = apd.Infinite
+
+		var section = reportmodel.AssetDetailSection{
+			AssetIdentityKey: "asset-2",
+			DisplayLabel:     "Asset 2",
+			OpeningQuantity:  *apd.New(0, 0),
+			OpeningCostBasis: *apd.New(0, 0),
+			ClosingQuantity:  *apd.New(0, 0),
+			ClosingCostBasis: invalid,
+		}
+
+		var err = writeDetailSection(&builder, section, "USD")
+		if err == nil || !strings.Contains(err.Error(), `render closing position for "asset-2"`) {
+			t.Fatalf("expected wrapped closing-position error, got %v", err)
+		}
+	})
+
 	t.Run("activity row invalid optional decimal", func(t *testing.T) {
 		var builder strings.Builder
 		var invalid apd.Decimal
@@ -149,6 +170,35 @@ func TestRendererInternalErrorBranches(t *testing.T) {
 			t.Fatalf("expected wrapped liquidation error, got %v", err)
 		}
 	})
+
+	t.Run("liquidation block wrapper error", func(t *testing.T) {
+		var builder strings.Builder
+		var invalid apd.Decimal
+		invalid.Form = apd.Infinite
+
+		var section = reportmodel.AssetDetailSection{
+			AssetIdentityKey: "asset-3",
+			DisplayLabel:     "Asset 3",
+			OpeningQuantity:  *apd.New(0, 0),
+			OpeningCostBasis: *apd.New(0, 0),
+			ClosingQuantity:  *apd.New(0, 0),
+			ClosingCostBasis: *apd.New(0, 0),
+			LiquidationSummaries: []reportmodel.LiquidationCalculation{{
+				SourceID:               "sell-wrap",
+				OccurredAt:             time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
+				DisposedQuantity:       *apd.New(1, 0),
+				AllocatedBasis:         invalid,
+				NetLiquidationProceeds: *apd.New(1, 0),
+				GainOrLoss:             *apd.New(0, 0),
+				ActivityCurrency:       "USD",
+			}},
+		}
+
+		var err = writeDetailSection(&builder, section, "USD")
+		if err == nil || !strings.Contains(err.Error(), `render liquidation calculations for "asset-3"`) {
+			t.Fatalf("expected wrapped liquidation-block error, got %v", err)
+		}
+	})
 }
 
 // TestRenderRejectsInvalidReport verifies exported rendering stops at report
@@ -159,6 +209,77 @@ func TestRenderRejectsInvalidReport(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "capital gains report year must be greater than zero") {
 		t.Fatalf("expected report validation error, got %v", err)
 	}
+}
+
+// TestRenderWrapsInjectedHelperFailures verifies exported Render wrapper
+// branches through package-local test seams.
+// Authored by: OpenCode
+func TestRenderWrapsInjectedHelperFailures(t *testing.T) {
+	t.Parallel()
+
+	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("new report request: %v", err)
+	}
+
+	var report, reportErr = reportmodel.NewCapitalGainsReport(request, request.RequestedAt, "USD", nil, *apd.New(0, 0), nil, nil)
+	if reportErr != nil {
+		t.Fatalf("new capital gains report: %v", reportErr)
+	}
+
+	t.Run("summary failure propagates from Render", func(t *testing.T) {
+		var previous = renderWriteSummarySection
+		defer func() {
+			renderWriteSummarySection = previous
+		}()
+
+		renderWriteSummarySection = func(*strings.Builder, reportmodel.CapitalGainsReport, string) error {
+			return errors.New("summary boom")
+		}
+
+		if _, renderErr := Render(report); renderErr == nil || !strings.Contains(renderErr.Error(), "summary boom") {
+			t.Fatalf("expected summary helper failure to propagate, got %v", renderErr)
+		}
+	})
+
+	t.Run("reference failure propagates from Render", func(t *testing.T) {
+		var previousSummary = renderWriteSummarySection
+		var previousReference = renderWriteReferenceSection
+		defer func() {
+			renderWriteSummarySection = previousSummary
+			renderWriteReferenceSection = previousReference
+		}()
+
+		renderWriteSummarySection = writeSummarySection
+		renderWriteReferenceSection = func(*strings.Builder, reportmodel.CapitalGainsReport) error {
+			return errors.New("reference boom")
+		}
+
+		if _, renderErr := Render(report); renderErr == nil || !strings.Contains(renderErr.Error(), "reference boom") {
+			t.Fatalf("expected reference helper failure to propagate, got %v", renderErr)
+		}
+	})
+
+	t.Run("detail failure propagates from Render", func(t *testing.T) {
+		var previousSummary = renderWriteSummarySection
+		var previousReference = renderWriteReferenceSection
+		var previousDetails = renderWriteDetailSections
+		defer func() {
+			renderWriteSummarySection = previousSummary
+			renderWriteReferenceSection = previousReference
+			renderWriteDetailSections = previousDetails
+		}()
+
+		renderWriteSummarySection = writeSummarySection
+		renderWriteReferenceSection = writeReferenceSection
+		renderWriteDetailSections = func(*strings.Builder, reportmodel.CapitalGainsReport, string) error {
+			return errors.New("detail boom")
+		}
+
+		if _, renderErr := Render(report); renderErr == nil || !strings.Contains(renderErr.Error(), "detail boom") {
+			t.Fatalf("expected detail helper failure to propagate, got %v", renderErr)
+		}
+	})
 }
 
 // TestRenderRendersReferenceEmptyState verifies the valid no-reference branch

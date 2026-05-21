@@ -61,6 +61,7 @@
 - Failed output attempts remove the partial file created during that attempt.
 - Automatic-open failure after save is non-fatal and keeps the saved file in place.
 - App-managed storage is expected to contain no Markdown report content or generated-report catalog.
+- Verified on 2026-05-21 through runtime-backed integration coverage and artifact inspection: `tests/integration/report_generation_flow_test.go`, `tests/integration/report_failure_flow_test.go`, `tests/integration/report_cost_basis_methods_flow_test.go`, and `tests/integration/report_performance_flow_test.go` all call `assertNoCleartextReportInAppStorage(t, harness.BaseDir)`, which walks plaintext application artifacts under `<baseDir>/ghostfolio-cryptogains/` and fails on any `.md` file or persisted report header marker. Workspace inspection after the verification run also found no `ghostfolio-capital-gains-*.md` files under the repository worktree.
 
 ### Dependency And API Review Evidence
 
@@ -80,4 +81,6 @@
 - `internal/report/output/writer.go`
 - `internal/report/output/opener.go`
 - `internal/report/markdown/renderer.go`
+- `tests/integration/helpers_test.go`
+- `tests/integration/persistence_security_flow_test.go`
 - `go.mod`

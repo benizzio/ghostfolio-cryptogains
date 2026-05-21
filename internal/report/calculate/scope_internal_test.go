@@ -4,6 +4,7 @@
 package calculate
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -166,5 +167,43 @@ func TestScopeHelperBranches(t *testing.T) {
 
 	if kind, ok := supportedApplicableScopeKind(syncmodel.SourceScopeKind("portfolio")); ok || kind != "" {
 		t.Fatalf("expected unsupported scope kind lookup to fail, got kind=%q ok=%t", kind, ok)
+	}
+}
+
+// TestResolveScopedAssetInputsWrapsReliableScopeFailures verifies the direct
+// wrapper branch around reliable-scope resolution.
+// Authored by: OpenCode
+func TestResolveScopedAssetInputsWrapsReliableScopeFailures(t *testing.T) {
+	t.Parallel()
+
+	var previous = resolveReliableApplicableScopeFunc
+	defer func() {
+		resolveReliableApplicableScopeFunc = previous
+	}()
+
+	resolveReliableApplicableScopeFunc = func(string, reportmodel.ActivityCalculationInput) (applicableScope, error) {
+		return applicableScope{}, errors.New("scope boom")
+	}
+
+	_, err := resolveScopedAssetInputs(reportmodel.CostBasisMethodScopeLocalHybrid, assetInputGroup{
+		AssetIdentityKey: "asset-btc-001",
+		DisplayLabel:     "BTC",
+		Inputs: []reportmodel.ActivityCalculationInput{{
+			SourceID:         "btc-buy-1",
+			OccurredAt:       time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
+			SourceYear:       2024,
+			ActivityType:     syncmodel.ActivityTypeBuy,
+			AssetIdentityKey: "asset-btc-001",
+			DisplayLabel:     "BTC",
+			Quantity:         *apd.New(1, 0),
+			SourceScope: &syncmodel.SourceScope{
+				ID:          "scope-a",
+				Kind:        syncmodel.SourceScopeKindWallet,
+				Reliability: syncmodel.ScopeReliabilityReliable,
+			},
+		}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "could not resolve the applicable scope for the scope-local method") {
+		t.Fatalf("expected wrapped reliable-scope failure, got %v", err)
 	}
 }

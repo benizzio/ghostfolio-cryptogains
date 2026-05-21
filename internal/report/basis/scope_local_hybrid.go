@@ -55,6 +55,15 @@ type scopeLocalProvenanceLot struct {
 	RemainingQuantity  apd.Decimal
 }
 
+// Test seams keep defensive scope-local wrapper branches directly coverable.
+// Authored by: OpenCode
+var (
+	scopeLocalNewLotMethodState    = NewLotMethodState
+	scopeLocalLotTotalOpenBasis    = func(state *LotMethodState) (apd.Decimal, error) { return state.TotalOpenBasis() }
+	scopeLocalLotTotalOpenQuantity = func(state *LotMethodState) (apd.Decimal, error) { return state.TotalOpenQuantity() }
+	scopeLocalSubtractDecimal      = subtractDecimal
+)
+
 // NewScopeLocalHybridState creates one empty scope-local hybrid basis state.
 //
 // Example:
@@ -166,7 +175,7 @@ func (state *ScopeLocalHybridState) TotalOpenQuantity() (apd.Decimal, error) {
 		if scopeState.inFallback() {
 			scopeQuantity = scopeState.fallbackPool.Quantity()
 		} else {
-			scopeQuantity, err = scopeState.exactState.TotalOpenQuantity()
+			scopeQuantity, err = scopeLocalLotTotalOpenQuantity(scopeState.exactState)
 			if err != nil {
 				return apd.Decimal{}, err
 			}
@@ -194,7 +203,7 @@ func (state *ScopeLocalHybridState) TotalOpenBasis() (apd.Decimal, error) {
 		if scopeState.inFallback() {
 			scopeBasis = scopeState.fallbackPool.Basis()
 		} else {
-			scopeBasis, err = scopeState.exactState.TotalOpenBasis()
+			scopeBasis, err = scopeLocalLotTotalOpenBasis(scopeState.exactState)
 			if err != nil {
 				return apd.Decimal{}, err
 			}
@@ -221,7 +230,7 @@ func (state *ScopeLocalHybridState) ensureScopeState(scopeKey string) (*scopeLoc
 		return existing, nil
 	}
 
-	var exactState, err = NewLotMethodState(LotMethodFIFO)
+	var exactState, err = scopeLocalNewLotMethodState(LotMethodFIFO)
 	if err != nil {
 		return nil, err
 	}
@@ -310,12 +319,12 @@ func (state *scopeLocalOpenState) consumeFallbackProvenance(quantity apd.Decimal
 			continue
 		}
 
-		var nextLotQuantity, err = subtractDecimal(state.provenanceLots[index].RemainingQuantity, matchedQuantity)
+		var nextLotQuantity, err = scopeLocalSubtractDecimal(state.provenanceLots[index].RemainingQuantity, matchedQuantity)
 		if err != nil {
 			return err
 		}
 		var nextRemainingQuantity apd.Decimal
-		nextRemainingQuantity, err = subtractDecimal(remainingQuantity, matchedQuantity)
+		nextRemainingQuantity, err = scopeLocalSubtractDecimal(remainingQuantity, matchedQuantity)
 		if err != nil {
 			return err
 		}

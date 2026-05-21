@@ -13,6 +13,12 @@ import (
 // Authored by: OpenCode
 var reportDecimalZero apd.Decimal
 
+// Test seams keep report-local multiply wrapper branches directly coverable.
+// Authored by: OpenCode
+var reportMultiplyOperation = func(product *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
+	return apd.BaseContext.Mul(product, left, right)
+}
+
 // multiplyDecimal preserves exact-decimal precision for report-local
 // multiplication steps.
 // Authored by: OpenCode
@@ -26,7 +32,7 @@ func multiplyDecimal(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
 
 	var product apd.Decimal
 	var err error
-	_, err = apd.BaseContext.Mul(&product, &left, &right)
+	_, err = reportMultiplyOperation(&product, &left, &right)
 	if err != nil {
 		return apd.Decimal{}, fmt.Errorf("multiply report decimals: %w", err)
 	}

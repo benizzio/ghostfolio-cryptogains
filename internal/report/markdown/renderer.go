@@ -23,6 +23,15 @@ var markdownSecretPatterns = []struct {
 	{pattern: regexp.MustCompile(`(?i)\bBearer\s+[^\s]+`), replacement: `Bearer [REDACTED]`},
 }
 
+// Test seams keep exported Render wrapper branches directly coverable without
+// weakening the validated helper behavior.
+// Authored by: OpenCode
+var (
+	renderWriteSummarySection   = writeSummarySection
+	renderWriteReferenceSection = writeReferenceSection
+	renderWriteDetailSections   = writeDetailSections
+)
+
 // Render converts one calculated yearly capital-gains report into the Markdown
 // document contract used by later output-file writers.
 //
@@ -44,13 +53,13 @@ func Render(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, 
 	var calculationCurrency = calculationCurrencyLabel(report.ReportCalculationCurrency)
 
 	writeHeader(&builder, report, calculationCurrency)
-	if err := writeSummarySection(&builder, report, calculationCurrency); err != nil {
+	if err := renderWriteSummarySection(&builder, report, calculationCurrency); err != nil {
 		return reportmodel.ReportDocument{}, err
 	}
-	if err := writeReferenceSection(&builder, report); err != nil {
+	if err := renderWriteReferenceSection(&builder, report); err != nil {
 		return reportmodel.ReportDocument{}, err
 	}
-	if err := writeDetailSections(&builder, report, calculationCurrency); err != nil {
+	if err := renderWriteDetailSections(&builder, report, calculationCurrency); err != nil {
 		return reportmodel.ReportDocument{}, err
 	}
 
