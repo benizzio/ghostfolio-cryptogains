@@ -1,0 +1,304 @@
+erDiagram
+    ProtectedActivityCache {
+        timestamp synced_at
+        integer activity_count
+        integer_array available_report_years
+        enum scope_reliability
+        ActivityRecord_array activities
+        ProtectedSnapshot protected_snapshot
+        ReportRequest_array report_requests
+        CapitalGainsReport_array capital_gains_reports
+    }
+
+    ActivityRecord {
+        string source_id
+        RFC3339_timestamp_string occurred_at
+        enum activity_type
+        string asset_identity_key
+        string asset_symbol
+        string_nullable asset_name
+        decimal quantity
+        string_nullable order_currency
+        decimal_nullable order_unit_price
+        decimal_nullable order_gross_value
+        decimal_nullable order_fee_amount
+        string_nullable asset_profile_currency
+        decimal_nullable asset_profile_unit_price
+        decimal_nullable asset_profile_fee_amount
+        string_nullable base_currency
+        decimal_nullable base_gross_value
+        decimal_nullable base_fee_amount
+        string_nullable comment
+        SourceScope_nullable source_scope
+        string raw_hash
+        ProtectedActivityCache protected_activity_cache
+        ActivityCalculationInput activity_calculation_input
+    }
+
+    SourceScope {
+        string scope_id
+        string_nullable scope_name
+        enum scope_kind
+        enum reliability
+        ActivityRecord_array activity_records
+        ApplicableScope_array applicable_scopes
+    }
+
+    SyncAndReportsContext {
+        string server_origin
+        secret_string security_token
+        ActiveReadableSnapshot_nullable active_readable_snapshot
+        ProtectedActivityCache_nullable protected_activity_cache
+        timestamp entered_at
+        AppSetupConfig setup_config
+        SyncDataAttempt_array sync_data_attempts
+        ReportRequest_array report_generation_attempts
+        ReportGenerationOutcome_array report_generation_outcomes
+    }
+
+    ReportRequest {
+        integer year
+        enum cost_basis_method
+        timestamp requested_at
+        SyncAndReportsContext context
+        ProtectedActivityCache protected_activity_cache
+        CostBasisMethod cost_basis_method_definition
+        CapitalGainsReport_nullable capital_gains_report
+    }
+
+    CostBasisMethod {
+        enum value
+        ReportRequest_array report_requests
+        BasisState_array basis_state_implementations
+    }
+
+    BasisState {
+        CostBasisMethod cost_basis_method
+        ApplicableScope_nullable applicable_scope
+    }
+
+    ActivityCalculationInput {
+        string source_id
+        timestamp occurred_at
+        integer source_year
+        enum activity_type
+        string asset_identity_key
+        string display_label
+        decimal quantity
+        decimal_nullable gross_value
+        decimal_nullable fee_amount
+        decimal_nullable unit_price
+        enum_nullable selected_currency_context
+        string_nullable selected_currency_code
+        SourceScope_nullable source_scope
+        boolean is_zero_priced_holding_reduction
+        string_nullable comment
+        ActivityRecord activity_record
+        AssetPositionTimeline asset_position_timeline
+    }
+
+    ApplicableScope {
+        string asset_identity_key
+        string scope_key
+        enum scope_kind
+        boolean broadened_to_asset
+        AssetPositionTimeline asset_position_timeline
+        BasisState basis_state
+        BasisLot_array basis_lots
+    }
+
+    BasisLot {
+        string source_id
+        string asset_identity_key
+        ApplicableScope_nullable applicable_scope
+        timestamp acquired_at
+        integer deterministic_order
+        decimal remaining_quantity
+        decimal remaining_basis
+        ActivityCalculationInput acquisition_input
+        BasisMatch_array basis_matches
+    }
+
+    BasisMatch {
+        string acquisition_source_id
+        decimal matched_quantity
+        decimal matched_basis
+        decimal_nullable matched_proceeds
+        decimal_nullable matched_gain_or_loss
+        BasisLot basis_lot
+        LiquidationCalculation_nullable liquidation_calculation
+        AssetActivityDetailRow_nullable holding_reduction_detail_row
+    }
+
+    AssetPositionTimeline {
+        string asset_identity_key
+        string display_label
+        decimal opening_quantity
+        decimal opening_basis
+        AssetActivityDetailRow_array in_year_rows
+        decimal closing_quantity
+        decimal closing_basis
+        decimal yearly_gain_or_loss
+        integer full_liquidation_count_through_year_end
+        boolean had_in_year_full_liquidation
+        boolean reopened_on_or_before_year_end
+        boolean has_in_year_activity
+        ActivityCalculationInput_array activity_calculation_inputs
+        ApplicableScope_array applicable_scopes
+        LiquidationCalculation_array liquidation_calculations
+        AssetSummaryEntry_nullable asset_summary_entry
+        CapitalGainsReport_nullable capital_gains_report
+    }
+
+    AssetActivityDetailRow {
+        string source_id
+        timestamp occurred_at
+        enum activity_type
+        decimal quantity
+        decimal_nullable gross_value
+        decimal_nullable fee_amount
+        string_nullable activity_currency
+        string calculation_currency
+        decimal basis_after_row
+        decimal quantity_after_row
+        string_nullable holding_reduction_explanation
+        LiquidationCalculation_nullable liquidation_calculation
+        AssetPositionTimeline asset_position_timeline
+        BasisMatch_array holding_reduction_matches
+    }
+
+    LiquidationCalculation {
+        string source_id
+        decimal disposed_quantity
+        decimal allocated_basis
+        decimal net_liquidation_proceeds
+        decimal gain_or_loss
+        string activity_currency
+        string calculation_currency
+        BasisMatch_array matches
+        AssetActivityDetailRow asset_activity_detail_row
+        AssetSummaryEntry asset_summary_entry
+        CapitalGainsReport capital_gains_report
+    }
+
+    AssetSummaryEntry {
+        string asset_identity_key
+        string display_label
+        decimal net_gain_or_loss
+        enum result_kind
+        string report_calculation_currency
+        CapitalGainsReport capital_gains_report
+        AssetPositionTimeline asset_position_timeline
+        LiquidationCalculation_array liquidation_calculations
+    }
+
+    ReferenceLiquidationEntry {
+        string asset_identity_key
+        string display_label
+        integer full_liquidation_count_through_year_end
+        enum main_section_status
+        CapitalGainsReport capital_gains_report
+    }
+
+    CapitalGainsReport {
+        integer year
+        enum cost_basis_method
+        timestamp generated_at
+        string report_calculation_currency
+        AssetSummaryEntry_array summary_entries
+        decimal yearly_net_total
+        ReferenceLiquidationEntry_array reference_entries
+        AssetPositionTimeline_array detail_sections
+        ReportRequest report_request
+        ProtectedActivityCache protected_activity_cache
+        ReportDocument report_document
+    }
+
+    ReportDocumentType {
+        enum value
+        ReportDocument_array report_documents
+    }
+
+    ReportDocument {
+        ReportDocumentType document_type
+        string content
+        integer year
+        enum cost_basis_method
+        timestamp generated_at
+        CapitalGainsReport capital_gains_report
+        ReportDocumentType document_type_definition
+        ReportOutputFile report_output_file
+    }
+
+    ReportOutputFile {
+        path documents_directory
+        string filename
+        path path
+        timestamp saved_at
+        boolean open_requested
+        string_nullable open_error
+        ReportDocument report_document
+        ReportGenerationOutcome report_generation_outcome
+    }
+
+    ReportGenerationOutcome {
+        boolean success
+        path_nullable saved_path
+        boolean open_failed
+        string message
+        SyncAndReportsContext context
+        ReportOutputFile_nullable report_output_file
+    }
+
+    ProtectedSnapshot ||--|| ProtectedActivityCache : unlocks
+    ProtectedActivityCache ||--o{ ActivityRecord : supplies
+    ProtectedActivityCache ||--o{ ReportRequest : consumed_by
+    ProtectedActivityCache ||--o{ CapitalGainsReport : source_for
+
+    ActivityRecord }o--o| SourceScope : references
+    ActivityRecord ||--|| ActivityCalculationInput : transforms_into
+
+    SourceScope ||--o{ ApplicableScope : contributes_to
+
+    AppSetupConfig ||--o{ SyncAndReportsContext : used_by
+    SyncAndReportsContext ||--o| ActiveReadableSnapshot : holds
+    SyncAndReportsContext ||--o| ProtectedActivityCache : holds
+    SyncAndReportsContext ||--o{ SyncDataAttempt : starts
+    SyncAndReportsContext ||--o{ ReportRequest : starts
+    SyncAndReportsContext ||--o{ ReportGenerationOutcome : owns_until_dismissed
+
+    ReportRequest }o--|| CostBasisMethod : selects
+    ReportRequest ||--o| CapitalGainsReport : produces
+
+    CostBasisMethod ||--o{ BasisState : determines
+
+    ActivityCalculationInput }o--o| SourceScope : preserves
+    ActivityCalculationInput ||--o{ BasisLot : creates
+
+    AssetPositionTimeline ||--o{ ActivityCalculationInput : derived_from
+    AssetPositionTimeline ||--o{ ApplicableScope : owns
+    AssetPositionTimeline ||--o{ LiquidationCalculation : contains
+    AssetPositionTimeline ||--o{ AssetActivityDetailRow : contains
+    AssetPositionTimeline ||--o| AssetSummaryEntry : produces
+
+    ApplicableScope ||--|| BasisState : owns
+    ApplicableScope ||--o{ BasisLot : scopes
+
+    BasisLot ||--o{ BasisMatch : consumed_by
+    LiquidationCalculation ||--o{ BasisMatch : uses
+    AssetActivityDetailRow ||--o{ BasisMatch : holding_reduction_matches
+
+    AssetActivityDetailRow ||--o| LiquidationCalculation : has
+
+    AssetSummaryEntry ||--o{ LiquidationCalculation : summarized_by
+    CapitalGainsReport ||--o{ LiquidationCalculation : totals
+
+    CapitalGainsReport ||--o{ AssetSummaryEntry : has_summary
+    CapitalGainsReport ||--o{ ReferenceLiquidationEntry : has_references
+    CapitalGainsReport ||--o{ AssetPositionTimeline : has_details
+
+    ReportDocumentType ||--o{ ReportDocument : defines
+    CapitalGainsReport ||--|| ReportDocument : rendered_into
+    ReportDocument ||--|| ReportOutputFile : saved_as
+
+    ReportOutputFile ||--|| ReportGenerationOutcome : reported_through
