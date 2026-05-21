@@ -221,7 +221,8 @@ Rules:
 - Every in-year activity for the included asset appears in this table.
 - The table includes acquisitions, priced liquidations, and explained zero-priced holding reductions.
 - `Activity Currency` shows the explicit currency code from which that row's `Gross Value` and `Fee` were taken for priced activity rows.
-- For explained zero-priced holding reductions, `Gross Value`, `Fee`, and `Activity Currency` are left blank because no activity monetary context is required from that row.
+- For explained zero-priced holding reductions, no activity monetary context is required from that row. If synced data preserves explicit zero-valued `Gross Value` or `Fee`, render `0`; otherwise leave those cells blank.
+- For explained zero-priced holding reductions, `Activity Currency` remains blank because no selected activity currency context exists for that row.
 - `Calculation Currency` shows the report's explicit shared report calculation currency for calculated row values such as `Basis After Row`.
 - `Note` explains zero-priced holding reductions as holding reductions with zero gain and zero loss.
 - The table does not include later activity.

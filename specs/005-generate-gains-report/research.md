@@ -62,9 +62,9 @@ For each activity, resolve monetary inputs using this priority: order currency, 
 
 ## Decision: Treat Zero-Priced Explained `SELL` Records As Holding Reductions
 
-Use the active cost-basis method to remove quantity and basis for explained zero-priced `SELL` records. Show them in per-asset detail activity rows, but do not create realized proceeds, gains, losses, or summary contributions.
+Use the active cost-basis method to remove quantity and basis for explained zero-priced `SELL` records. Show them in per-asset detail activity rows, but do not create realized proceeds, gains, losses, or summary contributions. If synced data preserves explicit zero-valued `unit_price`, `gross_value`, or `fee_amount`, keep those values distinct from missing values without requiring an activity monetary context.
 
-**Rationale**: The synced-data slice admits these records as explained non-taxable holding reductions. Reporting must carry that meaning forward while still keeping remaining basis correct.
+**Rationale**: The synced-data slice admits these records as explained non-taxable holding reductions. Reporting must carry that meaning forward while still keeping remaining basis correct. Explicit `0` is not equivalent to missing data for this slice, so preserved zero-valued source details must remain available to report models and rendering without changing the row's holding-reduction semantics.
 
 **Alternatives considered**:
 

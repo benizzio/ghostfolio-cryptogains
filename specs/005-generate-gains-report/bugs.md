@@ -1,6 +1,6 @@
 # Bugs found to report
 
-- [X] specs/005-generate-gains-report/data-model.md:380 mentions: `For explained zero-priced holding reductions, `gross_value`, `fee_amount`, and `activity_currency` are blank.`. The values should be 0 (zero)
+- [X] clarified the explained zero-priced holding-reduction docs so preserved explicit zero `unit_price`, `gross_value`, and `fee_amount` remain distinct from missing values, while `activity_currency` stays blank because no activity monetary context is required
 - [ ] specs/005-generate-gains-report/spec.md:135 mentions the field is named `symbolProfileId` bit it's actually just `id`, so the full path from activity is `SymbolProfile.id`
 - [ ] in the `Sync Data` UI screen, the Ghostfolio Security Token field is still being show. As it is now only needed in the unlock screen and stays in the context, it should not appear internally anymore
 - [ ] inside the `Sync and Reports` UI screen, when `Generate Capital Gains Report` is disabled, and we are selecting an option with the arrow keys, tha cursor still "navigates" through the disabled option, which is a bit confusing. It should skip the disabled option and only navigate through the enabled options

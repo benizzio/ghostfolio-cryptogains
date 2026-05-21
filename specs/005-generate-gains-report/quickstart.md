@@ -163,6 +163,7 @@ Verify at least these scenarios when checking the implemented workflow manually:
 - trigger a Documents-directory failure and confirm no partial Markdown file remains
 - use a fixture or server history that yields a reportable year with no main-section assets and confirm the empty-state report still saves
 - use a fixture with mixed selected activity currencies and confirm the report still renders `NOT APPLICABLE` for report calculation currency columns
+- use a production-shaped explained zero-priced `SELL` row that preserves explicit zero `unit_price`, `gross_value`, and `fee_amount`, and confirm the report keeps those zeros distinct from missing values without treating the row as a priced liquidation
 
 ## Reportable Year With No Main-Section Assets
 
@@ -252,7 +253,7 @@ Use deterministic fixtures that include:
 - a reportable year that yields no main-section assets
 - at least one zero-result included asset
 - at least one realized loss
-- an explained zero-priced `SELL` holding reduction
+- a production-shaped explained zero-priced `SELL` holding reduction that preserves explicit zero `unit_price`, `gross_value`, and `fee_amount`
 - a priced activity with explicit fee `0`
 - a priced activity with incomplete monetary context
 - mixed available monetary tiers for single-activity currency context selection
@@ -269,6 +270,7 @@ Expected result:
 - assets are grouped by stored Ghostfolio asset identity key
 - display labels do not affect grouping
 - zero-priced holding reductions reduce holdings and basis but produce no gain or loss
+- preserved explicit zero-valued `unit_price`, `gross_value`, and `fee_amount` on zero-priced holding reductions remain distinct from missing values during calculation and detail-row preparation
 - explicit fee `0` is accepted, while incomplete priced-activity monetary context fails the attempt
 - reference-section liquidation counts are correct through selected year end
 - scope-local fallback remains active only for the affected open scope until that scope reaches zero
@@ -295,6 +297,7 @@ Expected content:
 - opening position, in-year rows, liquidation calculations, and closing position in each detail section
 - liquidation tables show both `Activity Currency` and `Calculation Currency`
 - `Net Liquidation Proceeds` stays in the liquidation row's activity currency, while `Allocated Basis` and `Gain Or Loss` use the shared explicit report calculation currency
+- when an explained zero-priced holding-reduction row preserves explicit zero `gross_value` or `fee_amount`, the `In-Year Activity` table renders those cells as `0` rather than blank, while `Activity Currency` remains blank because no selected context exists for that row
 - no activity after the selected year
 
 Expected output layout details:

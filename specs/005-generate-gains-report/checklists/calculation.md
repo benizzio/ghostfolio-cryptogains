@@ -20,7 +20,7 @@
 - [x] CHK007 Is `first acquisition` unambiguous about whether reopening events, transfers, or zero-priced holding reductions can affect exclusion under `FR-014`? [Ambiguity, Spec FR-014, Spec FR-017]
 - [x] CHK008 Is `full liquidation count through the end of the selected year` precise about whether the count is per asset or per `(asset, applicable_scope)` when the scope-local hybrid method is active? [Ambiguity, Spec FR-017, Spec FR-027a]
 - [x] CHK009 Are `reliable` and `defensible` scope criteria defined concretely enough to decide when the scope-local method stays narrow versus broadens to the whole asset? [Clarity, Spec Cost Basis Method Definitions, Spec INT-001]
-- [x] CHK010 Is `complete required monetary value set` specified per activity type so it is clear which fields must exist for acquisitions, priced liquidations, and zero-priced holding reductions? [Clarity, Spec FR-031, Spec FR-034, Spec Single-Activity Currency Context Definitions]
+- [x] CHK010 Is `complete required monetary value set` specified per activity type so it is clear which fields must exist for acquisitions and priced liquidations, and that explained zero-priced holding reductions require no activity monetary inputs even when preserved explicit zero-valued source fields remain present? [Clarity, Spec FR-029a, Spec FR-031, Spec FR-034, Spec Single-Activity Currency Context Definitions]
 - [x] CHK011 Are exact-division failure conditions described clearly enough to know which divisions must terminate exactly and which comparisons can avoid division altogether? [Clarity, Spec FIN-001, Plan Reporting Domain Design]
 
 ## Requirement Consistency

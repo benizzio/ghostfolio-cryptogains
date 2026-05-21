@@ -213,9 +213,9 @@ Fields:
 | `asset_identity_key` | string | Calculation grouping key |
 | `display_label` | string | Symbol or name used for rendering only |
 | `quantity` | decimal | Exact activity quantity |
-| `gross_value` | decimal nullable | Selected from one complete activity currency context for priced activities |
-| `fee_amount` | decimal nullable | Selected from the same activity currency context for priced activities |
-| `unit_price` | decimal nullable | Selected or derived within the same activity context when exact for priced activities |
+| `gross_value` | decimal nullable | Selected from one complete activity currency context for priced activities; may remain as preserved explicit `0` for explained zero-priced holding reductions |
+| `fee_amount` | decimal nullable | Selected from the same activity currency context for priced activities; may remain as preserved explicit `0` for explained zero-priced holding reductions |
+| `unit_price` | decimal nullable | Selected or derived within the same activity context when exact for priced activities; may remain as preserved explicit `0` for explained zero-priced holding reductions |
 | `selected_currency_context` | enum nullable | `order`, `asset_profile`, or `base` when a priced activity requires one |
 | `selected_currency_code` | string nullable | Explicit currency code carried from the selected activity context when one is required |
 | `source_scope` | `SourceScope` nullable | Preserved source scope |
@@ -231,7 +231,7 @@ Validation rules:
 
 - A `BUY` requires gross acquisition value and fee from one chosen context.
 - A priced `SELL` requires gross liquidation value and fee from one chosen context.
-- An explained zero-priced holding reduction requires no activity monetary inputs and therefore no selected currency context.
+- An explained zero-priced holding reduction requires no activity monetary inputs and therefore no selected currency context, even when preserved explicit zero-valued `unit_price`, `gross_value`, or `fee_amount` remain present.
 - An explicit fee value of `0` is valid. A missing fee is not equivalent to zero.
 - Priced activity quantity must be greater than zero.
 - If unit price is not stored explicitly for a priced activity, it may be derived only when the needed division terminates exactly.
@@ -353,20 +353,21 @@ Purpose: One rendered in-year activity row in an included per-asset section.
 
 Fields:
 
-| Field                           | Type                              | Notes                                                                                                    |
-|---------------------------------|-----------------------------------|----------------------------------------------------------------------------------------------------------|
-| `source_id`                     | string                            | Source activity identifier                                                                               |
-| `occurred_at`                   | timestamp                         | Activity timestamp                                                                                       |
-| `activity_type`                 | enum                              | `BUY` or `SELL`                                                                                          |
-| `quantity`                      | decimal                           | Activity quantity                                                                                        |
-| `gross_value`                   | decimal nullable                  | Selected gross value for acquisitions and priced liquidations, rendered in the row's activity currency   |
-| `fee_amount`                    | decimal nullable                  | Selected fee, rendered in the row's activity currency                                                    |
-| `activity_currency`             | string nullable                   | Explicit currency code from the row's single-activity currency context                                   |
-| `calculation_currency`          | string                            | Explicit shared report calculation currency for calculated row values, or `NOT APPLICABLE` in this slice |
-| `basis_after_row`               | decimal                           | Remaining basis after applying row                                                                       |
-| `quantity_after_row`            | decimal                           | Remaining quantity after applying row                                                                    |
-| `holding_reduction_explanation` | string nullable                   | Present for zero-priced holding reductions                                                               |
-| `liquidation_calculation`       | `LiquidationCalculation` nullable | Present for priced in-year liquidations                                                                  |
+| Field                           | Type                              | Notes                                                                                                                                                             |
+|---------------------------------|-----------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `source_id`                     | string                            | Source activity identifier                                                                                                                                        |
+| `occurred_at`                   | timestamp                         | Activity timestamp                                                                                                                                                |
+| `activity_type`                 | enum                              | `BUY` or `SELL`                                                                                                                                                   |
+| `quantity`                      | decimal                           | Activity quantity                                                                                                                                                 |
+| `unit_price`                    | decimal nullable                  | Selected or derived unit price for priced rows; may remain as preserved explicit `0` when a detail layout carries it for explained zero-priced holding reductions |
+| `gross_value`                   | decimal nullable                  | Selected gross value for acquisitions and priced liquidations, or preserved explicit `0` for explained zero-priced holding reductions when present                |
+| `fee_amount`                    | decimal nullable                  | Selected fee for priced rows, or preserved explicit `0` for explained zero-priced holding reductions when present                                                 |
+| `activity_currency`             | string nullable                   | Explicit currency code from the row's single-activity currency context when one exists                                                                            |
+| `calculation_currency`          | string                            | Explicit shared report calculation currency for calculated row values, or `NOT APPLICABLE` in this slice                                                          |
+| `basis_after_row`               | decimal                           | Remaining basis after applying row                                                                                                                                |
+| `quantity_after_row`            | decimal                           | Remaining quantity after applying row                                                                                                                             |
+| `holding_reduction_explanation` | string nullable                   | Present for zero-priced holding reductions                                                                                                                        |
+| `liquidation_calculation`       | `LiquidationCalculation` nullable | Present for priced in-year liquidations                                                                                                                           |
 
 Relationships:
 
@@ -377,7 +378,7 @@ Validation rules:
 - Every in-year activity for an included asset appears as one row.
 - Zero-priced holding reductions show basis and quantity effects without realized gain or loss.
 - For priced rows, `activity_currency` records the explicit currency code used for `gross_value` and `fee_amount` in that row.
-- For explained zero-priced holding reductions, `gross_value`, `fee_amount`, and `activity_currency` are blank.
+- For explained zero-priced holding reductions, `activity_currency` remains blank because no selected currency context exists. `unit_price`, `gross_value`, and `fee_amount` stay nullable so missing values remain blank while preserved explicit `0` values remain distinguishable.
 - `calculation_currency` records the explicit shared report calculation currency used for calculated row values such as `basis_after_row`.
 
 ## LiquidationCalculation
