@@ -1,7 +1,7 @@
 # Bugs found to report
 
 - [X] clarified the explained zero-priced holding-reduction docs so preserved explicit zero `unit_price`, `gross_value`, and `fee_amount` remain distinct from missing values, while `activity_currency` stays blank because no activity monetary context is required
-- [ ] specs/005-generate-gains-report/spec.md:135 mentions the field is named `symbolProfileId` but it's actually just `id`, so the full path from activity is `SymbolProfile.id`
+- [X] specs/005-generate-gains-report/spec.md:135 mentions the field is named `symbolProfileId` but it's actually just `id`, so the full path from activity is `SymbolProfile.id`
 - [ ] in the `Sync Data` UI screen, the Ghostfolio Security Token field is still being show. As it is now only needed in the unlock screen and stays in the context, it should not appear internally anymore
 - [ ] inside the `Sync and Reports` UI screen, when `Generate Capital Gains Report` is disabled, and we are selecting an option with the arrow keys, tha cursor still "navigates" through the disabled option, which is a bit confusing. It should skip the disabled option and only navigate through the enabled options
 - [ ] when trying to unlock local data with a new Security Token that can't decrypt any existing local data, the screen still presents the normal `Sync and Reports` options. The requirement from previous slice of only allowing further actions if the Ghostfolio server authenticates the security token successfully should be kept. We should show an error message in the unlock screen already that informs the token is invalid
