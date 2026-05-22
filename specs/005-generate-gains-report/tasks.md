@@ -81,11 +81,11 @@ description: "Task list for Generate Yearly Gains And Losses Report implementati
 - [ ] T070 [US1] Add a dedicated in-context `Sync Data` confirmation or explicit non-token mode so `internal/tui/screen/sync_entry_screen.go` does not render editable token input after context unlock
 - [X] T018 [US1] Add active unlocked context state for runtime token, selected server, protected cache summary, report result scratch data, and no report history in `internal/tui/flow/model.go`
 - [X] T019 [US1] Implement runtime selected-server protected snapshot unlock for context entry without forcing a sync in `internal/app/runtime/sync_service.go` and `internal/app/runtime/snapshot_lifecycle.go`
-- [X] T020 [US1] Implement unlock screen key handling, masked token validation, selected-server unlock attempt, and transition into the context menu in `internal/tui/flow/sync_reports_flow.go`
-- [ ] T021 [US1] ⚠️ Reopened Route `Sync Data` from the unlocked context using the stored context token and return to Sync and Reports after success or failure in `internal/tui/flow/sync_flow.go` and `internal/tui/flow/sync_reports_flow.go` without reusing the unlock token-entry UI or allowing token display, focus, or editing on the in-context sync screen (reopened — BUG-003)
-- [X] T022 [US1] Route server-replacement cancellation and success back to the unlocked context without requiring another token prompt in `internal/tui/flow/sync_flow.go` and `internal/tui/flow/sync_reports_flow.go`
+- [X] T020 [US1] Implement unlock screen key handling, masked token validation, selected-server unlock attempt, and transition into the context menu in `internal/tui/flow/sync_flow.go` and `internal/tui/flow/model.go`
+- [ ] T021 [US1] ⚠️ Reopened Route `Sync Data` from the unlocked context using the stored context token and return to Sync and Reports after success or failure in `internal/tui/flow/sync_flow.go`, `internal/tui/flow/model.go`, and `internal/tui/flow/navigation.go` without reusing the unlock token-entry UI or allowing token display, focus, or editing on the in-context sync screen (reopened — BUG-003)
+- [X] T022 [US1] Route server-replacement cancellation and success back to the unlocked context without requiring another token prompt in `internal/tui/flow/sync_flow.go`, `internal/tui/flow/model.go`, and `internal/tui/flow/navigation.go`
 - [X] T023 [US1] Render `Sync Data` last successful sync timestamp, `no synced data available`, and report-generation unavailable reasons in `internal/tui/screen/sync_reports_screen.go`
-- [X] T024 [US1] Clear runtime token and in-mLemory report scratch state when leaving Sync and Reports or quitting from the context in `internal/tui/flow/model.go` and `internal/tui/flow/sync_reports_flow.go`
+- [X] T024 [US1] Clear runtime token and in-memory report scratch state when leaving Sync and Reports or quitting from the context in `internal/tui/flow/model.go` and `internal/tui/flow/navigation.go`
 
 **Checkpoint**: User Story 1 is independently functional and testable without calculating or saving reports.
 
