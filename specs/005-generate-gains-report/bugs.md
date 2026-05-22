@@ -8,3 +8,4 @@
 - [ ] report generation error should also be added to the failure diagnostics report file, that also should print information about the report generation error and, if the error is related to a specific activity, original activity data should be included to trace the issue to the original datasource
   - when printing activity data in the diagnostics reports, always use the original persisted data
   - make sure to print null values as well as it helps understand the errors. The current sync report is not printing null values, so it should be changed
+- [ ] the application is currently keeping the token in memory in cleartext and a memory dump of the application process would reveal the token. We need to add a security layer to make sure this is not possible while still being able to keep and use the token for later requests (research the best method to do it)
