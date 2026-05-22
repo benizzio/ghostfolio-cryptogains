@@ -14,6 +14,8 @@ description: "Task list for Generate Yearly Gains And Losses Report implementati
 
 **Bugfix**: 2026-05-22 — [BUG-003] Updated from bugfix patch
 
+**Bugfix**: 2026-05-22 — [BUG-004] Updated from bugfix patch
+
 **Tests**: Automated tests are mandatory for this feature. The feature specification marks User Scenarios & Testing as mandatory and `plan.md` requires integration-first coverage, targeted unit tests for calculation and IO rules, `make test`, `make coverage`, and an opt-in large-history performance path.
 
 **Organization**: Tasks are grouped by user story so each story can be implemented and verified independently.
@@ -69,10 +71,11 @@ description: "Task list for Generate Yearly Gains And Losses Report implementati
 
 ### Tests for User Story 1
 
-- [X] T013 [P] [US1] ⚠️ Reopened Add main-menu and Sync and Reports workflow contract coverage from `contracts/tui-workflows.md` in `tests/contract/main_menu_workflow_contract_test.go` and `tests/contract/sync_reports_workflow_contract_test.go` so the in-context `Sync Data` screen explains token reuse and does not show `Ghostfolio Security Token` input (reopened — BUG-003)
-- [X] T014 [P] [US1] ⚠️ Reopened Add integration coverage for token unlock, selected-server snapshot discovery, no-data readiness, existing-data readiness, last-sync timestamp display, token reuse after sync completion, context exit token clearing, and the rule that `Sync Data` inside the unlocked context cannot replace the stored runtime token through the screen itself in `tests/integration/sync_reports_context_flow_test.go` (reopened — BUG-003)
+- [ ] T013 [P] [US1] ⚠️ Reopened Add main-menu and Sync and Reports workflow contract coverage from `contracts/tui-workflows.md` in `tests/contract/main_menu_workflow_contract_test.go` and `tests/contract/sync_reports_workflow_contract_test.go` so the in-context `Sync Data` screen explains token reuse and does not show `Ghostfolio Security Token` input, and the unavailable `Generate Capital Gains Report` action remains visible but is skipped by keyboard focus in `Sync and Reports` (reopened — BUG-003, BUG-004)
+- [ ] T014 [P] [US1] ⚠️ Reopened Add integration coverage for token unlock, selected-server snapshot discovery, no-data readiness, existing-data readiness, last-sync timestamp display, token reuse after sync completion, context exit token clearing, and the rule that `Sync Data` inside the unlocked context cannot replace the stored runtime token through the screen itself, while Up and Down navigation skip the unavailable report action instead of landing on it, in `tests/integration/sync_reports_context_flow_test.go` (reopened — BUG-003, BUG-004)
 - [X] T015 [P] [US1] Add screen rendering coverage for Sync and Reports unlock and context menu states in `internal/tui/screen/sync_reports_screen_internal_test.go`
 - [X] T069 [P] [US1] Add screen rendering regression coverage for the in-context `Sync Data` screen so it hides any token label or input and shows only the existing-context-token explanation in `internal/tui/screen/sync_entry_screen_internal_test.go`
+- [ ] T071 [P] [US1] Add internal flow regression coverage that `Up` and `Down` skip disabled `Generate Capital Gains Report` actions in `Sync and Reports` when report generation is unavailable in `internal/tui/flow/model_internal_test.go`
 
 ### Implementation for User Story 1
 
@@ -85,6 +88,7 @@ description: "Task list for Generate Yearly Gains And Losses Report implementati
 - [X] T021 [US1] ⚠️ Reopened Route `Sync Data` from the unlocked context using the stored context token and return to Sync and Reports after success or failure in `internal/tui/flow/sync_flow.go`, `internal/tui/flow/model.go`, and `internal/tui/flow/navigation.go` without reusing the unlock token-entry UI or allowing token display, focus, or editing on the in-context sync screen (reopened — BUG-003)
 - [X] T022 [US1] Route server-replacement cancellation and success back to the unlocked context without requiring another token prompt in `internal/tui/flow/sync_flow.go`, `internal/tui/flow/model.go`, and `internal/tui/flow/navigation.go`
 - [X] T023 [US1] Render `Sync Data` last successful sync timestamp, `no synced data available`, and report-generation unavailable reasons in `internal/tui/screen/sync_reports_screen.go`
+- [ ] T072 [US1] Update `internal/tui/flow/navigation.go` so `updateSyncReportsMenu()` advances to the previous or next enabled menu item and never lands on disabled `Generate Capital Gains Report` rows when report generation is unavailable
 - [X] T024 [US1] Clear runtime token and in-memory report scratch state when leaving Sync and Reports or quitting from the context in `internal/tui/flow/model.go` and `internal/tui/flow/navigation.go`
 
 **Checkpoint**: User Story 1 is independently functional and testable without calculating or saving reports.
@@ -216,7 +220,7 @@ Parallel-capable after Phase 2:
 
 - T001, T002, and T003 can run in parallel.
 - T004, T006, T008, T009, T010, T011, and T067 can run in parallel after Phase 1; T005, T007, T012, and T068 close after the related model, snapshot, and fixture decisions exist.
-- T013, T014, T015, and T069 can run in parallel for US1 before T016 through T024 and T070.
+- T013, T014, T015, T069, and T071 can run in parallel for US1 before T016 through T024, T070, and T072.
 - T025 through T032 and T065 can run in parallel for US2; T033 through T036, T040 through T043, and T066 can then run in parallel before T037, T038, T044, T045, T047, and T048.
 - T049 through T051 can run in parallel for US3; T052, T054, and T056 can run in parallel before T053, T055, and T057 close the story.
 - T058, T059, T060, and T061 can run in parallel after story implementation; T062, T063, and T064 run after documentation and performance fixtures are in place.
@@ -230,10 +234,12 @@ Task: T013 Add main-menu and Sync and Reports workflow contract coverage in test
 Task: T014 Add Sync and Reports context integration coverage in tests/integration/sync_reports_context_flow_test.go
 Task: T015 Add Sync and Reports screen rendering coverage in internal/tui/screen/sync_reports_screen_internal_test.go
 Task: T069 Add in-context Sync Data screen rendering regression coverage in internal/tui/screen/sync_entry_screen_internal_test.go
+Task: T071 Add internal flow regression coverage for skip-disabled Sync and Reports navigation in internal/tui/flow/model_internal_test.go
 
 Task: T017 Add Sync and Reports screen renderers in internal/tui/screen/sync_reports_screen.go
 Task: T070 Add in-context Sync Data non-token screen mode in internal/tui/screen/sync_entry_screen.go
 Task: T019 Implement runtime selected-server snapshot unlock in internal/app/runtime/sync_service.go and internal/app/runtime/snapshot_lifecycle.go
+Task: T072 Update Sync and Reports navigation so disabled report actions are skipped in internal/tui/flow/navigation.go
 ```
 
 ## Parallel Example: User Story 2

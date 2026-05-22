@@ -11,6 +11,8 @@
 
 **Bugfix**: 2026-05-22 — [BUG-003] Updated from bugfix patch
 
+**Bugfix**: 2026-05-22 — [BUG-004] Updated from bugfix patch
+
 ## Summary
 
 Add yearly Markdown capital gains and losses report generation on top of the protected activity cache created by `specs/003-store-activity-data/`. The main business workflow becomes `Sync and Reports`, unlocks one token-scoped context once, shows `Sync Data` with last successful sync metadata, reuses the unlocked runtime token for in-context sync without showing token input again, gates `Generate Capital Gains Report` until reportable protected data exists, collects one report year and one cost-basis method, calculates gains and losses from normalized activity history with exact decimal arithmetic, saves one timestamped Markdown file to the current user's Documents folder, asks the operating system to open it, and returns to the unlocked context without retaining report history.
@@ -129,7 +131,7 @@ tests/
 
 - Main menu exposes `Sync and Reports` as the business workflow entry.
 - Selecting `Sync and Reports` prompts for the Ghostfolio token once with masked input. Snapshot discovery and unlock happen before the context menu exposes protected sync metadata or report years.
-- The unlocked context menu always shows `Sync Data` and `Generate Capital Gains Report`. `Sync Data` shows the last successful sync local date and time when a protected cache exists; otherwise it states that no synced data is available. `Generate Capital Gains Report` remains visible but unavailable until a cache exists and at least one reportable year can be derived.
+- The unlocked context menu always shows `Sync Data` and `Generate Capital Gains Report`. `Sync Data` shows the last successful sync local date and time when a protected cache exists; otherwise it states that no synced data is available. `Generate Capital Gains Report` remains visible but unavailable until a cache exists and at least one reportable year can be derived. When report generation is unavailable, Up and Down navigation skip that disabled action and land only on enabled actions.
 - Running `Sync Data` inside the context reuses the entered token, does not render token input again, shows only the action prompt needed to start sync, and returns to the unlocked context after success, failure, or server-replacement cancellation.
 - Running `Generate Capital Gains Report` collects one available year and one supported method. The highlighted method shows a short explanation before generation.
 - A calculation failure after year and method selection keeps the user in the unlocked context, produces no output file, and reports only non-secret activity references.
@@ -146,8 +148,8 @@ tests/
 
 ## Verification Plan
 
-- Contract tests cover visible workflow changes: `Sync and Reports` main-menu entry, token unlock, token reuse, in-context `Sync Data` token-free screen behavior, context menu actions, last-sync timestamp, report gating, year and method choice, and result transitions.
-- Integration tests use deterministic protected snapshots and fake runtime services to verify report generation without real Ghostfolio calls, Documents-folder behavior through temporary home directories, OS-open success and failure through a stub opener, empty-main-section reports, incomplete monetary-context failure after selection, same-calendar-date reopening behavior, in-context sync token immutability, and persisted-artifact leakage checks.
+- Contract tests cover visible workflow changes: `Sync and Reports` main-menu entry, token unlock, token reuse, in-context `Sync Data` token-free screen behavior, context menu actions, last-sync timestamp, report gating, skip-disabled keyboard navigation when report generation is unavailable, year and method choice, and result transitions.
+- Integration tests use deterministic protected snapshots and fake runtime services to verify report generation without real Ghostfolio calls, Documents-folder behavior through temporary home directories, OS-open success and failure through a stub opener, empty-main-section reports, incomplete monetary-context failure after selection, same-calendar-date reopening behavior, in-context sync token immutability, skip-disabled unlocked-context menu navigation when report generation is unavailable, and persisted-artifact leakage checks.
 - Unit tests cover basis calculators for FIFO, LIFO, HIFO, Average Cost Basis, scope-local hybrid fallback and post-zero reset, zero-priced holding reductions, production-shaped explained zero-priced `SELL` rows with explicit zero `unit_price`, `gross_value`, and `fee_amount`, full-liquidation counts, single-activity currency selection, canonical Markdown rendering, exact-division failure, filename suffixing, and partial-file cleanup.
 - Coverage verification remains `make coverage`. Performance verification uses a deterministic 10,000-activity fixture spanning at least 5 years with worst-case supported lot fragmentation, a stub opener, and one timed end-to-end run gated behind an opt-in environment variable.
 
@@ -158,3 +160,4 @@ No constitution violations require justification for this plan.
 - BUG-001: Reporting must distinguish absent monetary context from preserved explicit zero-valued source fields on explained zero-priced holding reductions so calculation, report models, and Markdown rendering do not collapse both cases into blank output.
 - BUG-002: The upstream Ghostfolio asset identity dependency is `SymbolProfile.id`, not the superseded top-level `symbolProfileId` assumption, so DTO mapping, snapshot compatibility, and stored-fixture refresh handling need reevaluation together.
 - BUG-003: The unlocked-context `Sync Data` path must not reuse the token-entry renderer or token-input flow after unlock; regression coverage must assert token-free screen behavior and stored-token-only sync start.
+- BUG-004: In the keyboard-driven `Sync and Reports` menu, disabled report actions must stay visible with an unavailable reason while Up and Down navigation skip them instead of letting selection land on the disabled row.
