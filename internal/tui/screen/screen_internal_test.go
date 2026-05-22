@@ -139,6 +139,39 @@ func TestSyncEntryScreenViewUsesValidationMessageOverride(t *testing.T) {
 	}
 }
 
+func TestSyncEntryScreenViewCoversContextTokenBranch(t *testing.T) {
+	t.Parallel()
+
+	var content = SyncEntryScreenView(SyncEntryScreenParams{
+		Theme:                   component.DefaultTheme(),
+		Width:                   80,
+		Height:                  24,
+		ScreenTitle:             "Sync Data",
+		ScreenSubtitle:          "Retrieve, validate, and securely store supported activity history.",
+		UseContextToken:         true,
+		ShowProtectedDataStatus: true,
+		MenuItems:               []component.MenuItem{{Label: "Start Sync", Enabled: true}, {Label: "Back", Enabled: true}},
+		SelectedIndex:           0,
+		HelpText:                "help",
+		ProtectedDataExists:     true,
+	})
+	if content == "" {
+		t.Fatalf("expected rendered content")
+	}
+	if strings.Contains(content, "Ghostfolio Security Token") {
+		t.Fatalf("expected context-token sync screen to hide token label, got %q", content)
+	}
+	if strings.Contains(content, "existing Sync and Reports context token") {
+		t.Fatalf("expected context-token screen to omit redundant intro text, got %q", content)
+	}
+	if !strings.Contains(content, "Start Sync to obtain current available activity data on the Ghostfolio") || !strings.Contains(content, "server.") {
+		t.Fatalf("expected context-token status text, got %q", content)
+	}
+	if !strings.Contains(content, "Protected Data Loaded For This Run: yes") {
+		t.Fatalf("expected protected-data status branch to stay visible, got %q", content)
+	}
+}
+
 // TestSyncProtectedDataStatusLabelCoversBothBranches verifies the visible sync
 // protected-data status helper.
 // Authored by: OpenCode

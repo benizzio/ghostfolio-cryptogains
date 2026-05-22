@@ -73,7 +73,7 @@ func (m *Model) handleSyncFinished(message syncFinishedMsg) (tea.Model, tea.Cmd)
 // workflow is idle.
 // Authored by: OpenCode
 func (m *Model) handleSyncPaste(message tea.Msg) (tea.Model, tea.Cmd) {
-	if m.sync.Busy || !m.sync.InputFocused {
+	if m.sync.Busy || m.sync.UseContextToken || !m.sync.InputFocused {
 		return m, nil
 	}
 
@@ -112,7 +112,7 @@ func (m *Model) handleSyncKeyPress(message tea.KeyPressMsg) (tea.Model, tea.Cmd)
 // handleFocusedSyncKey handles key presses while the token input owns focus.
 // Authored by: OpenCode
 func (m *Model) handleFocusedSyncKey(message tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
-	if !m.sync.InputFocused {
+	if !m.sync.InputFocused || m.sync.UseContextToken {
 		return m, nil, false
 	}
 
@@ -142,6 +142,9 @@ func (m *Model) handleSyncMenuKey(message tea.KeyPressMsg) (tea.Model, tea.Cmd) 
 		}
 		return m, nil
 	case key.Matches(message, focusBinding()):
+		if m.sync.UseContextToken {
+			return m, nil
+		}
 		return m.focusSyncTokenInput()
 	case key.Matches(message, enterBinding()):
 		return m.activateSyncSelection()
@@ -186,6 +189,10 @@ func (m *Model) blurSyncTokenInput() {
 // focusSyncTokenInput focuses the Ghostfolio security-token input.
 // Authored by: OpenCode
 func (m *Model) focusSyncTokenInput() (tea.Model, tea.Cmd) {
+	if m.sync.UseContextToken {
+		return m, nil
+	}
+
 	m.sync.InputFocused = true
 	return m, m.sync.TokenInput.Focus()
 }
@@ -228,8 +235,17 @@ func (m *Model) startSync() (tea.Model, tea.Cmd) {
 		return m, m.enterSetup("Complete setup before Sync Data can run.", bootstrap.SetupRequirementNone)
 	}
 
-	var token = strings.TrimSpace(m.sync.TokenInput.Value())
+	var token string
+	if m.sync.UseContextToken {
+		token = strings.TrimSpace(m.syncReports.RuntimeToken)
+	} else {
+		token = strings.TrimSpace(m.sync.TokenInput.Value())
+	}
 	if token == "" {
+		if m.sync.UseContextToken {
+			m.sync.ValidationMessage = "The active Sync and Reports token is unavailable. Return to the context menu and unlock again."
+			return m, nil
+		}
 		m.sync.ValidationMessage = "Enter the Ghostfolio security token before starting sync."
 		return m, nil
 	}

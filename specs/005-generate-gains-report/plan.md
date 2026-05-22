@@ -130,7 +130,7 @@ tests/
 - Main menu exposes `Sync and Reports` as the business workflow entry.
 - Selecting `Sync and Reports` prompts for the Ghostfolio token once with masked input. Snapshot discovery and unlock happen before the context menu exposes protected sync metadata or report years.
 - The unlocked context menu always shows `Sync Data` and `Generate Capital Gains Report`. `Sync Data` shows the last successful sync local date and time when a protected cache exists; otherwise it states that no synced data is available. `Generate Capital Gains Report` remains visible but unavailable until a cache exists and at least one reportable year can be derived.
-- Running `Sync Data` inside the context reuses the entered token, explains that the existing context token will be used, does not render token input again, and returns to the unlocked context after success, failure, or server-replacement cancellation.
+- Running `Sync Data` inside the context reuses the entered token, does not render token input again, shows only the action prompt needed to start sync, and returns to the unlocked context after success, failure, or server-replacement cancellation.
 - Running `Generate Capital Gains Report` collects one available year and one supported method. The highlighted method shows a short explanation before generation.
 - A calculation failure after year and method selection keeps the user in the unlocked context, produces no output file, and reports only non-secret activity references.
 - Successful generation shows the saved Markdown path, makes that path available for later manual deletion by the user, and shows any automatic-open warning, then returns to the unlocked context without another token prompt.

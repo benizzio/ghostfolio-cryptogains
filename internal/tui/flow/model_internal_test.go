@@ -211,7 +211,7 @@ func TestModelInitAndHelpers(t *testing.T) {
 	_ = model.enterSetup("invalid", bootstrap.SetupRequirementNone)
 	_ = model.enterSyncReportsUnlock()
 	_ = model.enterSync()
-	_ = model.enterSyncWithToken("token")
+	_ = model.enterSyncWithContextToken()
 	_ = model.selectedSetupOrigin()
 	_ = model.setupCanSave()
 	if reportMethodForIndex(-1) != "" {
@@ -582,8 +582,8 @@ func TestUpdateSyncReportsMenuUsesStoredTokenAndReadiness(t *testing.T) {
 	if model.active != syncScreenKey {
 		t.Fatalf("expected Sync Data action to route to sync screen, got %s", model.active)
 	}
-	if model.sync.TokenInput.Value() != "token-123" {
-		t.Fatalf("expected sync screen to reuse stored context token, got %q", model.sync.TokenInput.Value())
+	if !model.sync.UseContextToken {
+		t.Fatalf("expected sync screen to enter context-token mode")
 	}
 	if model.sync.InputFocused {
 		t.Fatalf("expected sync screen to start from the primary action with stored token")
@@ -1249,8 +1249,8 @@ func TestUpdateSyncResultCoversNavigation(t *testing.T) {
 	if model.active != syncScreenKey {
 		t.Fatalf("expected context Sync Again to reopen sync")
 	}
-	if model.sync.TokenInput.Value() != "token-123" {
-		t.Fatalf("expected context Sync Again to reuse runtime token, got %q", model.sync.TokenInput.Value())
+	if !model.sync.UseContextToken {
+		t.Fatalf("expected context Sync Again to reuse the runtime token without exposing it")
 	}
 
 	model.active = syncResultScreenKey
@@ -1299,8 +1299,8 @@ func TestUpdateSyncResultCoversNavigation(t *testing.T) {
 	if model.active != syncScreenKey {
 		t.Fatalf("expected diagnostic result sync-again action to reopen sync")
 	}
-	if model.sync.TokenInput.Value() != "token-456" {
-		t.Fatalf("expected diagnostic result sync-again to reuse runtime token, got %q", model.sync.TokenInput.Value())
+	if !model.sync.UseContextToken {
+		t.Fatalf("expected diagnostic result sync-again to reuse runtime token without exposing it")
 	}
 
 	model.active = syncResultScreenKey

@@ -26,6 +26,7 @@ type SyncEntryScreenParams struct {
 	ScreenSubtitle          string
 	IntroText               string
 	IdleStatusText          string
+	UseContextToken         bool
 	ShowProtectedDataStatus bool
 	MenuItems               []component.MenuItem
 	SelectedIndex           int
@@ -45,23 +46,31 @@ type SyncEntryScreenParams struct {
 //	view := screen.SyncEntryScreenView(params)
 //	_ = view
 //
-// `SyncEntryScreenView` renders the token-entry workflow for `Sync Data`.
-// It shows the runtime-only security-token field, the primary action menu when
-// idle, or the progress indicator when sync and protected storage are running.
+// `SyncEntryScreenView` renders the `Sync Data` workflow. It shows the
+// runtime-only security-token field for standalone sync entry, or a token-free
+// context explanation when an unlocked `Sync and Reports` context reuses the
+// in-memory token. The renderer switches between the idle entry view and the
+// busy progress view without mutating workflow state.
 //
 // Authored by: OpenCode
 func SyncEntryScreenView(params SyncEntryScreenParams) string {
+	var copy = component.DefaultSyncEntryCopy(params.UseContextToken)
 	if params.IntroText == "" {
-		params.IntroText = "The application will authenticate, retrieve activity history, validate it, and store it securely for future use only."
+		params.IntroText = copy.IntroText
 	}
 	if params.IdleStatusText == "" {
-		params.IdleStatusText = "Enter the Ghostfolio security token only when starting Sync Data."
+		params.IdleStatusText = copy.IdleStatusText
 	}
-	var bodyParts = []string{params.IntroText}
+	var bodyParts []string
+	if strings.TrimSpace(params.IntroText) != "" {
+		bodyParts = append(bodyParts, params.IntroText)
+	}
 	if params.ShowProtectedDataStatus {
 		bodyParts = append(bodyParts, fmt.Sprintf("Protected Data Loaded For This Run: %s", syncProtectedDataStatusLabel(params.ProtectedDataExists)))
 	}
-	bodyParts = append(bodyParts, params.Theme.InputLabel.Render("Ghostfolio Security Token"), params.TokenInput)
+	if !params.UseContextToken {
+		bodyParts = append(bodyParts, params.Theme.InputLabel.Render("Ghostfolio Security Token"), params.TokenInput)
+	}
 
 	if params.Busy {
 		bodyParts = append(bodyParts, fmt.Sprintf("%s %s", params.SpinnerFrame, params.BusyText))

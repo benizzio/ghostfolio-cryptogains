@@ -151,8 +151,14 @@ func TestSyncReportsContextUnlockShowsExistingDataReadinessAndReusesTokenForSync
 	if model.ActiveScreen() != "sync" {
 		t.Fatalf("expected Sync Data to route to sync screen, got %s", model.ActiveScreen())
 	}
-	if got := model.View().Content; !strings.Contains(got, "*********") {
-		t.Fatalf("expected stored token to stay masked on sync screen, got %q", got)
+	if got := model.View().Content; strings.Contains(got, "Ghostfolio Security Token") {
+		t.Fatalf("expected in-context sync screen to hide token input, got %q", got)
+	}
+	if got := model.View().Content; !strings.Contains(got, "Start Sync to obtain current available activity data on the Ghostfolio server.") {
+		t.Fatalf("expected in-context sync status text, got %q", got)
+	}
+	if got := model.View().Content; strings.Contains(got, "existing Sync and Reports context token") {
+		t.Fatalf("expected in-context sync screen to omit redundant token reminder, got %q", got)
 	}
 
 	updated, syncCmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
@@ -251,8 +257,14 @@ func TestSyncReportsContextUnlockUsesSelectedServerSnapshotAndReusesTokenWithPro
 	if model.ActiveScreen() != "sync" {
 		t.Fatalf("expected Sync Data action to route to sync screen, got %s", model.ActiveScreen())
 	}
-	if got := model.View().Content; !strings.Contains(got, "*********") {
-		t.Fatalf("expected runtime token reuse to prefill masked sync token, got %q", got)
+	if got := model.View().Content; strings.Contains(got, "Ghostfolio Security Token") {
+		t.Fatalf("expected runtime token reuse screen to hide token input, got %q", got)
+	}
+	if got := model.View().Content; !strings.Contains(got, "Start Sync to obtain current available activity data on the Ghostfolio server.") {
+		t.Fatalf("expected runtime token reuse status text, got %q", got)
+	}
+	if got := model.View().Content; strings.Contains(got, "existing Sync and Reports context token") {
+		t.Fatalf("expected runtime token reuse screen to omit redundant token reminder, got %q", got)
 	}
 
 	updated, syncCmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
@@ -315,5 +327,63 @@ func TestSyncReportsContextUnlockUsesSelectedServerSnapshotAndReusesTokenWithPro
 	}
 	if got := len(payload.ProtectedActivityCache.Activities); got != 2 {
 		t.Fatalf("expected unlocked snapshot activity count 2, got %d", got)
+	}
+}
+
+func TestSyncReportsContextSyncScreenDoesNotAcceptTokenEditing(t *testing.T) {
+	t.Parallel()
+
+	var config = mustCloudSetupConfig(t)
+	var service = &syncReportsContextService{
+		unlockResult: runtime.SyncReportsContextResult{
+			ProtectedData: runtime.ProtectedDataState{
+				HasReadableSnapshot:  true,
+				ActivityCount:        2,
+				AvailableReportYears: []int{2025},
+			},
+			ReportUnavailableReason: runtime.ReportFailureNone,
+		},
+		runOutcome: runtime.SyncOutcome{Success: false, FailureReason: runtime.SyncFailureTimeout, DetailReason: string(runtime.SyncFailureTimeout)},
+	}
+	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &config}, false, service))
+
+	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	_ = testutil.RunCmd(cmd)
+	model = assertFlowModel(t, updated)
+	updated, _ = model.Update(tea.PasteMsg{Content: "token-123"})
+	model = assertFlowModel(t, updated)
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = assertFlowModel(t, updated)
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = assertFlowModel(t, updated)
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = assertFlowModel(t, updated)
+
+	if model.ActiveScreen() != "sync" {
+		t.Fatalf("expected Sync Data to route to sync screen, got %s", model.ActiveScreen())
+	}
+
+	var before = model.View().Content
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+	model = assertFlowModel(t, updated)
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Text: "x", Code: 'x'}))
+	model = assertFlowModel(t, updated)
+	var after = model.View().Content
+
+	if !strings.Contains(before, "Start Sync to obtain current available activity data on the Ghostfolio server.") || !strings.Contains(after, "Start Sync to obtain current available activity data on the Ghostfolio server.") {
+		t.Fatalf("expected in-context sync status text to remain visible, before=%q after=%q", before, after)
+	}
+	if strings.Contains(before, "existing Sync and Reports context token") || strings.Contains(after, "existing Sync and Reports context token") {
+		t.Fatalf("expected attempted editing not to surface redundant token reminder, before=%q after=%q", before, after)
+	}
+	if strings.Contains(after, "Ghostfolio Security Token") {
+		t.Fatalf("expected token input to remain hidden after attempted editing, got %q", after)
+	}
+
+	updated, syncCmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = assertFlowModel(t, updated)
+	model = applySyncBatch(t, model, syncCmd)
+	if model.ActiveScreen() != "sync_reports_menu" {
+		t.Fatalf("expected in-context sync completion to return to Sync and Reports, got %s", model.ActiveScreen())
 	}
 }

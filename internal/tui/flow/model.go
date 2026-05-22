@@ -104,6 +104,7 @@ type syncState struct {
 	MenuIndex         int
 	InputFocused      bool
 	TokenInput        textinput.Model
+	UseContextToken   bool
 	ValidationMessage string
 	Busy              bool
 	BusyText          string
@@ -335,6 +336,7 @@ func (m *Model) View() tea.View {
 			},
 		)
 	case syncScreenKey:
+		var syncCopy = component.DefaultSyncEntryCopy(m.sync.UseContextToken)
 		rendered = screen.SyncEntryScreenView(
 			screen.SyncEntryScreenParams{
 				Theme:                   m.theme,
@@ -342,8 +344,9 @@ func (m *Model) View() tea.View {
 				Height:                  m.height,
 				ScreenTitle:             "Sync Data",
 				ScreenSubtitle:          "Retrieve, validate, and securely store supported activity history.",
-				IntroText:               "The application will authenticate, retrieve activity history, validate it, and store it securely for future use only.",
-				IdleStatusText:          "Enter the Ghostfolio security token only when starting Sync Data.",
+				IntroText:               syncCopy.IntroText,
+				IdleStatusText:          syncCopy.IdleStatusText,
+				UseContextToken:         m.sync.UseContextToken,
 				ShowProtectedDataStatus: true,
 				MenuItems:               m.syncMenuItems(),
 				SelectedIndex:           m.sync.MenuIndex,
@@ -613,16 +616,20 @@ func (m *Model) mainMenuHelpText() string {
 //
 // Authored by: OpenCode
 func (m *Model) syncHelpText() string {
+	var bindings = []key.Binding{
+		upBinding(),
+		downBinding(),
+		enterBinding(),
+		quitBinding(),
+	}
+	if !m.sync.UseContextToken {
+		bindings = append(bindings, focusBinding())
+	}
+
 	return component.RenderHelp(
 		component.ContentWidthForScreen(m.width),
 		component.Bindings{
-			Short: []key.Binding{
-				upBinding(),
-				downBinding(),
-				enterBinding(),
-				focusBinding(),
-				quitBinding(),
-			},
+			Short: bindings,
 		},
 	)
 }
@@ -833,13 +840,14 @@ func (m *Model) enterSync() tea.Cmd {
 	return m.sync.TokenInput.Focus()
 }
 
-// enterSyncWithToken routes the application to the sync entry screen with the
-// active context token already loaded into the masked input.
+// enterSyncWithContextToken routes the application to the sync entry screen in
+// token-free context mode, reusing the active `Sync and Reports` token without
+// exposing it in the renderer or input state.
 // Authored by: OpenCode
-func (m *Model) enterSyncWithToken(token string) tea.Cmd {
+func (m *Model) enterSyncWithContextToken() tea.Cmd {
 	m.active = syncScreenKey
 	m.sync = newSyncState()
-	m.sync.TokenInput.SetValue(token)
+	m.sync.UseContextToken = true
 	m.sync.InputFocused = false
 	m.sync.TokenInput.Blur()
 	m.sync.MenuIndex = 0

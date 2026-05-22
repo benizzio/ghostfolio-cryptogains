@@ -133,7 +133,7 @@ Entry conditions:
 
 Visible content:
 
-- explanation that the existing context token will be used for sync
+- primary action prompt for starting sync without any token input
 - busy status while auth, retrieval, normalization, validation, and protected write run
 - non-secret result or failure category after the attempt finishes if an intermediate result view is used
 

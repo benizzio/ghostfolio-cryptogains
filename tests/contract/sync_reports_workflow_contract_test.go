@@ -58,4 +58,21 @@ func TestSyncReportsWorkflowContract(t *testing.T) {
 	assertContains(t, diagnostic, "Failure Category: unsupported activity history")
 	assertContains(t, diagnostic, "Generate Diagnostic Report")
 	assertContains(t, diagnostic, "Generate Diagnostic Report is available for this failure from this context.")
+
+	var syncData = screen.SyncEntryScreenView(screen.SyncEntryScreenParams{
+		Theme:                   component.DefaultTheme(),
+		Width:                   100,
+		Height:                  32,
+		ScreenTitle:             "Sync Data",
+		ScreenSubtitle:          "Retrieve, validate, and securely store supported activity history.",
+		UseContextToken:         true,
+		ShowProtectedDataStatus: true,
+		MenuItems:               []component.MenuItem{{Label: "Start Sync", Enabled: true}, {Label: "Back", Enabled: true}},
+		SelectedIndex:           0,
+	})
+	assertContains(t, syncData, "Start Sync to obtain current available activity data on the Ghostfolio server.")
+	assertContains(t, syncData, "Start Sync")
+	assertContains(t, syncData, "Back")
+	assertNotContains(t, syncData, "Ghostfolio Security Token")
+	assertNotContains(t, syncData, "existing Sync and Reports context token")
 }

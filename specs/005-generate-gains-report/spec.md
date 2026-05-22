@@ -55,7 +55,7 @@ After setup is complete, the user can open `Sync and Reports`, unlock the token-
 2. **Given** the token unlocks the active context and no synced activity data exists for that token and selected server, **When** the `Sync and Reports` menu is shown, **Then** both `Sync Data` and `Generate Capital Gains Report` are visible, `Sync Data` is available, and report generation is unavailable with a clear reason.
 3. **Given** the token unlocks the active context and synced activity data exists, **When** the `Sync and Reports` menu is shown, **Then** `Sync Data` shows the last successful sync date and time and `Generate Capital Gains Report` is available.
 4. **Given** the user completes a sync or report-generation workflow and remains inside the active unlocked context, **When** that workflow ends, **Then** the system returns to the `Sync and Reports` menu without requiring the token again.
-5. **Given** the user selects `Sync Data` inside the active unlocked context, **When** the `Sync Data` screen is shown, **Then** the system explains that the existing context token will be used and does not ask for, display, focus, or allow editing of the Ghostfolio security token.
+5. **Given** the user selects `Sync Data` inside the active unlocked context, **When** the `Sync Data` screen is shown, **Then** the system does not ask for, display, focus, or allow editing of the Ghostfolio security token and shows only the action prompt needed to start sync.
 
 ---
 

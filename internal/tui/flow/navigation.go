@@ -115,7 +115,7 @@ func (m *Model) updateSyncResult(message tea.Msg) (tea.Model, tea.Cmd) {
 				return m.generateDiagnosticReport()
 			case 1:
 				if m.syncReports.Active {
-					return m, m.enterSyncWithToken(m.syncReports.RuntimeToken)
+					return m, m.enterSyncWithContextToken()
 				}
 				return m, m.enterSync()
 			default:
@@ -125,7 +125,7 @@ func (m *Model) updateSyncResult(message tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.result.MenuIndex == 0 {
 			if m.syncReports.Active {
-				return m, m.enterSyncWithToken(m.syncReports.RuntimeToken)
+				return m, m.enterSyncWithContextToken()
 			}
 			return m, m.enterSync()
 		}
@@ -165,7 +165,7 @@ func (m *Model) updateSyncReportsMenu(message tea.Msg) (tea.Model, tea.Cmd) {
 	case key.Matches(keyMessage, enterBinding()):
 		switch m.sync.MenuIndex {
 		case 0:
-			return m, m.enterSyncWithToken(m.syncReports.RuntimeToken)
+			return m, m.enterSyncWithContextToken()
 		case 1:
 			if m.syncReports.ProtectedData.HasReadableSnapshot && len(m.syncReports.ProtectedData.AvailableReportYears) > 0 {
 				m.enterReportSelection()
