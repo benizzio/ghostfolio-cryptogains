@@ -895,6 +895,9 @@ func TestBuildInYearArtifactsCoversZeroPricedPricedAndValidationFailures(t *test
 			SourceYear:                   2024,
 			ActivityType:                 syncmodel.ActivityTypeSell,
 			Quantity:                     mustReportDecimal(t, "1"),
+			UnitPrice:                    decimalPointer(t, "0"),
+			GrossValue:                   decimalPointer(t, "0"),
+			FeeAmount:                    decimalPointer(t, "0"),
 			Comment:                      "manual transfer",
 			IsZeroPricedHoldingReduction: true,
 		},
@@ -907,6 +910,10 @@ func TestBuildInYearArtifactsCoversZeroPricedPricedAndValidationFailures(t *test
 	}
 	if row == nil || liquidation != nil || yearlyNet.Sign() != 0 || row.ActivityCurrency != "" || row.HoldingReductionExplanation != "manual transfer" {
 		t.Fatalf("unexpected zero-priced row artifacts: row=%#v liquidation=%#v yearlyNet=%v", row, liquidation, yearlyNet)
+	}
+	var zero = mustReportDecimal(t, "0")
+	if row.UnitPrice == nil || row.UnitPrice.Cmp(&zero) != 0 || row.GrossValue == nil || row.GrossValue.Cmp(&zero) != 0 || row.FeeAmount == nil || row.FeeAmount.Cmp(&zero) != 0 {
+		t.Fatalf("expected zero-priced row to preserve explicit zero-valued fields, got %#v", row)
 	}
 
 	row, liquidation, yearlyNet, err = buildInYearArtifacts(
@@ -1291,6 +1298,10 @@ func zeroPricedHoldingReductionRecord(t *testing.T, sourceID string, occurredAt 
 		AssetSymbol:      assetSymbol,
 		AssetName:        assetName,
 		Quantity:         mustReportDecimal(t, "1"),
+		OrderCurrency:    "USD",
+		OrderUnitPrice:   decimalPointer(t, "0"),
+		OrderGrossValue:  decimalPointer(t, "0"),
+		OrderFeeAmount:   decimalPointer(t, "0"),
 		Comment:          "manual transfer",
 	}
 }

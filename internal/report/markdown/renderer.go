@@ -357,10 +357,15 @@ func renderDisplayLabel(displayLabel string, assetIdentityKey string) string {
 }
 
 // activityCurrencyColumn renders the activity-currency table cell and leaves it
-// blank for rows without one selected activity monetary context.
+// blank for rows without one selected activity monetary context, including
+// zero-priced holding reductions that still preserve explicit zero-valued source
+// details.
 // Authored by: OpenCode
 func activityCurrencyColumn(row reportmodel.AssetActivityRow) string {
-	if row.GrossValue == nil && row.FeeAmount == nil {
+	if strings.TrimSpace(row.ActivityCurrency) == "" {
+		return ""
+	}
+	if row.GrossValue == nil && row.FeeAmount == nil && row.UnitPrice == nil {
 		return ""
 	}
 

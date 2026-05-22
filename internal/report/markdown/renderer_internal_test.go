@@ -37,6 +37,15 @@ func TestRendererHelperFallbacks(t *testing.T) {
 		t.Fatalf("expected row without monetary context to leave activity currency blank")
 	}
 
+	var rowWithPreservedZeroValues = reportmodel.AssetActivityRow{
+		UnitPrice:  apdDecimalPointer(0),
+		GrossValue: apdDecimalPointer(0),
+		FeeAmount:  apdDecimalPointer(0),
+	}
+	if activityCurrencyColumn(rowWithPreservedZeroValues) != "" {
+		t.Fatalf("expected preserved zero-valued holding reduction fields to keep activity currency blank")
+	}
+
 	var pricedValue = *apd.New(1, 0)
 	var rowWithMonetaryContext = reportmodel.AssetActivityRow{
 		GrossValue:       &pricedValue,

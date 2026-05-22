@@ -26,7 +26,8 @@ import (
 // The selector applies the `order -> asset_profile -> base` priority, requires
 // the complete priced-activity monetary set from one tier only, preserves the
 // chosen explicit currency code, and leaves explained zero-priced `SELL`
-// records without a selected currency context.
+// records without a selected currency context while still preserving any
+// explicit zero-valued source details already stored for that row.
 // Authored by: OpenCode
 func SelectActivityCalculationInput(record syncmodel.ActivityRecord) (reportmodel.ActivityCalculationInput, error) {
 	var occurredAt, err = parseActivityOccurredAt(record)
@@ -46,8 +47,17 @@ func SelectActivityCalculationInput(record syncmodel.ActivityRecord) (reportmode
 		Comment:          strings.TrimSpace(record.Comment),
 	}
 
-	if isExplainedZeroPricedHoldingReduction(record) {
+	var zeroPricedValues zeroPricedHoldingReductionValues
+	var isZeroPriced bool
+	zeroPricedValues, isZeroPriced, err = selectZeroPricedHoldingReductionValues(record)
+	if err != nil {
+		return reportmodel.ActivityCalculationInput{}, err
+	}
+	if isZeroPriced {
 		input.IsZeroPricedHoldingReduction = true
+		input.GrossValue = zeroPricedValues.grossValue
+		input.FeeAmount = zeroPricedValues.feeAmount
+		input.UnitPrice = zeroPricedValues.unitPrice
 		return input, nil
 	}
 
@@ -83,6 +93,16 @@ type activityMoneyTier struct {
 	isCompleteSet bool
 }
 
+// zeroPricedHoldingReductionValues stores optional preserved source-field zeros
+// that remain available on explained zero-priced holding reductions without
+// creating a selected currency context.
+// Authored by: OpenCode
+type zeroPricedHoldingReductionValues struct {
+	unitPrice  *apd.Decimal
+	grossValue *apd.Decimal
+	feeAmount  *apd.Decimal
+}
+
 // parseActivityOccurredAt parses one normalized activity timestamp using the
 // stored source offset.
 // Authored by: OpenCode
@@ -112,22 +132,80 @@ func activityDisplayLabel(record syncmodel.ActivityRecord) string {
 	return strings.TrimSpace(record.AssetName)
 }
 
-// isExplainedZeroPricedHoldingReduction identifies the zero-priced SELL shape
-// that intentionally carries no selected activity currency context.
+// selectZeroPricedHoldingReductionValues identifies the explained zero-priced
+// SELL shape and preserves explicit zero-valued source fields without creating
+// a selected activity currency context.
 // Authored by: OpenCode
-func isExplainedZeroPricedHoldingReduction(record syncmodel.ActivityRecord) bool {
+func selectZeroPricedHoldingReductionValues(record syncmodel.ActivityRecord) (zeroPricedHoldingReductionValues, bool, error) {
 	if record.ActivityType != syncmodel.ActivityTypeSell {
-		return false
+		return zeroPricedHoldingReductionValues{}, false, nil
 	}
 	if strings.TrimSpace(record.Comment) == "" {
-		return false
+		return zeroPricedHoldingReductionValues{}, false, nil
 	}
 
-	var orderTier = buildOrderTier(record)
-	var assetTier = buildAssetProfileTier(record)
-	var baseTier = buildBaseTier(record)
+	var explicitValues = []*apd.Decimal{
+		record.OrderUnitPrice,
+		record.OrderGrossValue,
+		record.OrderFeeAmount,
+		record.AssetProfileUnitPrice,
+		record.AssetProfileFeeAmount,
+		record.BaseGrossValue,
+		record.BaseFeeAmount,
+	}
+	var allZero, err = allPresentDecimalsAreZero(explicitValues)
+	if err != nil {
+		return zeroPricedHoldingReductionValues{}, false, fmt.Errorf(
+			"activity %q zero-priced holding reduction values are invalid: %w",
+			strings.TrimSpace(record.SourceID),
+			err,
+		)
+	}
+	if !allZero {
+		return zeroPricedHoldingReductionValues{}, false, nil
+	}
 
-	return !orderTier.hasAnyValue && !assetTier.hasAnyValue && !baseTier.hasAnyValue
+	return zeroPricedHoldingReductionValues{
+		unitPrice:  firstExplicitZeroValue(record.OrderUnitPrice, record.AssetProfileUnitPrice),
+		grossValue: firstExplicitZeroValue(record.OrderGrossValue, record.BaseGrossValue),
+		feeAmount:  firstExplicitZeroValue(record.OrderFeeAmount, record.AssetProfileFeeAmount, record.BaseFeeAmount),
+	}, true, nil
+}
+
+// allPresentDecimalsAreZero reports whether every provided decimal pointer is
+// either missing or numerically zero.
+// Authored by: OpenCode
+func allPresentDecimalsAreZero(values []*apd.Decimal) (bool, error) {
+	for _, value := range values {
+		if value == nil {
+			continue
+		}
+
+		var isZero, err = decimalIsZero(*value)
+		if err != nil {
+			return false, err
+		}
+		if !isZero {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+// firstExplicitZeroValue returns the first explicitly stored prevalidated zero-
+// valued source field from the provided priority list.
+// Authored by: OpenCode
+func firstExplicitZeroValue(values ...*apd.Decimal) *apd.Decimal {
+	for _, value := range values {
+		if value == nil {
+			continue
+		}
+
+		return value
+	}
+
+	return nil
 }
 
 // requirePositivePricedQuantity enforces the priced-activity quantity

@@ -640,6 +640,9 @@ func buildInYearArtifacts(
 		OccurredAt:                  input.OccurredAt,
 		ActivityType:                input.ActivityType,
 		Quantity:                    input.Quantity,
+		UnitPrice:                   input.UnitPrice,
+		GrossValue:                  input.GrossValue,
+		FeeAmount:                   input.FeeAmount,
 		BasisAfterRow:               basisAfter,
 		CalculationCurrency:         reportCalculationCurrencyLabel,
 		QuantityAfterRow:            quantityAfter,
@@ -647,8 +650,6 @@ func buildInYearArtifacts(
 	}
 
 	if !input.IsZeroPricedHoldingReduction {
-		row.GrossValue = input.GrossValue
-		row.FeeAmount = input.FeeAmount
 		row.ActivityCurrency = input.SelectedCurrencyCode
 		row.HoldingReductionExplanation = ""
 	}

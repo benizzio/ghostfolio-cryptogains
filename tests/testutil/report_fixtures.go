@@ -84,6 +84,7 @@ type ExpectedAssetActivityRow struct {
 	SourceID                    string
 	ActivityType                syncmodel.ActivityType
 	Quantity                    string
+	UnitPrice                   string
 	GrossValue                  string
 	FeeAmount                   string
 	ActivityCurrency            string
@@ -110,7 +111,8 @@ type ExpectedLiquidationSummary struct {
 //
 // The fixture keeps its coverage intentionally broad but data volume small. It
 // includes activity before, within, and after the primary report year, multiple
-// asset timelines, one explained zero-priced holding reduction, one priced row
+// asset timelines, one production-shaped explained zero-priced holding
+// reduction that preserves explicit zero-valued source fields, one priced row
 // with an explicit zero fee, mixed amount-source tiers, and scope variation.
 //
 // Authored by: OpenCode
@@ -248,6 +250,10 @@ func DeterministicReportLedgerFixture() ReportLedgerFixture {
 			AssetSymbol:      "XRP",
 			AssetName:        "XRP",
 			Quantity:         "200",
+			OrderCurrency:    "USD",
+			OrderUnitPrice:   "0",
+			OrderGrossValue:  "0",
+			OrderFeeAmount:   "0",
 			Comment:          "Bridge migration holding reduction",
 			SourceScope:      reliableWalletScope("wallet-alt", "Alt Wallet"),
 		}),
@@ -795,6 +801,7 @@ func expectedPricedRow(sourceID string, activityType syncmodel.ActivityType, qua
 		SourceID:            sourceID,
 		ActivityType:        activityType,
 		Quantity:            quantity,
+		UnitPrice:           "",
 		GrossValue:          grossValue,
 		FeeAmount:           feeAmount,
 		ActivityCurrency:    activityCurrency,
@@ -812,6 +819,9 @@ func expectedHoldingReductionRow(sourceID string, quantity string, basisAfterRow
 		SourceID:                    sourceID,
 		ActivityType:                syncmodel.ActivityTypeSell,
 		Quantity:                    quantity,
+		UnitPrice:                   "0",
+		GrossValue:                  "0",
+		FeeAmount:                   "0",
 		BasisAfterRow:               basisAfterRow,
 		CalculationCurrency:         "NOT APPLICABLE",
 		QuantityAfterRow:            quantityAfterRow,

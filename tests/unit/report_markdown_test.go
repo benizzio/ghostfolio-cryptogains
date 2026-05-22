@@ -117,7 +117,7 @@ func TestRenderMarkdownCanonicalDecimalsCurrenciesAndSecretExclusion(t *testing.
 	assertContainsString(t, document.Content, "| ETH | -10 | NOT APPLICABLE |")
 	assertContainsString(t, document.Content, "| Overall Yearly Net Total | 1240.5 | NOT APPLICABLE |")
 	assertContainsString(t, document.Content, "| btc-sell-2024-001 | SELL | 1 | 25000 | 0 | USD | 22009 | NOT APPLICABLE | 1 |")
-	assertContainsString(t, document.Content, "| xrp-reduction-2024-001 | SELL | 200 |  |  |  | 400 | NOT APPLICABLE | 800 | manual custody transfer token=[REDACTED] jwt=[REDACTED] payload=[REDACTED] |")
+	assertContainsString(t, document.Content, "| xrp-reduction-2024-001 | SELL | 200 | 0 | 0 |  | 400 | NOT APPLICABLE | 800 | manual custody transfer token=[REDACTED] jwt=[REDACTED] payload=[REDACTED] |")
 	assertContainsString(t, document.Content, "| btc-sell-2024-001 | 1 | USD | 22009 | 25000 | 2991 | NOT APPLICABLE |")
 	assertNotContainsString(t, document.Content, "secret-token")
 	assertNotContainsString(t, document.Content, "secret-jwt")
@@ -207,6 +207,9 @@ func populatedMarkdownReportFixture() reportmodel.CapitalGainsReport {
 					OccurredAt:                  time.Date(2024, time.April, 1, 12, 0, 0, 0, time.Local),
 					ActivityType:                syncmodel.ActivityTypeSell,
 					Quantity:                    mustMarkdownDecimal(nil, "200.000"),
+					UnitPrice:                   markdownDecimalPointer(nil, "0.000"),
+					GrossValue:                  markdownDecimalPointer(nil, "0.000"),
+					FeeAmount:                   markdownDecimalPointer(nil, "0.000"),
 					BasisAfterRow:               mustMarkdownDecimal(nil, "400.000"),
 					CalculationCurrency:         "NOT APPLICABLE",
 					QuantityAfterRow:            mustMarkdownDecimal(nil, "800.000"),

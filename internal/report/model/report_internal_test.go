@@ -259,6 +259,11 @@ func TestReferenceAndDetailValidationGuardrails(t *testing.T) {
 		BasisAfterRow:    mustReportDecimal(t, "1"),
 		QuantityAfterRow: mustReportDecimal(t, "1"),
 	}
+	validRow.UnitPrice = &reportInvalidDecimal
+	if err = validRow.Validate(); err == nil || !strings.Contains(err.Error(), "asset activity row unit price") {
+		t.Fatalf("expected invalid unit-price optional decimal error, got %v", err)
+	}
+	validRow.UnitPrice = nil
 	validRow.GrossValue = &reportInvalidDecimal
 	if err = validRow.Validate(); err == nil || !strings.Contains(err.Error(), "asset activity row gross value") {
 		t.Fatalf("expected invalid optional decimal error, got %v", err)

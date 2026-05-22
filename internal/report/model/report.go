@@ -121,6 +121,7 @@ type AssetActivityRow struct {
 	OccurredAt                  time.Time
 	ActivityType                syncmodel.ActivityType
 	Quantity                    apd.Decimal
+	UnitPrice                   *apd.Decimal
 	GrossValue                  *apd.Decimal
 	FeeAmount                   *apd.Decimal
 	ActivityCurrency            string
@@ -355,6 +356,9 @@ func (row AssetActivityRow) Validate() error {
 		return fmt.Errorf("asset activity row activity type: %w", err)
 	}
 	if err := validatePositiveDecimal(row.Quantity, "asset activity row quantity"); err != nil {
+		return err
+	}
+	if err := validateOptionalDecimal(row.UnitPrice, "asset activity row unit price"); err != nil {
 		return err
 	}
 	if err := validateOptionalDecimal(row.GrossValue, "asset activity row gross value"); err != nil {

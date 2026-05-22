@@ -201,6 +201,36 @@ func TestSelectActivityCalculationInputCreatesZeroPricedHoldingReduction(t *test
 	}
 }
 
+// TestSelectActivityCalculationInputPreservesExplicitZeroValuedHoldingReductionFields
+// verifies that production-shaped zero-priced SELL rows keep explicit zero-
+// valued source details without becoming priced inputs.
+// Authored by: OpenCode
+func TestSelectActivityCalculationInputPreservesExplicitZeroValuedHoldingReductionFields(t *testing.T) {
+	t.Parallel()
+
+	var record = pricedActivityRecord()
+	record.ActivityType = syncmodel.ActivityTypeSell
+	record.Comment = "manual custody transfer"
+	record.OrderCurrency = "USD"
+	record.OrderUnitPrice = decimalPointer(t, "0")
+	record.OrderGrossValue = decimalPointer(t, "0")
+	record.OrderFeeAmount = decimalPointer(t, "0")
+
+	input, err := reportcalculate.SelectActivityCalculationInput(record)
+	if err != nil {
+		t.Fatalf("select activity input: %v", err)
+	}
+	if !input.IsZeroPricedHoldingReduction {
+		t.Fatalf("expected zero-priced holding reduction")
+	}
+	assertDecimalPointerString(t, input.UnitPrice, "0", "unit price")
+	assertDecimalPointerString(t, input.GrossValue, "0", "gross value")
+	assertDecimalPointerString(t, input.FeeAmount, "0", "fee amount")
+	if input.SelectedCurrencyContext != "" || input.SelectedCurrencyCode != "" {
+		t.Fatalf("expected no selected currency context for zero-priced holding reduction")
+	}
+}
+
 // TestSelectActivityCalculationInputPreservesExplicitZeroFee verifies that an
 // explicit fee value of zero remains selected.
 // Authored by: OpenCode

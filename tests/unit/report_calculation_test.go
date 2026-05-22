@@ -332,6 +332,10 @@ func TestCalculateIncludesZeroResultLossAndHoldingReductionDetails(t *testing.T)
 			AssetSymbol:      "RED",
 			AssetName:        "Reduction Asset",
 			Quantity:         "20",
+			OrderCurrency:    "USD",
+			OrderUnitPrice:   "0",
+			OrderGrossValue:  "0",
+			OrderFeeAmount:   "0",
 			Comment:          "manual move",
 		}),
 	))
@@ -366,9 +370,9 @@ func TestCalculateIncludesZeroResultLossAndHoldingReductionDetails(t *testing.T)
 		t.Fatalf("unexpected reduction activity row count: got %d want 2", len(reductionSection.ActivityRows))
 	}
 	var reductionRow = reductionSection.ActivityRows[1]
-	if reductionRow.GrossValue != nil || reductionRow.FeeAmount != nil {
-		t.Fatalf("expected zero-priced holding reduction row to omit gross value and fee")
-	}
+	assertCalculationDecimalPointerString(t, reductionRow.UnitPrice, "0", "holding reduction unit price")
+	assertCalculationDecimalPointerString(t, reductionRow.GrossValue, "0", "holding reduction gross value")
+	assertCalculationDecimalPointerString(t, reductionRow.FeeAmount, "0", "holding reduction fee")
 	if reductionRow.ActivityCurrency != "" {
 		t.Fatalf("expected zero-priced holding reduction row to omit activity currency")
 	}
@@ -437,9 +441,9 @@ type calculationActivityInput struct {
 	AssetName        string
 	Quantity         string
 	OrderCurrency    string
+	OrderUnitPrice   string
 	OrderGrossValue  string
 	OrderFeeAmount   string
-	OrderUnitPrice   string
 	Comment          string
 }
 
@@ -553,6 +557,25 @@ func assertCalculationDecimalString(t *testing.T, value apd.Decimal, want string
 	t.Helper()
 
 	var canonical, err = decimalsupport.CanonicalString(value)
+	if err != nil {
+		t.Fatalf("canonicalize %s: %v", label, err)
+	}
+	if canonical != want {
+		t.Fatalf("unexpected %s: got %q want %q", label, canonical, want)
+	}
+}
+
+// assertCalculationDecimalPointerString verifies one optional exact decimal
+// pointer against its canonical string form.
+// Authored by: OpenCode
+func assertCalculationDecimalPointerString(t *testing.T, value *apd.Decimal, want string, label string) {
+	t.Helper()
+
+	if value == nil {
+		t.Fatalf("expected %s to be present", label)
+	}
+
+	var canonical, err = decimalsupport.CanonicalString(*value)
 	if err != nil {
 		t.Fatalf("canonicalize %s: %v", label, err)
 	}

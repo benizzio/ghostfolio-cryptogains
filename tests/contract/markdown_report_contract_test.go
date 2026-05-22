@@ -35,6 +35,7 @@ func TestMarkdownReportDocumentContract(t *testing.T) {
 	assertContains(t, document.Content, "## Gains-And-Losses Summary")
 	assertContains(t, document.Content, "## Reference Section")
 	assertContains(t, document.Content, "## Asset Detail: BTC")
+	assertContains(t, document.Content, "## Asset Detail: XRP")
 	assertContains(t, document.Content, "| Asset | Net Gain Or Loss | Report Calculation Currency |")
 	assertContains(t, document.Content, "| Overall Yearly Net Total | 1240.5 | NOT APPLICABLE |")
 	assertContains(t, document.Content, "| Asset | Full Liquidation Count Through Year End | Main Section Status |")
@@ -43,6 +44,7 @@ func TestMarkdownReportDocumentContract(t *testing.T) {
 	assertContains(t, document.Content, "### Liquidation Calculations")
 	assertContains(t, document.Content, "### Closing Position")
 	assertContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 0 | USD | 22009 | NOT APPLICABLE | 1 | note token=[REDACTED] |")
+	assertContains(t, document.Content, "| 2024-04-01 12:00:00 | xrp-reduction-2024-001 | SELL | 200 | 0 | 0 |  | 400 | NOT APPLICABLE | 800 | custody transfer |")
 	assertContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | 1 | USD | 22009 | 25000 | 1240.5 | NOT APPLICABLE |")
 	assertNotContains(t, document.Content, "secret-token")
 }
@@ -89,6 +91,11 @@ func contractMarkdownReportFixture() reportmodel.CapitalGainsReport {
 			DisplayLabel:              "BTC",
 			NetGainOrLoss:             mustContractDecimal("1240.5"),
 			ReportCalculationCurrency: "NOT APPLICABLE",
+		}, {
+			AssetIdentityKey:          "asset-xrp",
+			DisplayLabel:              "XRP",
+			NetGainOrLoss:             mustContractDecimal("0"),
+			ReportCalculationCurrency: "NOT APPLICABLE",
 		}},
 		YearlyNetTotal: mustContractDecimal("1240.5"),
 		ReferenceEntries: []reportmodel.ReferenceLiquidationEntry{{
@@ -127,6 +134,27 @@ func contractMarkdownReportFixture() reportmodel.CapitalGainsReport {
 				GainOrLoss:             mustContractDecimal("1240.5"),
 				ActivityCurrency:       "USD",
 				CalculationCurrency:    "NOT APPLICABLE",
+			}},
+		}, {
+			AssetIdentityKey:    "asset-xrp",
+			DisplayLabel:        "XRP",
+			OpeningQuantity:     mustContractDecimal("1000"),
+			OpeningCostBasis:    mustContractDecimal("500"),
+			ClosingQuantity:     mustContractDecimal("800"),
+			ClosingCostBasis:    mustContractDecimal("400"),
+			CalculationCurrency: "NOT APPLICABLE",
+			ActivityRows: []reportmodel.AssetActivityRow{{
+				SourceID:                    "xrp-reduction-2024-001",
+				OccurredAt:                  time.Date(2024, time.April, 1, 12, 0, 0, 0, time.Local),
+				ActivityType:                syncmodel.ActivityTypeSell,
+				Quantity:                    mustContractDecimal("200"),
+				UnitPrice:                   contractDecimalPointer("0"),
+				GrossValue:                  contractDecimalPointer("0"),
+				FeeAmount:                   contractDecimalPointer("0"),
+				BasisAfterRow:               mustContractDecimal("400"),
+				CalculationCurrency:         "NOT APPLICABLE",
+				QuantityAfterRow:            mustContractDecimal("800"),
+				HoldingReductionExplanation: "custody transfer",
 			}},
 		}},
 	}
