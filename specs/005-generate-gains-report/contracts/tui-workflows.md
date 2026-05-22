@@ -74,12 +74,16 @@ Rules:
 - Empty token input is blocked with an in-workflow validation message.
 - The token is not persisted.
 - Snapshot discovery and unlock use only selected-server candidates.
-- If no selected-server snapshot unlocks, the context can still open so the user can run `Sync Data`, but report generation remains unavailable until sync data exists.
+- If a selected-server snapshot unlocks, the context opens immediately from that snapshot.
+- If no selected-server snapshot unlocks, the context opens only when Ghostfolio authenticates the informed token as a new isolated local-user context.
+- If no selected-server snapshot unlocks and Ghostfolio rejects the informed token, the screen stays on `Sync and Reports Unlock Screen`, shows `access denied`, disables `Unlock`, leaves `Back` as the only available action, preserves the rejected token field value for that failed screen instance, and clears that field only after the user leaves with `Back` and later returns to the unlock screen.
 - Auth or unlock failures must not reveal token material.
 
 Success transitions:
 
-- successful context unlock or new-context token acceptance -> `Sync and Reports Menu Screen`
+- selected-server snapshot unlock -> `Sync and Reports Menu Screen`
+- Ghostfolio-authenticated new isolated local-user context -> `Sync and Reports Menu Screen`
+- Ghostfolio-rejected token -> `Sync and Reports Unlock Screen`
 - `Back` -> `Main Menu Screen`
 
 ### Sync and Reports Menu Screen
@@ -300,7 +304,9 @@ Main Menu Screen
 └── Edit Setup -> Setup Screen
 
 Sync and Reports Unlock Screen
-├── Unlock -> Sync and Reports Menu Screen
+├── Unlock -> selected-server snapshot unlock -> Sync and Reports Menu Screen
+├── Unlock -> authenticated new isolated local-user context -> Sync and Reports Menu Screen
+├── Unlock -> rejected token -> Sync and Reports Unlock Screen
 └── Back -> Main Menu Screen
 
 Sync and Reports Menu Screen

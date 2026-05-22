@@ -135,10 +135,16 @@ Validation rules:
 - Token must be explicitly entered before actions are exposed.
 - Token must be cleared when leaving the context or when the app exits.
 - Protected cache metadata, report years, and last-sync timestamp must not be displayed before unlock.
+- Snapshot miss alone must not activate the context.
+- If no selected-server snapshot unlocks and Ghostfolio rejects the informed token, the workflow must remain on the unlock screen with `access denied`, `Unlock` disabled, `Back` as the only available action, the rejected token value preserved only for that failed screen instance, and that field cleared only after leaving and re-entering the unlock screen.
 
 State transitions:
 
-- `locked -> unlocked` after token entry and context setup.
+- `locked -> unlocked` after selected-server snapshot unlock.
+- `locked -> authenticating_new_context -> unlocked` after selected-server snapshot miss and Ghostfolio authentication success for a new isolated local-user context.
+- `locked -> rejected_token` after selected-server snapshot miss and Ghostfolio authentication rejection.
+- `rejected_token -> cleared` when the user leaves the unlock screen with `Back`.
+- `cleared -> locked` when the user later re-enters `Sync and Reports`.
 - `unlocked -> syncing -> unlocked` after sync success or failure.
 - `unlocked -> selecting_report -> generating_report -> unlocked` after report success or failure.
 - `unlocked -> cleared` when the user leaves the context.
