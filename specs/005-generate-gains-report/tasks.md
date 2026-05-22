@@ -10,6 +10,8 @@ description: "Task list for Generate Yearly Gains And Losses Report implementati
 
 **Bugfix**: 2026-05-22 — [BUG-001] Updated from bugfix patch
 
+**Bugfix**: 2026-05-22 — [BUG-002] Updated from bugfix patch
+
 **Tests**: Automated tests are mandatory for this feature. The feature specification marks User Scenarios & Testing as mandatory and `plan.md` requires integration-first coverage, targeted unit tests for calculation and IO rules, `make test`, `make coverage`, and an opt-in large-history performance path.
 
 **Organization**: Tasks are grouped by user story so each story can be implemented and verified independently.
@@ -41,8 +43,10 @@ description: "Task list for Generate Yearly Gains And Losses Report implementati
 
 **Critical**: Finish this phase before starting user story work.
 
-- [X] T004 [P] Persist a stable Ghostfolio asset identity key from non-empty Ghostfolio `symbolProfileId` into normalized activities and fail safe when required reporting rows lack that key in `internal/ghostfolio/dto/activity_page_response.go`, `internal/ghostfolio/mapper/activity_mapper.go`, and `internal/sync/model/activity_record.go`
-- [X] T005 Update snapshot compatibility for the asset identity model change by bumping `ActivityModelVersion` and older-snapshot expectations in `internal/snapshot/model/payload.go`, `tests/unit/stored_data_version_test.go`, and `tests/integration/snapshot_compatibility_flow_test.go`
+- [ ] T004 [P] ⚠️ Reopened Persist a stable Ghostfolio asset identity key from non-empty nested `SymbolProfile.id` into normalized activities and fail safe when required reporting rows lack that key in `internal/ghostfolio/dto/activity_page_response.go`, `internal/ghostfolio/mapper/activity_mapper.go`, and `internal/sync/model/activity_record.go` (reopened — BUG-002)
+- [ ] T005 ⚠️ Reopened Reevaluate snapshot compatibility for the asset identity model change against the corrected upstream `SymbolProfile.id` dependency, including whether `ActivityModelVersion`, refresh handling, and older-snapshot expectations need revision in `internal/snapshot/model/payload.go`, `tests/unit/stored_data_version_test.go`, and `tests/integration/snapshot_compatibility_flow_test.go` (reopened — BUG-002)
+- [ ] T067 [P] Add regression coverage that verifies upstream `Activity.SymbolProfile.id` maps into `AssetIdentityKey` end-to-end through DTO decoding and activity mapping in `internal/ghostfolio/mapper/activity_mapper_internal_test.go`
+- [ ] T068 Assess and refresh synced-activity fixtures, snapshot fixtures, and compatibility expectations that may still encode the superseded `symbolProfileId` assumption in `tests/testutil/testutil.go`, `tests/unit/stored_data_version_test.go`, and `tests/integration/snapshot_compatibility_flow_test.go`
 - [X] T006 [P] Update shared synced-activity test fixtures to include non-display `AssetIdentityKey` values in `tests/testutil/testutil.go`
 - [X] T007 Extend readable protected-data summaries with activity count, last successful sync timestamp, available report years, and unlocked cache access in `internal/app/runtime/sync_types.go`, `internal/app/runtime/active_snapshot_state.go`, and `internal/app/runtime/snapshot_lifecycle.go`
 - [X] T008 [P] Define report runtime request, outcome, failure reason, and service interface types in `internal/app/runtime/report_types.go`
@@ -207,7 +211,7 @@ Parallel-capable after Phase 2:
 ### Parallel Opportunities
 
 - T001, T002, and T003 can run in parallel.
-- T004, T006, T008, T009, T010, and T011 can run in parallel after Phase 1; T005, T007, and T012 close after the related model and runtime types exist.
+- T004, T006, T008, T009, T010, T011, and T067 can run in parallel after Phase 1; T005, T007, T012, and T068 close after the related model, snapshot, and fixture decisions exist.
 - T013, T014, and T015 can run in parallel for US1 before T016 through T024.
 - T025 through T032 and T065 can run in parallel for US2; T033 through T036, T040 through T043, and T066 can then run in parallel before T037, T038, T044, T045, T047, and T048.
 - T049 through T051 can run in parallel for US3; T052, T054, and T056 can run in parallel before T053, T055, and T057 close the story.
