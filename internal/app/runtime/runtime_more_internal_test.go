@@ -612,7 +612,7 @@ func TestRunCoversMappingNormalizationAndValidationFailures(t *testing.T) {
 			case "/api/v1/user":
 				_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":"USD"}}`))
 			case "/api/v1/activities":
-				_, _ = writer.Write([]byte(`{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","symbolProfileId":"asset-btc-runtime-001"},"quantity":1,"unitPriceInAssetProfileCurrency":1,"value":1,"feeInBaseCurrency":0}],"count":1}`))
+				_, _ = writer.Write([]byte(`{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"id":"asset-btc-runtime-001","symbol":"BTC","name":"Bitcoin"},"quantity":1,"unitPriceInAssetProfileCurrency":1,"value":1,"feeInBaseCurrency":0}],"count":1}`))
 			default:
 				writer.WriteHeader(http.StatusNotFound)
 			}
@@ -628,7 +628,7 @@ func TestRunCoversMappingNormalizationAndValidationFailures(t *testing.T) {
 	})
 
 	t.Run("normalization failure", func(t *testing.T) {
-		service, config := runtimeServiceWithHistoryServer(t, runtimeSnapshotStore{}, true, `{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","symbolProfileId":"asset-btc-runtime-001"},"quantity":1,"unitPriceInAssetProfileCurrency":1,"value":1,"feeInBaseCurrency":0},{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","symbolProfileId":"asset-btc-runtime-001"},"quantity":2,"unitPriceInAssetProfileCurrency":1,"value":2,"feeInBaseCurrency":0}],"count":2}`)
+		service, config := runtimeServiceWithHistoryServer(t, runtimeSnapshotStore{}, true, `{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"id":"asset-btc-runtime-001","symbol":"BTC","name":"Bitcoin"},"quantity":1,"unitPriceInAssetProfileCurrency":1,"value":1,"feeInBaseCurrency":0},{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"id":"asset-btc-runtime-001","symbol":"BTC","name":"Bitcoin"},"quantity":2,"unitPriceInAssetProfileCurrency":1,"value":2,"feeInBaseCurrency":0}],"count":2}`)
 		outcome := service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
 		if outcome.FailureReason != SyncFailureUnsupportedActivityHistory || !outcome.Diagnostic.Eligible {
 			t.Fatalf("expected unsupported-history normalization failure, got %#v", outcome)
@@ -636,7 +636,7 @@ func TestRunCoversMappingNormalizationAndValidationFailures(t *testing.T) {
 	})
 
 	t.Run("validation failure", func(t *testing.T) {
-		service, config := runtimeServiceWithHistoryServer(t, runtimeSnapshotStore{}, true, `{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"symbol":"BTC","name":"Bitcoin","symbolProfileId":"asset-btc-runtime-001"},"quantity":1,"unitPriceInAssetProfileCurrency":0,"value":1,"feeInBaseCurrency":0}],"count":1}`)
+		service, config := runtimeServiceWithHistoryServer(t, runtimeSnapshotStore{}, true, `{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"id":"asset-btc-runtime-001","symbol":"BTC","name":"Bitcoin"},"quantity":1,"unitPriceInAssetProfileCurrency":0,"value":1,"feeInBaseCurrency":0}],"count":1}`)
 		outcome := service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
 		if outcome.FailureReason != SyncFailureUnsupportedActivityHistory || !outcome.Diagnostic.Eligible {
 			t.Fatalf("expected unsupported-history validation failure, got %#v", outcome)

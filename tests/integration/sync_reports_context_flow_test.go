@@ -197,10 +197,10 @@ func TestSyncReportsContextUnlockUsesSelectedServerSnapshotAndReusesTokenWithPro
 	var store = configstore.NewJSONStore(tempDir)
 	var server = newGhostfolioStorageServer(t, []storagePageFixture{{
 		Count:          2,
-		ActivitiesJSON: `[{"id":"activity-buy","date":"2024-12-31T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD","symbolProfileId":"asset-btc-context-001"}}]`,
+		ActivitiesJSON: `[{"id":"activity-buy","date":"2024-12-31T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"id":"asset-btc-context-001","symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
 	}, {
 		Count:          2,
-		ActivitiesJSON: `[{"id":"activity-sell","date":"2025-05-20T13:30:00Z","type":"SELL","quantity":0.25,"valueInBaseCurrency":35,"unitPriceInAssetProfileCurrency":140,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD","symbolProfileId":"asset-btc-context-001"}}]`,
+		ActivitiesJSON: `[{"id":"activity-sell","date":"2025-05-20T13:30:00Z","type":"SELL","quantity":0.25,"valueInBaseCurrency":35,"unitPriceInAssetProfileCurrency":140,"SymbolProfile":{"id":"asset-btc-context-001","symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
 	}})
 	var config = mustCustomSetupConfig(t, server.URL)
 	if err := store.Save(context.Background(), config); err != nil {

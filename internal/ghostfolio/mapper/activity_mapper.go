@@ -193,7 +193,7 @@ func MapActivity(entry dto.ActivityPageEntry, baseCurrency string, decimalServic
 		SourceID:              sourceID,
 		OccurredAt:            occurredAt,
 		ActivityType:          syncmodel.ActivityType(strings.ToUpper(strings.TrimSpace(entry.Type))),
-		AssetIdentityKey:      strings.TrimSpace(entry.SymbolProfile.SymbolProfileID),
+		AssetIdentityKey:      strings.TrimSpace(entry.SymbolProfile.ID),
 		AssetSymbol:           strings.TrimSpace(entry.SymbolProfile.Symbol),
 		AssetName:             strings.TrimSpace(entry.SymbolProfile.Name),
 		Quantity:              quantity,

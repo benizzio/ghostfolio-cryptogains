@@ -63,7 +63,7 @@ func TestSyncEntrySuccessUsesProductionRuntimePath(t *testing.T) {
 
 	var tempDir = t.TempDir()
 	var server = newGhostfolioScenarioServer(t, ghostfolioScenario{
-		activitiesBody: `{"activities":[{"id":"activity-1","date":"2026-01-31T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":10,"unitPriceInAssetProfileCurrency":10,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD","symbolProfileId":"asset-btc-entry-001"}}],"count":1}`,
+		activitiesBody: `{"activities":[{"id":"activity-1","date":"2026-01-31T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":10,"unitPriceInAssetProfileCurrency":10,"SymbolProfile":{"id":"asset-btc-entry-001","symbol":"BTC","name":"Bitcoin","currency":"USD"}}],"count":1}`,
 	})
 	var fixture = syncEntryFixture{
 		config: mustCustomSetupConfig(t, server.URL),

@@ -14,6 +14,9 @@ const (
 	PayloadSchemaVersion = 1
 
 	// ActivityModelVersion is the supported normalized protected-activity model version.
+	// Version 4 already persists AssetIdentityKey in the protected payload, so the
+	// corrected upstream `SymbolProfile.id` mapping does not require a new on-disk
+	// model version.
 	ActivityModelVersion = 4
 )
 

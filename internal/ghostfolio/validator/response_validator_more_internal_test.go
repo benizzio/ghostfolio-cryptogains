@@ -184,7 +184,7 @@ func validActivityPageEntry() dto.ActivityPageEntry {
 		ValueInBaseCurrency:             json.Number("123.45"),
 		FeeInBaseCurrency:               json.Number("0.25"),
 		UnitPriceInAssetProfileCurrency: json.Number("82.3"),
-		SymbolProfile:                   dto.ActivitySymbolProfile{Symbol: "BTC", Name: "Bitcoin", Currency: "EUR", SymbolProfileID: "asset-btc-validator-001"},
+		SymbolProfile:                   dto.ActivitySymbolProfile{ID: "asset-btc-validator-001", Symbol: "BTC", Name: "Bitcoin", Currency: "EUR"},
 	}
 }
 
