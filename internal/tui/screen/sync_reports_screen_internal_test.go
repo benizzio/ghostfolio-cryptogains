@@ -42,6 +42,41 @@ func TestSyncReportsUnlockScreenViewCoversUnlockRenderState(t *testing.T) {
 	}
 }
 
+// TestSyncReportsUnlockScreenViewCoversRejectedTokenState verifies the unlock
+// screen branch rendered after Ghostfolio rejects the supplied token.
+// Authored by: OpenCode
+func TestSyncReportsUnlockScreenViewCoversRejectedTokenState(t *testing.T) {
+	t.Parallel()
+
+	var content = SyncEntryScreenView(SyncEntryScreenParams{
+		Theme:                   component.DefaultTheme(),
+		Width:                   80,
+		Height:                  24,
+		ScreenTitle:             "Sync and Reports",
+		ScreenSubtitle:          "Unlock the active sync and reporting context.",
+		IntroText:               "Enter the Ghostfolio security token once to unlock Sync Data and future reporting actions for this run.",
+		IdleStatusText:          "Enter the Ghostfolio security token to unlock Sync and Reports for this run.",
+		ShowProtectedDataStatus: false,
+		MenuItems:               []component.MenuItem{{Label: "Unlock", Enabled: false}, {Label: "Back", Enabled: true}},
+		SelectedIndex:           1,
+		TokenInput:              "********",
+		ValidationMessage:       "access denied",
+		HelpText:                "help",
+	})
+	if !strings.Contains(content, "access denied") {
+		t.Fatalf("expected rejected-token access-denied message, got %q", content)
+	}
+	if !strings.Contains(content, "x Unlock") {
+		t.Fatalf("expected rejected-token state to disable Unlock, got %q", content)
+	}
+	if !strings.Contains(content, "> Back") {
+		t.Fatalf("expected rejected-token state to leave Back as the only selected action, got %q", content)
+	}
+	if !strings.Contains(content, "********") {
+		t.Fatalf("expected rejected-token state to preserve the failed token field on that screen instance, got %q", content)
+	}
+}
+
 // TestSyncReportsScreenViewCoversNoSyncedDataBranch verifies the visible
 // renderer shape for the initial no-data Sync and Reports state.
 // Authored by: OpenCode

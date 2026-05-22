@@ -57,7 +57,11 @@ func (s testSyncService) UnlockSelectedServerSnapshot(context.Context, configmod
 	if s.unlockResult.ProtectedData.HasReadableSnapshot || len(s.unlockResult.ProtectedData.AvailableReportYears) > 0 || s.unlockResult.ReportUnavailableReason != "" {
 		return s.unlockResult
 	}
-	return runtime.SyncReportsContextResult{ProtectedData: s.protectedDataState, ReportUnavailableReason: runtime.ReportFailureNoSyncedDataAvailable}
+	return runtime.SyncReportsContextResult{
+		UnlockState:             runtime.SyncReportsUnlockStateAuthenticatedNewContext,
+		ProtectedData:           s.protectedDataState,
+		ReportUnavailableReason: runtime.ReportFailureNoSyncedDataAvailable,
+	}
 }
 
 func (s testSyncService) CheckServerReplacement(configmodel.AppSetupConfig) runtime.ServerReplacementCheck {
@@ -94,7 +98,10 @@ func (*cancellingSyncService) ProtectedDataState() runtime.ProtectedDataState {
 }
 
 func (*cancellingSyncService) UnlockSelectedServerSnapshot(context.Context, configmodel.AppSetupConfig, string) runtime.SyncReportsContextResult {
-	return runtime.SyncReportsContextResult{ReportUnavailableReason: runtime.ReportFailureNoSyncedDataAvailable}
+	return runtime.SyncReportsContextResult{
+		UnlockState:             runtime.SyncReportsUnlockStateAuthenticatedNewContext,
+		ReportUnavailableReason: runtime.ReportFailureNoSyncedDataAvailable,
+	}
 }
 
 func (*cancellingSyncService) CheckServerReplacement(configmodel.AppSetupConfig) runtime.ServerReplacementCheck {
@@ -510,7 +517,7 @@ func TestUpdateSyncReportsUnlockCapturesContextToken(t *testing.T) {
 
 	var config = mustSetupConfig(t)
 	var model = newTestModel(t, &config)
-	model.deps.SyncService = testSyncService{unlockResult: runtime.SyncReportsContextResult{ReportUnavailableReason: runtime.ReportFailureNoSyncedDataAvailable}}
+	model.deps.SyncService = testSyncService{unlockResult: runtime.SyncReportsContextResult{UnlockState: runtime.SyncReportsUnlockStateAuthenticatedNewContext, ReportUnavailableReason: runtime.ReportFailureNoSyncedDataAvailable}}
 	var updated tea.Model
 	model.active = syncReportsUnlockScreenKey
 	model.sync.InputFocused = false
@@ -535,6 +542,9 @@ func TestUpdateSyncReportsUnlockCapturesContextToken(t *testing.T) {
 	if got := model.View().Content; !strings.Contains(got, "Sync Data: no synced data available") {
 		t.Fatalf("expected no-data readiness state after unlock, got %q", got)
 	}
+	if model.syncReports.UnlockFailure != runtime.SyncFailureNone {
+		t.Fatalf("expected successful unlock to clear unlock failure state, got %q", model.syncReports.UnlockFailure)
+	}
 
 	model = newTestModel(t, &config)
 	model.active = syncReportsUnlockScreenKey
@@ -544,6 +554,66 @@ func TestUpdateSyncReportsUnlockCapturesContextToken(t *testing.T) {
 	model = updated.(*Model)
 	if model.active != mainMenuScreenKey {
 		t.Fatalf("expected unlock Back to return main menu")
+	}
+}
+
+func TestUpdateSyncReportsUnlockRejectedTokenRequiresBackBeforeRetry(t *testing.T) {
+	t.Parallel()
+
+	var config = mustSetupConfig(t)
+	var model = newTestModel(t, &config)
+	model.deps.SyncService = testSyncService{unlockResult: runtime.SyncReportsContextResult{UnlockState: runtime.SyncReportsUnlockStateRejectedToken, FailureReason: runtime.SyncFailureRejectedToken, ReportUnavailableReason: runtime.ReportFailureNoSyncedDataAvailable}}
+	model.active = syncReportsUnlockScreenKey
+	model.sync.InputFocused = false
+	model.sync.TokenInput.SetValue("token-123")
+	model.sync.TokenInput.Blur()
+
+	var updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	if cmd != nil {
+		t.Fatalf("expected rejected-token unlock to stay synchronous")
+	}
+	model = updated.(*Model)
+	if model.active != syncReportsUnlockScreenKey {
+		t.Fatalf("expected rejected token to stay on unlock screen, got %s", model.active)
+	}
+	if model.syncReports.UnlockFailure != runtime.SyncFailureRejectedToken {
+		t.Fatalf("expected rejected-token unlock failure state, got %q", model.syncReports.UnlockFailure)
+	}
+	if model.sync.MenuIndex != 1 {
+		t.Fatalf("expected rejected-token branch to select Back, got %d", model.sync.MenuIndex)
+	}
+	if model.sync.TokenInput.Value() != "token-123" {
+		t.Fatalf("expected rejected-token branch to preserve token input on failed screen instance, got %q", model.sync.TokenInput.Value())
+	}
+	if got := model.syncMenuItems(); len(got) != 2 || got[0].Enabled || !got[1].Enabled {
+		t.Fatalf("expected rejected-token branch to disable Unlock and keep Back enabled, got %#v", got)
+	}
+	if got := model.syncReportsUnlockValidationMessage(); got != "access denied" {
+		t.Fatalf("expected access-denied unlock validation message, got %q", got)
+	}
+
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	if cmd != nil {
+		t.Fatalf("expected blocked repeated unlock to remain synchronous")
+	}
+	model = updated.(*Model)
+	if model.active != mainMenuScreenKey {
+		t.Fatalf("expected selected Back action to return main menu after rejection, got %s", model.active)
+	}
+	if model.sync.TokenInput.Value() != "" {
+		t.Fatalf("expected leaving rejected unlock screen to clear retained token field, got %q", model.sync.TokenInput.Value())
+	}
+
+	cmd = model.enterSyncReportsUnlock()
+	_ = runCmdFlow(cmd)
+	if model.active != syncReportsUnlockScreenKey {
+		t.Fatalf("expected re-entry to return to unlock screen, got %s", model.active)
+	}
+	if model.sync.TokenInput.Value() != "" {
+		t.Fatalf("expected re-entered unlock screen to start with cleared token input, got %q", model.sync.TokenInput.Value())
+	}
+	if model.syncReports.UnlockFailure != runtime.SyncFailureNone {
+		t.Fatalf("expected re-entered unlock screen to clear rejected-token state, got %q", model.syncReports.UnlockFailure)
 	}
 }
 

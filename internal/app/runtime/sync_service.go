@@ -104,7 +104,16 @@ func NewSyncService(
 	validatorService syncvalidate.Validator,
 	snapshots snapshotstore.Store,
 ) SyncService {
-	return newSyncService(client, requestTimeout, baseConfigDir, allowDevHTTP, decimalService, normalizer, validatorService, newSnapshotLifecycle(snapshots, newActiveSnapshotState(), protectedPayloadBuilder{}))
+	return newSyncService(
+		client,
+		requestTimeout,
+		baseConfigDir,
+		allowDevHTTP,
+		decimalService,
+		normalizer,
+		validatorService,
+		newSnapshotLifecycle(snapshots, newActiveSnapshotState(), protectedPayloadBuilder{}),
+	)
 }
 
 // newSyncService creates the runtime sync service around one shared snapshot
@@ -198,7 +207,13 @@ func (s *syncService) Run(ctx context.Context, request SyncRequest) SyncOutcome 
 		return finalizeContractFailure(&session, &attempt, err)
 	}
 
-	cache, outcome, ok := s.buildProtectedActivityCache(timedContext, historyResponse, request.SecurityToken, &session, &attempt)
+	cache, outcome, ok := s.buildProtectedActivityCache(
+		timedContext,
+		historyResponse,
+		request.SecurityToken,
+		&session,
+		&attempt,
+	)
 	if !ok {
 		return outcome
 	}
@@ -216,12 +231,14 @@ func (s *syncService) Run(ctx context.Context, request SyncRequest) SyncOutcome 
 	}
 
 	attempt.Status = AttemptStatusPersisting
-	err = s.snapshots.Persist(timedContext, snapshotPersistRequest{
-		Config:        request.Config,
-		SecurityToken: request.SecurityToken,
-		Cache:         cache,
-		Existing:      unlockedSnapshot,
-	})
+	err = s.snapshots.Persist(
+		timedContext, snapshotPersistRequest{
+			Config:        request.Config,
+			SecurityToken: request.SecurityToken,
+			Cache:         cache,
+			Existing:      unlockedSnapshot,
+		},
+	)
 	if err != nil {
 		return s.finalizePersistenceFailure(timedContext, &session, &attempt, err, request.SecurityToken)
 	}
@@ -262,10 +279,12 @@ func (s *syncService) prepareSyncAttempt(
 	attempt *SyncAttempt,
 ) (snapshotUnlockResult, SyncOutcome, bool) {
 	if s.snapshots == nil {
-		return snapshotUnlockResult{}, s.finalizeSyncFailure(ctx, session, attempt, SyncFailureIncompatibleNewSyncData, syncmodel.DiagnosticContext{
-			FailureStage:  syncmodel.DiagnosticFailureStageProtectedPersistence,
-			FailureDetail: "protected snapshot store is unavailable",
-		}), false
+		return snapshotUnlockResult{}, s.finalizeSyncFailure(
+			ctx, session, attempt, SyncFailureIncompatibleNewSyncData, syncmodel.DiagnosticContext{
+				FailureStage:  syncmodel.DiagnosticFailureStageProtectedPersistence,
+				FailureDetail: "protected snapshot store is unavailable",
+			},
+		), false
 	}
 
 	var outcome, ok = s.confirmServerReplacement(ctx, request, session, attempt)
@@ -296,7 +315,13 @@ func (s *syncService) confirmServerReplacement(
 	}
 	if !request.ConfirmServerReplacement {
 		attempt.Status = AttemptStatusAborted
-		return s.finalizeSyncFailure(ctx, session, attempt, SyncFailureServerReplacementCancelled, syncmodel.DiagnosticContext{}), false
+		return s.finalizeSyncFailure(
+			ctx,
+			session,
+			attempt,
+			SyncFailureServerReplacementCancelled,
+			syncmodel.DiagnosticContext{},
+		), false
 	}
 
 	attempt.ServerMismatchConfirmed = true
@@ -317,10 +342,12 @@ func (s *syncService) finalizeUnlockFailure(
 		reason = SyncFailureUnsupportedStoredDataVersion
 	}
 
-	return s.finalizeSyncFailure(ctx, session, attempt, reason, syncmodel.DiagnosticContext{
-		FailureStage:  syncmodel.DiagnosticFailureStageStoredDataCompatibility,
-		FailureDetail: redact.ErrorText(err, securityToken),
-	})
+	return s.finalizeSyncFailure(
+		ctx, session, attempt, reason, syncmodel.DiagnosticContext{
+			FailureStage:  syncmodel.DiagnosticFailureStageStoredDataCompatibility,
+			FailureDetail: redact.ErrorText(err, securityToken),
+		},
+	)
 }
 
 // buildProtectedActivityCache maps, normalizes, and returns the protected activity cache for one retrieved history.
@@ -334,7 +361,11 @@ func (s *syncService) buildProtectedActivityCache(
 ) (syncmodel.ProtectedActivityCache, SyncOutcome, bool) {
 	attempt.Status = AttemptStatusNormalizing
 
-	records, err := ghostfoliomapper.MapActivities(historyResponse.Activities, session.UserBaseCurrency, s.decimalService)
+	records, err := ghostfoliomapper.MapActivities(
+		historyResponse.Activities,
+		session.UserBaseCurrency,
+		s.decimalService,
+	)
 	if err != nil {
 		return syncmodel.ProtectedActivityCache{}, s.finalizeSyncFailure(
 			ctx,
@@ -373,10 +404,12 @@ func (s *syncService) finalizePersistenceFailure(
 		reason = SyncFailureUnsupportedStoredDataVersion
 	}
 
-	return s.finalizeSyncFailure(ctx, session, attempt, reason, syncmodel.DiagnosticContext{
-		FailureStage:  syncmodel.DiagnosticFailureStageProtectedPersistence,
-		FailureDetail: redact.ErrorText(err, securityToken),
-	})
+	return s.finalizeSyncFailure(
+		ctx, session, attempt, reason, syncmodel.DiagnosticContext{
+			FailureStage:  syncmodel.DiagnosticFailureStageProtectedPersistence,
+			FailureDetail: redact.ErrorText(err, securityToken),
+		},
+	)
 }
 
 // GenerateDiagnosticReport writes one local synced-data diagnostic report for an eligible failure.
@@ -573,7 +606,47 @@ func (s *syncService) UnlockSelectedServerSnapshot(
 		return SyncReportsContextResult{ReportUnavailableReason: ReportFailureNoSyncedDataAvailable}
 	}
 
-	return s.snapshots.UnlockSelectedServerSnapshot(ctx, config.ServerOrigin, securityToken)
+	var result = s.snapshots.UnlockSelectedServerSnapshot(ctx, config.ServerOrigin, securityToken)
+	if result.UnlockState == SyncReportsUnlockStateSnapshotUnlocked || result.ReportUnavailableReason == ReportFailureUnsupportedStoredDataVersion {
+		return result
+	}
+
+	if s.client == nil {
+		result.UnlockState = SyncReportsUnlockStateRejectedToken
+		result.FailureReason = SyncFailureRejectedToken
+		return result
+	}
+
+	var timedContext, cancel = context.WithTimeout(ctx, s.requestTimeout)
+	defer cancel()
+
+	_, err := s.client.Authenticate(timedContext, config.ServerOrigin, securityToken)
+	if err == nil {
+		result.UnlockState = SyncReportsUnlockStateAuthenticatedNewContext
+		result.FailureReason = SyncFailureNone
+		return result
+	}
+
+	if requestFailure, ok := errors.AsType[*ghostfolioclient.RequestFailure](err); ok && requestFailure.Category == ghostfolioclient.FailureRejectedToken {
+		result.UnlockState = SyncReportsUnlockStateRejectedToken
+		result.FailureReason = SyncFailureRejectedToken
+		return result
+	}
+
+	result.UnlockState = SyncReportsUnlockStateRejectedToken
+	result.FailureReason = syncFailureReasonFromBoundary(syncFailureCategory(err))
+	return result
+}
+
+// syncFailureCategory extracts the Ghostfolio boundary category for one runtime
+// unlock authentication failure.
+// Authored by: OpenCode
+func syncFailureCategory(err error) ghostfolioclient.FailureCategory {
+	if requestFailure, ok := errors.AsType[*ghostfolioclient.RequestFailure](err); ok {
+		return requestFailure.Category
+	}
+
+	return ghostfolioclient.FailureConnectivityProblem
 }
 
 // CheckServerReplacement compares the selected server against the active readable snapshot.

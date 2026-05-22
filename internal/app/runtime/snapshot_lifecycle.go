@@ -161,10 +161,12 @@ func (s *snapshotLifecycle) UnlockSelectedServerSnapshot(
 		return result
 	}
 	if !unlockedSnapshot.Unlocked {
+		result.UnlockState = SyncReportsUnlockStateAuthenticatedNewContext
 		return result
 	}
 
 	s.state.Set(unlockedSnapshot.Candidate, unlockedSnapshot.Payload)
+	result.UnlockState = SyncReportsUnlockStateSnapshotUnlocked
 	result.ProtectedData = s.state.ProtectedDataState()
 	result.ReportUnavailableReason = syncReportsUnavailableReasonFromProtectedData(result.ProtectedData)
 	return result

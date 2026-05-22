@@ -9,6 +9,26 @@ import (
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 )
 
+// SyncReportsUnlockState identifies how one Sync and Reports unlock attempt
+// completed before the context menu can be exposed.
+// Authored by: OpenCode
+type SyncReportsUnlockState string
+
+const (
+	// SyncReportsUnlockStateSnapshotUnlocked indicates that a selected-server
+	// protected snapshot unlocked successfully.
+	SyncReportsUnlockStateSnapshotUnlocked SyncReportsUnlockState = "snapshot_unlocked"
+
+	// SyncReportsUnlockStateAuthenticatedNewContext indicates that no
+	// selected-server snapshot unlocked, but Ghostfolio accepted the token as a
+	// valid new isolated local-user context.
+	SyncReportsUnlockStateAuthenticatedNewContext SyncReportsUnlockState = "authenticated_new_context"
+
+	// SyncReportsUnlockStateRejectedToken indicates that no selected-server
+	// snapshot unlocked and Ghostfolio rejected the supplied token.
+	SyncReportsUnlockStateRejectedToken SyncReportsUnlockState = "rejected_token"
+)
+
 // ReportFailureReason identifies one supported user-visible report result
 // category, including the non-fatal automatic-open warning after a successful
 // save.
@@ -70,6 +90,8 @@ type ReportOutcome struct {
 // summary for the active Sync and Reports workflow.
 // Authored by: OpenCode
 type SyncReportsContextResult struct {
+	UnlockState             SyncReportsUnlockState
+	FailureReason           SyncFailureReason
 	ProtectedData           ProtectedDataState
 	ReportUnavailableReason ReportFailureReason
 }

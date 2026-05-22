@@ -13,6 +13,7 @@ import (
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/component"
 )
 
 const busyStatusText = "Syncing and storing activity history..."
@@ -73,6 +74,9 @@ func (m *Model) handleSyncFinished(message syncFinishedMsg) (tea.Model, tea.Cmd)
 // workflow is idle.
 // Authored by: OpenCode
 func (m *Model) handleSyncPaste(message tea.Msg) (tea.Model, tea.Cmd) {
+	if m.active == syncReportsUnlockScreenKey && m.syncReports.UnlockFailure == runtime.SyncFailureRejectedToken {
+		return m, nil
+	}
 	if m.sync.Busy || m.sync.UseContextToken || !m.sync.InputFocused {
 		return m, nil
 	}
@@ -112,6 +116,9 @@ func (m *Model) handleSyncKeyPress(message tea.KeyPressMsg) (tea.Model, tea.Cmd)
 // handleFocusedSyncKey handles key presses while the token input owns focus.
 // Authored by: OpenCode
 func (m *Model) handleFocusedSyncKey(message tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
+	if m.active == syncReportsUnlockScreenKey && m.syncReports.UnlockFailure == runtime.SyncFailureRejectedToken {
+		return m, nil, false
+	}
 	if !m.sync.InputFocused || m.sync.UseContextToken {
 		return m, nil, false
 	}
@@ -132,16 +139,27 @@ func (m *Model) handleFocusedSyncKey(message tea.KeyPressMsg) (tea.Model, tea.Cm
 func (m *Model) handleSyncMenuKey(message tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(message, upBinding()):
+		if m.active == syncReportsUnlockScreenKey {
+			m.moveSyncMenuSelection(-1, m.syncMenuItems())
+			return m, nil
+		}
 		if m.sync.MenuIndex > 0 {
 			m.sync.MenuIndex--
 		}
 		return m, nil
 	case key.Matches(message, downBinding()):
+		if m.active == syncReportsUnlockScreenKey {
+			m.moveSyncMenuSelection(1, m.syncMenuItems())
+			return m, nil
+		}
 		if m.sync.MenuIndex < len(m.syncMenuItems())-1 {
 			m.sync.MenuIndex++
 		}
 		return m, nil
 	case key.Matches(message, focusBinding()):
+		if m.active == syncReportsUnlockScreenKey && m.syncReports.UnlockFailure == runtime.SyncFailureRejectedToken {
+			return m, nil
+		}
 		if m.sync.UseContextToken {
 			return m, nil
 		}
@@ -218,6 +236,10 @@ func (m *Model) activateSyncSelection() (tea.Model, tea.Cmd) {
 // action for the active `Sync and Reports` context shell.
 // Authored by: OpenCode
 func (m *Model) activateSyncReportsUnlockSelection() (tea.Model, tea.Cmd) {
+	var menuItems = m.syncMenuItems()
+	if m.sync.MenuIndex < 0 || m.sync.MenuIndex >= len(menuItems) || !menuItems[m.sync.MenuIndex].Enabled {
+		return m, nil
+	}
 	switch m.sync.MenuIndex {
 	case 0:
 		return m.unlockSyncReportsContext()
@@ -275,6 +297,17 @@ func (m *Model) unlockSyncReportsContext() (tea.Model, tea.Cmd) {
 	}
 
 	var unlocked = m.deps.SyncService.UnlockSelectedServerSnapshot(context.Background(), *m.currentConfig, token)
+	if unlocked.ReportUnavailableReason == runtime.ReportFailureUnsupportedStoredDataVersion {
+		m.sync.ValidationMessage = "unsupported stored-data version"
+		m.syncReports.UnlockFailure = runtime.SyncFailureUnsupportedStoredDataVersion
+		return m, nil
+	}
+	if unlocked.UnlockState == runtime.SyncReportsUnlockStateRejectedToken || unlocked.FailureReason == runtime.SyncFailureRejectedToken {
+		m.sync.ValidationMessage = ""
+		m.syncReports.UnlockFailure = runtime.SyncFailureRejectedToken
+		m.sync.MenuIndex = 1
+		return m, nil
+	}
 	return m, m.enterSyncReportsMenu(unlocked, token)
 }
 
@@ -313,9 +346,31 @@ func (m *Model) startSyncAttempt(token string, confirmServerReplacement bool) (t
 // main menu before any context is activated.
 // Authored by: OpenCode
 func (m *Model) leaveSyncReportsUnlock() (tea.Model, tea.Cmd) {
+	m.syncReports.UnlockFailure = runtime.SyncFailureNone
 	m.sync.TokenInput.Reset()
 	m.enterMainMenu()
 	return m, nil
+}
+
+// moveSyncMenuSelection advances the sync or unlock menu selection to the next
+// enabled item in one direction, skipping disabled rows.
+// Authored by: OpenCode
+func (m *Model) moveSyncMenuSelection(step int, items []component.MenuItem) {
+	if step == 0 || len(items) == 0 {
+		return
+	}
+
+	var index = m.sync.MenuIndex
+	for {
+		index += step
+		if index < 0 || index >= len(items) {
+			return
+		}
+		if items[index].Enabled {
+			m.sync.MenuIndex = index
+			return
+		}
+	}
 }
 
 // startConfirmedServerReplacement resumes sync after explicit server-replacement confirmation.

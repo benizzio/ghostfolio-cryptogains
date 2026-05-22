@@ -5,6 +5,8 @@ package integration
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -50,11 +52,33 @@ func (s *syncReportsContextService) ProtectedDataState() runtime.ProtectedDataSt
 }
 
 func (s *syncReportsContextService) UnlockSelectedServerSnapshot(context.Context, configmodel.AppSetupConfig, string) runtime.SyncReportsContextResult {
+	if s.unlockResult.UnlockState == "" && s.unlockResult.FailureReason == "" && s.unlockResult.ReportUnavailableReason == runtime.ReportFailureNoSyncedDataAvailable && !s.unlockResult.ProtectedData.HasReadableSnapshot && len(s.unlockResult.ProtectedData.AvailableReportYears) == 0 {
+		s.unlockResult.UnlockState = runtime.SyncReportsUnlockStateAuthenticatedNewContext
+	}
 	return s.unlockResult
 }
 
 func (s *syncReportsContextService) CheckServerReplacement(configmodel.AppSetupConfig) runtime.ServerReplacementCheck {
 	return runtime.ServerReplacementCheck{}
+}
+
+// newGhostfolioRejectedAuthServer returns a deterministic Ghostfolio test
+// server that rejects anonymous-auth requests for unlock-flow coverage.
+// Authored by: OpenCode
+func newGhostfolioRejectedAuthServer(t *testing.T) *httptest.Server {
+	t.Helper()
+
+	var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/api/v1/auth/anonymous":
+			writer.WriteHeader(http.StatusForbidden)
+		default:
+			writer.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server
 }
 
 func TestSyncReportsContextUnlockShowsNoDataReadiness(t *testing.T) {
@@ -333,6 +357,126 @@ func TestSyncReportsContextUnlockUsesSelectedServerSnapshotAndReusesTokenWithPro
 	}
 	if got := len(payload.ProtectedActivityCache.Activities); got != 2 {
 		t.Fatalf("expected unlocked snapshot activity count 2, got %d", got)
+	}
+}
+
+// TestSyncReportsContextUnlockAuthenticatesNewContextAfterSelectedServerSnapshotMiss
+// verifies that snapshot miss alone does not unlock the context, but successful
+// Ghostfolio auth does.
+// Authored by: OpenCode
+func TestSyncReportsContextUnlockAuthenticatesNewContextAfterSelectedServerSnapshotMiss(t *testing.T) {
+	t.Parallel()
+
+	var tempDir = t.TempDir()
+	var store = configstore.NewJSONStore(tempDir)
+	var server = newGhostfolioStorageServer(t, []storagePageFixture{{Count: 0, ActivitiesJSON: `[]`}})
+	var config = mustCustomSetupConfig(t, server.URL)
+	if err := store.Save(context.Background(), config); err != nil {
+		t.Fatalf("save config: %v", err)
+	}
+	var service = runtime.NewSyncService(
+		ghostfolioclient.New(server.Client()),
+		time.Second,
+		tempDir,
+		true,
+		decimalsupport.NewService(),
+		syncnormalize.NewNormalizer(),
+		syncvalidate.NewValidator(),
+		snapshotstore.NewEncryptedStore(tempDir, nil),
+	)
+
+	var model = flow.NewModel(newFlowDependenciesWithStore(t, bootstrap.StartupState{ActiveConfig: &config}, true, service, store))
+	model = openSyncEntry(t, model)
+	model = typeToken(t, model, "token-123")
+	model = blurTokenInputFromSyncEntry(t, model)
+
+	var updated, unlockCmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	_ = testutil.RunCmd(unlockCmd)
+	model = assertFlowModel(t, updated)
+	if model.ActiveScreen() != "sync_reports_menu" {
+		t.Fatalf("expected successful auth after snapshot miss to open sync and reports menu, got %s", model.ActiveScreen())
+	}
+	var content = model.View().Content
+	if !strings.Contains(content, "Sync Data: no synced data available") {
+		t.Fatalf("expected authenticated new context to show no-data readiness, got %q", content)
+	}
+	if !strings.Contains(content, "Generate Capital Gains Report: unavailable") {
+		t.Fatalf("expected authenticated new context to keep report unavailable without synced data, got %q", content)
+	}
+}
+
+func TestSyncReportsContextRejectedTokenStaysOnUnlockScreenUntilBack(t *testing.T) {
+	t.Parallel()
+
+	var tempDir = t.TempDir()
+	var store = configstore.NewJSONStore(tempDir)
+	var server = newGhostfolioRejectedAuthServer(t)
+	var config = mustCustomSetupConfig(t, server.URL)
+	if err := store.Save(context.Background(), config); err != nil {
+		t.Fatalf("save config: %v", err)
+	}
+	var service = runtime.NewSyncService(
+		ghostfolioclient.New(server.Client()),
+		time.Second,
+		tempDir,
+		true,
+		decimalsupport.NewService(),
+		syncnormalize.NewNormalizer(),
+		syncvalidate.NewValidator(),
+		snapshotstore.NewEncryptedStore(tempDir, nil),
+	)
+
+	var model = flow.NewModel(newFlowDependenciesWithStore(t, bootstrap.StartupState{ActiveConfig: &config}, true, service, store))
+	model = openSyncEntry(t, model)
+	model = typeToken(t, model, "token-123")
+	model = blurTokenInputFromSyncEntry(t, model)
+
+	var updated, unlockCmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	_ = testutil.RunCmd(unlockCmd)
+	model = assertFlowModel(t, updated)
+	if model.ActiveScreen() != "sync_reports_unlock" {
+		t.Fatalf("expected rejected token to keep unlock screen active, got %s", model.ActiveScreen())
+	}
+	var content = model.View().Content
+	if !strings.Contains(content, "access denied") {
+		t.Fatalf("expected rejected token access-denied message, got %q", content)
+	}
+	if !strings.Contains(content, "x Unlock") {
+		t.Fatalf("expected rejected token state to disable Unlock, got %q", content)
+	}
+	if !strings.Contains(content, "> Back") {
+		t.Fatalf("expected rejected token state to leave Back selected, got %q", content)
+	}
+	if !strings.Contains(content, "*********") {
+		t.Fatalf("expected rejected token state to preserve masked token field, got %q", content)
+	}
+
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyUp}))
+	model = assertFlowModel(t, updated)
+	if got := model.View().Content; !strings.Contains(got, "> Back") {
+		t.Fatalf("expected rejected-token state to keep Back as the only reachable action, got %q", got)
+	}
+
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+	model = assertFlowModel(t, updated)
+	if got := model.View().Content; strings.Contains(got, "> Unlock") {
+		t.Fatalf("expected rejected-token state to block refocusing the token input for retry, got %q", got)
+	}
+
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = assertFlowModel(t, updated)
+	if model.ActiveScreen() != "main_menu" {
+		t.Fatalf("expected Back from rejected-token state to return main menu, got %s", model.ActiveScreen())
+	}
+
+	updated, reopenCmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	_ = testutil.RunCmd(reopenCmd)
+	model = assertFlowModel(t, updated)
+	if model.ActiveScreen() != "sync_reports_unlock" {
+		t.Fatalf("expected re-entry after rejected token to return to unlock screen, got %s", model.ActiveScreen())
+	}
+	if got := model.View().Content; strings.Contains(got, "*********") || strings.Contains(got, "access denied") {
+		t.Fatalf("expected leaving and re-entering to clear rejected-token field and error state, got %q", got)
 	}
 }
 

@@ -21,8 +21,10 @@ import (
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	ghostfolioclient "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/client"
+	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	syncnormalize "github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
 	syncvalidate "github.com/benizzio/ghostfolio-cryptogains/internal/sync/validate"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
@@ -53,6 +55,7 @@ type ghostfolioScenario struct {
 type syncEntryFixture struct {
 	config  configmodel.AppSetupConfig
 	service runtime.SyncService
+	baseDir string
 }
 
 // TestSyncEntrySuccessUsesProductionRuntimePath verifies the successful sync
@@ -66,7 +69,8 @@ func TestSyncEntrySuccessUsesProductionRuntimePath(t *testing.T) {
 		activitiesBody: `{"activities":[{"id":"activity-1","date":"2026-01-31T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":10,"unitPriceInAssetProfileCurrency":10,"SymbolProfile":{"id":"asset-btc-entry-001","symbol":"BTC","name":"Bitcoin","currency":"USD"}}],"count":1}`,
 	})
 	var fixture = syncEntryFixture{
-		config: mustCustomSetupConfig(t, server.URL),
+		config:  mustCustomSetupConfig(t, server.URL),
+		baseDir: tempDir,
 		service: runtime.NewSyncService(
 			ghostfolioclient.New(server.Client()),
 			time.Second,
@@ -178,6 +182,7 @@ func TestSyncEntryFailureCategoriesUseProductionRuntimePath(t *testing.T) {
 			t.Parallel()
 
 			var fixture = testCase.buildFixture(t)
+			seedSyncEntryProtectedSnapshot(t, fixture, "abc123")
 			var model = newSyncEntryModel(t, fixture)
 
 			model = openSyncEntry(t, model)
@@ -210,6 +215,7 @@ func TestFailedSyncResultDefaultActionStartsSyncAgain(t *testing.T) {
 
 	var server = newGhostfolioScenarioServer(t, ghostfolioScenario{authStatus: http.StatusForbidden})
 	var fixture = newSyncEntryFixture(t, server.Client(), server.URL, time.Second)
+	seedSyncEntryProtectedSnapshot(t, fixture, "abc123")
 	var model = newSyncEntryModel(t, fixture)
 
 	model = openSyncEntry(t, model)
@@ -412,13 +418,52 @@ func newGhostfolioScenarioServer(t *testing.T, scenario ghostfolioScenario) *htt
 // Authored by: OpenCode
 func newSyncEntryFixture(t *testing.T, client *http.Client, origin string, requestTimeout time.Duration) syncEntryFixture {
 	t.Helper()
+	var tempDir = t.TempDir()
 
 	return syncEntryFixture{
-		config: mustCustomSetupConfig(t, origin),
+		config:  mustCustomSetupConfig(t, origin),
+		baseDir: tempDir,
 		service: func() runtime.SyncService {
-			var tempDir = t.TempDir()
 			return runtime.NewSyncService(ghostfolioclient.New(client), requestTimeout, tempDir, true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(tempDir, nil))
 		}(),
+	}
+}
+
+// seedSyncEntryProtectedSnapshot writes one minimal selected-server protected
+// snapshot so sync-entry integration tests can unlock the active context before
+// exercising in-context sync behavior.
+// Authored by: OpenCode
+func seedSyncEntryProtectedSnapshot(t *testing.T, fixture syncEntryFixture, token string) {
+	t.Helper()
+
+	var syncedAt = time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC)
+	_, err := snapshotstore.NewEncryptedStore(fixture.baseDir, nil).Write(context.Background(), snapshotstore.WriteRequest{
+		SecurityToken: token,
+		ServerOrigin:  fixture.config.ServerOrigin,
+		Payload: snapshotmodel.Payload{
+			StoredDataVersion: snapshotmodel.DefaultStoredDataVersion(""),
+			RegisteredLocalUser: snapshotmodel.RegisteredLocalUser{
+				LocalUserID:          "sync-entry-user",
+				CreatedAt:            syncedAt,
+				UpdatedAt:            syncedAt,
+				LastSuccessfulSyncAt: syncedAt,
+			},
+			SetupProfile: snapshotmodel.SetupProfile{
+				ServerOrigin:      fixture.config.ServerOrigin,
+				ServerMode:        fixture.config.ServerMode,
+				AllowDevHTTP:      fixture.config.AllowDevHTTP,
+				LastValidatedAt:   fixture.config.UpdatedAt,
+				SourceAPIBasePath: "api/v1",
+			},
+			ProtectedActivityCache: syncmodel.ProtectedActivityCache{
+				SyncedAt:             syncedAt,
+				ActivityCount:        1,
+				AvailableReportYears: []int{2025},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("seed sync-entry protected snapshot: %v", err)
 	}
 }
 

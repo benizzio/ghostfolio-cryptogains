@@ -848,7 +848,7 @@ func TestSnapshotLifecycleAndWrapperNilBranches(t *testing.T) {
 
 	var nilUnlockLifecycle *snapshotLifecycle
 	var nilUnlockResult = nilUnlockLifecycle.UnlockSelectedServerSnapshot(context.Background(), "https://ghostfol.io", "token")
-	if nilUnlockResult.ReportUnavailableReason != ReportFailureNoSyncedDataAvailable || nilUnlockResult.ProtectedData.HasReadableSnapshot || nilUnlockResult.ProtectedData.ServerOrigin != "" || nilUnlockResult.ProtectedData.ActivityCount != 0 || !nilUnlockResult.ProtectedData.LastSuccessfulSyncAt.IsZero() || len(nilUnlockResult.ProtectedData.AvailableReportYears) != 0 {
+	if nilUnlockResult.ReportUnavailableReason != ReportFailureNoSyncedDataAvailable || nilUnlockResult.ProtectedData.HasReadableSnapshot || nilUnlockResult.ProtectedData.ServerOrigin != "" || nilUnlockResult.ProtectedData.ActivityCount != 0 || !nilUnlockResult.ProtectedData.LastSuccessfulSyncAt.IsZero() || len(nilUnlockResult.ProtectedData.AvailableReportYears) != 0 || nilUnlockResult.UnlockState != "" {
 		t.Fatalf("expected nil unlock lifecycle to report no synced data, got %#v", nilUnlockResult)
 	}
 
@@ -862,6 +862,9 @@ func TestSnapshotLifecycleAndWrapperNilBranches(t *testing.T) {
 	var unsupportedUnlockResult = unsupportedLifecycle.UnlockSelectedServerSnapshot(context.Background(), "https://ghostfol.io", "token")
 	if unsupportedUnlockResult.ReportUnavailableReason != ReportFailureUnsupportedStoredDataVersion {
 		t.Fatalf("expected unsupported stored-data version result, got %#v", unsupportedUnlockResult)
+	}
+	if unsupportedUnlockResult.UnlockState != "" {
+		t.Fatalf("expected unsupported stored-data version unlock to avoid exposing a context state, got %#v", unsupportedUnlockResult)
 	}
 }
 
@@ -976,7 +979,7 @@ func TestSyncReportsProtectedDataAvailabilityHelpers(t *testing.T) {
 	var service = &syncService{snapshots: lifecycle}
 	var config = runtimeSetupConfigFixture(t, "https://ghostfol.io", true)
 	var result = service.UnlockSelectedServerSnapshot(context.Background(), config, "token")
-	if !result.ProtectedData.HasReadableSnapshot || result.ReportUnavailableReason != ReportFailureNone {
+	if !result.ProtectedData.HasReadableSnapshot || result.ReportUnavailableReason != ReportFailureNone || result.UnlockState != SyncReportsUnlockStateSnapshotUnlocked {
 		t.Fatalf("expected sync-service unlock delegation to expose readable report data, got %#v", result)
 	}
 
@@ -984,6 +987,40 @@ func TestSyncReportsProtectedDataAvailabilityHelpers(t *testing.T) {
 	result = nilSnapshotService.UnlockSelectedServerSnapshot(context.Background(), config, "token")
 	if result.ReportUnavailableReason != ReportFailureNoSyncedDataAvailable {
 		t.Fatalf("expected nil snapshot lifecycle unlock to report no synced data, got %#v", result)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/api/v1/auth/anonymous":
+			_, _ = writer.Write([]byte(`{"authToken":"jwt"}`))
+		default:
+			writer.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	config = runtimeSetupConfigFixture(t, server.URL, true)
+	service = requireSyncService(t, NewSyncService(ghostfolioclient.New(server.Client()), time.Second, t.TempDir(), true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), runtimeSnapshotStore{}))
+	result = service.UnlockSelectedServerSnapshot(context.Background(), config, "token")
+	if result.UnlockState != SyncReportsUnlockStateAuthenticatedNewContext || result.FailureReason != SyncFailureNone || result.ProtectedData.HasReadableSnapshot {
+		t.Fatalf("expected snapshot miss with successful auth to open a new isolated context, got %#v", result)
+	}
+
+	rejectedServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/api/v1/auth/anonymous":
+			writer.WriteHeader(http.StatusForbidden)
+		default:
+			writer.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer rejectedServer.Close()
+	config = runtimeSetupConfigFixture(t, rejectedServer.URL, true)
+	service = requireSyncService(t, NewSyncService(ghostfolioclient.New(rejectedServer.Client()), time.Second, t.TempDir(), true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), runtimeSnapshotStore{}))
+	result = service.UnlockSelectedServerSnapshot(context.Background(), config, "token")
+	if result.UnlockState != SyncReportsUnlockStateRejectedToken || result.FailureReason != SyncFailureRejectedToken {
+		t.Fatalf("expected snapshot miss with rejected auth to stay rejected, got %#v", result)
 	}
 }
 

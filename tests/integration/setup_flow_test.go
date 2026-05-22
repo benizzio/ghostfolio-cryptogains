@@ -43,7 +43,7 @@ func (integrationSyncService) ProtectedDataState() runtime.ProtectedDataState {
 }
 
 func (integrationSyncService) UnlockSelectedServerSnapshot(context.Context, configmodel.AppSetupConfig, string) runtime.SyncReportsContextResult {
-	return runtime.SyncReportsContextResult{ReportUnavailableReason: runtime.ReportFailureNoSyncedDataAvailable}
+	return runtime.SyncReportsContextResult{UnlockState: runtime.SyncReportsUnlockStateAuthenticatedNewContext, ReportUnavailableReason: runtime.ReportFailureNoSyncedDataAvailable}
 }
 
 func (integrationSyncService) CheckServerReplacement(configmodel.AppSetupConfig) runtime.ServerReplacementCheck {

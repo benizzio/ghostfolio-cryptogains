@@ -123,6 +123,7 @@ type syncReportsContextState struct {
 	SyncResult           syncContextResultState
 	ReportUnavailable    runtime.ReportFailureReason
 	ReportResult         runtime.ReportOutcome
+	UnlockFailure        runtime.SyncFailureReason
 }
 
 // syncContextResultState holds transient sync-failure feedback rendered inside
@@ -323,11 +324,11 @@ func (m *Model) View() tea.View {
 				ScreenSubtitle:          "Unlock the active sync and reporting context.",
 				IntroText:               "Enter the Ghostfolio security token once to unlock Sync Data and future reporting actions for this run.",
 				IdleStatusText:          "Enter the Ghostfolio security token to unlock Sync and Reports for this run.",
+				ValidationMessage:       m.syncReportsUnlockValidationMessage(),
 				ShowProtectedDataStatus: false,
 				MenuItems:               m.syncMenuItems(),
 				SelectedIndex:           m.sync.MenuIndex,
 				TokenInput:              m.sync.TokenInput.View(),
-				ValidationMessage:       m.sync.ValidationMessage,
 				HelpText:                m.syncHelpText(),
 				Busy:                    m.sync.Busy,
 				BusyText:                m.sync.BusyText,
@@ -508,8 +509,9 @@ func (m *Model) syncMenuItems() []component.MenuItem {
 		return nil
 	}
 	if m.active == syncReportsUnlockScreenKey {
+		var unlockEnabled = m.syncReports.UnlockFailure != runtime.SyncFailureRejectedToken
 		return []component.MenuItem{
-			{Label: "Unlock", Enabled: true},
+			{Label: "Unlock", Enabled: unlockEnabled},
 			{Label: "Back", Enabled: true},
 		}
 	}
@@ -809,8 +811,22 @@ func (m *Model) enterSyncReportsMenu(unlocked runtime.SyncReportsContextResult, 
 	m.syncReports.SelectedServerOrigin = m.currentServerOrigin()
 	m.syncReports.ProtectedData = unlocked.ProtectedData
 	m.syncReports.ReportUnavailable = unlocked.ReportUnavailableReason
+	m.syncReports.UnlockFailure = runtime.SyncFailureNone
 	m.report = newReportState(unlocked.ProtectedData.AvailableReportYears)
 	return nil
+}
+
+// syncReportsUnlockValidationMessage returns the current unlock-screen guidance,
+// including the blocked rejected-token state for the current unlock instance.
+// Authored by: OpenCode
+func (m *Model) syncReportsUnlockValidationMessage() string {
+	if m.sync.ValidationMessage != "" {
+		return m.sync.ValidationMessage
+	}
+	if m.syncReports.UnlockFailure == runtime.SyncFailureRejectedToken {
+		return "access denied"
+	}
+	return ""
 }
 
 // enterReportSelection routes the application to the report-selection screen.

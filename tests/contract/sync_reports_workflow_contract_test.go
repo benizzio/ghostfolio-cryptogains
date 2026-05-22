@@ -17,6 +17,26 @@ import (
 func TestSyncReportsWorkflowContract(t *testing.T) {
 	t.Parallel()
 
+	var rejectedUnlock = screen.SyncEntryScreenView(screen.SyncEntryScreenParams{
+		Theme:                   component.DefaultTheme(),
+		Width:                   100,
+		Height:                  32,
+		ScreenTitle:             "Sync and Reports",
+		ScreenSubtitle:          "Unlock the active sync and reporting context.",
+		IntroText:               "Enter the Ghostfolio security token once to unlock Sync Data and future reporting actions for this run.",
+		IdleStatusText:          "Enter the Ghostfolio security token to unlock Sync and Reports for this run.",
+		ShowProtectedDataStatus: false,
+		MenuItems:               []component.MenuItem{{Label: "Unlock", Enabled: false}, {Label: "Back", Enabled: true}},
+		SelectedIndex:           1,
+		TokenInput:              "********",
+		ValidationMessage:       "access denied",
+	})
+	assertContains(t, rejectedUnlock, "Sync and Reports")
+	assertContains(t, rejectedUnlock, "access denied")
+	assertContains(t, rejectedUnlock, "x Unlock")
+	assertContains(t, rejectedUnlock, "> Back")
+	assertNotContains(t, rejectedUnlock, "Protected Data:")
+
 	var content = screen.SyncReportsScreenView(screen.SyncReportsScreenParams{
 		Theme:              component.DefaultTheme(),
 		Width:              100,
