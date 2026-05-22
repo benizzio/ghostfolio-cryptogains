@@ -71,6 +71,9 @@ func TestSyncReportsWorkflowContract(t *testing.T) {
 		SelectedIndex:           0,
 	})
 	assertContains(t, syncData, "Start Sync to obtain current available activity data on the Ghostfolio server.")
+	assertContains(t, syncData, "reuses the active Sync and Reports token")
+	assertContains(t, syncData, "does not show token")
+	assertContains(t, syncData, "input again")
 	assertContains(t, syncData, "Start Sync")
 	assertContains(t, syncData, "Back")
 	assertNotContains(t, syncData, "Ghostfolio Security Token")

@@ -29,4 +29,5 @@ func TestMainMenuWorkflowContract(t *testing.T) {
 	assertNotContains(t, content, "Last Successful Sync")
 	assertNotContains(t, content, "Available Report Years")
 	assertNotContains(t, content, "Sync Data")
+	assertNotContains(t, content, "Generate Capital Gains Report")
 }

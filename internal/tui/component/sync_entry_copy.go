@@ -17,6 +17,7 @@ type SyncEntryCopy struct {
 const (
 	syncEntryStandaloneIntroText      = "The application will authenticate, retrieve activity history, validate it, and store it securely for future use only."
 	syncEntryStandaloneIdleStatusText = "Enter the Ghostfolio security token only when starting Sync Data."
+	syncEntryContextIntroText         = "This screen reuses the active Sync and Reports token for this run and does not show token input again."
 	syncEntryContextIdleStatusText    = "Start Sync to obtain current available activity data on the Ghostfolio server."
 )
 
@@ -35,7 +36,7 @@ const (
 // Authored by: OpenCode
 func DefaultSyncEntryCopy(useContextToken bool) SyncEntryCopy {
 	if useContextToken {
-		return SyncEntryCopy{IdleStatusText: syncEntryContextIdleStatusText}
+		return SyncEntryCopy{IntroText: syncEntryContextIntroText, IdleStatusText: syncEntryContextIdleStatusText}
 	}
 
 	return SyncEntryCopy{

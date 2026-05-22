@@ -690,8 +690,8 @@ func TestUpdateSyncReportsMenuCoversDiagnosticPromptAndGeneration(t *testing.T) 
 
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 	model = updated.(*Model)
-	if model.sync.MenuIndex != 1 {
-		t.Fatalf("expected down to move to report action after written path, got %d", model.sync.MenuIndex)
+	if model.sync.MenuIndex != 2 {
+		t.Fatalf("expected down to skip disabled report action after written path, got %d", model.sync.MenuIndex)
 	}
 	updated, _ = model.Update(struct{}{})
 	if updated.(*Model).active != syncReportsMenuScreenKey {
@@ -742,6 +742,66 @@ func TestUpdateSyncReportsMenuCoversDiagnosticPromptAndGeneration(t *testing.T) 
 	updated, _ = model.Update(diagnosticReportFinishedMsg{Path: "/tmp/report.diagnostic.json"})
 	if updated.(*Model).syncReports.SyncResult.Outcome.Diagnostic.Path != "/tmp/report.diagnostic.json" {
 		t.Fatalf("expected direct diagnostic finished message to update context path, got %#v", updated.(*Model).syncReports.SyncResult.Outcome.Diagnostic)
+	}
+}
+
+func TestUpdateSyncReportsMenuSkipsDisabledReportAction(t *testing.T) {
+	t.Parallel()
+
+	var config = mustSetupConfig(t)
+	var model = newTestModel(t, &config)
+	model.active = syncReportsMenuScreenKey
+	model.syncReports.Active = true
+	model.syncReports.RuntimeToken = "token-123"
+	model.syncReports.ProtectedData = runtime.ProtectedDataState{}
+	model.sync.MenuIndex = 0
+
+	var updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	if cmd != nil {
+		t.Fatalf("expected down navigation to remain synchronous")
+	}
+	model = updated.(*Model)
+	if model.sync.MenuIndex != 2 {
+		t.Fatalf("expected down to skip disabled report action and land on Back To Main Menu, got %d", model.sync.MenuIndex)
+	}
+
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyUp}))
+	if cmd != nil {
+		t.Fatalf("expected up navigation to remain synchronous")
+	}
+	model = updated.(*Model)
+	if model.sync.MenuIndex != 0 {
+		t.Fatalf("expected up to skip disabled report action and return to Sync Data, got %d", model.sync.MenuIndex)
+	}
+
+	model.sync.MenuIndex = 0
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyUp}))
+	if cmd != nil {
+		t.Fatalf("expected up navigation at top to remain synchronous")
+	}
+	model = updated.(*Model)
+	if model.sync.MenuIndex != 0 {
+		t.Fatalf("expected up at top to stay on Sync Data, got %d", model.sync.MenuIndex)
+	}
+
+	model.sync.MenuIndex = 2
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	if cmd != nil {
+		t.Fatalf("expected down navigation at bottom to remain synchronous")
+	}
+	model = updated.(*Model)
+	if model.sync.MenuIndex != 2 {
+		t.Fatalf("expected down at bottom to stay on Back To Main Menu, got %d", model.sync.MenuIndex)
+	}
+
+	model.sync.MenuIndex = 1
+	model.moveSyncReportsMenuSelection(0, model.syncReportsMenuItems())
+	if model.sync.MenuIndex != 1 {
+		t.Fatalf("expected zero-step sync reports navigation to keep selection, got %d", model.sync.MenuIndex)
+	}
+	model.moveSyncReportsMenuSelection(1, nil)
+	if model.sync.MenuIndex != 1 {
+		t.Fatalf("expected empty sync reports menu navigation to keep selection, got %d", model.sync.MenuIndex)
 	}
 }
 
@@ -872,6 +932,27 @@ func TestUpdateReportCoversIgnoredAndFallbackBranches(t *testing.T) {
 	model = updated.(*Model)
 	if model.active != syncReportsMenuScreenKey || model.sync.MenuIndex != 1 {
 		t.Fatalf("expected selection Back to return to report menu item, got active=%s index=%d", model.active, model.sync.MenuIndex)
+	}
+
+	model = newTestModel(t, &config)
+	model.sync.InputFocused = false
+	model.sync.UseContextToken = true
+	updated, cmd = model.focusSyncTokenInput()
+	if cmd != nil || updated.(*Model).sync.InputFocused {
+		t.Fatalf("expected focusSyncTokenInput to ignore context-token mode")
+	}
+
+	model = newTestModel(t, &config)
+	model.active = syncScreenKey
+	model.sync.UseContextToken = true
+	model.syncReports.Active = true
+	model.syncReports.RuntimeToken = ""
+	updated, cmd = model.startSync()
+	if cmd != nil {
+		t.Fatalf("expected missing context token to fail synchronously")
+	}
+	if updated.(*Model).sync.ValidationMessage == "" {
+		t.Fatalf("expected missing context token to surface validation guidance")
 	}
 
 	model = newTestModel(t, &config)

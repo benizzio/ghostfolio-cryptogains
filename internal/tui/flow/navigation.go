@@ -9,6 +9,7 @@ import (
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/component"
 )
 
 var (
@@ -155,13 +156,9 @@ func (m *Model) updateSyncReportsMenu(message tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch {
 	case key.Matches(keyMessage, upBinding()):
-		if m.sync.MenuIndex > 0 {
-			m.sync.MenuIndex--
-		}
+		m.moveSyncReportsMenuSelection(-1, menuItems)
 	case key.Matches(keyMessage, downBinding()):
-		if m.sync.MenuIndex < len(menuItems)-1 {
-			m.sync.MenuIndex++
-		}
+		m.moveSyncReportsMenuSelection(1, menuItems)
 	case key.Matches(keyMessage, enterBinding()):
 		switch m.sync.MenuIndex {
 		case 0:
@@ -187,6 +184,27 @@ func (m *Model) updateSyncReportsMenu(message tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+// moveSyncReportsMenuSelection advances the unlocked-context menu selection to
+// the next enabled item in one direction, skipping disabled rows.
+// Authored by: OpenCode
+func (m *Model) moveSyncReportsMenuSelection(step int, items []component.MenuItem) {
+	if step == 0 || len(items) == 0 {
+		return
+	}
+
+	var index = m.sync.MenuIndex
+	for {
+		index += step
+		if index < 0 || index >= len(items) {
+			return
+		}
+		if items[index].Enabled {
+			m.sync.MenuIndex = index
+			return
+		}
+	}
 }
 
 // generateDiagnosticReport writes one local synced-data diagnostic report from the current result screen.

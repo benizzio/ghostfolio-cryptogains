@@ -154,6 +154,9 @@ func TestSyncReportsContextUnlockShowsExistingDataReadinessAndReusesTokenForSync
 	if got := model.View().Content; strings.Contains(got, "Ghostfolio Security Token") {
 		t.Fatalf("expected in-context sync screen to hide token input, got %q", got)
 	}
+	if got := model.View().Content; !strings.Contains(got, "reuses the active Sync and Reports token") || !strings.Contains(got, "does not show token") || !strings.Contains(got, "input again") {
+		t.Fatalf("expected in-context sync screen to explain token reuse, got %q", got)
+	}
 	if got := model.View().Content; !strings.Contains(got, "Start Sync to obtain current available activity data on the Ghostfolio server.") {
 		t.Fatalf("expected in-context sync status text, got %q", got)
 	}
@@ -259,6 +262,9 @@ func TestSyncReportsContextUnlockUsesSelectedServerSnapshotAndReusesTokenWithPro
 	}
 	if got := model.View().Content; strings.Contains(got, "Ghostfolio Security Token") {
 		t.Fatalf("expected runtime token reuse screen to hide token input, got %q", got)
+	}
+	if got := model.View().Content; !strings.Contains(got, "reuses the active Sync and Reports token") || !strings.Contains(got, "does not show token") || !strings.Contains(got, "input again") {
+		t.Fatalf("expected runtime token reuse screen to explain token reuse, got %q", got)
 	}
 	if got := model.View().Content; !strings.Contains(got, "Start Sync to obtain current available activity data on the Ghostfolio server.") {
 		t.Fatalf("expected runtime token reuse status text, got %q", got)
@@ -373,6 +379,9 @@ func TestSyncReportsContextSyncScreenDoesNotAcceptTokenEditing(t *testing.T) {
 	if !strings.Contains(before, "Start Sync to obtain current available activity data on the Ghostfolio server.") || !strings.Contains(after, "Start Sync to obtain current available activity data on the Ghostfolio server.") {
 		t.Fatalf("expected in-context sync status text to remain visible, before=%q after=%q", before, after)
 	}
+	if !strings.Contains(before, "reuses the active Sync and Reports token") || !strings.Contains(after, "reuses the active Sync and Reports token") {
+		t.Fatalf("expected attempted editing not to remove token reuse explanation, before=%q after=%q", before, after)
+	}
 	if strings.Contains(before, "existing Sync and Reports context token") || strings.Contains(after, "existing Sync and Reports context token") {
 		t.Fatalf("expected attempted editing not to surface redundant token reminder, before=%q after=%q", before, after)
 	}
@@ -385,5 +394,52 @@ func TestSyncReportsContextSyncScreenDoesNotAcceptTokenEditing(t *testing.T) {
 	model = applySyncBatch(t, model, syncCmd)
 	if model.ActiveScreen() != "sync_reports_menu" {
 		t.Fatalf("expected in-context sync completion to return to Sync and Reports, got %s", model.ActiveScreen())
+	}
+}
+
+func TestSyncReportsContextMenuSkipsUnavailableReportAction(t *testing.T) {
+	t.Parallel()
+
+	var config = mustCloudSetupConfig(t)
+	var service = &syncReportsContextService{
+		unlockResult: runtime.SyncReportsContextResult{ReportUnavailableReason: runtime.ReportFailureNoSyncedDataAvailable},
+	}
+	var model = flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &config}, false, service))
+
+	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	_ = testutil.RunCmd(cmd)
+	model = assertFlowModel(t, updated)
+	updated, _ = model.Update(tea.PasteMsg{Content: "token-123"})
+	model = assertFlowModel(t, updated)
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = assertFlowModel(t, updated)
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = assertFlowModel(t, updated)
+
+	if model.ActiveScreen() != "sync_reports_menu" {
+		t.Fatalf("expected sync and reports menu, got %s", model.ActiveScreen())
+	}
+
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	model = assertFlowModel(t, updated)
+	if got := model.View().Content; !strings.Contains(got, "> Back To Main Menu") {
+		t.Fatalf("expected down to skip disabled report action and select Back To Main Menu, got %q", got)
+	}
+
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyUp}))
+	model = assertFlowModel(t, updated)
+	if got := model.View().Content; !strings.Contains(got, "> Sync Data") {
+		t.Fatalf("expected up to skip disabled report action and return to Sync Data, got %q", got)
+	}
+
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	model = assertFlowModel(t, updated)
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = assertFlowModel(t, updated)
+	if model.ActiveScreen() != "main_menu" {
+		t.Fatalf("expected skipped selection to activate Back To Main Menu, got %s", model.ActiveScreen())
+	}
+	if got := model.View().Content; strings.Contains(got, "Last Successful Sync") || strings.Contains(got, "Available Report Years") {
+		t.Fatalf("expected protected readiness data to clear on main menu return, got %q", got)
 	}
 }

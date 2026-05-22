@@ -164,6 +164,9 @@ func TestSyncEntryScreenViewCoversContextTokenBranch(t *testing.T) {
 	if strings.Contains(content, "existing Sync and Reports context token") {
 		t.Fatalf("expected context-token screen to omit redundant intro text, got %q", content)
 	}
+	if !strings.Contains(content, "reuses the active Sync and Reports token") || !strings.Contains(content, "does not show token") || !strings.Contains(content, "input again") {
+		t.Fatalf("expected context-token screen to explain token reuse, got %q", content)
+	}
 	if !strings.Contains(content, "Start Sync to obtain current available activity data on the Ghostfolio") || !strings.Contains(content, "server.") {
 		t.Fatalf("expected context-token status text, got %q", content)
 	}
