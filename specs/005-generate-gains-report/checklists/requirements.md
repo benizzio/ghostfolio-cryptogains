@@ -34,6 +34,8 @@
 - Validation completed on 2026-05-19 against `specs/005-generate-gains-report/spec.md`.
 - No clarification markers remain.
 - Revalidated after the `spec-fixes.md` updates: the workflow now centers on the unlocked `Sync and Reports` context, the report structure is defined explicitly, and single-activity currency-context rules are separated from exact-decimal rules.
+- Revalidated on 2026-05-23 for BUG-006 artifact consistency: `data-model.md`, `contracts/tui-workflows.md`, `quickstart.md`, and this checklist now align on diagnostics outcome state, diagnostics-path disclosure, source-faithful persisted `ActivityRecord` use, and explicit `null` rendering.
+- Runtime-backed verification for regenerated coverage and fresh artifact inspection remains tracked separately by `T062` and `T064`; the evidence below distinguishes current documented evidence from those pending reruns.
 
 ## Implementation Evidence
 
@@ -60,8 +62,29 @@
 - Cleartext report output is intentional only after a successful final save to Documents.
 - Failed output attempts remove the partial file created during that attempt.
 - Automatic-open failure after save is non-fatal and keeps the saved file in place.
-- App-managed storage is expected to contain no Markdown report content or generated-report catalog.
-- Verified on 2026-05-21 through runtime-backed integration coverage and artifact inspection: `tests/integration/report_generation_flow_test.go`, `tests/integration/report_failure_flow_test.go`, `tests/integration/report_cost_basis_methods_flow_test.go`, and `tests/integration/report_performance_flow_test.go` all call `assertNoCleartextReportInAppStorage(t, harness.BaseDir)`, which walks plaintext application artifacts under `<baseDir>/ghostfolio-cryptogains/` and fails on any `.md` file or persisted report header marker. Workspace inspection after the verification run also found no `ghostfolio-capital-gains-*.md` files under the repository worktree.
+- App-managed storage is expected to contain no Markdown report content or generated-report catalog. Eligible failed sync or report attempts may still write separate `.diagnostic.json` artifacts under the application-owned diagnostics directory.
+- Verified on 2026-05-21 for successful-report leakage paths through runtime-backed integration coverage and artifact inspection: `tests/integration/report_generation_flow_test.go`, `tests/integration/report_failure_flow_test.go`, `tests/integration/report_cost_basis_methods_flow_test.go`, and `tests/integration/report_performance_flow_test.go` all call `assertNoCleartextReportInAppStorage(t, harness.BaseDir)`, which walks plaintext application artifacts under `<baseDir>/ghostfolio-cryptogains/` and fails on any `.md` file or persisted report header marker. Workspace inspection after that verification run also found no `ghostfolio-capital-gains-*.md` files under the repository worktree.
+- BUG-006 extends this review to diagnostics artifacts. Fresh runtime-backed verification that generated `.diagnostic.json` files stay outside Documents, disclose only the intended path, and do not reintroduce cleartext Markdown copies remains tracked by `T064`.
+
+### Report-Failure Diagnostics Artifact Review Evidence
+
+- `spec.md` now requires eligible pre-save report failures to support a separate local diagnostics artifact, distinguishes that flow from opener-only warnings, and requires path disclosure under `FR-034b` through `FR-035c`.
+- `data-model.md` now models transient diagnostics outcome state, diagnostics path, failure category, and original persisted offending-record context through `ReportFailureDiagnostics` and `ReportGenerationOutcome`.
+- `contracts/tui-workflows.md` now states that the failure-result screen offers `Generate Diagnostic Report` outside explicit development mode, generates diagnostics automatically in explicit development mode, and shows the written diagnostics path when generation succeeds.
+- `quickstart.md` now includes manual verification steps for production-mode prompting, explicit-development automatic generation, and diagnostics-artifact location checks.
+
+### Source-Faithful Persisted Activity Evidence
+
+- `spec.md` requires activity-specific diagnostics to serialize the original persisted `ActivityRecord`, not selected activity-calculation inputs, rendered report rows, or other derived report values.
+- `data-model.md` now defines `offending_activity_record` on `ReportFailureDiagnostics` and constrains it to the original persisted record only.
+- `quickstart.md` now requires manual inspection that activity-specific diagnostics use the original persisted `ActivityRecord` shape.
+
+### Explicit `null` Rendering Evidence
+
+- `spec.md` requires absent source fields in report-failure and synced-data diagnostics to render as explicit `null` values.
+- `data-model.md` now records that nullable source fields in serialized offending-record output must render as explicit `null` values.
+- `quickstart.md` now includes manual inspection guidance for explicit `null` rendering in generated diagnostics artifacts.
+- Full rerun evidence for synced-data and report-failure explicit-`null` regression paths remains tracked by `T062`.
 
 ### Dependency And API Review Evidence
 
@@ -71,11 +94,13 @@
 
 ### Evidence Sources
 
+- `specs/005-generate-gains-report/spec.md`
 - `specs/005-generate-gains-report/plan.md`
 - `specs/005-generate-gains-report/research.md`
 - `specs/005-generate-gains-report/data-model.md`
 - `specs/005-generate-gains-report/contracts/markdown-report.md`
 - `specs/005-generate-gains-report/contracts/tui-workflows.md`
+- `specs/005-generate-gains-report/quickstart.md`
 - `internal/app/runtime/report_service.go`
 - `internal/report/output/documents.go`
 - `internal/report/output/writer.go`

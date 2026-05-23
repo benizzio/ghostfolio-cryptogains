@@ -559,9 +559,38 @@ Validation rules:
 - Partial files from failed saves must be removed.
 - Successful files remain even if automatic opening fails.
 
+## ReportFailureDiagnostics
+
+Purpose: Runtime diagnostics-generation state and persisted-source context for one eligible report-generation failure.
+
+Fields:
+
+| Field | Type | Persistence | Notes |
+|-------|------|-------------|-------|
+| `eligible` | boolean | runtime only | True only for report-generation failures that occur before the final Markdown file is saved |
+| `status` | enum | runtime only | `not_applicable`, `prompt_required`, `declined`, `generating`, `generated`, or `generation_failed` |
+| `failure_category` | enum nullable | runtime only | Primary report-generation failure category that drives diagnostics eligibility and user messaging |
+| `artifact_path` | path nullable | runtime only | Present only when a diagnostics artifact is written successfully |
+| `generation_message` | string nullable | runtime only | Non-secret status text for diagnostics success or failure |
+| `offending_activity_record` | `ActivityRecord` nullable | runtime only | Original persisted record included only when the report failure is activity-specific |
+| `redaction_mode` | enum nullable | runtime only | `production_redacted` or `explicit_development_detail` when diagnostics are generated |
+
+Relationships:
+
+- Belongs to one `ReportGenerationOutcome`.
+- Writes zero or one local `.diagnostic.json` artifact under the application-owned diagnostics directory.
+
+Validation rules:
+
+- Diagnostics are eligible only for calculation, validation, rendering, or output-preparation failures that happen before the final Markdown file is saved.
+- A successful save followed by automatic-open failure is not diagnostics-eligible.
+- When `offending_activity_record` is present, it must mirror the original persisted `ActivityRecord` rather than selected activity inputs, rendered rows, or other derived report values.
+- Nullable source fields in serialized offending-record output must render as explicit `null` values.
+- Production-mode diagnostics redact financial-value fields. Explicit-development-mode diagnostics may include the full non-secret offending persisted record context.
+
 ## ReportGenerationOutcome
 
-Purpose: Transient user-visible result after generation finishes.
+Purpose: Transient user-visible result and optional diagnostics state after generation finishes.
 
 Fields:
 
@@ -571,12 +600,17 @@ Fields:
 | `saved_path` | path nullable | runtime only | Present after successful save |
 | `open_failed` | boolean | runtime only | True when save succeeded but opener failed |
 | `message` | string | runtime only | Non-secret result or actionable error |
+| `failure_category` | enum nullable | runtime only | Primary actionable report-generation failure category, absent on success and opener-only warnings |
+| `diagnostics` | `ReportFailureDiagnostics` nullable | runtime only | Present for eligible report-generation failures or diagnostics-generation attempts |
 
 Relationships:
 
 - Belongs to one active `SyncAndReportsContext` until the result is dismissed.
+- May own one `ReportFailureDiagnostics` state object while the result screen remains active.
 
 Validation rules:
 
 - Outcome is not persisted.
+- `failure_category` remains absent when the report saves successfully, including opener-only warning cases.
+- Diagnostics prompt state, diagnostics path disclosure, and any offending persisted activity context remain transient and are cleared when the result is dismissed or the user leaves the context.
 - Error messages must not include token, JWT, raw protected payloads, or unredacted financial details beyond what the final report intentionally contains after save.

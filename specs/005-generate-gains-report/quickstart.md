@@ -69,6 +69,10 @@ Expected implemented automated coverage scope for this slice includes:
 - Documents-folder save
 - filename uniqueness within the same second
 - OS-open success and failure handling
+- production-mode report-failure diagnostics prompt and explicit-development-mode automatic diagnostics generation
+- diagnostics-path disclosure for eligible failures
+- original persisted `ActivityRecord` inclusion for activity-specific report failures
+- explicit `null` rendering in report-failure and synced-data diagnostics artifacts
 - no report history after returning to the context
 - persisted-artifact leakage checks
 
@@ -161,6 +165,8 @@ Verify at least these scenarios when checking the implemented workflow manually:
 - generate another report from the same unlocked context and confirm no previous report path is retained as history
 - trigger an automatic-open failure and confirm the saved file remains in Documents with manual deletion guidance
 - trigger a Documents-directory failure and confirm no partial Markdown file remains
+- trigger an eligible pre-save report-generation failure and confirm the result offers `Generate Diagnostic Report` outside explicit development mode or generates diagnostics automatically in explicit development mode
+- inspect one generated diagnostics artifact and confirm it uses the original persisted `ActivityRecord` with explicit `null` values for absent source fields instead of derived report data
 - use a fixture or server history that yields a reportable year with no main-section assets and confirm the empty-state report still saves
 - use a fixture with mixed selected activity currencies and confirm the report still renders `NOT APPLICABLE` for report calculation currency columns
 - use a production-shaped explained zero-priced `SELL` row that preserves explicit zero `unit_price`, `gross_value`, and `fee_amount`, and confirm the report keeps those zeros distinct from missing values without treating the row as a priced liquidation
@@ -190,6 +196,21 @@ Expected result:
 - the error is actionable and identifies only non-secret references such as asset label and source ID
 - the unlocked `Sync and Reports` context remains active
 - no partial Markdown file remains
+- outside explicit development mode, the failure result offers `Generate Diagnostic Report` before any diagnostics artifact is written
+- when diagnostics generation is requested, the workflow discloses the local `.diagnostic.json` path outside Documents
+- if the failure is tied to one activity, the diagnostics artifact includes the original persisted `ActivityRecord` with explicit `null` values for absent source fields and without substituting selected calculation inputs or rendered report rows
+
+## Explicit-Development Automatic Diagnostics Path
+
+1. Start the application in explicit development mode.
+2. Trigger an eligible report-generation failure before the final Markdown file is saved.
+
+Expected result:
+
+- the failure result does not wait for a manual diagnostics confirmation step
+- the workflow generates a local `.diagnostic.json` artifact automatically
+- the result discloses the generated diagnostics path
+- the generated artifact still excludes token and JWT material
 
 ## Mixed Selected-Currency
 
@@ -227,6 +248,8 @@ Expected result:
 - report generation fails with an actionable output-location error
 - no partial Markdown file remains
 - no app-managed cleartext report artifact is written
+- the failure may still generate a separate `.diagnostic.json` artifact outside Documents under the application-owned diagnostics directory
+- when diagnostics are generated, the result discloses the diagnostics path instead of implying the Markdown output path succeeded
 - the workflow returns to the report result or selection state without clearing the active token context
 
 ## Same-Second Filename Collision Path
@@ -341,6 +364,12 @@ Report output location for this slice:
 - macOS: `~/Documents/`
 - Windows: per-user Documents known folder, with documented default `%USERPROFILE%\Documents\`
 
+Diagnostics artifact location for eligible failed sync or report attempts:
+
+- Linux: application-owned diagnostics directory under `$XDG_CONFIG_HOME/ghostfolio-cryptogains/` or `~/.config/ghostfolio-cryptogains/`
+- macOS: application-owned diagnostics directory under `~/Library/Application Support/ghostfolio-cryptogains/`
+- Windows: application-owned diagnostics directory under `%AppData%\ghostfolio-cryptogains\`
+
 Removal behavior:
 
 - deleting `setup.json` resets bootstrap setup on next launch
@@ -358,6 +387,8 @@ Expected result:
 - `snapshots/` contains encrypted snapshot files only
 - app-managed storage contains no Markdown report content
 - app-managed storage contains no generated-report catalog or history
+- app-managed storage may contain `.diagnostic.json` files only for eligible failed sync or report attempts
+- any diagnostics artifact remains outside Documents and excludes token and JWT material
 - Documents contains only successful final report files
 - failed output attempts leave no partial Markdown file
 - no persisted artifact stores the Ghostfolio security token or JWT

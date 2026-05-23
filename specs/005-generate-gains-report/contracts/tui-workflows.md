@@ -248,6 +248,7 @@ Rules:
 - Calculation uses the currently unlocked protected cache and does not run a new sync.
 - Activity after the selected year is ignored.
 - On calculation or save failure, the workflow reports an actionable non-secret error and removes any partial cleartext output created by the attempt.
+- Eligible failures continue into report-failure diagnostics handling on the result screen. A saved report whose later automatic-open request fails never enters that diagnostics flow.
 - On save success and automatic-open failure, the workflow treats the save as successful and reports the open warning.
 
 Success transitions:
@@ -273,22 +274,32 @@ Visible content on failure:
 - actionable non-secret failure message
 - selected year
 - selected cost basis method when available
+- diagnostics-status message when the failure is eligible for a report-failure diagnostics artifact
+- generated diagnostics artifact path when a diagnostics artifact was written
 - primary action menu
 
 Primary menu items:
 
+- `Generate Diagnostic Report` when the failure is diagnostics-eligible, the application is not in explicit development mode, and no diagnostics artifact has been written yet
 - `Back To Sync and Reports`
 - `Generate Another Report` when protected reportable data still exists
 
 Rules:
 
 - The saved path is shown only as a transient result message.
+- Outside explicit development mode, an eligible failure must ask whether to generate a diagnostics artifact before writing it. The failure-result screen provides `Generate Diagnostic Report` for that path.
+- In explicit development mode, an eligible failure generates diagnostics automatically before or while the result screen is shown, and the screen discloses the written path when generation succeeds.
+- When diagnostics generation fails, the screen keeps the original report-generation failure as the primary failure result and adds a non-secret diagnostics-generation status message.
+- The failure-result screen must never render the offending persisted activity record inline. It may disclose only non-secret references in the UI and the diagnostics-artifact path when one exists.
+- Returning to `Sync and Reports` or starting another report without generating diagnostics counts as declining the optional production-mode diagnostics prompt.
+- Automatic-open failure after a successful save remains a success-path warning and must not offer `Generate Diagnostic Report`.
 - Dismissing the result must not create report history or a reopen list.
 - Returning to `Sync and Reports` does not ask for the token again.
 - Leaving the context after this screen clears the token and any in-memory report content.
 
 Success transitions:
 
+- `Generate Diagnostic Report` -> `Report Result Screen`
 - `Back To Sync and Reports` -> `Sync and Reports Menu Screen`
 - `Generate Another Report` -> `Report Selection Screen`
 
@@ -319,6 +330,7 @@ Report Selection Screen
 └── Back -> Sync and Reports Menu Screen
 
 Report Result Screen
+├── Generate Diagnostic Report -> Report Result Screen
 ├── Back To Sync and Reports -> Sync and Reports Menu Screen
 └── Generate Another Report -> Report Selection Screen
 ```
@@ -328,9 +340,13 @@ Report Result Screen
 - `no synced data available`
 - `no reportable years available`
 - `unsupported stored-data version`
-- `unsupported report calculation`
+- `incomplete activity monetary context`
+- `report validation failed`
+- `report calculation failed`
+- `report rendering failed`
 - `documents folder unavailable`
+- `report output preparation failed`
 - `report file write failed`
 - `automatic open failed after save`
 
-Each failed report-generation attempt shows one primary actionable reason. The automatic-open failure category is a warning after a successful save, not a failed save.
+Each failed report-generation attempt shows one primary actionable reason. Calculation, validation, rendering, documents-folder, output-preparation, and pre-save write failures that happen before the final Markdown file is saved are diagnostics-eligible. The automatic-open failure category is a warning after a successful save, not a failed save, and is never diagnostics-eligible.
