@@ -77,6 +77,25 @@ func TestReportGenerationEmptyMainSectionWritesEmptyMarkdownReport(t *testing.T)
 	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
 }
 
+// TestReportGenerationWriteFailureGeneratesWrappedDiagnosticCauseChain verifies
+// that output-preparation diagnostics preserve both the actionable outer
+// failure and the wrapped inner write cause.
+// Authored by: OpenCode
+func TestReportGenerationWriteFailureGeneratesWrappedDiagnosticCauseChain(t *testing.T) {
+	if os.Getenv("GHOSTFOLIO_CRYPTOGAINS_HELPER_WRITE_FAILURE") == "2" {
+		reportoutput.InstallWriteFailureAfterCreateForTesting(errors.New("forced write failure"))
+		runReportGenerationWriteFailureDiagnosticScenario(t)
+		return
+	}
+
+	var command = exec.Command(os.Args[0], "-test.run=TestReportGenerationWriteFailureGeneratesWrappedDiagnosticCauseChain$")
+	command.Env = append(os.Environ(), "GHOSTFOLIO_CRYPTOGAINS_HELPER_WRITE_FAILURE=2")
+	var output, err = command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("run write-failure diagnostic helper process: %v\n%s", err, string(output))
+	}
+}
+
 // TestReportGenerationIncompleteMonetaryContextShowsFailure verifies the
 // runtime-backed unsupported-calculation outcome for incomplete priced activity
 // currency data.
@@ -381,6 +400,66 @@ func runReportGenerationWriteFailureScenario(t *testing.T) {
 	}
 }
 
+// runReportGenerationWriteFailureDiagnosticScenario exercises the report-result
+// diagnostic path for a wrapped output-preparation failure.
+// Authored by: OpenCode
+func runReportGenerationWriteFailureDiagnosticScenario(t *testing.T) {
+	t.Helper()
+
+	var reportIO = testutil.NewReportIOFixture(t)
+	var openLogPath = installOpenCommandRecorder(t, 0)
+	var fixture = testutil.DeterministicReportLedgerFixture()
+	var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
+
+	seedProtectedSnapshot(t, harness, "token-123", fixture.ProtectedActivityCache)
+
+	var model = unlockSyncReportsContext(t, harness.Model, "token-123")
+	model = openReportSelectionFromContext(t, model)
+	model = selectReportYear(t, model, fixture.PrimaryReportYear)
+	model, cmd := startReportGenerationFromSelection(t, model)
+	model = applyBatchCmd(t, model, cmd)
+
+	if model.ActiveScreen() != "report_result" {
+		t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
+	}
+	if files := mustMarkdownFiles(t, reportIO.DocumentsDir); len(files) != 0 {
+		t.Fatalf("expected no saved Markdown report after write failure, got %#v", files)
+	}
+	if openerRequests := readOpenCommandRequests(t, openLogPath); len(openerRequests) != 0 {
+		t.Fatalf("expected no opener request when save failed after create, got %#v", openerRequests)
+	}
+
+	var updated tea.Model
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = assertFlowModel(t, updated)
+	updated, _ = model.Update(testutil.RunCmd(cmd))
+	model = assertFlowModel(t, updated)
+
+	var diagnosticFiles = mustDiagnosticFiles(t, harness.BaseDir)
+	if len(diagnosticFiles) != 1 {
+		t.Fatalf("expected one report diagnostics artifact after explicit choice, got %#v", diagnosticFiles)
+	}
+	assertReportFailureDiagnosticArtifact(t, diagnosticFiles[0], false)
+
+	var raw, err = os.ReadFile(diagnosticFiles[0])
+	if err != nil {
+		t.Fatalf("read report diagnostics artifact: %v", err)
+	}
+	var text = string(raw)
+	for _, expected := range []string{
+		`"failure_detail": "could not save the report file"`,
+		`"failure_cause_chain": [`,
+		`"could not save the report file"`,
+		`"write report file`,
+		`forced write failure`,
+	} {
+		if !strings.Contains(text, expected) {
+			t.Fatalf("expected wrapped output-preparation diagnostics to contain %q, got %q", expected, text)
+		}
+	}
+	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
+}
+
 // referenceOnlyProtectedActivityCache returns one deterministic protected cache
 // that produces a valid empty-main-section report with one reference-only row.
 // Authored by: OpenCode
@@ -471,18 +550,30 @@ func assertReportFailureDiagnosticArtifact(t *testing.T, path string, expectFina
 		t.Fatalf("expected report diagnostics artifact to remain secret-safe and report-free, got %q", text)
 	}
 	for _, expected := range []string{
-		`"failure_category": "unsupported report calculation"`,
-		`"offending_activity_record"`,
-		`"source_id": "doge-buy-2025-incomplete-001"`,
-		`"asset_identity_key": "asset-doge-001"`,
-		`"order_currency": "USD"`,
-		`"asset_profile_currency": null`,
-		`"base_currency": null`,
-		`"source_scope": {`,
-		`"id": "wallet-speculative"`,
+		`"failure_detail":`,
+		`"failure_cause_chain": [`,
 	} {
 		if !strings.Contains(text, expected) {
 			t.Fatalf("expected diagnostics artifact to contain %q, got %q", expected, text)
+		}
+	}
+	if !strings.Contains(text, `"failure_category": "unsupported report calculation"`) && !strings.Contains(text, `"failure_category": "report file write failed"`) {
+		t.Fatalf("expected diagnostics artifact to contain a supported report failure category, got %q", text)
+	}
+	if strings.Contains(text, `"failure_category": "unsupported report calculation"`) {
+		for _, expected := range []string{
+			`"offending_activity_record"`,
+			`"source_id": "doge-buy-2025-incomplete-001"`,
+			`"asset_identity_key": "asset-doge-001"`,
+			`"order_currency": "USD"`,
+			`"asset_profile_currency": null`,
+			`"base_currency": null`,
+			`"source_scope": {`,
+			`"id": "wallet-speculative"`,
+		} {
+			if !strings.Contains(text, expected) {
+				t.Fatalf("expected calculation diagnostics artifact to contain %q, got %q", expected, text)
+			}
 		}
 	}
 	if strings.Contains(text, `"selected_currency_context"`) || strings.Contains(text, `"activity_currency"`) {
@@ -490,20 +581,53 @@ func assertReportFailureDiagnosticArtifact(t *testing.T, path string, expectFina
 	}
 
 	var payload struct {
-		OffendingActivityRecord struct {
-			Quantity *string `json:"quantity"`
+		FailureCategory         string   `json:"failure_category"`
+		FailureDetail           string   `json:"failure_detail"`
+		FailureCauseChain       []string `json:"failure_cause_chain"`
+		OffendingActivityRecord *struct {
+			SourceID             *string `json:"source_id"`
+			AssetIdentityKey     *string `json:"asset_identity_key"`
+			Quantity             *string `json:"quantity"`
+			OrderCurrency        *string `json:"order_currency"`
+			AssetProfileCurrency *string `json:"asset_profile_currency"`
+			BaseCurrency         *string `json:"base_currency"`
+			SourceScope          *struct {
+				ID *string `json:"id"`
+			} `json:"source_scope"`
 		} `json:"offending_activity_record"`
 	}
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		t.Fatalf("unmarshal report diagnostics artifact: %v", err)
 	}
+	if payload.FailureDetail == "" || len(payload.FailureCauseChain) == 0 {
+		t.Fatalf("expected diagnostics artifact to preserve failure detail and cause chain, got %#v", payload)
+	}
+	if payload.FailureCauseChain[0] != payload.FailureDetail {
+		t.Fatalf("expected cause chain to start with the actionable outer failure, got %#v", payload)
+	}
+	if payload.FailureCategory == "unsupported report calculation" {
+		if len(payload.FailureCauseChain) < 2 || payload.FailureCauseChain[1] != `activity "doge-buy-2025-incomplete-001" order currency context is incomplete; provide or exactly derive gross value and fee from that tier only` {
+			t.Fatalf("expected wrapped calculation diagnostics cause chain, got %#v", payload.FailureCauseChain)
+		}
+		if payload.OffendingActivityRecord == nil || payload.OffendingActivityRecord.SourceID == nil || *payload.OffendingActivityRecord.SourceID != "doge-buy-2025-incomplete-001" {
+			t.Fatalf("expected calculation diagnostics artifact to preserve offending activity context, got %#v", payload)
+		}
+	}
+	if payload.FailureCategory == "report file write failed" {
+		if len(payload.FailureCauseChain) < 3 || payload.FailureCauseChain[0] != "could not save the report file" || !strings.Contains(payload.FailureCauseChain[1], "write report file") || payload.FailureCauseChain[2] != "forced write failure" {
+			t.Fatalf("expected wrapped write diagnostics cause chain, got %#v", payload.FailureCauseChain)
+		}
+		if payload.OffendingActivityRecord != nil {
+			t.Fatalf("expected write-failure diagnostics to omit activity-specific context, got %#v", payload.OffendingActivityRecord)
+		}
+	}
 	if expectFinancialValues {
-		if payload.OffendingActivityRecord.Quantity == nil || *payload.OffendingActivityRecord.Quantity != "10000" {
+		if payload.OffendingActivityRecord == nil || payload.OffendingActivityRecord.Quantity == nil || *payload.OffendingActivityRecord.Quantity != "10000" {
 			t.Fatalf("expected explicit-development diagnostics to retain quantity, got %q", text)
 		}
 		return
 	}
-	if payload.OffendingActivityRecord.Quantity != nil {
+	if payload.OffendingActivityRecord != nil && payload.OffendingActivityRecord.Quantity != nil {
 		t.Fatalf("expected production diagnostics to redact quantity, got %q", text)
 	}
 }

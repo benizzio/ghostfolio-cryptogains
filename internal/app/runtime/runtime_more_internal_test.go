@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -70,6 +71,14 @@ type runtimeDiagnosticCarrierError struct {
 	context syncmodel.DiagnosticContext
 }
 
+// runtimeWrappedError exposes controllable wrapped-error text and cause values
+// for helper branch coverage.
+// Authored by: OpenCode
+type runtimeWrappedError struct {
+	message string
+	cause   error
+}
+
 // runtimeNormalizerFunc adapts one test function to the runtime normalization
 // contract.
 // Authored by: OpenCode
@@ -115,6 +124,18 @@ func (e runtimeDiagnosticCarrierError) DiagnosticContext() syncmodel.DiagnosticC
 // Authored by: OpenCode
 func (e runtimeDiagnosticCarrierError) DiagnosticReportContext() syncmodel.DiagnosticContext {
 	return e.context
+}
+
+// Error returns the injected wrapped-error message.
+// Authored by: OpenCode
+func (e runtimeWrappedError) Error() string {
+	return e.message
+}
+
+// Unwrap returns the injected wrapped cause.
+// Authored by: OpenCode
+func (e runtimeWrappedError) Unwrap() error {
+	return e.cause
 }
 
 // TestWriteDiagnosticReportCoversBranches verifies structured diagnostic-report
@@ -220,6 +241,10 @@ func TestBuildDiagnosticReportDocumentPreservesCurrencyContextWhileRedactingFina
 	request.Context = syncmodel.DiagnosticContext{
 		FailureStage:  syncmodel.DiagnosticFailureStageValidation,
 		FailureDetail: `activity "buy-1" unit price currency context is uninformed across order, asset-profile, and base tiers`,
+		FailureCauseChain: []string{
+			`activity "buy-1" unit price currency context is uninformed across order, asset-profile, and base tiers`,
+			`lower token abc123 layer`,
+		},
 		Records: []syncmodel.DiagnosticRecord{{
 			SourceID:              "buy-1",
 			OrderCurrency:         "CHF",
@@ -243,6 +268,9 @@ func TestBuildDiagnosticReportDocumentPreservesCurrencyContextWhileRedactingFina
 	if len(redacted.Records) != 1 {
 		t.Fatalf("expected one redacted diagnostic record, got %#v", redacted)
 	}
+	if len(redacted.FailureCauseChain) != 2 || redacted.FailureCauseChain[0] != `activity "buy-1" unit price currency context is uninformed across order, asset-profile, and base tiers` || !strings.Contains(redacted.FailureCauseChain[1], "token [REDACTED]") {
+		t.Fatalf("expected redacted cause chain to be preserved, got %#v", redacted.FailureCauseChain)
+	}
 	redactedRecord := redacted.Records[0]
 	if redactedRecord.OrderCurrency != "CHF" || redactedRecord.AssetProfileCurrency != "EUR" || redactedRecord.BaseCurrency != "USD" {
 		t.Fatalf("expected currency context to remain visible after redaction, got %#v", redactedRecord)
@@ -256,6 +284,9 @@ func TestBuildDiagnosticReportDocumentPreservesCurrencyContextWhileRedactingFina
 	unredactedRecord := unredacted.Records[0]
 	if unredactedRecord.OrderUnitPrice != "90" || unredactedRecord.OrderGrossValue != "90" || unredactedRecord.OrderFeeAmount != "1.5" || unredactedRecord.AssetProfileUnitPrice != "95" || unredactedRecord.AssetProfileFeeAmount != "1.6" || unredactedRecord.BaseGrossValue != "100" || unredactedRecord.BaseFeeAmount != "1.7" {
 		t.Fatalf("expected explicit-development-mode diagnostics to retain source financial values, got %#v", unredactedRecord)
+	}
+	if len(unredacted.FailureCauseChain) != 2 || unredacted.FailureCauseChain[1] != `lower token [REDACTED] layer` {
+		t.Fatalf("expected unredacted cause chain to be preserved, got %#v", unredacted.FailureCauseChain)
 	}
 }
 
@@ -276,7 +307,8 @@ func TestBuildDiagnosticReportDocumentSupportsReportFailureDiagnostics(t *testin
 		Attempt:                 SyncAttempt{AttemptID: "attempt-report-1", Status: AttemptStatusFailed, StartedAt: time.Unix(10, 0).UTC(), CompletedAt: time.Unix(11, 0).UTC()},
 		ExplicitDevelopmentMode: true,
 		Context: syncmodel.DiagnosticContext{
-			FailureDetail: "incomplete context",
+			FailureDetail:     "incomplete context",
+			FailureCauseChain: []string{"incomplete context", "tier detail", "Bearer secret-token"},
 			OffendingActivityRecord: &syncmodel.ActivityRecord{
 				SourceID:         "doge-buy-2025-incomplete-001",
 				OccurredAt:       "2025-02-01T10:00:00Z",
@@ -305,6 +337,9 @@ func TestBuildDiagnosticReportDocumentSupportsReportFailureDiagnostics(t *testin
 	if !strings.Contains(text, `"failure_category":"unsupported report calculation"`) {
 		t.Fatalf("expected report failure category in JSON, got %q", text)
 	}
+	if !strings.Contains(text, `"failure_cause_chain":["incomplete context","tier detail","Bearer [REDACTED]"]`) {
+		t.Fatalf("expected failure cause chain in JSON, got %q", text)
+	}
 	if !strings.Contains(text, `"offending_activity_record"`) || !strings.Contains(text, `"order_currency":null`) || !strings.Contains(text, `"source_scope":null`) {
 		t.Fatalf("expected explicit nulls in offending activity record JSON, got %q", text)
 	}
@@ -316,6 +351,9 @@ func TestBuildDiagnosticReportDocumentSupportsReportFailureDiagnostics(t *testin
 	document = buildDiagnosticReportDocument(request, time.Unix(12, 0).UTC())
 	if document.OffendingActivityRecord == nil || document.OffendingActivityRecord.Quantity != nil {
 		t.Fatalf("expected production redaction to clear offending record financial values, got %#v", document.OffendingActivityRecord)
+	}
+	if len(document.FailureCauseChain) != 3 || document.FailureCauseChain[2] != "Bearer [REDACTED]" {
+		t.Fatalf("expected production redaction to scrub wrapped-cause secrets, got %#v", document.FailureCauseChain)
 	}
 }
 
@@ -388,21 +426,27 @@ func TestNewSyncServiceAndHelperFunctionsCoverBranches(t *testing.T) {
 	}
 
 	contextFromNil := diagnosticContextFromError(nil, syncmodel.DiagnosticFailureStageValidation, "token")
-	if contextFromNil.FailureStage != syncmodel.DiagnosticFailureStageValidation || contextFromNil.FailureDetail != "" {
+	if contextFromNil.FailureStage != syncmodel.DiagnosticFailureStageValidation || contextFromNil.FailureDetail != "" || len(contextFromNil.FailureCauseChain) != 0 {
 		t.Fatalf("expected default diagnostic context for nil error, got %#v", contextFromNil)
 	}
 
-	contextFromPlain := diagnosticContextFromError(errors.New("token boom"), syncmodel.DiagnosticFailureStageValidation, "token")
+	contextFromPlain := diagnosticContextFromError(fmt.Errorf("outer token boom: %w", errors.New("Bearer jwt-token")), syncmodel.DiagnosticFailureStageValidation, "token")
 	if strings.Contains(contextFromPlain.FailureDetail, "token") {
 		t.Fatalf("expected secret to be redacted from plain error, got %#v", contextFromPlain)
 	}
+	if len(contextFromPlain.FailureCauseChain) != 2 || strings.Contains(strings.Join(contextFromPlain.FailureCauseChain, " "), "jwt-token") {
+		t.Fatalf("expected plain wrapped cause chain to be redacted, got %#v", contextFromPlain)
+	}
 
-	contextFromCarrier := diagnosticContextFromError(runtimeDiagnosticCarrierError{context: syncmodel.DiagnosticContext{FailureDetail: "token detail"}}, syncmodel.DiagnosticFailureStageNormalization, "token")
+	contextFromCarrier := diagnosticContextFromError(runtimeDiagnosticCarrierError{context: syncmodel.DiagnosticContext{FailureDetail: "token detail", FailureCauseChain: []string{"token detail", "Bearer jwt-token"}}}, syncmodel.DiagnosticFailureStageNormalization, "token")
 	if contextFromCarrier.FailureStage != syncmodel.DiagnosticFailureStageNormalization {
 		t.Fatalf("expected default stage to be applied, got %#v", contextFromCarrier)
 	}
 	if strings.Contains(contextFromCarrier.FailureDetail, "token") {
 		t.Fatalf("expected carrier detail to be redacted, got %#v", contextFromCarrier)
+	}
+	if len(contextFromCarrier.FailureCauseChain) != 2 || strings.Contains(strings.Join(contextFromCarrier.FailureCauseChain, " "), "jwt-token") {
+		t.Fatalf("expected carrier cause chain to be redacted, got %#v", contextFromCarrier)
 	}
 
 	carrierWithStage := diagnosticContextFromError(runtimeDiagnosticCarrierError{context: syncmodel.DiagnosticContext{FailureStage: syncmodel.DiagnosticFailureStageMapping, FailureDetail: "mapped"}}, syncmodel.DiagnosticFailureStageNormalization)
@@ -457,6 +501,58 @@ func TestNewSyncServiceAndHelperFunctionsCoverBranches(t *testing.T) {
 	}
 	if len(id) != 8 {
 		t.Fatalf("expected hex identifier, got %q", id)
+	}
+}
+
+// TestDiagnosticHelperFunctionsCoverRemainingBranches verifies direct helper
+// branches for wrapped-cause extraction, duplicate suppression, redaction, and
+// nil-safe unwrap behavior.
+// Authored by: OpenCode
+func TestDiagnosticHelperFunctionsCoverRemainingBranches(t *testing.T) {
+	t.Parallel()
+
+	var carrierFallback = diagnosticContextFromError(runtimeDiagnosticCarrierError{context: syncmodel.DiagnosticContext{}}, syncmodel.DiagnosticFailureStageNormalization)
+	if carrierFallback.FailureStage != syncmodel.DiagnosticFailureStageNormalization || carrierFallback.FailureDetail != "carrier boom" {
+		t.Fatalf("expected carrier fallback detail and stage, got %#v", carrierFallback)
+	}
+	if len(carrierFallback.FailureCauseChain) != 1 || carrierFallback.FailureCauseChain[0] != "carrier boom" {
+		t.Fatalf("expected carrier fallback cause chain, got %#v", carrierFallback.FailureCauseChain)
+	}
+
+	if detail := diagnosticFailureDetail(errors.New("plain detail")); detail != "plain detail" {
+		t.Fatalf("expected plain detail without unwrap suffix trimming, got %q", detail)
+	}
+	if detail := diagnosticFailureDetail(runtimeWrappedError{message: "outer detail", cause: errors.New(" ")}); detail != "outer detail" {
+		t.Fatalf("expected blank wrapped cause detail to be ignored, got %q", detail)
+	}
+
+	if chain := diagnosticCauseChainFromError(runtimeWrappedError{message: " ", cause: errors.New("inner detail")}); len(chain) != 1 || chain[0] != "inner detail" {
+		t.Fatalf("expected blank outer detail to fall back to wrapped cause, got %#v", chain)
+	}
+	if chain := diagnosticCauseChainFromError(runtimeWrappedError{message: "outer detail", cause: errors.New(" ")}); len(chain) != 1 || chain[0] != "outer detail" {
+		t.Fatalf("expected blank wrapped cause entries to be skipped, got %#v", chain)
+	}
+	if chain := diagnosticCauseChainFromError(runtimeWrappedError{message: "same detail", cause: errors.New("same detail")}); len(chain) != 1 || chain[0] != "same detail" {
+		t.Fatalf("expected duplicate wrapped cause entries to be suppressed, got %#v", chain)
+	}
+
+	if chain := redactDiagnosticCauseChain(nil); chain != nil {
+		t.Fatalf("expected nil input chain to stay nil, got %#v", chain)
+	}
+	var redactedChain = redactDiagnosticCauseChain([]string{" ", "token abc123", "token abc123", "Bearer jwt-secret", "Bearer jwt-secret"}, "abc123")
+	if len(redactedChain) != 2 || redactedChain[0] != "token [REDACTED]" || redactedChain[1] != "Bearer [REDACTED]" {
+		t.Fatalf("expected blank entries skipped, secrets redacted, and duplicates collapsed, got %#v", redactedChain)
+	}
+
+	if unwrapSingleError(nil) != nil {
+		t.Fatalf("expected nil unwrap input to return nil")
+	}
+	if unwrapSingleError(errors.New("plain detail")) != nil {
+		t.Fatalf("expected non-wrapped error to return nil from unwrap helper")
+	}
+	var cause = errors.New("inner detail")
+	if unwrapped := unwrapSingleError(runtimeWrappedError{message: "outer detail", cause: cause}); !errors.Is(unwrapped, cause) {
+		t.Fatalf("expected wrapped cause from unwrap helper, got %v", unwrapped)
 	}
 }
 

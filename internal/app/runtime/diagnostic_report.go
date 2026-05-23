@@ -5,12 +5,15 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
 
@@ -44,6 +47,7 @@ type diagnosticReportDocument struct {
 	Attempt                 diagnosticAttemptDocument           `json:"attempt"`
 	FailureStage            syncmodel.DiagnosticFailureStage    `json:"failure_stage,omitempty"`
 	FailureDetail           string                              `json:"failure_detail,omitempty"`
+	FailureCauseChain       []string                            `json:"failure_cause_chain,omitempty"`
 	Records                 []syncmodel.DiagnosticRecord        `json:"records,omitempty"`
 	OffendingActivityRecord *syncmodel.DiagnosticActivityRecord `json:"offending_activity_record,omitempty"`
 }
@@ -110,6 +114,7 @@ func buildDiagnosticReportDocument(
 	generatedAt time.Time,
 ) diagnosticReportDocument {
 	var context = request.Context
+	context = redactDiagnosticCauseChainContext(context)
 	if request.RedactFinancialValues {
 		context = redactDiagnosticContext(context)
 	}
@@ -131,6 +136,7 @@ func buildDiagnosticReportDocument(
 		},
 		FailureStage:            context.FailureStage,
 		FailureDetail:           context.FailureDetail,
+		FailureCauseChain:       slices.Clone(context.FailureCauseChain),
 		Records:                 context.Records,
 		OffendingActivityRecord: diagnosticOffendingActivityRecord(context, request.RedactFinancialValues),
 	}
@@ -140,6 +146,8 @@ func buildDiagnosticReportDocument(
 // context for non-development diagnostic reports.
 // Authored by: OpenCode
 func redactDiagnosticContext(context syncmodel.DiagnosticContext) syncmodel.DiagnosticContext {
+	context = redactDiagnosticCauseChainContext(context)
+
 	var records = make([]syncmodel.DiagnosticRecord, 0, len(context.Records))
 	for _, record := range context.Records {
 		record.Quantity = ""
@@ -154,6 +162,16 @@ func redactDiagnosticContext(context syncmodel.DiagnosticContext) syncmodel.Diag
 	}
 
 	context.Records = records
+	return context
+}
+
+// redactDiagnosticCauseChainContext scrubs obvious secret-shaped fragments from
+// the shared diagnostics detail and wrapped-cause chain regardless of runtime
+// mode.
+// Authored by: OpenCode
+func redactDiagnosticCauseChainContext(context syncmodel.DiagnosticContext) syncmodel.DiagnosticContext {
+	context.FailureDetail = redact.ErrorText(errors.New(context.FailureDetail))
+	context.FailureCauseChain = redactDiagnosticCauseChain(context.FailureCauseChain)
 	return context
 }
 

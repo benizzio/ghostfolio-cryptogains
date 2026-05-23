@@ -96,6 +96,7 @@ func (s *reportService) Generate(ctx context.Context, request ReportGenerationRe
 	var document reportmodel.ReportDocument
 	document, err = s.render(report)
 	if err != nil {
+		var wrappedErr = reportRenderDiagnosticError(request.Request, err)
 		return s.reportFailureOutcome(
 			ctx,
 			request,
@@ -107,7 +108,7 @@ func (s *reportService) Generate(ctx context.Context, request ReportGenerationRe
 				request.Request.CostBasisMethod.Label(),
 				strings.TrimSpace(err.Error()),
 			),
-			syncmodel.DiagnosticContext{FailureDetail: strings.TrimSpace(err.Error())},
+			reportDiagnosticContextFromError(wrappedErr),
 		)
 	}
 
@@ -115,13 +116,14 @@ func (s *reportService) Generate(ctx context.Context, request ReportGenerationRe
 	outputFile, err = s.write(document)
 	if err != nil {
 		var reason = reportWriteFailureReason(err)
+		var wrappedErr = reportWriteDiagnosticError(reason, err)
 		return s.reportFailureOutcome(
 			ctx,
 			request,
 			outcomeAttempt,
 			reason,
 			reportWriteFailureMessage(reason, err),
-			syncmodel.DiagnosticContext{FailureDetail: strings.TrimSpace(err.Error())},
+			reportDiagnosticContextFromError(wrappedErr),
 		)
 	}
 
@@ -338,9 +340,17 @@ func reportDiagnosticEligible(reason ReportFailureReason) bool {
 func reportDiagnosticContextFromError(err error) syncmodel.DiagnosticContext {
 	var carrier ReportFailureDiagnosticCarrier
 	if errors.As(err, &carrier) {
-		return carrier.DiagnosticReportContext()
+		var diagnosticReportContext = carrier.DiagnosticReportContext()
+		if diagnosticReportContext.FailureDetail == "" {
+			diagnosticReportContext.FailureDetail = diagnosticFailureDetail(err)
+		}
+		if len(diagnosticReportContext.FailureCauseChain) == 0 {
+			diagnosticReportContext.FailureCauseChain = diagnosticCauseChainFromError(err)
+		}
+		return diagnosticReportContext
 	}
-	return syncmodel.DiagnosticContext{FailureDetail: strings.TrimSpace(err.Error())}
+
+	return diagnosticContextFromError(err, "")
 }
 
 // reportCalculationFailureMessage formats one actionable calculation failure.
@@ -351,6 +361,19 @@ func reportCalculationFailureMessage(request reportmodel.ReportRequest, err erro
 		request.Year,
 		request.CostBasisMethod.Label(),
 		strings.TrimSpace(err.Error()),
+	)
+}
+
+// reportRenderDiagnosticError wraps one renderer failure with report-level
+// context so diagnostics can preserve both the actionable outer failure and the
+// deeper wrapped cause chain.
+// Authored by: OpenCode
+func reportRenderDiagnosticError(request reportmodel.ReportRequest, err error) error {
+	return fmt.Errorf(
+		"could not render the %d %s report: %w",
+		request.Year,
+		request.CostBasisMethod.Label(),
+		err,
 	)
 }
 
@@ -387,6 +410,17 @@ func reportWriteFailureMessage(reason ReportFailureReason, err error) string {
 		"Could not save the report file: %s. Check write permissions and free space in the Documents folder, then try again. Any partial file created during this attempt was removed.",
 		detail,
 	)
+}
+
+// reportWriteDiagnosticError wraps one output-preparation failure with a stable
+// report-level summary for diagnostics.
+// Authored by: OpenCode
+func reportWriteDiagnosticError(reason ReportFailureReason, err error) error {
+	if reason == ReportFailureDocumentsFolderUnavailable {
+		return fmt.Errorf("could not save the report because the Documents folder is unavailable: %w", err)
+	}
+
+	return fmt.Errorf("could not save the report file: %w", err)
 }
 
 // reportOpenFailureMessage formats one non-fatal automatic-open warning.

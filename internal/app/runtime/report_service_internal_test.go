@@ -6,6 +6,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -117,6 +118,12 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		}
 		if !strings.Contains(outcome.Message, "Could not render the 2024 FIFO report: render boom") {
 			t.Fatalf("expected trimmed render failure message, got %q", outcome.Message)
+		}
+		if !outcome.Diagnostic.Eligible || len(outcome.Diagnostic.Request.Context.FailureCauseChain) != 2 {
+			t.Fatalf("expected wrapped render diagnostic chain, got %#v", outcome.Diagnostic)
+		}
+		if !strings.Contains(outcome.Diagnostic.Request.Context.FailureCauseChain[0], "could not render the 2024 FIFO report") || outcome.Diagnostic.Request.Context.FailureCauseChain[1] != "render boom" {
+			t.Fatalf("expected ordered render failure cause chain, got %#v", outcome.Diagnostic.Request.Context.FailureCauseChain)
 		}
 	})
 
@@ -300,6 +307,12 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		if !strings.Contains(outcome.Message, "partial file") {
 			t.Fatalf("expected cleanup guidance, got %q", outcome.Message)
 		}
+		if !outcome.Diagnostic.Eligible || len(outcome.Diagnostic.Request.Context.FailureCauseChain) != 2 {
+			t.Fatalf("expected wrapped write diagnostic chain, got %#v", outcome.Diagnostic)
+		}
+		if outcome.Diagnostic.Request.Context.FailureCauseChain[0] != "could not save the report file" || !strings.Contains(outcome.Diagnostic.Request.Context.FailureCauseChain[1], "write report file") || !strings.Contains(outcome.Diagnostic.Request.Context.FailureCauseChain[1], "permission denied") {
+			t.Fatalf("expected ordered write failure cause chain, got %#v", outcome.Diagnostic.Request.Context.FailureCauseChain)
+		}
 	})
 
 	t.Run("production calculation failure exposes pending diagnostics with original persisted record", func(t *testing.T) {
@@ -395,15 +408,26 @@ func TestReportServiceHelperFunctionsCoverRemainingBranches(t *testing.T) {
 		t.Fatalf("expected zero request time to fall back to current timestamps, got %#v", zeroAttempt)
 	}
 
-	var carrierContext = syncmodel.DiagnosticContext{FailureDetail: "carrier detail"}
+	var carrierContext = syncmodel.DiagnosticContext{FailureDetail: "carrier detail", FailureCauseChain: []string{"carrier detail", "carrier inner detail"}}
 	var fromCarrier = reportDiagnosticContextFromError(runtimeDiagnosticCarrierError{context: carrierContext})
-	if fromCarrier.FailureStage != carrierContext.FailureStage || fromCarrier.FailureDetail != carrierContext.FailureDetail || len(fromCarrier.Records) != len(carrierContext.Records) || fromCarrier.OffendingActivityRecord != carrierContext.OffendingActivityRecord {
+	if fromCarrier.FailureStage != carrierContext.FailureStage || fromCarrier.FailureDetail != carrierContext.FailureDetail || len(fromCarrier.FailureCauseChain) != len(carrierContext.FailureCauseChain) || len(fromCarrier.Records) != len(carrierContext.Records) || fromCarrier.OffendingActivityRecord != carrierContext.OffendingActivityRecord {
 		t.Fatalf("expected carrier context to be preserved, got %#v", fromCarrier)
 	}
 
-	var fromPlain = reportDiagnosticContextFromError(errors.New(" plain detail "))
+	var fallbackCarrier = reportDiagnosticContextFromError(runtimeDiagnosticCarrierError{context: syncmodel.DiagnosticContext{}})
+	if fallbackCarrier.FailureDetail != "carrier boom" {
+		t.Fatalf("expected empty carrier detail to fall back to error text, got %#v", fallbackCarrier)
+	}
+	if len(fallbackCarrier.FailureCauseChain) != 1 || fallbackCarrier.FailureCauseChain[0] != "carrier boom" {
+		t.Fatalf("expected empty carrier cause chain to fall back to error chain, got %#v", fallbackCarrier)
+	}
+
+	var fromPlain = reportDiagnosticContextFromError(fmt.Errorf("plain detail: %w", errors.New("lower detail")))
 	if fromPlain.FailureDetail != "plain detail" {
 		t.Fatalf("expected plain error detail fallback, got %#v", fromPlain)
+	}
+	if len(fromPlain.FailureCauseChain) != 2 || fromPlain.FailureCauseChain[0] != "plain detail" || fromPlain.FailureCauseChain[1] != "lower detail" {
+		t.Fatalf("expected plain wrapped cause chain fallback, got %#v", fromPlain)
 	}
 
 	var nonEligibleOutcome = service.reportFailureOutcome(
@@ -414,7 +438,7 @@ func TestReportServiceHelperFunctionsCoverRemainingBranches(t *testing.T) {
 		"warning",
 		syncmodel.DiagnosticContext{FailureDetail: "warning"},
 	)
-	if nonEligibleOutcome.Diagnostic.Eligible || nonEligibleOutcome.Diagnostic.Path != "" || nonEligibleOutcome.Diagnostic.Request.FailureReason != SyncFailureNone || nonEligibleOutcome.Diagnostic.Request.FailureCategory != ReportFailureNone || nonEligibleOutcome.Diagnostic.Request.ServerOrigin != "" || nonEligibleOutcome.Diagnostic.Request.Attempt != (SyncAttempt{}) || nonEligibleOutcome.Diagnostic.Request.Context.FailureStage != "" || nonEligibleOutcome.Diagnostic.Request.Context.FailureDetail != "" || len(nonEligibleOutcome.Diagnostic.Request.Context.Records) != 0 || nonEligibleOutcome.Diagnostic.Request.Context.OffendingActivityRecord != nil || nonEligibleOutcome.Diagnostic.Request.RedactFinancialValues || nonEligibleOutcome.Diagnostic.Request.ExplicitDevelopmentMode {
+	if nonEligibleOutcome.Diagnostic.Eligible || nonEligibleOutcome.Diagnostic.Path != "" || nonEligibleOutcome.Diagnostic.Request.FailureReason != SyncFailureNone || nonEligibleOutcome.Diagnostic.Request.FailureCategory != ReportFailureNone || nonEligibleOutcome.Diagnostic.Request.ServerOrigin != "" || nonEligibleOutcome.Diagnostic.Request.Attempt != (SyncAttempt{}) || nonEligibleOutcome.Diagnostic.Request.Context.FailureStage != "" || nonEligibleOutcome.Diagnostic.Request.Context.FailureDetail != "" || len(nonEligibleOutcome.Diagnostic.Request.Context.FailureCauseChain) != 0 || len(nonEligibleOutcome.Diagnostic.Request.Context.Records) != 0 || nonEligibleOutcome.Diagnostic.Request.Context.OffendingActivityRecord != nil || nonEligibleOutcome.Diagnostic.Request.RedactFinancialValues || nonEligibleOutcome.Diagnostic.Request.ExplicitDevelopmentMode {
 		t.Fatalf("expected non-eligible report failure to omit diagnostic state, got %#v", nonEligibleOutcome.Diagnostic)
 	}
 

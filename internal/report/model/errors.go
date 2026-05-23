@@ -5,8 +5,10 @@ package model
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
+	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
 
@@ -54,6 +56,7 @@ type CalculationError struct {
 	displayLabel string
 	record       *syncmodel.ActivityRecord
 	cause        error
+	causeChain   []string
 }
 
 // NewCalculationError creates one structured non-secret report-calculation
@@ -88,6 +91,7 @@ func NewCalculationError(kind CalculationErrorKind, message string, sourceID str
 		sourceID:     strings.TrimSpace(sourceID),
 		displayLabel: strings.TrimSpace(displayLabel),
 		cause:        cause,
+		causeChain:   calculationErrorCauseChain(detail, cause),
 	}
 }
 
@@ -176,6 +180,43 @@ func (e *CalculationError) DiagnosticReportContext() syncmodel.DiagnosticContext
 
 	return syncmodel.DiagnosticContext{
 		FailureDetail:           e.Error(),
+		FailureCauseChain:       slices.Clone(calculationErrorCauseChain(e.Error(), e.cause)),
 		OffendingActivityRecord: e.record,
 	}
+}
+
+// calculationErrorCauseChain builds one deterministic outer-to-inner wrapped
+// cause chain for diagnostics while leaving the user-visible detail unchanged.
+// Authored by: OpenCode
+func calculationErrorCauseChain(outerDetail string, cause error) []string {
+	var chain []string
+	var outer = strings.TrimSpace(outerDetail)
+	if outer != "" {
+		chain = append(chain, outer)
+	}
+
+	for current := cause; current != nil; current = unwrapSingle(current) {
+		var detail = strings.TrimSpace(redact.ErrorText(current))
+		if detail == "" {
+			continue
+		}
+		if len(chain) > 0 && chain[len(chain)-1] == detail {
+			continue
+		}
+		chain = append(chain, detail)
+	}
+
+	return chain
+}
+
+// unwrapSingle follows one wrapped error edge when available.
+// Authored by: OpenCode
+func unwrapSingle(err error) error {
+	if err == nil {
+		return nil
+	}
+	if unwrapper, ok := err.(interface{ Unwrap() error }); ok {
+		return unwrapper.Unwrap()
+	}
+	return nil
 }

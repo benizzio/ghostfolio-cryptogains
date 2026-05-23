@@ -150,6 +150,24 @@ func TestDiagnosticRecordMarshalJSONRendersExplicitNullFields(t *testing.T) {
 	}
 }
 
+func TestDiagnosticContextFailureCauseChainFieldPreservesOrdering(t *testing.T) {
+	t.Parallel()
+
+	var context = DiagnosticContext{
+		FailureDetail:     "outer failure",
+		FailureCauseChain: []string{"outer failure", "middle failure", "inner failure"},
+	}
+
+	var raw, err = json.Marshal(context)
+	if err != nil {
+		t.Fatalf("marshal diagnostic context: %v", err)
+	}
+	var text = string(raw)
+	if !strings.Contains(text, `"failure_cause_chain":["outer failure","middle failure","inner failure"]`) {
+		t.Fatalf("expected ordered cause chain in diagnostic context JSON, got %q", text)
+	}
+}
+
 func TestDiagnosticRecordUnmarshalJSONHandlesErrorAndNullFields(t *testing.T) {
 	t.Parallel()
 

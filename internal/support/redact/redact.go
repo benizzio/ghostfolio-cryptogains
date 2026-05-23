@@ -3,9 +3,21 @@
 // Authored by: OpenCode
 package redact
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 const replacement = "[REDACTED]"
+
+var obviousSecretPatterns = []struct {
+	pattern     *regexp.Regexp
+	replacement string
+}{
+	{pattern: regexp.MustCompile(`(?i)\b(token|jwt|payload)\s*[:=]\s*[^\s]+`), replacement: `$1=[REDACTED]`},
+	{pattern: regexp.MustCompile(`(?i)\b(token|jwt|payload)\s+[^\s]+`), replacement: `$1 [REDACTED]`},
+	{pattern: regexp.MustCompile(`(?i)\bBearer\s+[^\s]+`), replacement: `Bearer [REDACTED]`},
+}
 
 // Text removes known secret values from text that may be shown to users or
 // written into diagnostics.
@@ -23,6 +35,9 @@ func Text(input string, secrets ...string) string {
 			continue
 		}
 		redacted = strings.ReplaceAll(redacted, secret, replacement)
+	}
+	for _, secretPattern := range obviousSecretPatterns {
+		redacted = secretPattern.pattern.ReplaceAllString(redacted, secretPattern.replacement)
 	}
 	return redacted
 }

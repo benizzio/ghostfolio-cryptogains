@@ -4,6 +4,7 @@ package model
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -49,17 +50,44 @@ func TestCalculationErrorHandlesFallbacks(t *testing.T) {
 	if diagnosticContext.FailureDetail == "" || diagnosticContext.OffendingActivityRecord != persistedRecord {
 		t.Fatalf("expected calculation error to expose report diagnostic context, got %#v", diagnosticContext)
 	}
+	if len(diagnosticContext.FailureCauseChain) != 2 || diagnosticContext.FailureCauseChain[0] != err.Error() || diagnosticContext.FailureCauseChain[1] != "root cause" {
+		t.Fatalf("expected wrapped calculation cause chain, got %#v", diagnosticContext)
+	}
 
 	err = NewCalculationError(CalculationErrorKindInvalidRequest, "", "", "", nil)
 	if err.Error() != "unsupported report calculation" {
 		t.Fatalf("expected default calculation error message, got %q", err.Error())
+	}
+	if got := err.DiagnosticReportContext().FailureCauseChain; len(got) != 1 || got[0] != "unsupported report calculation" {
+		t.Fatalf("expected default calculation error cause chain, got %#v", got)
+	}
+
+	err = NewCalculationError(
+		CalculationErrorKindActivityInput,
+		"outer failure",
+		"source-2",
+		"ETH",
+		fmt.Errorf("lower token abc123 layer: %w", errors.New("Bearer jwt-secret")),
+	)
+	diagnosticContext = err.DiagnosticReportContext()
+	if len(diagnosticContext.FailureCauseChain) != 3 {
+		t.Fatalf("expected redacted wrapped cause chain, got %#v", diagnosticContext)
+	}
+	if diagnosticContext.FailureCauseChain[0] != err.Error() {
+		t.Fatalf("expected actionable outer failure first, got %#v", diagnosticContext.FailureCauseChain)
+	}
+	if !strings.Contains(diagnosticContext.FailureCauseChain[1], "token [REDACTED]") || diagnosticContext.FailureCauseChain[2] != "Bearer [REDACTED]" {
+		t.Fatalf("expected nested causes to be redacted, got %#v", diagnosticContext.FailureCauseChain)
+	}
+	if strings.Contains(strings.Join(diagnosticContext.FailureCauseChain, " "), "abc123") || strings.Contains(strings.Join(diagnosticContext.FailureCauseChain, " "), "jwt-secret") {
+		t.Fatalf("expected secret-bearing wrapped causes to be redacted, got %#v", diagnosticContext.FailureCauseChain)
 	}
 
 	var nilError *CalculationError
 	if nilError.Error() != "" {
 		t.Fatalf("expected nil calculation error string to be empty")
 	}
-	if got := nilError.DiagnosticReportContext(); got.FailureStage != "" || got.FailureDetail != "" || len(got.Records) != 0 || got.OffendingActivityRecord != nil {
+	if got := nilError.DiagnosticReportContext(); got.FailureStage != "" || got.FailureDetail != "" || len(got.FailureCauseChain) != 0 || len(got.Records) != 0 || got.OffendingActivityRecord != nil {
 		t.Fatalf("expected nil calculation error diagnostic context to be empty, got %#v", got)
 	}
 	if nilError.Unwrap() != nil {
@@ -73,6 +101,33 @@ func TestCalculationErrorHandlesFallbacks(t *testing.T) {
 	}
 	if nilError.DisplayLabel() != "" {
 		t.Fatalf("expected nil calculation error display label to be empty")
+	}
+}
+
+// TestCalculationErrorHelpersCoverRemainingBranches verifies blank wrapped
+// causes, duplicate suppression, blank outer detail fallback, and nil unwrap
+// handling for diagnostics helper paths.
+// Authored by: OpenCode
+func TestCalculationErrorHelpersCoverRemainingBranches(t *testing.T) {
+	t.Parallel()
+
+	var chain = calculationErrorCauseChain("   ", errors.New("inner cause"))
+	if len(chain) != 1 || chain[0] != "inner cause" {
+		t.Fatalf("expected blank outer detail to defer to wrapped cause, got %#v", chain)
+	}
+
+	chain = calculationErrorCauseChain("outer detail", errors.New("   "))
+	if len(chain) != 1 || chain[0] != "outer detail" {
+		t.Fatalf("expected blank wrapped cause detail to be ignored, got %#v", chain)
+	}
+
+	chain = calculationErrorCauseChain("same detail", errors.New("same detail"))
+	if len(chain) != 1 || chain[0] != "same detail" {
+		t.Fatalf("expected duplicate wrapped cause detail to be suppressed, got %#v", chain)
+	}
+
+	if unwrapSingle(nil) != nil {
+		t.Fatalf("expected nil unwrap helper input to return nil")
 	}
 }
 

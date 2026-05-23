@@ -537,12 +537,13 @@ func diagnosticContextFromError(
 	defaultStage syncmodel.DiagnosticFailureStage,
 	secrets ...string,
 ) syncmodel.DiagnosticContext {
-	var context = syncmodel.DiagnosticContext{
-		FailureStage:  defaultStage,
-		FailureDetail: redact.ErrorText(err, secrets...),
+	var diagnosticContext = syncmodel.DiagnosticContext{
+		FailureStage:      defaultStage,
+		FailureDetail:     diagnosticFailureDetail(err, secrets...),
+		FailureCauseChain: diagnosticCauseChainFromError(err, secrets...),
 	}
 	if err == nil {
-		return context
+		return diagnosticContext
 	}
 
 	var carrier interface {
@@ -552,15 +553,115 @@ func diagnosticContextFromError(
 		DiagnosticContext() syncmodel.DiagnosticContext
 	}); ok {
 		carrier = typed
-		context = carrier.DiagnosticContext()
-		if context.FailureStage == "" {
-			context.FailureStage = defaultStage
+		diagnosticContext = carrier.DiagnosticContext()
+		if diagnosticContext.FailureStage == "" {
+			diagnosticContext.FailureStage = defaultStage
 		}
-		context.FailureDetail = redact.Text(context.FailureDetail, secrets...)
-		return context
+		diagnosticContext.FailureDetail = redact.Text(diagnosticContext.FailureDetail, secrets...)
+		diagnosticContext.FailureCauseChain = redactDiagnosticCauseChain(
+			diagnosticContext.FailureCauseChain,
+			secrets...,
+		)
+		if diagnosticContext.FailureDetail == "" {
+			diagnosticContext.FailureDetail = diagnosticFailureDetail(err, secrets...)
+		}
+		if len(diagnosticContext.FailureCauseChain) == 0 {
+			diagnosticContext.FailureCauseChain = diagnosticCauseChainFromError(err, secrets...)
+		}
+		return diagnosticContext
 	}
 
-	return context
+	return diagnosticContext
+}
+
+// diagnosticFailureDetail keeps the actionable outer failure detail separate
+// from any wrapped lower-level cause text.
+// Authored by: OpenCode
+func diagnosticFailureDetail(err error, secrets ...string) string {
+	if err == nil {
+		return ""
+	}
+
+	var detail = strings.TrimSpace(redact.ErrorText(err, secrets...))
+	var cause = unwrapSingleError(err)
+	if cause == nil {
+		return detail
+	}
+
+	var causeDetail = strings.TrimSpace(redact.ErrorText(cause, secrets...))
+	if causeDetail == "" {
+		return detail
+	}
+
+	var suffix = ": " + causeDetail
+	if strings.HasSuffix(detail, suffix) {
+		return strings.TrimSpace(strings.TrimSuffix(detail, suffix))
+	}
+
+	return detail
+}
+
+// diagnosticCauseChainFromError extracts one deterministic outer-to-inner cause
+// chain from a wrapped error while keeping obvious secrets redacted.
+// Authored by: OpenCode
+func diagnosticCauseChainFromError(err error, secrets ...string) []string {
+	if err == nil {
+		return nil
+	}
+
+	var chain []string
+	var outerDetail = diagnosticFailureDetail(err, secrets...)
+	if outerDetail != "" {
+		chain = append(chain, outerDetail)
+	}
+
+	for current := unwrapSingleError(err); current != nil; current = unwrapSingleError(current) {
+		var detail = strings.TrimSpace(redact.ErrorText(current, secrets...))
+		if detail == "" {
+			continue
+		}
+		if len(chain) > 0 && chain[len(chain)-1] == detail {
+			continue
+		}
+		chain = append(chain, detail)
+	}
+
+	return chain
+}
+
+// redactDiagnosticCauseChain redacts secrets from one precomputed cause chain.
+// Authored by: OpenCode
+func redactDiagnosticCauseChain(entries []string, secrets ...string) []string {
+	if len(entries) == 0 {
+		return nil
+	}
+
+	var chain = make([]string, 0, len(entries))
+	for _, entry := range entries {
+		var detail = strings.TrimSpace(redact.Text(entry, secrets...))
+		if detail == "" {
+			continue
+		}
+		if len(chain) > 0 && chain[len(chain)-1] == detail {
+			continue
+		}
+		chain = append(chain, detail)
+	}
+
+	return chain
+}
+
+// unwrapSingleError follows one wrapped-error edge when available.
+// Authored by: OpenCode
+func unwrapSingleError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var unwrapper interface{ Unwrap() error }
+	if errors.As(err, &unwrapper) {
+		return unwrapper.Unwrap()
+	}
+	return nil
 }
 
 // clearSessionSecrets removes transient secret material from the active session.

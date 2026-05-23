@@ -103,6 +103,7 @@ type DiagnosticActivityRecord struct {
 type DiagnosticContext struct {
 	FailureStage            DiagnosticFailureStage `json:"failure_stage,omitempty"`
 	FailureDetail           string                 `json:"failure_detail,omitempty"`
+	FailureCauseChain       []string               `json:"failure_cause_chain,omitempty"`
 	Records                 []DiagnosticRecord     `json:"records,omitempty"`
 	OffendingActivityRecord *ActivityRecord        `json:"-"`
 }
