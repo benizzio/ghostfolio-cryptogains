@@ -66,6 +66,30 @@ func TestSelectActivityCalculationInputUsesAssetProfileTierWithoutMixing(t *test
 	assertSelectedContext(t, input, reportmodel.SelectedCurrencyContextAssetProfile, "EUR", "125", "0", "12.5")
 }
 
+// TestSelectActivityCalculationInputSkipsCurrencylessHigherTier verifies that a
+// higher-priority tier with financial values but no explicit currency is
+// skipped before completeness validation.
+// Authored by: OpenCode
+func TestSelectActivityCalculationInputSkipsCurrencylessHigherTier(t *testing.T) {
+	t.Parallel()
+
+	var record = pricedActivityRecord()
+	record.OrderCurrency = ""
+	record.OrderGrossValue = decimalPointer(t, "100")
+	record.OrderFeeAmount = decimalPointer(t, "1")
+	record.OrderUnitPrice = decimalPointer(t, "10")
+	record.AssetProfileCurrency = "EUR"
+	record.AssetProfileUnitPrice = decimalPointer(t, "12.5")
+	record.AssetProfileFeeAmount = decimalPointer(t, "0")
+
+	input, err := reportcalculate.SelectActivityCalculationInput(record)
+	if err != nil {
+		t.Fatalf("select activity input: %v", err)
+	}
+
+	assertSelectedContext(t, input, reportmodel.SelectedCurrencyContextAssetProfile, "EUR", "125", "0", "12.5")
+}
+
 // TestSelectActivityCalculationInputUsesBaseTierAndDerivesExactUnitPrice
 // verifies exact unit-price derivation from a complete base tier.
 // Authored by: OpenCode
@@ -87,10 +111,10 @@ func TestSelectActivityCalculationInputUsesBaseTierAndDerivesExactUnitPrice(t *t
 	assertSelectedContext(t, input, reportmodel.SelectedCurrencyContextBase, "GBP", "150", "5", "15")
 }
 
-// TestSelectActivityCalculationInputRejectsIncompleteHigherTier verifies that a
-// partial higher-priority tier fails instead of mixing with a lower tier.
+// TestSelectActivityCalculationInputSkipsIncompleteHigherTier verifies that an
+// unusable explicit-currency tier does not block a later complete tier.
 // Authored by: OpenCode
-func TestSelectActivityCalculationInputRejectsIncompleteHigherTier(t *testing.T) {
+func TestSelectActivityCalculationInputSkipsIncompleteHigherTier(t *testing.T) {
 	t.Parallel()
 
 	var record = pricedActivityRecord()
@@ -103,10 +127,12 @@ func TestSelectActivityCalculationInputRejectsIncompleteHigherTier(t *testing.T)
 	_, err := reportcalculate.SelectActivityCalculationInput(record)
 	if err == nil {
 		t.Fatalf("expected incomplete higher-priority tier to fail")
+	input, err := reportcalculate.SelectActivityCalculationInput(record)
+	if err != nil {
+		t.Fatalf("select activity input: %v", err)
 	}
-	if !strings.Contains(err.Error(), "order currency context is incomplete") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+
+	assertSelectedContext(t, input, reportmodel.SelectedCurrencyContextAssetProfile, "EUR", "100", "1", "10")
 }
 
 // TestSelectActivityCalculationInputRejectsMissingFeeInsteadOfTreatingZero
@@ -126,6 +152,30 @@ func TestSelectActivityCalculationInputRejectsMissingFeeInsteadOfTreatingZero(t 
 	if !strings.Contains(err.Error(), "base currency context is incomplete") {
 		t.Fatalf("unexpected error: %v", err)
 	}
+}
+
+// TestSelectActivityCalculationInputSkipsNonDerivableHigherTier verifies that a
+// later explicit-currency tier may still satisfy the input when an earlier
+// explicit-currency tier cannot derive one exact unit price safely.
+// Authored by: OpenCode
+func TestSelectActivityCalculationInputSkipsNonDerivableHigherTier(t *testing.T) {
+	t.Parallel()
+
+	var record = pricedActivityRecord()
+	record.Quantity = mustDecimal(t, "3")
+	record.OrderCurrency = "USD"
+	record.OrderGrossValue = decimalPointer(t, "1")
+	record.OrderFeeAmount = decimalPointer(t, "0")
+	record.BaseCurrency = "GBP"
+	record.BaseGrossValue = decimalPointer(t, "300")
+	record.BaseFeeAmount = decimalPointer(t, "0")
+
+	input, err := reportcalculate.SelectActivityCalculationInput(record)
+	if err != nil {
+		t.Fatalf("select activity input: %v", err)
+	}
+
+	assertSelectedContext(t, input, reportmodel.SelectedCurrencyContextBase, "GBP", "300", "0", "100")
 }
 
 // TestSelectActivityCalculationInputRejectsNonPositivePricedQuantity verifies
@@ -174,6 +224,29 @@ func TestSelectActivityCalculationInputRejectsNonTerminatingUnitPriceDerivation(
 	if !strings.Contains(err.Error(), "cannot be derived exactly") {
 		t.Fatalf("unexpected error: %v", err)
 	}
+}
+
+// TestSelectActivityCalculationInputPrefersGrossValueDerivation verifies that a
+// selected tier may derive gross value by multiplication before considering any
+// division-based fallback or lower-priority tier.
+// Authored by: OpenCode
+func TestSelectActivityCalculationInputPrefersGrossValueDerivation(t *testing.T) {
+	t.Parallel()
+
+	var record = pricedActivityRecord()
+	record.OrderCurrency = "USD"
+	record.OrderUnitPrice = decimalPointer(t, "12.5")
+	record.OrderFeeAmount = decimalPointer(t, "0")
+	record.BaseCurrency = "GBP"
+	record.BaseGrossValue = decimalPointer(t, "999")
+	record.BaseFeeAmount = decimalPointer(t, "9")
+
+	input, err := reportcalculate.SelectActivityCalculationInput(record)
+	if err != nil {
+		t.Fatalf("select activity input: %v", err)
+	}
+
+	assertSelectedContext(t, input, reportmodel.SelectedCurrencyContextOrder, "USD", "125", "0", "12.5")
 }
 
 // TestSelectActivityCalculationInputCreatesZeroPricedHoldingReduction verifies

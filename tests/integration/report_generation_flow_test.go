@@ -148,3 +148,66 @@ func TestReportGenerationOpenWarningPreservesSavedReportAndAllowsAnotherRun(t *t
 		t.Fatalf("expected Generate Another Report to return to report selection, got %s", model.ActiveScreen())
 	}
 }
+
+// TestReportGenerationSkipsCurrencylessOrderTier verifies the BUG-007
+// regression path where later explicit-currency values remain usable when a
+// higher-priority order tier carries financial values but no currency label.
+// Authored by: OpenCode
+func TestReportGenerationSkipsCurrencylessOrderTier(t *testing.T) {
+	var reportIO = testutil.NewReportIOFixture(t)
+	var openLogPath = installOpenCommandRecorder(t, 0)
+	var fixture = testutil.DeterministicReportLedgerFixture()
+	var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
+	var cache = fixture.ProtectedActivityCache
+	var filteredActivities = cache.Activities[:0]
+	for _, activity := range cache.Activities {
+		if activity.SourceID == "doge-buy-2025-incomplete-001" {
+			continue
+		}
+		filteredActivities = append(filteredActivities, activity)
+	}
+	cache.Activities = filteredActivities
+	cache.ActivityCount = len(filteredActivities)
+	cache.RetrievedCount = len(filteredActivities)
+
+	seedProtectedSnapshot(t, harness, "token-123", cache)
+
+	var model = unlockSyncReportsContext(t, harness.Model, "token-123")
+	model = openReportSelectionFromContext(t, model)
+	model = selectReportYear(t, model, fixture.CurrencylessOrderReportYear)
+	model, cmd := startReportGenerationFromSelection(t, model)
+	model = applyBatchCmd(t, model, cmd)
+
+	if model.ActiveScreen() != "report_result" {
+		t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
+	}
+	var content = normalizeRenderedText(model.View().Content)
+	if !strings.Contains(content, "Saved Markdown Path:") {
+		t.Fatalf("expected successful report result, got %q", content)
+	}
+
+	var files = mustMarkdownFiles(t, reportIO.DocumentsDir)
+	if len(files) != 1 {
+		t.Fatalf("expected one saved Markdown file, got %#v", files)
+	}
+	var reportPath = files[0]
+	testutil.AssertRegularFile(t, reportPath)
+
+	var openerRequests = readOpenCommandRequests(t, openLogPath)
+	if len(openerRequests) != 1 || openerRequests[0] != reportPath {
+		t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
+	}
+
+	var rawReport, err = os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read saved report %q: %v", reportPath, err)
+	}
+	var reportText = string(rawReport)
+	if !strings.Contains(reportText, "| sol-buy-2026-asset-tier-001 | BUY | 50 | 4000 | 0.5 | EUR |") {
+		t.Fatalf("expected saved report to show the later explicit-currency asset tier, got %q", reportText)
+	}
+	if strings.Contains(reportText, "| sol-buy-2026-asset-tier-001 | BUY | 50 | 4050 | 1 |") {
+		t.Fatalf("expected saved report to skip the currencyless order-tier monetary values, got %q", reportText)
+	}
+	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
+}

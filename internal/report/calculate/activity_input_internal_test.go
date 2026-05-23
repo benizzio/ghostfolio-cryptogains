@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/cockroachdb/apd/v3"
@@ -68,6 +69,84 @@ func TestActivityInputHelperBranches(t *testing.T) {
 	if value := informedGrossValue(&invalid, "USD", mustActivityInputDecimal(t, "1")); value != nil {
 		t.Fatalf("expected invalid gross-value derivation to return nil, got %v", value)
 	}
+}
+
+// TestActivityInputTierHelpersCoverRemainingBranches verifies direct helper
+// branches for explicit-currency tier derivation and guard behavior.
+// Authored by: OpenCode
+func TestActivityInputTierHelpersCoverRemainingBranches(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns nil when an explicit tier has neither gross value nor unit price", func(t *testing.T) {
+		var record = validActivityInputRecord(t)
+		var tier = activityMoneyTier{
+			name:         reportmodel.SelectedCurrencyContextBase,
+			currencyCode: "USD",
+			feeAmount:    activityInputDecimalPointer(t, "1"),
+			hasAnyValue:  true,
+		}
+
+		var grossValue, err = selectTierGrossValue(record, tier)
+		if err != nil {
+			t.Fatalf("select tier gross value: %v", err)
+		}
+		if grossValue != nil {
+			t.Fatalf("expected missing explicit tier gross value to stay nil, got %v", grossValue)
+		}
+
+		_, err = selectExplicitCurrencyTier(record, tier)
+		if err == nil || !strings.Contains(err.Error(), `activity "activity-1" base currency context is incomplete`) {
+			t.Fatalf("expected incomplete explicit tier failure, got %v", err)
+		}
+	})
+
+	t.Run("surfaces gross-value derivation failure from an explicit tier", func(t *testing.T) {
+		var invalid apd.Decimal
+		invalid.Form = apd.Infinite
+
+		var record = validActivityInputRecord(t)
+		_, err := selectExplicitCurrencyTier(record, activityMoneyTier{
+			name:         reportmodel.SelectedCurrencyContextOrder,
+			currencyCode: "USD",
+			unitPrice:    &invalid,
+			feeAmount:    activityInputDecimalPointer(t, "0"),
+			hasAnyValue:  true,
+		})
+		if err == nil || !strings.Contains(err.Error(), `activity "activity-1" order gross value cannot be derived from quantity and unit price`) {
+			t.Fatalf("expected gross-value derivation failure, got %v", err)
+		}
+	})
+
+	t.Run("returns nil unit price when gross value is absent", func(t *testing.T) {
+		var unitPrice, err = selectTierUnitPrice(validActivityInputRecord(t), activityMoneyTier{
+			name:         reportmodel.SelectedCurrencyContextAssetProfile,
+			currencyCode: "EUR",
+		}, nil)
+		if err != nil {
+			t.Fatalf("select tier unit price: %v", err)
+		}
+		if unitPrice != nil {
+			t.Fatalf("expected absent gross value to keep unit price nil, got %v", unitPrice)
+		}
+	})
+
+	t.Run("covers informed gross-value guard and success branches", func(t *testing.T) {
+		if value := informedGrossValue(activityInputDecimalPointer(t, "2"), "", mustActivityInputDecimal(t, "3")); value != nil {
+			t.Fatalf("expected uninformed tier gross value to stay nil, got %v", value)
+		}
+
+		var value = informedGrossValue(activityInputDecimalPointer(t, "2"), "USD", mustActivityInputDecimal(t, "3"))
+		if value == nil {
+			t.Fatalf("expected informed gross-value derivation to succeed")
+		}
+		var canonical, err = decimalsupport.CanonicalString(*value)
+		if err != nil {
+			t.Fatalf("canonicalize derived gross value: %v", err)
+		}
+		if canonical != "6" {
+			t.Fatalf("unexpected informed gross-value derivation: got %q want %q", canonical, "6")
+		}
+	})
 }
 
 // TestZeroPricedHoldingReductionHelpers verifies the direct helper branches for

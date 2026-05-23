@@ -23,11 +23,13 @@ import (
 //	}
 //	_ = input.SelectedCurrencyCode
 //
-// The selector applies the `order -> asset_profile -> base` priority, requires
-// the complete priced-activity monetary set from one tier only, preserves the
-// chosen explicit currency code, and leaves explained zero-priced `SELL`
-// records without a selected currency context while still preserving any
-// explicit zero-valued source details already stored for that row.
+// The selector applies the `order -> asset_profile -> base` priority, skips
+// tiers that do not carry an explicit currency code, continues past explicit-
+// currency tiers that still cannot safely supply one complete same-tier input,
+// preserves the chosen explicit currency code, and leaves explained zero-
+// priced `SELL` records without a selected currency context while still
+// preserving any explicit zero-valued source details already stored for that
+// row.
 // Authored by: OpenCode
 func SelectActivityCalculationInput(record syncmodel.ActivityRecord) (reportmodel.ActivityCalculationInput, error) {
 	var occurredAt, err = parseActivityOccurredAt(record)
@@ -85,13 +87,12 @@ func SelectActivityCalculationInput(record syncmodel.ActivityRecord) (reportmode
 // copied into the report activity input.
 // Authored by: OpenCode
 type activityMoneyTier struct {
-	name          reportmodel.SelectedCurrencyContext
-	currencyCode  string
-	unitPrice     *apd.Decimal
-	grossValue    *apd.Decimal
-	feeAmount     *apd.Decimal
-	hasAnyValue   bool
-	isCompleteSet bool
+	name         reportmodel.SelectedCurrencyContext
+	currencyCode string
+	unitPrice    *apd.Decimal
+	grossValue   *apd.Decimal
+	feeAmount    *apd.Decimal
+	hasAnyValue  bool
 }
 
 // zeroPricedHoldingReductionValues stores optional preserved source-field zeros
@@ -233,48 +234,115 @@ func selectPricedActivityTier(record syncmodel.ActivityRecord) (reportmodel.Acti
 		buildAssetProfileTier(record),
 		buildBaseTier(record),
 	}
+	var lastExplicitTierErr error
 
 	for _, tier := range tiers {
 		if !tier.hasAnyValue {
 			continue
 		}
-		if !tier.isCompleteSet {
-			return reportmodel.ActivityCalculationInput{}, fmt.Errorf(
-				"activity %q %s currency context is incomplete; provide gross value and fee from that tier only",
-				strings.TrimSpace(record.SourceID),
-				tier.name,
-			)
+		if strings.TrimSpace(tier.currencyCode) == "" {
+			continue
 		}
 
-		var unitPrice = tier.unitPrice
-		if unitPrice == nil {
-			var derivedUnitPrice apd.Decimal
-			var err error
-			derivedUnitPrice, _, err = decimalsupport.DivideExact(*tier.grossValue, record.Quantity)
-			if err != nil {
-				return reportmodel.ActivityCalculationInput{}, fmt.Errorf(
-					"activity %q %s unit price cannot be derived exactly from gross value and quantity: %w",
-					strings.TrimSpace(record.SourceID),
-					tier.name,
-					err,
-				)
-			}
-			unitPrice = &derivedUnitPrice
+		var tierInput reportmodel.ActivityCalculationInput
+		var err error
+		tierInput, err = selectExplicitCurrencyTier(record, tier)
+		if err != nil {
+			lastExplicitTierErr = err
+			continue
 		}
 
-		return reportmodel.ActivityCalculationInput{
-			GrossValue:              tier.grossValue,
-			FeeAmount:               tier.feeAmount,
-			UnitPrice:               unitPrice,
-			SelectedCurrencyContext: tier.name,
-			SelectedCurrencyCode:    tier.currencyCode,
-		}, nil
+		return tierInput, nil
+	}
+	if lastExplicitTierErr != nil {
+		return reportmodel.ActivityCalculationInput{}, lastExplicitTierErr
 	}
 
 	return reportmodel.ActivityCalculationInput{}, fmt.Errorf(
 		"activity %q priced activity requires one complete order, asset_profile, or base currency context",
 		strings.TrimSpace(record.SourceID),
 	)
+}
+
+// selectExplicitCurrencyTier validates and derives one complete priced-activity
+// input from a single explicit-currency tier.
+// Authored by: OpenCode
+func selectExplicitCurrencyTier(record syncmodel.ActivityRecord, tier activityMoneyTier) (reportmodel.ActivityCalculationInput, error) {
+	var grossValue, err = selectTierGrossValue(record, tier)
+	if err != nil {
+		return reportmodel.ActivityCalculationInput{}, err
+	}
+	if grossValue == nil || tier.feeAmount == nil {
+		return reportmodel.ActivityCalculationInput{}, fmt.Errorf(
+			"activity %q %s currency context is incomplete; provide or exactly derive gross value and fee from that tier only",
+			strings.TrimSpace(record.SourceID),
+			tier.name,
+		)
+	}
+
+	var unitPrice *apd.Decimal
+	unitPrice, err = selectTierUnitPrice(record, tier, grossValue)
+	if err != nil {
+		return reportmodel.ActivityCalculationInput{}, err
+	}
+
+	return reportmodel.ActivityCalculationInput{
+		GrossValue:              grossValue,
+		FeeAmount:               tier.feeAmount,
+		UnitPrice:               unitPrice,
+		SelectedCurrencyContext: tier.name,
+		SelectedCurrencyCode:    tier.currencyCode,
+	}, nil
+}
+
+// selectTierGrossValue returns one tier gross value, deriving it by same-tier
+// multiplication before any division-based fallback is considered.
+// Authored by: OpenCode
+func selectTierGrossValue(record syncmodel.ActivityRecord, tier activityMoneyTier) (*apd.Decimal, error) {
+	if tier.grossValue != nil {
+		return tier.grossValue, nil
+	}
+	if tier.unitPrice == nil {
+		return nil, nil
+	}
+
+	var derivedGrossValue, err = multiplyDecimal(record.Quantity, *tier.unitPrice)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"activity %q %s gross value cannot be derived from quantity and unit price: %w",
+			strings.TrimSpace(record.SourceID),
+			tier.name,
+			err,
+		)
+	}
+
+	return &derivedGrossValue, nil
+}
+
+// selectTierUnitPrice returns one tier unit price, deriving it only when exact
+// same-tier division is available.
+// Authored by: OpenCode
+func selectTierUnitPrice(record syncmodel.ActivityRecord, tier activityMoneyTier, grossValue *apd.Decimal) (*apd.Decimal, error) {
+	if tier.unitPrice != nil {
+		return tier.unitPrice, nil
+	}
+	if grossValue == nil {
+		return nil, nil
+	}
+
+	var derivedUnitPrice apd.Decimal
+	var err error
+	derivedUnitPrice, _, err = decimalsupport.DivideExact(*grossValue, record.Quantity)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"activity %q %s unit price cannot be derived exactly from gross value and quantity: %w",
+			strings.TrimSpace(record.SourceID),
+			tier.name,
+			err,
+		)
+	}
+
+	return &derivedUnitPrice, nil
 }
 
 // buildOrderTier collects the order-tier priced-activity values.
@@ -284,13 +352,12 @@ func buildOrderTier(record syncmodel.ActivityRecord) activityMoneyTier {
 	var hasAnyValue = record.OrderUnitPrice != nil || record.OrderGrossValue != nil || record.OrderFeeAmount != nil
 
 	return activityMoneyTier{
-		name:          reportmodel.SelectedCurrencyContextOrder,
-		currencyCode:  currency,
-		unitPrice:     informedTierValue(record.OrderUnitPrice, currency),
-		grossValue:    informedTierValue(record.OrderGrossValue, currency),
-		feeAmount:     informedTierValue(record.OrderFeeAmount, currency),
-		hasAnyValue:   hasAnyValue,
-		isCompleteSet: currency != "" && record.OrderGrossValue != nil && record.OrderFeeAmount != nil,
+		name:         reportmodel.SelectedCurrencyContextOrder,
+		currencyCode: currency,
+		unitPrice:    informedTierValue(record.OrderUnitPrice, currency),
+		grossValue:   informedTierValue(record.OrderGrossValue, currency),
+		feeAmount:    informedTierValue(record.OrderFeeAmount, currency),
+		hasAnyValue:  hasAnyValue,
 	}
 }
 
@@ -301,13 +368,11 @@ func buildAssetProfileTier(record syncmodel.ActivityRecord) activityMoneyTier {
 	var hasAnyValue = record.AssetProfileUnitPrice != nil || record.AssetProfileFeeAmount != nil
 
 	return activityMoneyTier{
-		name:          reportmodel.SelectedCurrencyContextAssetProfile,
-		currencyCode:  currency,
-		unitPrice:     informedTierValue(record.AssetProfileUnitPrice, currency),
-		grossValue:    informedGrossValue(record.AssetProfileUnitPrice, currency, record.Quantity),
-		feeAmount:     informedTierValue(record.AssetProfileFeeAmount, currency),
-		hasAnyValue:   hasAnyValue,
-		isCompleteSet: currency != "" && record.AssetProfileUnitPrice != nil && record.AssetProfileFeeAmount != nil,
+		name:         reportmodel.SelectedCurrencyContextAssetProfile,
+		currencyCode: currency,
+		unitPrice:    informedTierValue(record.AssetProfileUnitPrice, currency),
+		feeAmount:    informedTierValue(record.AssetProfileFeeAmount, currency),
+		hasAnyValue:  hasAnyValue,
 	}
 }
 
@@ -318,12 +383,11 @@ func buildBaseTier(record syncmodel.ActivityRecord) activityMoneyTier {
 	var hasAnyValue = record.BaseGrossValue != nil || record.BaseFeeAmount != nil
 
 	return activityMoneyTier{
-		name:          reportmodel.SelectedCurrencyContextBase,
-		currencyCode:  currency,
-		grossValue:    informedTierValue(record.BaseGrossValue, currency),
-		feeAmount:     informedTierValue(record.BaseFeeAmount, currency),
-		hasAnyValue:   hasAnyValue,
-		isCompleteSet: currency != "" && record.BaseGrossValue != nil && record.BaseFeeAmount != nil,
+		name:         reportmodel.SelectedCurrencyContextBase,
+		currencyCode: currency,
+		grossValue:   informedTierValue(record.BaseGrossValue, currency),
+		feeAmount:    informedTierValue(record.BaseFeeAmount, currency),
+		hasAnyValue:  hasAnyValue,
 	}
 }
 

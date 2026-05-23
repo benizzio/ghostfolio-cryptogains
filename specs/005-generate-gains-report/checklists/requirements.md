@@ -65,7 +65,7 @@
 - Automatic-open failure after save is non-fatal and keeps the saved file in place.
 - App-managed storage is expected to contain no Markdown report content or generated-report catalog. Eligible failed sync or report attempts may still write separate `.diagnostic.json` artifacts under the application-owned diagnostics directory.
 - Verified on 2026-05-21 for successful-report leakage paths through runtime-backed integration coverage and artifact inspection: `tests/integration/report_generation_flow_test.go`, `tests/integration/report_failure_flow_test.go`, `tests/integration/report_cost_basis_methods_flow_test.go`, and `tests/integration/report_performance_flow_test.go` all call `assertNoCleartextReportInAppStorage(t, harness.BaseDir)`, which walks plaintext application artifacts under `<baseDir>/ghostfolio-cryptogains/` and fails on any `.md` file or persisted report header marker. Workspace inspection after that verification run also found no `ghostfolio-capital-gains-*.md` files under the repository worktree.
-- BUG-006 extends this review to diagnostics artifacts. Fresh runtime-backed verification that generated `.diagnostic.json` files stay outside Documents, disclose only the intended path, and do not reintroduce cleartext Markdown copies remains tracked by `T064`.
+- Reverified on 2026-05-23 after the BUG-006 and BUG-007 regression additions. Fresh `make test`, targeted runtime-backed success and failure regressions, and workspace inspection showed no `ghostfolio-capital-gains-*.md` files and no `.diagnostic.json` files under the repository worktree. Diagnostics paths remain disclosed separately from Documents, and the report-failure integrations continue asserting `assertNoCleartextReportInAppStorage(t, harness.BaseDir)`.
 
 ### Report-Failure Diagnostics Artifact Review Evidence
 
@@ -85,7 +85,7 @@
 - `spec.md` requires absent source fields in report-failure and synced-data diagnostics to render as explicit `null` values.
 - `data-model.md` now records that nullable source fields in serialized offending-record output must render as explicit `null` values.
 - `quickstart.md` now includes manual inspection guidance for explicit `null` rendering in generated diagnostics artifacts.
-- Full rerun evidence for synced-data and report-failure explicit-`null` regression paths remains tracked by `T062`.
+- Reverified on 2026-05-23 through `make test` and `make coverage`, including `tests/integration/report_failure_flow_test.go`, `tests/integration/sync_diagnostic_report_flow_test.go`, and `tests/integration/diagnostic_redaction_test.go`, which exercise explicit `null` rendering for report-failure and synced-data diagnostics.
 
 ### Currency-Context Selection Evidence
 
@@ -94,7 +94,7 @@
 - `data-model.md` now constrains `ActivityCalculationInput` so a chosen context requires `selected_currency_code`, eligible tiers must have explicit currency, and derivations stay inside one selected tier.
 - `contracts/markdown-report.md` now states that priced-row `Activity Currency` reflects the actual selected lower-priority explicit tier when higher-priority tiers were skipped for missing currency.
 - `quickstart.md` now includes manual and fixture verification for the production-shaped `order_currency = null` regression, multiplication-based gross derivation, and failure only after all explicit-currency tiers are unusable.
-- Fresh runtime-backed verification for the currencyless-order-tier regression paths remains tracked by `T062`.
+- Reverified on 2026-05-23 through `tests/unit/report_activity_input_test.go`, `internal/report/calculate/activity_input_internal_test.go`, `tests/integration/report_generation_flow_test.go`, and `tests/integration/report_failure_flow_test.go`, which now cover skipping currencyless higher tiers, same-tier multiplication before division fallback, successful lower-priority explicit-currency selection, and terminal failure only after explicit-currency tiers are exhausted.
 
 ### Dependency And API Review Evidence
 

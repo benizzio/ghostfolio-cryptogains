@@ -191,6 +191,76 @@ func TestReportGenerationIncompleteMonetaryContextAutoGeneratesDiagnosticsInExpl
 	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
 }
 
+// TestReportGenerationIncompleteMonetaryContextFailsAfterAllExplicitCurrencyTiers
+// verifies that a currencyless higher-priority tier is skipped and failure
+// occurs only after the remaining explicit-currency tiers are exhausted.
+// Authored by: OpenCode
+func TestReportGenerationIncompleteMonetaryContextFailsAfterAllExplicitCurrencyTiers(t *testing.T) {
+	var reportIO = testutil.NewReportIOFixture(t)
+	var openLogPath = installOpenCommandRecorder(t, 0)
+	var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
+
+	var cache = syncmodel.ProtectedActivityCache{
+		SyncedAt:             time.Date(2026, time.May, 20, 15, 4, 5, 0, time.UTC),
+		RetrievedCount:       1,
+		ActivityCount:        1,
+		AvailableReportYears: []int{2026},
+		Activities: []syncmodel.ActivityRecord{{
+			SourceID:              "ada-buy-2026-currencyless-order-incomplete-001",
+			OccurredAt:            "2026-02-01T12:00:00Z",
+			ActivityType:          syncmodel.ActivityTypeBuy,
+			AssetIdentityKey:      "asset-ada-002",
+			AssetSymbol:           "ADA",
+			AssetName:             "Cardano",
+			Quantity:              mustReportFlowDecimal(t, "10"),
+			OrderUnitPrice:        reportFlowDecimalPointer(t, "1"),
+			OrderGrossValue:       reportFlowDecimalPointer(t, "10"),
+			OrderFeeAmount:        reportFlowDecimalPointer(t, "0"),
+			AssetProfileCurrency:  "EUR",
+			AssetProfileUnitPrice: reportFlowDecimalPointer(t, "2"),
+			BaseCurrency:          "USD",
+			BaseGrossValue:        reportFlowDecimalPointer(t, "30"),
+			DataSource:            "integration-report-fixture",
+			RawHash:               "ada-buy-2026-currencyless-order-incomplete-001",
+		}},
+	}
+
+	seedProtectedSnapshot(t, harness, "token-123", cache)
+
+	var model = unlockSyncReportsContext(t, harness.Model, "token-123")
+	model = openReportSelectionFromContext(t, model)
+	model = selectReportYear(t, model, 2026)
+	model, cmd := startReportGenerationFromSelection(t, model)
+	model = applyBatchCmd(t, model, cmd)
+
+	if model.ActiveScreen() != "report_result" {
+		t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
+	}
+
+	var content = normalizeRenderedText(model.View().Content)
+	for _, expected := range []string{
+		"Failure Category: unsupported report calculation",
+		"ADA",
+		"incomplete",
+		"No report file was saved.",
+	} {
+		if !strings.Contains(content, expected) {
+			t.Fatalf("expected failure result to contain %q, got %q", expected, content)
+		}
+	}
+	if !strings.Contains(strings.ReplaceAll(content, " ", ""), "ada-buy-2026-currencyless-order-incomplete-001") {
+		t.Fatalf("expected failure result to reference the offending source ID, got %q", content)
+	}
+
+	if files := mustMarkdownFiles(t, reportIO.DocumentsDir); len(files) != 0 {
+		t.Fatalf("expected no saved Markdown report after exhausted explicit-currency failure, got %#v", files)
+	}
+	if openerRequests := readOpenCommandRequests(t, openLogPath); len(openerRequests) != 0 {
+		t.Fatalf("expected no opener request after exhausted explicit-currency failure, got %#v", openerRequests)
+	}
+	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
+}
+
 // TestReportGenerationDocumentsUnavailableShowsFailure verifies the save
 // failure path when the resolved Documents directory is missing.
 // Authored by: OpenCode

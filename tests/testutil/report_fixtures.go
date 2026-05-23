@@ -19,6 +19,7 @@ type ReportLedgerFixture struct {
 	ProtectedActivityCache      syncmodel.ProtectedActivityCache
 	PrimaryReportYear           int
 	IncompleteContextReportYear int
+	CurrencylessOrderReportYear int
 	ExpectedReports             map[reportmodel.CostBasisMethod]ExpectedReportLedger
 }
 
@@ -113,7 +114,9 @@ type ExpectedLiquidationSummary struct {
 // includes activity before, within, and after the primary report year, multiple
 // asset timelines, one production-shaped explained zero-priced holding
 // reduction that preserves explicit zero-valued source fields, one priced row
-// with an explicit zero fee, mixed amount-source tiers, and scope variation.
+// with an explicit zero fee, one priced BUY whose order tier is currencyless
+// while later tiers remain usable, mixed amount-source tiers, and scope
+// variation.
 //
 // Authored by: OpenCode
 func DeterministicReportLedgerFixture() ReportLedgerFixture {
@@ -357,9 +360,15 @@ func DeterministicReportLedgerFixture() ReportLedgerFixture {
 			AssetSymbol:           "SOL",
 			AssetName:             "Solana",
 			Quantity:              "50",
+			OrderUnitPrice:        "81",
+			OrderGrossValue:       "4050",
+			OrderFeeAmount:        "1",
 			AssetProfileCurrency:  "EUR",
 			AssetProfileUnitPrice: "80",
 			AssetProfileFeeAmount: "0.5",
+			BaseCurrency:          "USD",
+			BaseGrossValue:        "4300",
+			BaseFeeAmount:         "0.75",
 			SourceScope:           reliableWalletScope("wallet-growth", "Growth Wallet"),
 		}),
 	}
@@ -375,6 +384,7 @@ func DeterministicReportLedgerFixture() ReportLedgerFixture {
 		},
 		PrimaryReportYear:           2024,
 		IncompleteContextReportYear: 2025,
+		CurrencylessOrderReportYear: 2026,
 		ExpectedReports:             deterministicExpectedReportsByMethod(),
 	}
 }
