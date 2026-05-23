@@ -124,9 +124,6 @@ func TestSelectActivityCalculationInputSkipsIncompleteHigherTier(t *testing.T) {
 	record.AssetProfileUnitPrice = decimalPointer(t, "10")
 	record.AssetProfileFeeAmount = decimalPointer(t, "1")
 
-	_, err := reportcalculate.SelectActivityCalculationInput(record)
-	if err == nil {
-		t.Fatalf("expected incomplete higher-priority tier to fail")
 	input, err := reportcalculate.SelectActivityCalculationInput(record)
 	if err != nil {
 		t.Fatalf("select activity input: %v", err)
