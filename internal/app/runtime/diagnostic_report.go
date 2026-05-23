@@ -34,16 +34,18 @@ const (
 // written for eligible synced-data failures.
 // Authored by: OpenCode
 type diagnosticReportDocument struct {
-	SchemaVersion           int                              `json:"schema_version"`
-	GeneratedAt             time.Time                        `json:"generated_at"`
-	FailureReason           SyncFailureReason                `json:"failure_reason"`
-	ServerOrigin            string                           `json:"server_origin"`
-	ExplicitDevelopmentMode bool                             `json:"explicit_development_mode"`
-	FinancialValuesRedacted bool                             `json:"financial_values_redacted"`
-	Attempt                 diagnosticAttemptDocument        `json:"attempt"`
-	FailureStage            syncmodel.DiagnosticFailureStage `json:"failure_stage,omitempty"`
-	FailureDetail           string                           `json:"failure_detail,omitempty"`
-	Records                 []syncmodel.DiagnosticRecord     `json:"records,omitempty"`
+	SchemaVersion           int                                 `json:"schema_version"`
+	GeneratedAt             time.Time                           `json:"generated_at"`
+	FailureReason           SyncFailureReason                   `json:"failure_reason,omitempty"`
+	FailureCategory         ReportFailureReason                 `json:"failure_category,omitempty"`
+	ServerOrigin            string                              `json:"server_origin"`
+	ExplicitDevelopmentMode bool                                `json:"explicit_development_mode"`
+	FinancialValuesRedacted bool                                `json:"financial_values_redacted"`
+	Attempt                 diagnosticAttemptDocument           `json:"attempt"`
+	FailureStage            syncmodel.DiagnosticFailureStage    `json:"failure_stage,omitempty"`
+	FailureDetail           string                              `json:"failure_detail,omitempty"`
+	Records                 []syncmodel.DiagnosticRecord        `json:"records,omitempty"`
+	OffendingActivityRecord *syncmodel.DiagnosticActivityRecord `json:"offending_activity_record,omitempty"`
 }
 
 // diagnosticAttemptDocument stores the structured attempt lifecycle context
@@ -68,7 +70,9 @@ func writeDiagnosticReport(
 		return "", err
 	}
 	if request.FailureReason == SyncFailureNone {
-		return "", fmt.Errorf("diagnostic report requires a failure reason")
+		if request.FailureCategory == ReportFailureNone {
+			return "", fmt.Errorf("diagnostic report requires a failure reason or category")
+		}
 	}
 	if request.ServerOrigin == "" {
 		return "", fmt.Errorf("diagnostic report requires a server origin")
@@ -114,6 +118,7 @@ func buildDiagnosticReportDocument(
 		SchemaVersion:           diagnosticReportVersion,
 		GeneratedAt:             generatedAt,
 		FailureReason:           request.FailureReason,
+		FailureCategory:         request.FailureCategory,
 		ServerOrigin:            request.ServerOrigin,
 		ExplicitDevelopmentMode: request.ExplicitDevelopmentMode,
 		FinancialValuesRedacted: request.RedactFinancialValues,
@@ -124,9 +129,10 @@ func buildDiagnosticReportDocument(
 			CompletedAt:             request.Attempt.CompletedAt,
 			ServerMismatchConfirmed: request.Attempt.ServerMismatchConfirmed,
 		},
-		FailureStage:  context.FailureStage,
-		FailureDetail: context.FailureDetail,
-		Records:       context.Records,
+		FailureStage:            context.FailureStage,
+		FailureDetail:           context.FailureDetail,
+		Records:                 context.Records,
+		OffendingActivityRecord: diagnosticOffendingActivityRecord(context, request.RedactFinancialValues),
 	}
 }
 
@@ -149,6 +155,23 @@ func redactDiagnosticContext(context syncmodel.DiagnosticContext) syncmodel.Diag
 
 	context.Records = records
 	return context
+}
+
+// diagnosticOffendingActivityRecord converts one optional offending activity
+// record from runtime context into the persisted document shape.
+// Authored by: OpenCode
+func diagnosticOffendingActivityRecord(context syncmodel.DiagnosticContext, redactFinancialValues bool) *syncmodel.DiagnosticActivityRecord {
+	if context.OffendingActivityRecord == nil {
+		return nil
+	}
+
+	var record = syncmodel.DiagnosticActivityRecordFromActivityRecord(*context.OffendingActivityRecord)
+	if redactFinancialValues {
+		redactedRecord := record.RedactFinancialValues()
+		return &redactedRecord
+	}
+
+	return &record
 }
 
 // resolveBaseConfigDir returns the configured application-data root used for

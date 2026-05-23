@@ -7,6 +7,7 @@ import (
 	"context"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
 
 // SyncReportsUnlockState identifies how one Sync and Reports unlock attempt
@@ -73,7 +74,10 @@ const (
 // attempt.
 // Authored by: OpenCode
 type ReportGenerationRequest struct {
-	Request reportmodel.ReportRequest
+	Request                 reportmodel.ReportRequest
+	AttemptID               string
+	ServerOrigin            string
+	ExplicitDevelopmentMode bool
 }
 
 // ReportOutcome stores the structured result of one completed report attempt.
@@ -82,8 +86,17 @@ type ReportOutcome struct {
 	Success       bool
 	Message       string
 	FailureReason ReportFailureReason
+	Attempt       SyncAttempt
 	Request       reportmodel.ReportRequest
 	OutputFile    reportmodel.ReportOutputFile
+	Diagnostic    DiagnosticReportState
+}
+
+// ReportFailureDiagnosticCarrier exposes original persisted-record context for
+// one report-generation failure when such context exists.
+// Authored by: OpenCode
+type ReportFailureDiagnosticCarrier interface {
+	DiagnosticReportContext() syncmodel.DiagnosticContext
 }
 
 // SyncReportsContextResult stores the unlocked selected-server protected-data

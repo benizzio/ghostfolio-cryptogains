@@ -24,6 +24,8 @@ func (m *Model) updateReport(message tea.Msg) (tea.Model, tea.Cmd) {
 	switch typedMessage := message.(type) {
 	case reportFinishedMsg:
 		return m.handleReportFinished(typedMessage)
+	case diagnosticReportFinishedMsg:
+		return m.handleDiagnosticReportFinished(typedMessage)
 	case spinner.TickMsg:
 		if m.active != reportBusyScreenKey || !m.report.Busy {
 			return m, nil
@@ -154,7 +156,12 @@ func (m *Model) startReportGeneration() (tea.Model, tea.Cmd) {
 	m.spinner = spinner.New(spinner.WithSpinner(spinner.Line))
 	return m, tea.Batch(
 		m.spinner.Tick,
-		m.reportCmd(context.Background(), m.report.AttemptID, runtime.ReportGenerationRequest{Request: validatedRequest}),
+		m.reportCmd(context.Background(), m.report.AttemptID, runtime.ReportGenerationRequest{
+			Request:                 validatedRequest,
+			AttemptID:               m.report.AttemptID,
+			ServerOrigin:            m.currentServerOrigin(),
+			ExplicitDevelopmentMode: m.deps.Options.AllowDevHTTP,
+		}),
 	)
 }
 
@@ -185,6 +192,22 @@ func (m *Model) handleReportResultKey(message tea.KeyPressMsg) (tea.Model, tea.C
 			m.report.ActionIndex++
 		}
 	case key.Matches(message, enterBinding()):
+		if m.reportOutcomeHasPendingDiagnostic() {
+			switch m.report.ActionIndex {
+			case 0:
+				return m.generateDiagnosticReport()
+			case 1:
+				m.clearTransientReportState()
+				m.active = syncReportsMenuScreenKey
+				m.sync.MenuIndex = 1
+				return m, nil
+			default:
+				m.clearTransientReportState()
+				m.enterReportSelection()
+				return m, nil
+			}
+		}
+
 		if m.report.ActionIndex == 0 {
 			m.clearTransientReportState()
 			m.active = syncReportsMenuScreenKey

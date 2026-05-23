@@ -35,6 +35,7 @@ type ActivityCalculationInput struct {
 	OccurredAt                   time.Time
 	SourceYear                   int
 	ActivityType                 syncmodel.ActivityType
+	PersistedActivityRecord      *syncmodel.ActivityRecord
 	AssetIdentityKey             string
 	DisplayLabel                 string
 	Quantity                     apd.Decimal

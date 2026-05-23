@@ -122,10 +122,11 @@ type ProtectedDataState struct {
 }
 
 // DiagnosticReportRequest stores the structured data needed to write one local
-// synced-data diagnostic report.
+// synced-data or report-failure diagnostic report.
 // Authored by: OpenCode
 type DiagnosticReportRequest struct {
 	FailureReason           SyncFailureReason
+	FailureCategory         ReportFailureReason
 	ServerOrigin            string
 	Attempt                 SyncAttempt
 	Context                 syncmodel.DiagnosticContext
@@ -137,7 +138,8 @@ type DiagnosticReportRequest struct {
 // available for the current failure outcome and where it was written.
 // Authored by: OpenCode
 type DiagnosticReportState struct {
-	Eligible bool
-	Path     string
-	Request  DiagnosticReportRequest
+	Eligible          bool
+	Path              string
+	GenerationMessage string
+	Request           DiagnosticReportRequest
 }

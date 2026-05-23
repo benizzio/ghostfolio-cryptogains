@@ -240,14 +240,10 @@ func (m *Model) activateSyncReportsUnlockSelection() (tea.Model, tea.Cmd) {
 	if m.sync.MenuIndex < 0 || m.sync.MenuIndex >= len(menuItems) || !menuItems[m.sync.MenuIndex].Enabled {
 		return m, nil
 	}
-	switch m.sync.MenuIndex {
-	case 0:
+	if m.sync.MenuIndex == 0 {
 		return m.unlockSyncReportsContext()
-	case 1:
-		return m.leaveSyncReportsUnlock()
-	default:
-		return m, nil
 	}
+	return m.leaveSyncReportsUnlock()
 }
 
 // startSync validates token input and starts one asynchronous sync run.

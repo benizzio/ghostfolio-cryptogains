@@ -4,9 +4,11 @@
 package integration
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -116,13 +118,77 @@ func TestReportGenerationIncompleteMonetaryContextShowsFailure(t *testing.T) {
 	if openerRequests := readOpenCommandRequests(t, openLogPath); len(openerRequests) != 0 {
 		t.Fatalf("expected no opener request after calculation failure, got %#v", openerRequests)
 	}
+	if files := mustDiagnosticFiles(t, harness.BaseDir); len(files) != 0 {
+		t.Fatalf("expected production mode to defer report diagnostics until explicit choice, got %#v", files)
+	}
 	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
 
-	var updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	var updated tea.Model
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = assertFlowModel(t, updated)
+	if !strings.Contains(normalizeRenderedText(model.View().Content), "Generating diagnostic report...") {
+		t.Fatalf("expected report result diagnostics busy state, got %q", model.View().Content)
+	}
+	updated, _ = model.Update(testutil.RunCmd(cmd))
+	model = assertFlowModel(t, updated)
+	content = normalizeRenderedText(model.View().Content)
+	if !strings.Contains(content, "Diagnostic Report Path:") {
+		t.Fatalf("expected report diagnostics path disclosure, got %q", content)
+	}
+	var diagnosticFiles = mustDiagnosticFiles(t, harness.BaseDir)
+	if len(diagnosticFiles) != 1 {
+		t.Fatalf("expected one report diagnostics artifact after explicit choice, got %#v", diagnosticFiles)
+	}
+	assertReportFailureDiagnosticArtifact(t, diagnosticFiles[0], false)
+
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = assertFlowModel(t, updated)
 	if model.ActiveScreen() != "sync_reports_menu" {
 		t.Fatalf("expected failure dismissal to return to sync and reports menu, got %s", model.ActiveScreen())
 	}
+}
+
+// TestReportGenerationIncompleteMonetaryContextAutoGeneratesDiagnosticsInExplicitDevelopmentMode
+// verifies the explicit-development diagnostics path for activity-specific
+// report failures.
+// Authored by: OpenCode
+func TestReportGenerationIncompleteMonetaryContextAutoGeneratesDiagnosticsInExplicitDevelopmentMode(t *testing.T) {
+	var reportIO = testutil.NewReportIOFixture(t)
+	var openLogPath = installOpenCommandRecorder(t, 0)
+	var fixture = testutil.DeterministicReportLedgerFixture()
+	var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), true)
+
+	seedProtectedSnapshot(t, harness, "token-123", fixture.ProtectedActivityCache)
+
+	var model = unlockSyncReportsContext(t, harness.Model, "token-123")
+	model = openReportSelectionFromContext(t, model)
+	model = selectReportYear(t, model, fixture.IncompleteContextReportYear)
+	model, cmd := startReportGenerationFromSelection(t, model)
+	model = applyBatchCmd(t, model, cmd)
+
+	if model.ActiveScreen() != "report_result" {
+		t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
+	}
+
+	var content = normalizeRenderedText(model.View().Content)
+	if strings.Contains(content, "Generate Diagnostic Report") {
+		t.Fatalf("expected explicit development mode to skip the prompt, got %q", content)
+	}
+	if !strings.Contains(content, "Diagnostic Report Path:") {
+		t.Fatalf("expected explicit-development diagnostics path disclosure, got %q", content)
+	}
+	if files := mustMarkdownFiles(t, reportIO.DocumentsDir); len(files) != 0 {
+		t.Fatalf("expected no Markdown report after calculation failure, got %#v", files)
+	}
+	if openerRequests := readOpenCommandRequests(t, openLogPath); len(openerRequests) != 0 {
+		t.Fatalf("expected no opener request after calculation failure, got %#v", openerRequests)
+	}
+	var diagnosticFiles = mustDiagnosticFiles(t, harness.BaseDir)
+	if len(diagnosticFiles) != 1 {
+		t.Fatalf("expected one auto-generated report diagnostics artifact, got %#v", diagnosticFiles)
+	}
+	assertReportFailureDiagnosticArtifact(t, diagnosticFiles[0], true)
+	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
 }
 
 // TestReportGenerationDocumentsUnavailableShowsFailure verifies the save
@@ -236,7 +302,9 @@ func runReportGenerationWriteFailureScenario(t *testing.T) {
 	}
 	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
 
-	var updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	var updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	model = assertFlowModel(t, updated)
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = assertFlowModel(t, updated)
 	if model.ActiveScreen() != "sync_reports_menu" {
 		t.Fatalf("expected write-failure dismissal to return to sync and reports menu, got %s", model.ActiveScreen())
@@ -312,4 +380,60 @@ func reportFlowDecimalPointer(t *testing.T, raw string) *apd.Decimal {
 
 	var value = mustReportFlowDecimal(t, raw)
 	return &value
+}
+
+// assertReportFailureDiagnosticArtifact verifies one report-failure diagnostic
+// artifact for BUG-006 source-faithful persisted-record behavior.
+// Authored by: OpenCode
+func assertReportFailureDiagnosticArtifact(t *testing.T, path string, expectFinancialValues bool) {
+	t.Helper()
+
+	testutil.AssertRegularFile(t, path)
+	if filepath.Ext(path) != ".json" {
+		t.Fatalf("expected diagnostic artifact path, got %q", path)
+	}
+	var raw, err = os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read report diagnostics artifact: %v", err)
+	}
+	var text = string(raw)
+	if strings.Contains(text, "token-123") || strings.Contains(text, "jwt") || strings.Contains(text, "Ghostfolio Capital Gains And Losses Report") {
+		t.Fatalf("expected report diagnostics artifact to remain secret-safe and report-free, got %q", text)
+	}
+	for _, expected := range []string{
+		`"failure_category": "unsupported report calculation"`,
+		`"offending_activity_record"`,
+		`"source_id": "doge-buy-2025-incomplete-001"`,
+		`"asset_identity_key": "asset-doge-001"`,
+		`"order_currency": "USD"`,
+		`"asset_profile_currency": null`,
+		`"base_currency": null`,
+		`"source_scope": {`,
+		`"id": "wallet-speculative"`,
+	} {
+		if !strings.Contains(text, expected) {
+			t.Fatalf("expected diagnostics artifact to contain %q, got %q", expected, text)
+		}
+	}
+	if strings.Contains(text, `"selected_currency_context"`) || strings.Contains(text, `"activity_currency"`) {
+		t.Fatalf("expected diagnostics artifact to omit derived report fields, got %q", text)
+	}
+
+	var payload struct {
+		OffendingActivityRecord struct {
+			Quantity *string `json:"quantity"`
+		} `json:"offending_activity_record"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		t.Fatalf("unmarshal report diagnostics artifact: %v", err)
+	}
+	if expectFinancialValues {
+		if payload.OffendingActivityRecord.Quantity == nil || *payload.OffendingActivityRecord.Quantity != "10000" {
+			t.Fatalf("expected explicit-development diagnostics to retain quantity, got %q", text)
+		}
+		return
+	}
+	if payload.OffendingActivityRecord.Quantity != nil {
+		t.Fatalf("expected production diagnostics to redact quantity, got %q", text)
+	}
 }

@@ -454,11 +454,19 @@ func TestReportScreenHelperBranches(t *testing.T) {
 			Success:       false,
 			FailureReason: runtime.ReportFailureUnsupportedReportCalculation,
 			Message:       "Could not generate the report.",
-			Request:       request,
+			Diagnostic: runtime.DiagnosticReportState{
+				Eligible:          true,
+				GenerationMessage: "Diagnostic report generated successfully.",
+				Path:              "/tmp/report.diagnostic.json",
+			},
+			Request: request,
 		},
 	})
 	if !strings.Contains(failure, "Failure Category: unsupported report calculation") {
 		t.Fatalf("expected report failure status, got %q", failure)
+	}
+	if !strings.Contains(failure, "Diagnostic report generated successfully.") || !strings.Contains(failure, "Diagnostic Report Path: /tmp/report.diagnostic.json") {
+		t.Fatalf("expected report failure diagnostics disclosure, got %q", failure)
 	}
 
 	if got := reportMethodExplanation("   "); !strings.Contains(got, reportmodel.CostBasisMethod("").Explanation()) {
@@ -469,5 +477,8 @@ func TestReportScreenHelperBranches(t *testing.T) {
 	}
 	if got := reportResultSummary(runtime.ReportOutcome{Success: false, Message: "failure detail"}); got != "failure detail" {
 		t.Fatalf("expected failure summary to return failure message, got %q", got)
+	}
+	if got := reportResultSummary(runtime.ReportOutcome{Success: false, Message: "failure detail", Diagnostic: runtime.DiagnosticReportState{Eligible: true}}); !strings.Contains(got, "Generate Diagnostic Report is available") {
+		t.Fatalf("expected eligible report failure summary to disclose diagnostics prompt, got %q", got)
 	}
 }

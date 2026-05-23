@@ -212,7 +212,7 @@ func TestModelInitAndHelpers(t *testing.T) {
 	if model.syncReports.RuntimeToken != "" {
 		t.Fatalf("expected main menu entry to clear sync and reports runtime token")
 	}
-	if model.syncReports.ReportResult != (runtime.ReportOutcome{}) {
+	if model.syncReports.ReportResult.Success || model.syncReports.ReportResult.Message != "" || model.syncReports.ReportResult.FailureReason != runtime.ReportFailureNone || model.syncReports.ReportResult.Request != (reportmodel.ReportRequest{}) || model.syncReports.ReportResult.OutputFile != (reportmodel.ReportOutputFile{}) || model.syncReports.ReportResult.Attempt != (runtime.SyncAttempt{}) || model.syncReports.ReportResult.Diagnostic.Eligible || model.syncReports.ReportResult.Diagnostic.Path != "" || model.syncReports.ReportResult.Diagnostic.GenerationMessage != "" {
 		t.Fatalf("expected main menu entry to clear sync and reports report scratch state")
 	}
 	_ = model.enterSetup("invalid", bootstrap.SetupRequirementNone)
@@ -446,7 +446,7 @@ func TestUpdateSyncCoversResultAndBusyBranches(t *testing.T) {
 	if model.syncReports.RuntimeToken != "token-123" {
 		t.Fatalf("expected active context sync to keep runtime token, got %q", model.syncReports.RuntimeToken)
 	}
-	if model.syncReports.ReportResult != (runtime.ReportOutcome{Success: true, Message: "stale"}) {
+	if !model.syncReports.ReportResult.Success || model.syncReports.ReportResult.Message != "stale" || model.syncReports.ReportResult.FailureReason != runtime.ReportFailureNone || model.syncReports.ReportResult.Diagnostic.Eligible || model.syncReports.ReportResult.Diagnostic.Path != "" || model.syncReports.ReportResult.Diagnostic.GenerationMessage != "" {
 		t.Fatalf("expected active context sync to preserve report scratch state until context exit, got %#v", model.syncReports.ReportResult)
 	}
 }
@@ -614,6 +614,12 @@ func TestUpdateSyncReportsUnlockRejectedTokenRequiresBackBeforeRetry(t *testing.
 	}
 	if model.syncReports.UnlockFailure != runtime.SyncFailureNone {
 		t.Fatalf("expected re-entered unlock screen to clear rejected-token state, got %q", model.syncReports.UnlockFailure)
+	}
+
+	model.sync.ValidationMessage = "manual validation"
+	model.syncReports.UnlockFailure = runtime.SyncFailureRejectedToken
+	if got := model.syncReportsUnlockValidationMessage(); got != "manual validation" {
+		t.Fatalf("expected explicit validation message to take precedence, got %q", got)
 	}
 }
 
@@ -959,7 +965,7 @@ func TestUpdateReportCoversSelectionBusyAndResultBranches(t *testing.T) {
 	if model.active != reportSelectionScreenKey {
 		t.Fatalf("expected Generate Another Report to reopen selection, got %s", model.active)
 	}
-	if model.syncReports.ReportResult != (runtime.ReportOutcome{}) {
+	if model.syncReports.ReportResult.Success || model.syncReports.ReportResult.Message != "" || model.syncReports.ReportResult.FailureReason != runtime.ReportFailureNone || model.syncReports.ReportResult.Request != (reportmodel.ReportRequest{}) || model.syncReports.ReportResult.OutputFile != (reportmodel.ReportOutputFile{}) || model.syncReports.ReportResult.Attempt != (runtime.SyncAttempt{}) || model.syncReports.ReportResult.Diagnostic.Eligible || model.syncReports.ReportResult.Diagnostic.Path != "" || model.syncReports.ReportResult.Diagnostic.GenerationMessage != "" {
 		t.Fatalf("expected Generate Another Report to clear transient report state, got %#v", model.syncReports)
 	}
 
@@ -969,11 +975,11 @@ func TestUpdateReportCoversSelectionBusyAndResultBranches(t *testing.T) {
 	if model.active != syncReportsMenuScreenKey {
 		t.Fatalf("expected Back To Sync and Reports to return to context menu, got %s", model.active)
 	}
-	if model.syncReports.ReportResult != (runtime.ReportOutcome{}) {
+	if model.syncReports.ReportResult.Success || model.syncReports.ReportResult.Message != "" || model.syncReports.ReportResult.FailureReason != runtime.ReportFailureNone || model.syncReports.ReportResult.Request != (reportmodel.ReportRequest{}) || model.syncReports.ReportResult.OutputFile != (reportmodel.ReportOutputFile{}) || model.syncReports.ReportResult.Attempt != (runtime.SyncAttempt{}) || model.syncReports.ReportResult.Diagnostic.Eligible || model.syncReports.ReportResult.Diagnostic.Path != "" || model.syncReports.ReportResult.Diagnostic.GenerationMessage != "" {
 		t.Fatalf("expected result dismissal to clear transient report state, got %#v", model.syncReports)
 	}
 	model.enterMainMenu()
-	if model.syncReports.ReportResult != (runtime.ReportOutcome{}) {
+	if model.syncReports.ReportResult.Success || model.syncReports.ReportResult.Message != "" || model.syncReports.ReportResult.FailureReason != runtime.ReportFailureNone || model.syncReports.ReportResult.Request != (reportmodel.ReportRequest{}) || model.syncReports.ReportResult.OutputFile != (reportmodel.ReportOutputFile{}) || model.syncReports.ReportResult.Attempt != (runtime.SyncAttempt{}) || model.syncReports.ReportResult.Diagnostic.Eligible || model.syncReports.ReportResult.Diagnostic.Path != "" || model.syncReports.ReportResult.Diagnostic.GenerationMessage != "" {
 		t.Fatalf("expected context exit to clear report history state, got %#v", model.syncReports)
 	}
 }
@@ -1133,6 +1139,81 @@ func TestUpdateReportCoversIgnoredAndFallbackBranches(t *testing.T) {
 	}
 	if updated.(*Model).report.ActionIndex != 0 {
 		t.Fatalf("expected report result with one item to ignore down, got %d", updated.(*Model).report.ActionIndex)
+	}
+
+	model = newTestModel(t, &config)
+	model.active = reportResultScreenKey
+	model.report.Busy = true
+	if items := model.reportResultMenuItems(); len(items) != 2 || items[0].Label != "Generate Diagnostic Report" || items[1].Label != "Back To Sync and Reports" || items[0].Enabled || items[1].Enabled {
+		t.Fatalf("expected busy report-result menu to disable visible actions, got %#v", items)
+	}
+
+	model = newTestModel(t, &config)
+	model.active = reportResultScreenKey
+	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
+	model.syncReports.ReportResult = runtime.ReportOutcome{
+		FailureReason: runtime.ReportFailureUnsupportedReportCalculation,
+		Attempt:       runtime.SyncAttempt{AttemptID: "report-attempt-1"},
+		Diagnostic: runtime.DiagnosticReportState{
+			Eligible: true,
+			Request:  runtime.DiagnosticReportRequest{},
+		},
+	}
+	if items := model.reportResultMenuItems(); len(items) != 3 || items[0].Label != "Generate Diagnostic Report" || items[1].Label != "Back To Sync and Reports" || items[2].Label != "Generate Another Report" {
+		t.Fatalf("expected report result diagnostic menu items, got %#v", items)
+	}
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = updated.(*Model)
+	if !model.report.Busy {
+		t.Fatalf("expected report diagnostic generation to enter busy state")
+	}
+	updated, _ = model.Update(runCmdFlow(cmd))
+	model = updated.(*Model)
+	if model.syncReports.ReportResult.Diagnostic.Path == "" {
+		t.Fatalf("expected report diagnostic path after generation, got %#v", model.syncReports.ReportResult.Diagnostic)
+	}
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	model = updated.(*Model)
+	if model.report.ActionIndex != 1 {
+		t.Fatalf("expected report result menu to move to Back after diagnostics, got %d", model.report.ActionIndex)
+	}
+
+	model = newTestModel(t, &config)
+	model.active = reportResultScreenKey
+	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
+	model.syncReports.ReportResult = runtime.ReportOutcome{
+		FailureReason: runtime.ReportFailureUnsupportedReportCalculation,
+		Diagnostic: runtime.DiagnosticReportState{
+			Eligible: true,
+		},
+	}
+	model.report.ActionIndex = 1
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	if cmd != nil {
+		t.Fatalf("expected pending-diagnostic Back action to remain synchronous")
+	}
+	model = updated.(*Model)
+	if model.active != syncReportsMenuScreenKey || model.sync.MenuIndex != 1 {
+		t.Fatalf("expected pending-diagnostic Back action to return to sync and reports, got active=%s index=%d", model.active, model.sync.MenuIndex)
+	}
+
+	model = newTestModel(t, &config)
+	model.active = reportResultScreenKey
+	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
+	model.syncReports.ReportResult = runtime.ReportOutcome{
+		FailureReason: runtime.ReportFailureUnsupportedReportCalculation,
+		Diagnostic: runtime.DiagnosticReportState{
+			Eligible: true,
+		},
+	}
+	model.report.ActionIndex = 2
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	if cmd != nil {
+		t.Fatalf("expected pending-diagnostic default action to remain synchronous")
+	}
+	model = updated.(*Model)
+	if model.active != reportSelectionScreenKey {
+		t.Fatalf("expected pending-diagnostic default action to reopen report selection, got %s", model.active)
 	}
 
 	model = newTestModel(t, &config)
@@ -1551,7 +1632,32 @@ func TestGenerateDiagnosticReportAndServerReplacementIgnoreBranches(t *testing.T
 		t.Fatalf("expected diagnostic write error to surface on result screen")
 	}
 
+	model = newTestModel(t, &config)
+	model.deps.SyncService = testSyncService{diagnosticErr: errors.New("report boom")}
+	model.active = reportResultScreenKey
+	model.syncReports.ReportResult = runtime.ReportOutcome{
+		FailureReason: runtime.ReportFailureUnsupportedReportCalculation,
+		Diagnostic:    runtime.DiagnosticReportState{Eligible: true, Request: runtime.DiagnosticReportRequest{}},
+	}
+	updated, cmd = model.generateDiagnosticReport()
+	model = updated.(*Model)
+	if !model.report.Busy || model.syncReports.ReportResult.Diagnostic.GenerationMessage != "Generating diagnostic report..." {
+		t.Fatalf("expected report diagnostic generation to enter busy state, got %#v", model.syncReports.ReportResult.Diagnostic)
+	}
+	updated, _ = model.Update(runCmdFlow(cmd))
+	model = updated.(*Model)
+	if model.syncReports.ReportResult.Diagnostic.Path != "" {
+		t.Fatalf("expected report diagnostic write error to keep empty path, got %#v", model.syncReports.ReportResult.Diagnostic)
+	}
+	if model.syncReports.ReportResult.Diagnostic.GenerationMessage != "Diagnostic report generation failed. Try again." {
+		t.Fatalf("expected report diagnostic error message, got %#v", model.syncReports.ReportResult.Diagnostic)
+	}
+
+	model = newTestModel(t, &config)
 	model.deps.SyncService = testSyncService{}
+	model.active = syncResultScreenKey
+	model.result = resultState{Outcome: runtime.SyncOutcome{Success: false, FailureReason: runtime.SyncFailureUnsupportedActivityHistory, Diagnostic: runtime.DiagnosticReportState{Eligible: true, Request: runtime.DiagnosticReportRequest{}}}}
+	model.currentConfig = &config
 	updated, cmd = model.generateDiagnosticReport()
 	model = updated.(*Model)
 	if model.result.Outcome.Diagnostic.Request.ServerOrigin != config.ServerOrigin || model.result.Outcome.Diagnostic.Request.Attempt.AttemptID != model.result.Outcome.Attempt.AttemptID {
@@ -1573,6 +1679,47 @@ func TestGenerateDiagnosticReportAndServerReplacementIgnoreBranches(t *testing.T
 	updated, cmd = model.Update(struct{}{})
 	if cmd != nil || updated.(*Model).active != syncReportsMenuScreenKey {
 		t.Fatalf("expected non-key sync-reports message to be ignored")
+	}
+
+	model = newTestModel(t, &config)
+	model.active = syncReportsUnlockScreenKey
+	model.sync.MenuIndex = 0
+	model.syncReports.UnlockFailure = runtime.SyncFailureRejectedToken
+	updated, cmd = model.Update(tea.PasteMsg{Content: "blocked-token"})
+	if cmd != nil || updated.(*Model).sync.TokenInput.Value() != "" {
+		t.Fatalf("expected blocked rejected-token unlock paste to be ignored")
+	}
+	model = updated.(*Model)
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	if cmd != nil {
+		t.Fatalf("expected unlock-screen down navigation to remain synchronous")
+	}
+	model = updated.(*Model)
+	if model.sync.MenuIndex != 1 {
+		t.Fatalf("expected unlock-screen down navigation to skip disabled Unlock action, got %d", model.sync.MenuIndex)
+	}
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+	if cmd != nil || !updated.(*Model).sync.InputFocused {
+		t.Fatalf("expected focus toggle to leave the blocked unlock input state unchanged")
+	}
+
+	model = newTestModel(t, &config)
+	model.active = syncReportsUnlockScreenKey
+	model.deps.SyncService = testSyncService{unlockResult: runtime.SyncReportsContextResult{ReportUnavailableReason: runtime.ReportFailureUnsupportedStoredDataVersion}}
+	model.sync.InputFocused = false
+	model.sync.TokenInput.SetValue("token-123")
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	if cmd != nil {
+		t.Fatalf("expected unsupported stored-data unlock to remain synchronous")
+	}
+	model = updated.(*Model)
+	if model.syncReports.UnlockFailure != runtime.SyncFailureUnsupportedStoredDataVersion || model.sync.ValidationMessage != "unsupported stored-data version" {
+		t.Fatalf("expected unsupported stored-data unlock guidance, got failure=%q message=%q", model.syncReports.UnlockFailure, model.sync.ValidationMessage)
+	}
+
+	model.moveSyncMenuSelection(0, model.syncMenuItems())
+	if model.sync.MenuIndex != 0 {
+		t.Fatalf("expected zero-step sync menu move to leave selection unchanged")
 	}
 
 	model.active = serverReplacementScreenKey

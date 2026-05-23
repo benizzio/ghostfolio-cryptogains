@@ -111,6 +111,12 @@ func (e runtimeDiagnosticCarrierError) DiagnosticContext() syncmodel.DiagnosticC
 	return e.context
 }
 
+// DiagnosticReportContext returns the injected report-failure troubleshooting context.
+// Authored by: OpenCode
+func (e runtimeDiagnosticCarrierError) DiagnosticReportContext() syncmodel.DiagnosticContext {
+	return e.context
+}
+
 // TestWriteDiagnosticReportCoversBranches verifies structured diagnostic-report
 // writing across validation, encoding, persistence, and success branches.
 // Authored by: OpenCode
@@ -250,6 +256,66 @@ func TestBuildDiagnosticReportDocumentPreservesCurrencyContextWhileRedactingFina
 	unredactedRecord := unredacted.Records[0]
 	if unredactedRecord.OrderUnitPrice != "90" || unredactedRecord.OrderGrossValue != "90" || unredactedRecord.OrderFeeAmount != "1.5" || unredactedRecord.AssetProfileUnitPrice != "95" || unredactedRecord.AssetProfileFeeAmount != "1.6" || unredactedRecord.BaseGrossValue != "100" || unredactedRecord.BaseFeeAmount != "1.7" {
 		t.Fatalf("expected explicit-development-mode diagnostics to retain source financial values, got %#v", unredactedRecord)
+	}
+}
+
+// TestBuildDiagnosticReportDocumentSupportsReportFailureDiagnostics verifies the
+// shared writer payload for report-failure diagnostics.
+// Authored by: OpenCode
+func TestBuildDiagnosticReportDocumentSupportsReportFailureDiagnostics(t *testing.T) {
+	t.Parallel()
+
+	var quantity, _, err = decimalsupport.ParseString("1")
+	if err != nil {
+		t.Fatalf("parse quantity: %v", err)
+	}
+
+	var request = DiagnosticReportRequest{
+		FailureCategory:         ReportFailureUnsupportedReportCalculation,
+		ServerOrigin:            "https://ghostfol.io",
+		Attempt:                 SyncAttempt{AttemptID: "attempt-report-1", Status: AttemptStatusFailed, StartedAt: time.Unix(10, 0).UTC(), CompletedAt: time.Unix(11, 0).UTC()},
+		ExplicitDevelopmentMode: true,
+		Context: syncmodel.DiagnosticContext{
+			FailureDetail: "incomplete context",
+			OffendingActivityRecord: &syncmodel.ActivityRecord{
+				SourceID:         "doge-buy-2025-incomplete-001",
+				OccurredAt:       "2025-02-01T10:00:00Z",
+				ActivityType:     syncmodel.ActivityTypeBuy,
+				AssetIdentityKey: "asset-doge-001",
+				AssetSymbol:      "DOGE",
+				Quantity:         quantity,
+				RawHash:          "doge-buy-2025-incomplete-001",
+			},
+		},
+	}
+
+	var document = buildDiagnosticReportDocument(request, time.Unix(12, 0).UTC())
+	if document.FailureCategory != ReportFailureUnsupportedReportCalculation || document.FailureReason != SyncFailureNone {
+		t.Fatalf("expected report-failure category without sync failure reason, got %#v", document)
+	}
+	if document.OffendingActivityRecord == nil || document.OffendingActivityRecord.AssetIdentityKey == nil || *document.OffendingActivityRecord.AssetIdentityKey != "asset-doge-001" {
+		t.Fatalf("expected offending activity record to be preserved, got %#v", document)
+	}
+
+	raw, err := json.Marshal(document)
+	if err != nil {
+		t.Fatalf("marshal report-failure diagnostic document: %v", err)
+	}
+	text := string(raw)
+	if !strings.Contains(text, `"failure_category":"unsupported report calculation"`) {
+		t.Fatalf("expected report failure category in JSON, got %q", text)
+	}
+	if !strings.Contains(text, `"offending_activity_record"`) || !strings.Contains(text, `"order_currency":null`) || !strings.Contains(text, `"source_scope":null`) {
+		t.Fatalf("expected explicit nulls in offending activity record JSON, got %q", text)
+	}
+	if strings.Contains(text, `"selected_currency_context"`) || strings.Contains(text, `"activity_currency"`) {
+		t.Fatalf("expected no derived report fields in JSON, got %q", text)
+	}
+
+	request.RedactFinancialValues = true
+	document = buildDiagnosticReportDocument(request, time.Unix(12, 0).UTC())
+	if document.OffendingActivityRecord == nil || document.OffendingActivityRecord.Quantity != nil {
+		t.Fatalf("expected production redaction to clear offending record financial values, got %#v", document.OffendingActivityRecord)
 	}
 }
 
@@ -1021,6 +1087,29 @@ func TestSyncReportsProtectedDataAvailabilityHelpers(t *testing.T) {
 	result = service.UnlockSelectedServerSnapshot(context.Background(), config, "token")
 	if result.UnlockState != SyncReportsUnlockStateRejectedToken || result.FailureReason != SyncFailureRejectedToken {
 		t.Fatalf("expected snapshot miss with rejected auth to stay rejected, got %#v", result)
+	}
+
+	service = &syncService{snapshots: newSnapshotLifecycle(runtimeSnapshotStore{}, newActiveSnapshotState(), protectedPayloadBuilder{})}
+	result = service.UnlockSelectedServerSnapshot(context.Background(), config, "token")
+	if result.UnlockState != SyncReportsUnlockStateRejectedToken || result.FailureReason != SyncFailureRejectedToken {
+		t.Fatalf("expected missing runtime client to reject unlock retry, got %#v", result)
+	}
+
+	timeoutServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/api/v1/auth/anonymous":
+			writer.WriteHeader(http.StatusGatewayTimeout)
+		default:
+			writer.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer timeoutServer.Close()
+	config = runtimeSetupConfigFixture(t, timeoutServer.URL, true)
+	service = requireSyncService(t, NewSyncService(ghostfolioclient.New(timeoutServer.Client()), time.Second, t.TempDir(), true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), runtimeSnapshotStore{}))
+	result = service.UnlockSelectedServerSnapshot(context.Background(), config, "token")
+	if result.UnlockState != SyncReportsUnlockStateRejectedToken || result.FailureReason != SyncFailureUnsuccessfulServerResponse {
+		t.Fatalf("expected non-rejected auth failure to map through boundary failure reason, got %#v", result)
 	}
 }
 

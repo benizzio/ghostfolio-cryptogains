@@ -36,15 +36,16 @@ func SelectActivityCalculationInput(record syncmodel.ActivityRecord) (reportmode
 	}
 
 	var input = reportmodel.ActivityCalculationInput{
-		SourceID:         strings.TrimSpace(record.SourceID),
-		OccurredAt:       occurredAt,
-		SourceYear:       occurredAt.Year(),
-		ActivityType:     record.ActivityType,
-		AssetIdentityKey: strings.TrimSpace(record.AssetIdentityKey),
-		DisplayLabel:     activityDisplayLabel(record),
-		Quantity:         record.Quantity,
-		SourceScope:      record.SourceScope,
-		Comment:          strings.TrimSpace(record.Comment),
+		SourceID:                strings.TrimSpace(record.SourceID),
+		OccurredAt:              occurredAt,
+		SourceYear:              occurredAt.Year(),
+		ActivityType:            record.ActivityType,
+		PersistedActivityRecord: &record,
+		AssetIdentityKey:        strings.TrimSpace(record.AssetIdentityKey),
+		DisplayLabel:            activityDisplayLabel(record),
+		Quantity:                record.Quantity,
+		SourceScope:             record.SourceScope,
+		Comment:                 strings.TrimSpace(record.Comment),
 	}
 
 	var zeroPricedValues zeroPricedHoldingReductionValues

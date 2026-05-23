@@ -190,5 +190,16 @@ func reportResultSummary(outcome runtime.ReportOutcome) string {
 		return outcome.Message
 	}
 
-	return outcome.Message
+	var lines = []string{outcome.Message}
+	if strings.TrimSpace(outcome.Diagnostic.GenerationMessage) != "" {
+		lines = append(lines, outcome.Diagnostic.GenerationMessage)
+	}
+	if strings.TrimSpace(outcome.Diagnostic.Path) != "" {
+		lines = append(lines, fmt.Sprintf("Diagnostic Report Path: %s", outcome.Diagnostic.Path))
+	}
+	if outcome.Diagnostic.Eligible && outcome.Diagnostic.Path == "" && strings.TrimSpace(outcome.Diagnostic.GenerationMessage) == "" {
+		lines = append(lines, "Generate Diagnostic Report is available for this failure from this screen.")
+	}
+
+	return strings.Join(lines, "\n\n")
 }

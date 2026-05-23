@@ -46,7 +46,11 @@ func (s diagnosticReportService) PrepareState(
 	var path, err = s.Write(ctx, request)
 	if err == nil {
 		state.Path = path
+		state.GenerationMessage = "Diagnostic report generated successfully."
+		return state
 	}
+
+	state.GenerationMessage = "Diagnostic report generation failed. Try again."
 
 	return state
 }

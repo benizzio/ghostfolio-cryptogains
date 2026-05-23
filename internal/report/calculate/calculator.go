@@ -958,12 +958,12 @@ func subtractCalculationDecimal(left apd.Decimal, right apd.Decimal) (apd.Decima
 // normalized synced activity record.
 // Authored by: OpenCode
 func newRecordCalculationError(kind reportmodel.CalculationErrorKind, record syncmodel.ActivityRecord, message string, cause error) error {
-	return reportmodel.NewCalculationError(kind, message, strings.TrimSpace(record.SourceID), activityDisplayLabel(record), cause)
+	return reportmodel.NewCalculationError(kind, message, strings.TrimSpace(record.SourceID), activityDisplayLabel(record), cause).WithPersistedActivityRecord(&record)
 }
 
 // newInputCalculationError creates one structured calculation error from a
 // selected activity calculation input.
 // Authored by: OpenCode
 func newInputCalculationError(kind reportmodel.CalculationErrorKind, input reportmodel.ActivityCalculationInput, message string, cause error) error {
-	return reportmodel.NewCalculationError(kind, message, strings.TrimSpace(input.SourceID), strings.TrimSpace(input.DisplayLabel), cause)
+	return reportmodel.NewCalculationError(kind, message, strings.TrimSpace(input.SourceID), strings.TrimSpace(input.DisplayLabel), cause).WithPersistedActivityRecord(input.PersistedActivityRecord)
 }

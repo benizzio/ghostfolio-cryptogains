@@ -43,6 +43,13 @@ func TestCalculationErrorHandlesFallbacks(t *testing.T) {
 		t.Fatalf("unexpected calculation error display label: %q", err.DisplayLabel())
 	}
 
+	var persistedRecord = &syncmodel.ActivityRecord{SourceID: "source-1", AssetSymbol: "BTC"}
+	err = err.WithPersistedActivityRecord(persistedRecord)
+	var diagnosticContext = err.DiagnosticReportContext()
+	if diagnosticContext.FailureDetail == "" || diagnosticContext.OffendingActivityRecord != persistedRecord {
+		t.Fatalf("expected calculation error to expose report diagnostic context, got %#v", diagnosticContext)
+	}
+
 	err = NewCalculationError(CalculationErrorKindInvalidRequest, "", "", "", nil)
 	if err.Error() != "unsupported report calculation" {
 		t.Fatalf("expected default calculation error message, got %q", err.Error())
@@ -51,6 +58,9 @@ func TestCalculationErrorHandlesFallbacks(t *testing.T) {
 	var nilError *CalculationError
 	if nilError.Error() != "" {
 		t.Fatalf("expected nil calculation error string to be empty")
+	}
+	if got := nilError.DiagnosticReportContext(); got.FailureStage != "" || got.FailureDetail != "" || len(got.Records) != 0 || got.OffendingActivityRecord != nil {
+		t.Fatalf("expected nil calculation error diagnostic context to be empty, got %#v", got)
 	}
 	if nilError.Unwrap() != nil {
 		t.Fatalf("expected nil calculation error unwrap to be nil")

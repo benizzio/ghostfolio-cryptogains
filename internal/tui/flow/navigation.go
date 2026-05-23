@@ -207,13 +207,16 @@ func (m *Model) moveSyncReportsMenuSelection(step int, items []component.MenuIte
 	}
 }
 
-// generateDiagnosticReport writes one local synced-data diagnostic report from the current result screen.
+// generateDiagnosticReport writes one local synced-data or report-failure
+// diagnostic report from the current result screen.
 // Authored by: OpenCode
 func (m *Model) generateDiagnosticReport() (tea.Model, tea.Cmd) {
 	var request = m.result.Outcome.Diagnostic.Request
 	var useSyncReportsContext = m.active == syncReportsMenuScreenKey
 	if useSyncReportsContext {
 		request = m.syncReports.SyncResult.Outcome.Diagnostic.Request
+	} else if m.active == reportResultScreenKey {
+		request = m.syncReports.ReportResult.Diagnostic.Request
 	}
 	if request.ServerOrigin == "" && m.currentConfig != nil {
 		request.ServerOrigin = m.currentConfig.ServerOrigin
@@ -221,6 +224,8 @@ func (m *Model) generateDiagnosticReport() (tea.Model, tea.Cmd) {
 	if request.Attempt.AttemptID == "" {
 		if useSyncReportsContext {
 			request.Attempt = m.syncReports.SyncResult.Outcome.Attempt
+		} else if m.active == reportResultScreenKey {
+			request.Attempt = m.syncReports.ReportResult.Attempt
 		} else {
 			request.Attempt = m.result.Outcome.Attempt
 		}
@@ -231,9 +236,15 @@ func (m *Model) generateDiagnosticReport() (tea.Model, tea.Cmd) {
 		m.syncReports.SyncResult.StatusMessage = "Generating diagnostic report..."
 		m.sync.MenuIndex = m.syncReportsDefaultMenuIndex()
 	} else {
-		m.result.Outcome.Diagnostic.Request = request
-		m.result.Busy = true
-		m.result.StatusMessage = "Generating diagnostic report..."
+		if m.active == reportResultScreenKey {
+			m.syncReports.ReportResult.Diagnostic.Request = request
+			m.report.Busy = true
+			m.syncReports.ReportResult.Diagnostic.GenerationMessage = "Generating diagnostic report..."
+		} else {
+			m.result.Outcome.Diagnostic.Request = request
+			m.result.Busy = true
+			m.result.StatusMessage = "Generating diagnostic report..."
+		}
 	}
 	return m, m.generateDiagnosticReportCmd(request)
 }
@@ -246,24 +257,39 @@ func (m *Model) handleDiagnosticReportFinished(message diagnosticReportFinishedM
 		m.syncReports.SyncResult.Busy = false
 		if message.Err != nil {
 			m.syncReports.SyncResult.StatusMessage = "Diagnostic report generation failed. Try again."
+			m.syncReports.SyncResult.Outcome.Diagnostic.GenerationMessage = m.syncReports.SyncResult.StatusMessage
 			m.sync.MenuIndex = m.syncReportsDefaultMenuIndex()
 			return m, nil
 		}
 
 		m.syncReports.SyncResult.Outcome.Diagnostic.Path = message.Path
 		m.syncReports.SyncResult.StatusMessage = "Diagnostic report generated successfully."
+		m.syncReports.SyncResult.Outcome.Diagnostic.GenerationMessage = m.syncReports.SyncResult.StatusMessage
 		m.sync.MenuIndex = m.syncReportsDefaultMenuIndex()
+		return m, nil
+	}
+	if m.active == reportResultScreenKey {
+		m.report.Busy = false
+		if message.Err != nil {
+			m.syncReports.ReportResult.Diagnostic.GenerationMessage = "Diagnostic report generation failed. Try again."
+			return m, nil
+		}
+
+		m.syncReports.ReportResult.Diagnostic.Path = message.Path
+		m.syncReports.ReportResult.Diagnostic.GenerationMessage = "Diagnostic report generated successfully."
 		return m, nil
 	}
 
 	m.result.Busy = false
 	if message.Err != nil {
 		m.result.StatusMessage = "Diagnostic report generation failed. Try again."
+		m.result.Outcome.Diagnostic.GenerationMessage = m.result.StatusMessage
 		return m, nil
 	}
 
 	m.result.Outcome.Diagnostic.Path = message.Path
 	m.result.StatusMessage = "Diagnostic report generated successfully."
+	m.result.Outcome.Diagnostic.GenerationMessage = m.result.StatusMessage
 	return m, nil
 }
 

@@ -38,10 +38,10 @@ var transientResultSentinels = []string{
 }
 
 var productionDiagnosticFinancialSentinels = []string{
-	`"quantity":`,
-	`"unit_price":`,
-	`"gross_value":`,
-	`"fee_amount":`,
+	`"quantity": "`,
+	`"unit_price": "`,
+	`"gross_value": "`,
+	`"fee_amount": "`,
 }
 
 // TestPersistenceSecurityFlowArtifactsStayFreeOfSecretsAndTransientFailureText

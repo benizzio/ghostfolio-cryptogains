@@ -6,6 +6,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,6 +15,7 @@ import (
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 	"github.com/cockroachdb/apd/v3"
@@ -299,6 +301,62 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 			t.Fatalf("expected cleanup guidance, got %q", outcome.Message)
 		}
 	})
+
+	t.Run("production calculation failure exposes pending diagnostics with original persisted record", func(t *testing.T) {
+		var request = reportRequestFixture(t, 2025, reportmodel.CostBasisMethodFIFO)
+		var offendingRecord = reportFailureActivityRecordFixture(t)
+		var service = &reportService{
+			snapshots:         reportSnapshotLifecycleWithCache(syncmodel.ProtectedActivityCache{ActivityCount: 1, AvailableReportYears: []int{2025}, Activities: []syncmodel.ActivityRecord{offendingRecord}}),
+			diagnosticReports: newDiagnosticReportService(t.TempDir()),
+			calculate: func(reportmodel.ReportRequest, syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+				return reportmodel.CapitalGainsReport{}, reportmodel.NewCalculationError(reportmodel.CalculationErrorKindActivityInput, "incomplete context", offendingRecord.SourceID, offendingRecord.AssetSymbol, nil).WithPersistedActivityRecord(&offendingRecord)
+			},
+		}
+
+		var outcome = service.Generate(context.Background(), ReportGenerationRequest{Request: request, ServerOrigin: "https://ghostfol.io"})
+		if outcome.FailureReason != ReportFailureUnsupportedReportCalculation || !outcome.Diagnostic.Eligible {
+			t.Fatalf("expected diagnostics-eligible calculation failure, got %#v", outcome)
+		}
+		if outcome.Diagnostic.Path != "" {
+			t.Fatalf("expected production mode to defer diagnostic creation, got %#v", outcome.Diagnostic)
+		}
+		if outcome.Diagnostic.Request.Context.OffendingActivityRecord == nil || outcome.Diagnostic.Request.Context.OffendingActivityRecord.SourceID != offendingRecord.SourceID {
+			t.Fatalf("expected original persisted record in diagnostics request, got %#v", outcome.Diagnostic.Request.Context)
+		}
+	})
+
+	t.Run("explicit development mode auto-writes report diagnostics with explicit null fields", func(t *testing.T) {
+		var baseDir = t.TempDir()
+		var request = reportRequestFixture(t, 2025, reportmodel.CostBasisMethodFIFO)
+		var offendingRecord = reportFailureActivityRecordFixture(t)
+		var service = &reportService{
+			snapshots:         reportSnapshotLifecycleWithCache(syncmodel.ProtectedActivityCache{ActivityCount: 1, AvailableReportYears: []int{2025}, Activities: []syncmodel.ActivityRecord{offendingRecord}}),
+			allowDevHTTP:      true,
+			diagnosticReports: newDiagnosticReportService(baseDir),
+			calculate: func(reportmodel.ReportRequest, syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+				return reportmodel.CapitalGainsReport{}, reportmodel.NewCalculationError(reportmodel.CalculationErrorKindActivityInput, "incomplete context", offendingRecord.SourceID, offendingRecord.AssetSymbol, nil).WithPersistedActivityRecord(&offendingRecord)
+			},
+		}
+
+		var outcome = service.Generate(context.Background(), ReportGenerationRequest{Request: request, ServerOrigin: "https://ghostfol.io", ExplicitDevelopmentMode: true, AttemptID: "attempt-report-1"})
+		if outcome.Diagnostic.Path == "" {
+			t.Fatalf("expected explicit development mode to auto-write diagnostics, got %#v", outcome)
+		}
+		var raw, err = os.ReadFile(outcome.Diagnostic.Path)
+		if err != nil {
+			t.Fatalf("read report diagnostic artifact: %v", err)
+		}
+		var text = string(raw)
+		if !strings.Contains(text, `"failure_category": "unsupported report calculation"`) {
+			t.Fatalf("expected report failure category in artifact, got %q", text)
+		}
+		if !strings.Contains(text, `"offending_activity_record"`) || !strings.Contains(text, `"order_currency": null`) || !strings.Contains(text, `"asset_profile_currency": null`) || !strings.Contains(text, `"source_scope": null`) {
+			t.Fatalf("expected original persisted record with explicit nulls, got %q", text)
+		}
+		if strings.Contains(text, `"selected_currency_context"`) || strings.Contains(text, `"activity_currency"`) {
+			t.Fatalf("expected no derived report-input fields in artifact, got %q", text)
+		}
+	})
 }
 
 // TestReportServiceHelperFunctionsCoverRemainingBranches verifies direct helper
@@ -311,13 +369,90 @@ func TestReportServiceHelperFunctionsCoverRemainingBranches(t *testing.T) {
 	var service = &reportService{snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache)}
 
 	var cache, outcome, ok = service.readAvailableCache(request)
-	if !ok || cache.ActivityCount == 0 || outcome != (ReportOutcome{}) {
+	if !ok || cache.ActivityCount == 0 || outcome.Success || outcome.Message != "" || outcome.FailureReason != ReportFailureNone || outcome.Request != (reportmodel.ReportRequest{}) || outcome.OutputFile != (reportmodel.ReportOutputFile{}) || outcome.Attempt != (SyncAttempt{}) || outcome.Diagnostic.Eligible || outcome.Diagnostic.Path != "" || outcome.Diagnostic.GenerationMessage != "" {
 		t.Fatalf("expected available cache read to succeed, got ok=%v cache=%#v outcome=%#v", ok, cache, outcome)
 	}
 
 	var message = reportCalculationFailureMessage(request, errors.New(" calculation boom "))
 	if !strings.Contains(message, "Could not generate the 2024 FIFO report: calculation boom") {
 		t.Fatalf("expected trimmed calculation failure message, got %q", message)
+	}
+	if !reportDiagnosticEligible(ReportFailureUnsupportedReportCalculation) {
+		t.Fatalf("expected unsupported calculation to remain diagnostic eligible")
+	}
+	if !reportDiagnosticEligible(ReportFailureDocumentsFolderUnavailable) {
+		t.Fatalf("expected documents-folder failure to remain diagnostic eligible")
+	}
+	if !reportDiagnosticEligible(ReportFailureReportFileWriteFailed) {
+		t.Fatalf("expected write failure to remain diagnostic eligible")
+	}
+	if reportDiagnosticEligible(ReportFailureAutomaticOpenFailedAfterSave) {
+		t.Fatalf("expected automatic-open warning to be diagnostic ineligible")
+	}
+
+	var zeroAttempt = reportAttempt(ReportGenerationRequest{Request: reportmodel.ReportRequest{}})
+	if zeroAttempt.StartedAt.IsZero() || zeroAttempt.CompletedAt.IsZero() {
+		t.Fatalf("expected zero request time to fall back to current timestamps, got %#v", zeroAttempt)
+	}
+
+	var carrierContext = syncmodel.DiagnosticContext{FailureDetail: "carrier detail"}
+	var fromCarrier = reportDiagnosticContextFromError(runtimeDiagnosticCarrierError{context: carrierContext})
+	if fromCarrier.FailureStage != carrierContext.FailureStage || fromCarrier.FailureDetail != carrierContext.FailureDetail || len(fromCarrier.Records) != len(carrierContext.Records) || fromCarrier.OffendingActivityRecord != carrierContext.OffendingActivityRecord {
+		t.Fatalf("expected carrier context to be preserved, got %#v", fromCarrier)
+	}
+
+	var fromPlain = reportDiagnosticContextFromError(errors.New(" plain detail "))
+	if fromPlain.FailureDetail != "plain detail" {
+		t.Fatalf("expected plain error detail fallback, got %#v", fromPlain)
+	}
+
+	var nonEligibleOutcome = service.reportFailureOutcome(
+		context.Background(),
+		ReportGenerationRequest{Request: request, ServerOrigin: "https://ghostfol.io"},
+		SyncAttempt{AttemptID: "attempt-non-eligible"},
+		ReportFailureAutomaticOpenFailedAfterSave,
+		"warning",
+		syncmodel.DiagnosticContext{FailureDetail: "warning"},
+	)
+	if nonEligibleOutcome.Diagnostic.Eligible || nonEligibleOutcome.Diagnostic.Path != "" || nonEligibleOutcome.Diagnostic.Request.FailureReason != SyncFailureNone || nonEligibleOutcome.Diagnostic.Request.FailureCategory != ReportFailureNone || nonEligibleOutcome.Diagnostic.Request.ServerOrigin != "" || nonEligibleOutcome.Diagnostic.Request.Attempt != (SyncAttempt{}) || nonEligibleOutcome.Diagnostic.Request.Context.FailureStage != "" || nonEligibleOutcome.Diagnostic.Request.Context.FailureDetail != "" || len(nonEligibleOutcome.Diagnostic.Request.Context.Records) != 0 || nonEligibleOutcome.Diagnostic.Request.Context.OffendingActivityRecord != nil || nonEligibleOutcome.Diagnostic.Request.RedactFinancialValues || nonEligibleOutcome.Diagnostic.Request.ExplicitDevelopmentMode {
+		t.Fatalf("expected non-eligible report failure to omit diagnostic state, got %#v", nonEligibleOutcome.Diagnostic)
+	}
+
+	var eligibleOutcome = service.reportFailureOutcome(
+		context.Background(),
+		ReportGenerationRequest{Request: request, ServerOrigin: "https://ghostfol.io", ExplicitDevelopmentMode: true},
+		SyncAttempt{AttemptID: "attempt-eligible"},
+		ReportFailureReportFileWriteFailed,
+		"write failed",
+		syncmodel.DiagnosticContext{FailureDetail: "write failed"},
+	)
+	if !eligibleOutcome.Diagnostic.Eligible {
+		t.Fatalf("expected eligible report failure to expose diagnostic state")
+	}
+	if eligibleOutcome.Diagnostic.Request.FailureCategory != ReportFailureReportFileWriteFailed {
+		t.Fatalf("expected diagnostic request to preserve failure category, got %#v", eligibleOutcome.Diagnostic.Request)
+	}
+	if !eligibleOutcome.Diagnostic.Request.ExplicitDevelopmentMode {
+		t.Fatalf("expected explicit development mode to flow into diagnostic request")
+	}
+	if eligibleOutcome.Diagnostic.GenerationMessage == "" {
+		t.Fatalf("expected explicit development mode to attempt immediate diagnostic generation, got %#v", eligibleOutcome.Diagnostic)
+	}
+	if reason := reportWriteFailureReason(errors.New("documents path: missing")); reason != ReportFailureDocumentsFolderUnavailable {
+		t.Fatalf("expected documents-path text to classify as folder unavailable, got %q", reason)
+	}
+	if reason := reportWriteFailureReason(errors.New("permission denied")); reason != ReportFailureReportFileWriteFailed {
+		t.Fatalf("expected generic write error to classify as final write failure, got %q", reason)
+	}
+	if got := joinAvailableYears(nil); got != "" {
+		t.Fatalf("expected nil available years to join empty string, got %q", got)
+	}
+	if containsReportYear([]int{2024, 2025}, 2026) {
+		t.Fatalf("expected selected year to be absent")
+	}
+	var pointed = pointerToReportOutcome(ReportOutcome{FailureReason: ReportFailureReportFileWriteFailed})
+	if pointed == nil || pointed.FailureReason != ReportFailureReportFileWriteFailed {
+		t.Fatalf("expected pointer helper to preserve report outcome, got %#v", pointed)
 	}
 
 	t.Run("fails when snapshot lifecycle has no active readable cache", func(t *testing.T) {
@@ -400,4 +535,24 @@ func reportDocumentFixture(t *testing.T, report reportmodel.CapitalGainsReport, 
 	}
 
 	return document
+}
+
+// reportFailureActivityRecordFixture returns one persisted activity record with
+// nullable source fields used for report-diagnostics coverage.
+// Authored by: OpenCode
+func reportFailureActivityRecordFixture(t *testing.T) syncmodel.ActivityRecord {
+	var quantity, _, err = decimalsupport.ParseString("1")
+	if err != nil {
+		t.Fatalf("parse quantity: %v", err)
+	}
+
+	return syncmodel.ActivityRecord{
+		SourceID:         "doge-buy-2025-incomplete-001",
+		OccurredAt:       "2025-02-01T10:00:00Z",
+		ActivityType:     syncmodel.ActivityTypeBuy,
+		AssetIdentityKey: "asset-doge-001",
+		AssetSymbol:      "DOGE",
+		Quantity:         quantity,
+		RawHash:          "doge-buy-2025-incomplete-001",
+	}
 }

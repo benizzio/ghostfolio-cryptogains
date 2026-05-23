@@ -78,7 +78,7 @@ func New(options bootstrap.Options) (*App, error) {
 		syncValidator,
 		sharedSnapshots,
 	)
-	var reportService = newReportService(sharedSnapshots)
+	var reportService = newReportService(sharedSnapshots, baseConfigDir, options.AllowDevHTTP)
 
 	return &App{
 		Options:        options,

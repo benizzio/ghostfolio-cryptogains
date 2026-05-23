@@ -6,6 +6,8 @@ package model
 import (
 	"fmt"
 	"strings"
+
+	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
 
 // CalculationErrorKind identifies one report-calculation failure branch that
@@ -50,6 +52,7 @@ type CalculationError struct {
 	message      string
 	sourceID     string
 	displayLabel string
+	record       *syncmodel.ActivityRecord
 	cause        error
 }
 
@@ -86,6 +89,18 @@ func NewCalculationError(kind CalculationErrorKind, message string, sourceID str
 		displayLabel: strings.TrimSpace(displayLabel),
 		cause:        cause,
 	}
+}
+
+// WithPersistedActivityRecord attaches the original persisted activity record to
+// one calculation error for downstream diagnostics.
+// Authored by: OpenCode
+func (e *CalculationError) WithPersistedActivityRecord(record *syncmodel.ActivityRecord) *CalculationError {
+	if e == nil || record == nil {
+		return e
+	}
+
+	e.record = record
+	return e
 }
 
 // Error returns the non-secret user-visible calculation failure detail.
@@ -149,4 +164,18 @@ func (e *CalculationError) DisplayLabel() string {
 	}
 
 	return e.displayLabel
+}
+
+// DiagnosticReportContext returns the source-faithful persisted-record context
+// used by report-failure diagnostics.
+// Authored by: OpenCode
+func (e *CalculationError) DiagnosticReportContext() syncmodel.DiagnosticContext {
+	if e == nil {
+		return syncmodel.DiagnosticContext{}
+	}
+
+	return syncmodel.DiagnosticContext{
+		FailureDetail:           e.Error(),
+		OffendingActivityRecord: e.record,
+	}
 }

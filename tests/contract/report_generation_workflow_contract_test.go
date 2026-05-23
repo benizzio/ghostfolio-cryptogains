@@ -102,12 +102,13 @@ func TestReportGenerationWorkflowContract(t *testing.T) {
 		Width:         100,
 		Height:        32,
 		MethodLabel:   "HIFO",
-		MenuItems:     []component.MenuItem{{Label: "Back To Sync and Reports", Enabled: true}, {Label: "Generate Another Report", Enabled: true}},
+		MenuItems:     []component.MenuItem{{Label: "Generate Diagnostic Report", Enabled: true}, {Label: "Back To Sync and Reports", Enabled: true}, {Label: "Generate Another Report", Enabled: true}},
 		SelectedIndex: 0,
 		Outcome: runtime.ReportOutcome{
 			Success:       false,
 			FailureReason: runtime.ReportFailureUnsupportedReportCalculation,
 			Message:       "Could not generate the selected report because the synced activity history is not supported for safe calculation.",
+			Diagnostic:    runtime.DiagnosticReportState{Eligible: true},
 			Request: reportmodel.ReportRequest{
 				Year:            2025,
 				CostBasisMethod: reportmodel.CostBasisMethodHIFO,
@@ -118,5 +119,29 @@ func TestReportGenerationWorkflowContract(t *testing.T) {
 	assertContains(t, failure, "Failure Category: unsupported report calculation")
 	assertContains(t, failure, "Selected Year: 2025")
 	assertContains(t, failure, "Cost Basis Method: HIFO")
+	assertContains(t, failure, "Generate Diagnostic Report")
+	assertContains(t, failure, "Generate Diagnostic Report is available for this failure from this screen.")
 	assertContains(t, failure, "Back To Sync and Reports")
+
+	var devFailure = screen.ReportResultScreenView(screen.ReportResultScreenParams{
+		Theme:         component.DefaultTheme(),
+		Width:         100,
+		Height:        32,
+		MethodLabel:   "FIFO",
+		MenuItems:     []component.MenuItem{{Label: "Back To Sync and Reports", Enabled: true}, {Label: "Generate Another Report", Enabled: true}},
+		SelectedIndex: 0,
+		Outcome: runtime.ReportOutcome{
+			Success:       false,
+			FailureReason: runtime.ReportFailureUnsupportedReportCalculation,
+			Message:       "Could not generate the selected report because one activity is incomplete.",
+			Diagnostic: runtime.DiagnosticReportState{
+				Eligible:          true,
+				GenerationMessage: "Diagnostic report generated successfully.",
+				Path:              "/tmp/example.diagnostic.json",
+			},
+			Request: request,
+		},
+	})
+	assertContains(t, devFailure, "Diagnostic report generated successfully.")
+	assertContains(t, devFailure, "Diagnostic Report Path: /tmp/example.diagnostic.json")
 }

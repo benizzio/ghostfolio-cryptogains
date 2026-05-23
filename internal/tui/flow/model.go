@@ -581,9 +581,16 @@ func (m *Model) reportSelectionMenuItems() []component.MenuItem {
 // reportResultMenuItems builds the completed report-result action menu.
 // Authored by: OpenCode
 func (m *Model) reportResultMenuItems() []component.MenuItem {
-	var items = []component.MenuItem{{Label: "Back To Sync and Reports", Enabled: true}}
+	var items []component.MenuItem
+	if m.report.Busy {
+		items = append(items, component.MenuItem{Label: "Generate Diagnostic Report", Enabled: false})
+	}
+	if m.reportOutcomeHasPendingDiagnostic() {
+		items = append(items, component.MenuItem{Label: "Generate Diagnostic Report", Enabled: true})
+	}
+	items = append(items, component.MenuItem{Label: "Back To Sync and Reports", Enabled: !m.report.Busy})
 	if m.syncReports.ProtectedData.HasReadableSnapshot && len(m.syncReports.ProtectedData.AvailableReportYears) > 0 {
-		items = append(items, component.MenuItem{Label: "Generate Another Report", Enabled: true})
+		items = append(items, component.MenuItem{Label: "Generate Another Report", Enabled: !m.report.Busy})
 	}
 	return items
 }
@@ -670,6 +677,13 @@ func (m *Model) reportResultHelpText() string {
 		component.ContentWidthForScreen(m.width),
 		component.Bindings{Short: []key.Binding{upBinding(), downBinding(), enterBinding(), quitBinding()}},
 	)
+}
+
+// reportOutcomeHasPendingDiagnostic reports whether the active report result may
+// still generate a diagnostics artifact explicitly.
+// Authored by: OpenCode
+func (m *Model) reportOutcomeHasPendingDiagnostic() bool {
+	return m.syncReports.ReportResult.Diagnostic.Eligible && m.syncReports.ReportResult.Diagnostic.Path == ""
 }
 
 // serverReplacementHelpText renders the visible hotkeys for the server-replacement screen.

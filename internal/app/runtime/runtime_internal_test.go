@@ -176,6 +176,20 @@ func TestSyncFailureReasonFromBoundaryCoversAllCategories(t *testing.T) {
 	}
 }
 
+func TestSyncFailureCategoryHandlesRequestFailures(t *testing.T) {
+	t.Parallel()
+
+	var category = syncFailureCategory(&ghostfolioclient.RequestFailure{Category: ghostfolioclient.FailureUnsuccessfulServerResponse})
+	if category != ghostfolioclient.FailureUnsuccessfulServerResponse {
+		t.Fatalf("expected request failure category to be preserved, got %q", category)
+	}
+
+	category = syncFailureCategory(errors.New("plain failure"))
+	if category != ghostfolioclient.FailureConnectivityProblem {
+		t.Fatalf("expected non-request failures to fall back to connectivity, got %q", category)
+	}
+}
+
 func TestRunHandlesActivitiesTransportFailure(t *testing.T) {
 	t.Parallel()
 

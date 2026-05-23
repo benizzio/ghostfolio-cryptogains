@@ -95,8 +95,11 @@ func TestSyncDiagnosticReportFlowPromptsInProductionAndWritesOnExplicitChoice(t 
 	if len(records) == 0 {
 		t.Fatalf("expected production diagnostic report records")
 	}
-	if records[0].Quantity == "1" || records[0].AssetProfileUnitPrice == "100" || records[0].BaseGrossValue == "100" {
+	if records[0].Quantity != nil || records[0].AssetProfileUnitPrice != nil || records[0].BaseGrossValue != nil {
 		t.Fatalf("expected production report to redact financial values, got %q", reportText)
+	}
+	if records[0].OrderCurrency != nil {
+		t.Fatalf("expected absent source currency to serialize as explicit null, got %q", reportText)
 	}
 }
 
@@ -157,7 +160,7 @@ func TestSyncDiagnosticReportFlowGeneratesAutomaticallyInExplicitDevelopmentMode
 	if len(records) == 0 {
 		t.Fatalf("expected development diagnostic report records")
 	}
-	if records[0].Quantity != "1" || records[0].AssetProfileUnitPrice != "100" || records[0].BaseGrossValue != "100" {
+	if records[0].Quantity == nil || *records[0].Quantity != "1" || records[0].AssetProfileUnitPrice == nil || *records[0].AssetProfileUnitPrice != "100" || records[0].BaseGrossValue == nil || *records[0].BaseGrossValue != "100" {
 		t.Fatalf("expected development report to retain source financial context, got %q", reportText)
 	}
 }
@@ -226,6 +229,9 @@ func mustDiagnosticFiles(t *testing.T, baseDir string) []string {
 
 	entries, err := os.ReadDir(filepath.Join(baseDir, "ghostfolio-cryptogains", "diagnostics"))
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		t.Fatalf("read diagnostics directory: %v", err)
 	}
 
@@ -237,11 +243,12 @@ func mustDiagnosticFiles(t *testing.T, baseDir string) []string {
 }
 
 type diagnosticReportRecord struct {
-	Quantity              string `json:"quantity"`
-	OrderUnitPrice        string `json:"order_unit_price"`
-	OrderGrossValue       string `json:"order_gross_value"`
-	AssetProfileUnitPrice string `json:"asset_profile_unit_price"`
-	BaseGrossValue        string `json:"base_gross_value"`
+	Quantity              *string `json:"quantity"`
+	OrderUnitPrice        *string `json:"order_unit_price"`
+	OrderGrossValue       *string `json:"order_gross_value"`
+	AssetProfileUnitPrice *string `json:"asset_profile_unit_price"`
+	BaseGrossValue        *string `json:"base_gross_value"`
+	OrderCurrency         *string `json:"order_currency"`
 }
 
 type diagnosticReportPayload struct {
