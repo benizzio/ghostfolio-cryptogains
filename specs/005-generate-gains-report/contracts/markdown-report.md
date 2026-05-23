@@ -220,7 +220,8 @@ Rules:
 
 - Every in-year activity for the included asset appears in this table.
 - The table includes acquisitions, priced liquidations, and explained zero-priced holding reductions.
-- `Activity Currency` shows the explicit currency code from which that row's `Gross Value` and `Fee` were taken for priced activity rows.
+- `Activity Currency` shows the explicit currency code from the selected same-tier context for priced activity rows.
+- When a higher-priority tier is skipped because it lacks an explicit currency code, `Activity Currency` reflects the later selected explicit-currency tier for that row.
 - For explained zero-priced holding reductions, no activity monetary context is required from that row. If synced data preserves explicit zero-valued `Gross Value` or `Fee`, render `0`; otherwise leave those cells blank.
 - For explained zero-priced holding reductions, `Activity Currency` remains blank because no selected activity currency context exists for that row.
 - `Calculation Currency` shows the report's explicit shared report calculation currency for calculated row values such as `Basis After Row`.
@@ -270,6 +271,8 @@ Before Markdown rendering, the calculator supplies a complete `CapitalGainsRepor
 - reference entries
 - detail sections
 - report calculation currency label
+- activity-row `Activity Currency` values that already reflect the first eligible explicit-currency tier selected by the calculator, including lower-priority tiers when higher-priority tiers were skipped for lacking a currency code
+- selected activity inputs that already reflect any same-tier exact derivation needed to satisfy the chosen context, with gross-value multiplication completed before any division-based unit-price fallback
 
 Markdown rendering must not:
 

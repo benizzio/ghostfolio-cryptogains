@@ -50,12 +50,13 @@ Implement FIFO, LIFO, HIFO, Average Cost Basis, and Scope-Local Exact Unit Match
 
 ## Decision: Select One Complete Activity Currency Context Before Calculation
 
-For each activity, resolve monetary inputs using this priority: order currency, then asset-profile currency, then base currency. A tier is usable only when it supplies the complete monetary value set needed for that activity. After selection, the calculation treats selected values from all activities as equal-value inputs and uses the report-wide label `NOT APPLICABLE`.
+For each activity, evaluate monetary tiers in this priority order: order currency, then asset-profile currency, then base currency. A tier is eligible only when it has an explicit currency code. Tiers that carry financial values but no currency code are skipped before completeness validation or derivation is attempted. The selected tier is the first eligible tier that can supply or exactly derive the complete monetary value set needed for that activity using only same-tier values. When gross value is missing but quantity and unit price are present in the selected tier, derive gross value by multiplication before considering any division-based unit-price fallback. After selection, the calculation treats selected values from all activities as equal-value inputs and uses the report-wide label `NOT APPLICABLE`.
 
-**Rationale**: This directly follows the feature's single-activity currency context rule, avoids undocumented currency conversion, and preserves the constitution rule that currency-denominated values remain explicitly tied to currency throughout calculation and rendering.
+**Rationale**: This directly follows the feature's single-activity currency context rule, avoids undocumented currency conversion or tier mixing, accepts production-shaped rows where a higher-priority tier is currencyless but a later explicit-currency tier is valid, and prefers the exact same-tier multiplication path that avoids unnecessary division failure.
 
 **Alternatives considered**:
 
+- Fail immediately on the first tier that contains partial financial values: rejected because a currencyless tier is not a selectable currency context and must not block evaluation of later eligible tiers.
 - Mix gross value from one tier and fee from another: rejected because it violates the single-activity context rule.
 - Convert all values to a common currency: rejected because this slice has no exchange-rate source, conversion boundary, or rounding rule.
 - Prefer base currency globally: rejected because the spec defines the priority as `order -> asset -> base`.

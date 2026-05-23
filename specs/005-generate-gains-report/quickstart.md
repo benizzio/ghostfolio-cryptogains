@@ -59,7 +59,7 @@ Expected implemented automated coverage scope for this slice includes:
 - zero-result included assets
 - negative loss rendering
 - zero-priced holding reductions
-- single-activity currency context priority and no tier mixing
+- single-activity currency context priority, skipping tiers without explicit currency before completeness validation, multiplication-based same-tier gross-value derivation before division-based fallback, and no tier mixing
 - explicit shared report calculation currency `NOT APPLICABLE` for this slice
 - empty-main-section report rendering with yearly total `0`
 - incomplete activity monetary-context failure after year and method selection
@@ -169,6 +169,7 @@ Verify at least these scenarios when checking the implemented workflow manually:
 - inspect one generated diagnostics artifact and confirm it uses the original persisted `ActivityRecord` with explicit `null` values for absent source fields instead of derived report data
 - use a fixture or server history that yields a reportable year with no main-section assets and confirm the empty-state report still saves
 - use a fixture with mixed selected activity currencies and confirm the report still renders `NOT APPLICABLE` for report calculation currency columns
+- use a priced `BUY` fixture where order financial values exist but `order_currency` is absent, the asset-profile tier has explicit currency and fee, and gross value must be derived from quantity and unit price; confirm generation skips the currencyless order tier and uses the asset-profile currency instead of failing early
 - use a production-shaped explained zero-priced `SELL` row that preserves explicit zero `unit_price`, `gross_value`, and `fee_amount`, and confirm the report keeps those zeros distinct from missing values without treating the row as a priced liquidation
 
 ## Reportable Year With No Main-Section Assets
@@ -186,19 +187,34 @@ Expected result:
 
 ## Incomplete Monetary Context Failure After Selection
 
-1. Use a deterministic fixture where one priced `BUY` or priced `SELL` inside the selected year lacks a complete `order`, `asset`, and `base` monetary context for the required gross value and fee pair.
+1. Use a deterministic fixture where one priced `BUY` or priced `SELL` inside the selected year still lacks a complete explicit-currency `order`, `asset`, or `base` monetary context for the required gross value and fee pair even after skipping currencyless tiers and allowing same-tier exact derivation.
 2. Select that year and any method.
 3. Start report generation.
 
 Expected result:
 
 - generation fails before any file is saved
+- generation fails only after every explicit-currency tier for the offending activity is unusable
 - the error is actionable and identifies only non-secret references such as asset label and source ID
 - the unlocked `Sync and Reports` context remains active
 - no partial Markdown file remains
 - outside explicit development mode, the failure result offers `Generate Diagnostic Report` before any diagnostics artifact is written
 - when diagnostics generation is requested, the workflow discloses the local `.diagnostic.json` path outside Documents
 - if the failure is tied to one activity, the diagnostics artifact includes the original persisted `ActivityRecord` with explicit `null` values for absent source fields and without substituting selected calculation inputs or rendered report rows
+
+## Currencyless Higher-Priority Tier Path
+
+1. Use a deterministic fixture where a priced `BUY` has order financial fields but `order_currency = null`, while the asset-profile tier has an explicit currency, fee, and unit price that can derive gross value from `quantity * unit_price`.
+2. Select that year and any method.
+3. Start report generation.
+
+Expected result:
+
+- generation succeeds or proceeds past activity-input validation using the asset-profile tier
+- the order tier is skipped before completeness validation because it lacks an explicit currency code
+- the row or liquidation detail that shows `Activity Currency` reflects the asset-profile currency rather than the skipped order tier
+- gross value is derived by same-tier multiplication before any division-based fallback is considered
+- no values from the order tier or base tier are mixed into the selected activity input
 
 ## Explicit-Development Automatic Diagnostics Path
 
@@ -278,6 +294,7 @@ Use deterministic fixtures that include:
 - at least one realized loss
 - a production-shaped explained zero-priced `SELL` holding reduction that preserves explicit zero `unit_price`, `gross_value`, and `fee_amount`
 - a priced activity with explicit fee `0`
+- a priced `BUY` where order financial fields exist but `order_currency` is absent and the asset-profile or base tier can still supply or exactly derive same-tier values
 - a priced activity with incomplete monetary context
 - mixed available monetary tiers for single-activity currency context selection
 - unreliable or missing source scope for scope-local fallback
@@ -294,7 +311,10 @@ Expected result:
 - display labels do not affect grouping
 - zero-priced holding reductions reduce holdings and basis but produce no gain or loss
 - preserved explicit zero-valued `unit_price`, `gross_value`, and `fee_amount` on zero-priced holding reductions remain distinct from missing values during calculation and detail-row preparation
+- tiers without explicit currency are skipped before completeness validation
+- same-tier gross-value derivation by multiplication is preferred before division-based unit-price derivation
 - explicit fee `0` is accepted, while incomplete priced-activity monetary context fails the attempt
+- incomplete priced-activity monetary context fails only after all explicit-currency tiers are unusable
 - reference-section liquidation counts are correct through selected year end
 - scope-local fallback remains active only for the affected open scope until that scope reaches zero
 - later reacquisition in the same scope re-evaluates exact matching, while other scopes keep independent state
