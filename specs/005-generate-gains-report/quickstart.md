@@ -166,7 +166,7 @@ Verify at least these scenarios when checking the implemented workflow manually:
 - trigger an automatic-open failure and confirm the saved file remains in Documents with manual deletion guidance
 - trigger a Documents-directory failure and confirm no partial Markdown file remains
 - trigger an eligible pre-save report-generation failure and confirm the result offers `Generate Diagnostic Report` outside explicit development mode or generates diagnostics automatically in explicit development mode
-- inspect one generated diagnostics artifact and confirm it uses the original persisted `ActivityRecord` with explicit `null` values for absent source fields instead of derived report data
+- inspect one generated diagnostics artifact and confirm it uses the original persisted `ActivityRecord` with explicit `null` values for absent source fields instead of derived report data, and that wrapped failures preserve actionable `failure_detail` plus ordered `failure_cause_chain` entries without leaking secret-bearing nested causes
 - use a fixture or server history that yields a reportable year with no main-section assets and confirm the empty-state report still saves
 - use a fixture with mixed selected activity currencies and confirm the report still renders `NOT APPLICABLE` for report calculation currency columns
 - use a priced `BUY` fixture where order financial values exist but `order_currency` is absent, the asset-profile tier has explicit currency and fee, and gross value must be derived from quantity and unit price; confirm generation skips the currencyless order tier and uses the asset-profile currency instead of failing early
@@ -201,6 +201,7 @@ Expected result:
 - outside explicit development mode, the failure result offers `Generate Diagnostic Report` before any diagnostics artifact is written
 - when diagnostics generation is requested, the workflow discloses the local `.diagnostic.json` path outside Documents
 - if the failure is tied to one activity, the diagnostics artifact includes the original persisted `ActivityRecord` with explicit `null` values for absent source fields and without substituting selected calculation inputs or rendered report rows
+- if diagnostics are generated from a wrapped failure, the artifact preserves the actionable `failure_detail` plus an outer-to-inner `failure_cause_chain` whose secret-bearing nested causes are redacted or omitted
 
 ## Currencyless Higher-Priority Tier Path
 
@@ -227,6 +228,19 @@ Expected result:
 - the workflow generates a local `.diagnostic.json` artifact automatically
 - the result discloses the generated diagnostics path
 - the generated artifact still excludes token and JWT material
+
+## Wrapped Failure Cause-Chain Inspection
+
+1. Trigger an eligible report-generation failure whose implementation wraps a lower-level calculation, rendering, output-preparation, or diagnostics-generation error.
+2. Generate the diagnostics artifact.
+3. Inspect the serialized `failure_detail` and `failure_cause_chain` fields.
+
+Expected result:
+
+- `failure_detail` remains the actionable outer report-failure summary
+- `failure_cause_chain[0]` matches or restates the same outer report failure preserved by `failure_detail`
+- later `failure_cause_chain` entries continue in deterministic outer-to-inner order toward the deepest eligible non-secret wrapped cause
+- nested secret-bearing or production-disallowed financial-value causes are redacted or omitted instead of being written verbatim
 
 ## Mixed Selected-Currency
 
@@ -408,6 +422,7 @@ Expected result:
 - app-managed storage contains no Markdown report content
 - app-managed storage contains no generated-report catalog or history
 - app-managed storage may contain `.diagnostic.json` files only for eligible failed sync or report attempts
+- diagnostics artifacts generated from wrapped failures preserve actionable `failure_detail` and ordered `failure_cause_chain` entries, with nested secret-bearing causes redacted or omitted
 - any diagnostics artifact remains outside Documents and excludes token and JWT material
 - Documents contains only successful final report files
 - failed output attempts leave no partial Markdown file

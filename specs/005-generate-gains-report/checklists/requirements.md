@@ -36,6 +36,7 @@
 - Revalidated after the `spec-fixes.md` updates: the workflow now centers on the unlocked `Sync and Reports` context, the report structure is defined explicitly, and single-activity currency-context rules are separated from exact-decimal rules.
 - Revalidated on 2026-05-23 for BUG-006 artifact consistency: `data-model.md`, `contracts/tui-workflows.md`, `quickstart.md`, and this checklist now align on diagnostics outcome state, diagnostics-path disclosure, source-faithful persisted `ActivityRecord` use, and explicit `null` rendering.
 - Revalidated on 2026-05-23 for BUG-007 artifact consistency: `research.md`, `data-model.md`, `contracts/markdown-report.md`, `quickstart.md`, and this checklist now align on explicit-currency tier eligibility, skipping currencyless tiers before completeness validation, same-tier exact derivation, multiplication-before-division precedence, and lower-priority selected activity-currency output when earlier tiers are currencyless.
+- Revalidated on 2026-05-23 for BUG-008 artifact consistency: `data-model.md`, `quickstart.md`, this checklist, and `specs/004-source-faithful-diagnostics/spec.md` now align on preserving actionable `failure_detail`, ordered `failure_cause_chain`, and nested-cause redaction or suppression rules for shared diagnostics artifacts.
 - Runtime-backed verification for regenerated coverage and fresh artifact inspection remains tracked separately by `T062` and `T064`; the evidence below distinguishes current documented evidence from those pending reruns.
 
 ## Implementation Evidence
@@ -69,10 +70,17 @@
 
 ### Report-Failure Diagnostics Artifact Review Evidence
 
-- `spec.md` now requires eligible pre-save report failures to support a separate local diagnostics artifact, distinguishes that flow from opener-only warnings, and requires path disclosure under `FR-034b` through `FR-035c`.
-- `data-model.md` now models transient diagnostics outcome state, diagnostics path, failure category, and original persisted offending-record context through `ReportFailureDiagnostics` and `ReportGenerationOutcome`.
+- `spec.md` now requires eligible pre-save report failures to support a separate local diagnostics artifact, distinguishes that flow from opener-only warnings, and requires path disclosure plus ordered cause-chain preservation under `FR-034b` through `FR-035d`.
+- `data-model.md` now models transient diagnostics outcome state, diagnostics path, failure category, actionable `failure_detail`, ordered `failure_cause_chain`, and original persisted offending-record context through `ReportFailureDiagnostics` and `ReportGenerationOutcome`.
+- `specs/004-source-faithful-diagnostics/spec.md` now keeps the shared diagnostics contract aligned by preserving actionable `failure detail` and any eligible ordered wrapped-cause chain under the same redaction and suppression rules used for other diagnostics content.
 - `contracts/tui-workflows.md` now states that the failure-result screen offers `Generate Diagnostic Report` outside explicit development mode, generates diagnostics automatically in explicit development mode, and shows the written diagnostics path when generation succeeds.
-- `quickstart.md` now includes manual verification steps for production-mode prompting, explicit-development automatic generation, and diagnostics-artifact location checks.
+- `quickstart.md` now includes manual verification steps for production-mode prompting, explicit-development automatic generation, diagnostics-artifact location checks, and wrapped-failure inspection of ordered `failure_cause_chain` entries.
+
+### Wrapped-Cause Redaction And Suppression Evidence
+
+- `spec.md` now requires wrapped-failure diagnostics to preserve `failure_detail`, serialize ordered `failure_cause_chain`, and redact or suppress nested secret-bearing causes under `FR-035d`, `QUAL-001b`, and `SC-008a`.
+- `data-model.md` now records that `failure_cause_chain` starts with the same actionable outer failure preserved by `failure_detail` and applies the same diagnostics redaction and suppression rules to later entries.
+- `quickstart.md` now requires manual artifact inspection proving outer-to-inner ordering and redaction or omission of nested secret-bearing or production-disallowed financial-value causes.
 
 ### Source-Faithful Persisted Activity Evidence
 
