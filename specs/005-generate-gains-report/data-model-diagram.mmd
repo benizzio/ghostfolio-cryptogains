@@ -32,7 +32,7 @@ erDiagram
         SourceScope_nullable source_scope
         string raw_hash
         ProtectedActivityCache protected_activity_cache
-        ActivityCalculationInput activity_calculation_input
+        ActivityCalculationInput_nullable activity_calculation_input
     }
 
     SourceScope {
@@ -41,6 +41,7 @@ erDiagram
         enum scope_kind
         enum reliability
         ActivityRecord_array activity_records
+        ActivityCalculationInput_array activity_calculation_inputs
         ApplicableScope_array applicable_scopes
     }
 
@@ -50,9 +51,8 @@ erDiagram
         ActiveReadableSnapshot_nullable active_readable_snapshot
         ProtectedActivityCache_nullable protected_activity_cache
         timestamp entered_at
-        AppSetupConfig setup_config
-        SyncDataAttempt_array sync_data_attempts
-        ReportRequest_array report_generation_attempts
+        AppSetupConfig app_setup_config
+        ReportRequest_array report_requests
         ReportGenerationOutcome_array report_generation_outcomes
     }
 
@@ -60,21 +60,20 @@ erDiagram
         integer year
         enum cost_basis_method
         timestamp requested_at
-        SyncAndReportsContext context
+        SyncAndReportsContext sync_and_reports_context
         ProtectedActivityCache protected_activity_cache
         CostBasisMethod cost_basis_method_definition
         CapitalGainsReport_nullable capital_gains_report
     }
 
     CostBasisMethod {
-        enum value
+        enum fifo
+        enum lifo
+        enum hifo
+        enum average_cost
+        enum scope_local_hybrid
+        BasisState_array basis_states
         ReportRequest_array report_requests
-        BasisState_array basis_state_implementations
-    }
-
-    BasisState {
-        CostBasisMethod cost_basis_method
-        ApplicableScope_nullable applicable_scope
     }
 
     ActivityCalculationInput {
@@ -95,6 +94,7 @@ erDiagram
         string_nullable comment
         ActivityRecord activity_record
         AssetPositionTimeline asset_position_timeline
+        BasisLot_array basis_lots
     }
 
     ApplicableScope {
@@ -155,6 +155,7 @@ erDiagram
         timestamp occurred_at
         enum activity_type
         decimal quantity
+        decimal_nullable unit_price
         decimal_nullable gross_value
         decimal_nullable fee_amount
         string_nullable activity_currency
@@ -211,11 +212,11 @@ erDiagram
         AssetPositionTimeline_array detail_sections
         ReportRequest report_request
         ProtectedActivityCache protected_activity_cache
-        ReportDocument report_document
+        ReportDocument_nullable report_document
     }
 
     ReportDocumentType {
-        enum value
+        enum markdown
         ReportDocument_array report_documents
     }
 
@@ -226,8 +227,7 @@ erDiagram
         enum cost_basis_method
         timestamp generated_at
         CapitalGainsReport capital_gains_report
-        ReportDocumentType document_type_definition
-        ReportOutputFile report_output_file
+        ReportOutputFile_nullable report_output_file
     }
 
     ReportOutputFile {
@@ -241,64 +241,77 @@ erDiagram
         ReportGenerationOutcome report_generation_outcome
     }
 
+    ReportFailureDiagnostics {
+        boolean eligible
+        enum status
+        enum_nullable failure_category
+        path_nullable artifact_path
+        string_nullable generation_message
+        ActivityRecord_nullable offending_activity_record
+        enum_nullable redaction_mode
+        ReportGenerationOutcome report_generation_outcome
+    }
+
     ReportGenerationOutcome {
         boolean success
         path_nullable saved_path
         boolean open_failed
         string message
-        SyncAndReportsContext context
+        enum_nullable failure_category
+        ReportFailureDiagnostics_nullable diagnostics
+        SyncAndReportsContext sync_and_reports_context
         ReportOutputFile_nullable report_output_file
     }
 
-    ProtectedSnapshot ||--|| ProtectedActivityCache : unlocks
-    ProtectedActivityCache ||--o{ ActivityRecord : supplies
-    ProtectedActivityCache ||--o{ ReportRequest : consumed_by
+    ProtectedSnapshot ||--|| ProtectedActivityCache : stores
+    ProtectedActivityCache ||--o{ ActivityRecord : contains
+    ProtectedActivityCache ||--o{ ReportRequest : feeds
     ProtectedActivityCache ||--o{ CapitalGainsReport : source_for
 
     ActivityRecord }o--o| SourceScope : references
-    ActivityRecord ||--|| ActivityCalculationInput : transforms_into
-
-    SourceScope ||--o{ ApplicableScope : contributes_to
-
-    AppSetupConfig ||--o{ SyncAndReportsContext : used_by
-    SyncAndReportsContext ||--o| ActiveReadableSnapshot : holds
-    SyncAndReportsContext ||--o| ProtectedActivityCache : holds
-    SyncAndReportsContext ||--o{ SyncDataAttempt : starts
-    SyncAndReportsContext ||--o{ ReportRequest : starts
-    SyncAndReportsContext ||--o{ ReportGenerationOutcome : owns_until_dismissed
-
-    ReportRequest }o--|| CostBasisMethod : selects
-    ReportRequest ||--o| CapitalGainsReport : produces
-
-    CostBasisMethod ||--o{ BasisState : determines
+    ActivityRecord ||--o| ActivityCalculationInput : transforms_into
 
     ActivityCalculationInput }o--o| SourceScope : preserves
-    ActivityCalculationInput ||--o{ BasisLot : creates
+    SourceScope o|--o{ ApplicableScope : contributes_to
 
-    AssetPositionTimeline ||--o{ ActivityCalculationInput : derived_from
+    SyncAndReportsContext }o--|| AppSetupConfig : uses
+    SyncAndReportsContext ||--o| ActiveReadableSnapshot : holds
+    SyncAndReportsContext ||--o| ProtectedActivityCache : holds
+    SyncAndReportsContext ||--o{ ReportRequest : starts
+    SyncAndReportsContext ||--o{ ReportGenerationOutcome : shows
+
+    CostBasisMethod ||--o{ BasisState : determines
+    CostBasisMethod ||--o{ ReportRequest : selected_by
+
+    AssetPositionTimeline ||--o{ ActivityCalculationInput : replays
+    ActivityCalculationInput ||--o{ BasisLot : may_create
+
     AssetPositionTimeline ||--o{ ApplicableScope : owns
-    AssetPositionTimeline ||--o{ LiquidationCalculation : contains
-    AssetPositionTimeline ||--o{ AssetActivityDetailRow : contains
-    AssetPositionTimeline ||--o| AssetSummaryEntry : produces
-
     ApplicableScope ||--|| BasisState : owns
-    ApplicableScope ||--o{ BasisLot : scopes
+    ApplicableScope o|--o{ BasisLot : scopes
 
     BasisLot ||--o{ BasisMatch : consumed_by
-    LiquidationCalculation ||--o{ BasisMatch : uses
-    AssetActivityDetailRow ||--o{ BasisMatch : holding_reduction_matches
 
-    AssetActivityDetailRow ||--o| LiquidationCalculation : has
+    AssetPositionTimeline ||--o{ AssetActivityDetailRow : contains
+    AssetPositionTimeline ||--o{ LiquidationCalculation : contains
+    AssetPositionTimeline ||--o| AssetSummaryEntry : may_produce
 
-    AssetSummaryEntry ||--o{ LiquidationCalculation : summarized_by
+    AssetActivityDetailRow ||--o| LiquidationCalculation : may_include
+    AssetActivityDetailRow o|--o{ BasisMatch : holds_reduction_matches
+
+    LiquidationCalculation o|--o{ BasisMatch : uses
+    AssetSummaryEntry ||--o{ LiquidationCalculation : aggregates
     CapitalGainsReport ||--o{ LiquidationCalculation : totals
 
-    CapitalGainsReport ||--o{ AssetSummaryEntry : has_summary
-    CapitalGainsReport ||--o{ ReferenceLiquidationEntry : has_references
-    CapitalGainsReport ||--o{ AssetPositionTimeline : has_details
+    ReportRequest ||--o| CapitalGainsReport : produces
+    CapitalGainsReport ||--o{ AssetSummaryEntry : summarizes
+    CapitalGainsReport ||--o{ ReferenceLiquidationEntry : references
+    CapitalGainsReport ||--o{ AssetPositionTimeline : details
+    CapitalGainsReport ||--o| ReportDocument : rendered_into
 
     ReportDocumentType ||--o{ ReportDocument : defines
-    CapitalGainsReport ||--|| ReportDocument : rendered_into
-    ReportDocument ||--|| ReportOutputFile : saved_as
+    ReportDocument ||--o| ReportOutputFile : saved_as
 
+    ReportGenerationOutcome ||--o| ReportFailureDiagnostics : may_include
     ReportOutputFile o|--|| ReportGenerationOutcome : reported_through
+    ReportFailureDiagnostics }o--o| ActivityRecord : includes_offending_record
