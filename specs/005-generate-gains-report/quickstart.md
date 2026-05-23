@@ -60,6 +60,7 @@ Expected implemented automated coverage scope for this slice includes:
 - negative loss rendering
 - zero-priced holding reductions
 - single-activity currency context priority, skipping tiers without explicit currency before completeness validation, multiplication-based same-tier gross-value derivation before division-based fallback, and no tier mixing
+- deterministic histories that require repeating-decimal internal division or allocation and still succeed under the shared 16-decimal internal calculation precision without extra report-boundary rounding
 - explicit shared report calculation currency `NOT APPLICABLE` for this slice
 - empty-main-section report rendering with yearly total `0`
 - incomplete activity monetary-context failure after year and method selection
@@ -187,7 +188,7 @@ Expected result:
 
 ## Incomplete Monetary Context Failure After Selection
 
-1. Use a deterministic fixture where one priced `BUY` or priced `SELL` inside the selected year still lacks a complete explicit-currency `order`, `asset`, or `base` monetary context for the required gross value and fee pair even after skipping currencyless tiers and allowing same-tier exact derivation.
+1. Use a deterministic fixture where one priced `BUY` or priced `SELL` inside the selected year still lacks a complete explicit-currency `order`, `asset`, or `base` monetary context for the required gross value and fee pair even after skipping currencyless tiers and allowing same-tier derivation under the shared 16-decimal internal calculation precision where division is required.
 2. Select that year and any method.
 3. Start report generation.
 
@@ -216,6 +217,18 @@ Expected result:
 - the row or liquidation detail that shows `Activity Currency` reflects the asset-profile currency rather than the skipped order tier
 - gross value is derived by same-tier multiplication before any division-based fallback is considered
 - no values from the order tier or base tier are mixed into the selected activity input
+
+## Rounded Internal Division Path
+
+1. Use a deterministic fixture where same-tier derivation, average-cost updates, partial-lot basis allocation, or proportional proceeds allocation requires a repeating decimal.
+2. Select that year and any method.
+3. Start report generation.
+
+Expected result:
+
+- generation succeeds
+- the internal calculation path uses the shared 16-decimal precision with round-half-up rounding where division or proportional allocation is required
+- rendered report values reuse those internal results without an added report-boundary rounding step
 
 ## Explicit-Development Automatic Diagnostics Path
 

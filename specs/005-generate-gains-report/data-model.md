@@ -219,9 +219,9 @@ Fields:
 | `asset_identity_key` | string | Calculation grouping key |
 | `display_label` | string | Symbol or name used for rendering only |
 | `quantity` | decimal | Exact activity quantity |
-| `gross_value` | decimal nullable | Selected or exactly derived from one eligible explicit-currency tier for priced activities; may remain as preserved explicit `0` for explained zero-priced holding reductions |
+| `gross_value` | decimal nullable | Selected or derived from one eligible explicit-currency tier for priced activities; division-based derivation uses the shared 16-decimal internal report-calculation precision; may remain as preserved explicit `0` for explained zero-priced holding reductions |
 | `fee_amount` | decimal nullable | Selected from the same eligible explicit-currency tier for priced activities; may remain as preserved explicit `0` for explained zero-priced holding reductions |
-| `unit_price` | decimal nullable | Selected or exactly derived within the same eligible explicit-currency tier for priced activities; may remain as preserved explicit `0` for explained zero-priced holding reductions |
+| `unit_price` | decimal nullable | Selected or derived within the same eligible explicit-currency tier for priced activities; division-based derivation uses the shared 16-decimal internal report-calculation precision; may remain as preserved explicit `0` for explained zero-priced holding reductions |
 | `selected_currency_context` | enum nullable | `order`, `asset_profile`, or `base` when a priced activity requires one and the first eligible explicit-currency tier is selected |
 | `selected_currency_code` | string nullable | Explicit currency code carried from the selected activity context when one is required; mandatory whenever `selected_currency_context` is set |
 | `source_scope` | `SourceScope` nullable | Preserved source scope |
@@ -235,17 +235,18 @@ Relationships:
 
 Validation rules:
 
-- A `BUY` requires gross acquisition value and fee from the first eligible tier that has an explicit currency code and can supply or exactly derive both values from same-tier data only.
-- A priced `SELL` requires gross liquidation value and fee from the first eligible tier that has an explicit currency code and can supply or exactly derive both values from same-tier data only.
+- A `BUY` requires gross acquisition value and fee from the first eligible tier that has an explicit currency code and can supply or derive both values from same-tier data only.
+- A priced `SELL` requires gross liquidation value and fee from the first eligible tier that has an explicit currency code and can supply or derive both values from same-tier data only.
 - A tier without an explicit currency code is not a selectable context and is skipped before completeness validation or derivation is attempted.
 - An explained zero-priced holding reduction requires no activity monetary inputs and therefore no selected currency context, even when preserved explicit zero-valued `unit_price`, `gross_value`, or `fee_amount` remain present.
 - An explicit fee value of `0` is valid. A missing fee is not equivalent to zero.
 - Priced activity quantity must be greater than zero.
 - If gross value is missing for a priced activity but positive quantity and unit price are present in the selected tier, gross value is derived by same-tier multiplication before any division-based fallback is considered.
-- If unit price is not stored explicitly for a priced activity, it may be derived only by same-tier exact division when the needed division terminates exactly.
+- If unit price is not stored explicitly for a priced activity, it may be derived only by same-tier division using the shared 16-decimal internal report-calculation precision with round-half-up rounding.
 - Values from different tiers must not be mixed inside one input.
 - A chosen context requires an explicit `selected_currency_code` from the chosen tier. Without that explicit code, no tier is selected.
-- Activity-input validation fails only when no explicit-currency tier can safely supply or exactly derive the required values.
+- Division-based same-tier derivation uses the shared 16-decimal internal report-calculation precision with round-half-up rounding.
+- Activity-input validation fails only when no explicit-currency tier can safely supply or derive the required values.
 - After input creation, currency identity remains explicit for priced rows. No conversion occurs, and successful rendered cross-activity monetary outputs require one shared report calculation currency.
 
 ## ApplicableScope

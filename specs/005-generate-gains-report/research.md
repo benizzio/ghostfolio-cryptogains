@@ -24,15 +24,15 @@ Use `github.com/cockroachdb/apd/v3` for all quantities, gross values, fees, basi
 - Integer minor units: rejected because crypto quantities and Ghostfolio monetary inputs do not share one fixed minor-unit scale.
 - New rational arithmetic library: rejected because this slice requires canonical exact-decimal output, not fractional notation, and the existing dependency set should remain minimal.
 
-## Decision: Fail Required Non-Terminating Decimal Divisions
+## Decision: Use Shared 16-Decimal Internal Calculation Precision
 
-When a required calculation division cannot be represented as a finite exact decimal, report generation fails with an actionable calculation error. The implementation should minimize division where possible, for example by comparing HIFO unit costs with cross multiplication and allocating basis as `lot_basis * disposed_quantity / lot_quantity`.
+Keep the no-additional-rounding rule at the Markdown output boundary, but use one shared internal report-calculation precision of 16 decimal places with round-half-up rounding for non-terminating divisions and proportional allocations. The implementation should still minimize division where possible, for example by comparing HIFO unit costs with cross multiplication and allocating basis as `lot_basis * disposed_quantity / lot_quantity`.
 
-**Rationale**: The feature requires no report-boundary rounding and canonical exact-decimal rendering. A repeating decimal cannot be rendered as a finite exact decimal without introducing a rounding policy that the specification explicitly does not define for this slice.
+**Rationale**: The feature now separates report presentation precision from internal calculation precision. Cost-basis methods and same-tier derivations can require repeating-decimal math even for otherwise valid histories, so failing those histories would incorrectly reject supported report runs.
 
 **Alternatives considered**:
 
-- Round to a fixed scale: rejected because no rounding policy exists in the spec.
+- Fail required non-terminating decimal divisions: rejected because it blocks valid report runs that need repeating-decimal math.
 - Render fractions: rejected because the spec requires canonical exact-decimal strings.
 - Silently truncate: rejected because it would create unauditable financial output.
 
@@ -50,9 +50,9 @@ Implement FIFO, LIFO, HIFO, Average Cost Basis, and Scope-Local Exact Unit Match
 
 ## Decision: Select One Complete Activity Currency Context Before Calculation
 
-For each activity, evaluate monetary tiers in this priority order: order currency, then asset-profile currency, then base currency. A tier is eligible only when it has an explicit currency code. Tiers that carry financial values but no currency code are skipped before completeness validation or derivation is attempted. The selected tier is the first eligible tier that can supply or exactly derive the complete monetary value set needed for that activity using only same-tier values. When gross value is missing but quantity and unit price are present in the selected tier, derive gross value by multiplication before considering any division-based unit-price fallback. After selection, the calculation treats selected values from all activities as equal-value inputs and uses the report-wide label `NOT APPLICABLE`.
+For each activity, evaluate monetary tiers in this priority order: order currency, then asset-profile currency, then base currency. A tier is eligible only when it has an explicit currency code. Tiers that carry financial values but no currency code are skipped before completeness validation or derivation is attempted. The selected tier is the first eligible tier that can supply or derive the complete monetary value set needed for that activity using only same-tier values. When gross value is missing but quantity and unit price are present in the selected tier, derive gross value by multiplication before considering any division-based unit-price fallback. When unit price must be derived by division, use the shared 16-decimal internal calculation precision. After selection, the calculation treats selected values from all activities as equal-value inputs and uses the report-wide label `NOT APPLICABLE`.
 
-**Rationale**: This directly follows the feature's single-activity currency context rule, avoids undocumented currency conversion or tier mixing, accepts production-shaped rows where a higher-priority tier is currencyless but a later explicit-currency tier is valid, and prefers the exact same-tier multiplication path that avoids unnecessary division failure.
+**Rationale**: This directly follows the feature's single-activity currency context rule, avoids undocumented currency conversion or tier mixing, accepts production-shaped rows where a higher-priority tier is currencyless but a later explicit-currency tier is valid, and prefers the same-tier multiplication path that avoids unnecessary division.
 
 **Alternatives considered**:
 
