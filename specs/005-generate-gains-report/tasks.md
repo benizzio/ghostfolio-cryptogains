@@ -18,6 +18,8 @@ description: "Task list for Generate Yearly Gains And Losses Report implementati
 
 **Bugfix**: 2026-05-22 — [BUG-005] Updated from bugfix patch
 
+**Bugfix**: 2026-05-23 — [BUG-006] Updated from bugfix patch
+
 **Tests**: Automated tests are mandatory for this feature. The feature specification marks User Scenarios & Testing as mandatory and `plan.md` requires integration-first coverage, targeted unit tests for calculation and IO rules, `make test`, `make coverage`, and an opt-in large-history performance path.
 
 **Organization**: Tasks are grouped by user story so each story can be implemented and verified independently.
@@ -107,14 +109,16 @@ description: "Task list for Generate Yearly Gains And Losses Report implementati
 ### Tests for User Story 2
 
 - [X] T025 [P] [US2] ⚠️ Reopened Add Markdown document and output-file contract coverage from `contracts/markdown-report.md` in `tests/contract/markdown_report_contract_test.go` to distinguish preserved explicit zero-valued explained zero-priced holding-reduction fields from blank values (reopened — BUG-001)
-- [X] T026 [P] [US2] Add report selection, busy, result, and failure workflow contract coverage from `contracts/tui-workflows.md` in `tests/contract/report_generation_workflow_contract_test.go`
+- [ ] T026 [P] [US2] ⚠️ Reopened Add report selection, busy, result, and failure workflow contract coverage from `contracts/tui-workflows.md` in `tests/contract/report_generation_workflow_contract_test.go`, including report-failure diagnostics eligibility for calculation, validation, rendering, and output-preparation failures, production prompt and explicit-development-mode automatic generation, diagnostics-path disclosure, and opener-only warning distinction after a successful save (reopened — BUG-006)
 - [X] T027 [P] [US2] Add integration coverage for deterministic multi-year report generation, available-year selection, Documents save, one opener request on success, opener failure warning, and return to unlocked context in `tests/integration/report_generation_flow_test.go`
-- [X] T028 [P] [US2] Add integration coverage for empty-main-section reports with `NOT APPLICABLE` calculation currency, incomplete monetary context failure, Documents unavailable failure, partial-file cleanup, and app-managed storage leakage checks in `tests/integration/report_failure_flow_test.go`
+- [ ] T028 [P] [US2] ⚠️ Reopened Add integration coverage for empty-main-section reports with `NOT APPLICABLE` calculation currency, incomplete monetary context failure, Documents unavailable failure, partial-file cleanup, app-managed storage leakage checks, report-failure diagnostics file creation, explicit-development-mode behavior, and activity-specific diagnostics that carry the original persisted activity record with explicit `null` values and no derived substitute fields in `tests/integration/report_failure_flow_test.go` (reopened — BUG-006)
 - [X] T029 [P] [US2] ⚠️ Reopened Add unit coverage for selected-year cutoffs, first-acquisition exclusion, main-section inclusion, reference-only exclusion, same-source-calendar-date BUY-before-SELL reopening behavior, full-liquidation counts, zero-result included assets, negative losses, zero-priced holding reductions, and production-shaped explained zero-priced `SELL` rows with explicit zero `unit_price`, `gross_value`, and `fee_amount` in `tests/unit/report_calculation_test.go` (reopened — BUG-001)
 - [X] T030 [P] [US2] Add unit coverage for Documents directory resolution, timestamped filename slugs, same-second suffixes, exclusive creation, write cleanup, and platform opener commands in `tests/unit/report_output_test.go`
 - [X] T031 [P] [US2] ⚠️ Reopened Add unit coverage for Markdown header and section order, required tables, empty states, canonical exact decimal rendering, explicit report calculation currency label or `NOT APPLICABLE`, activity currency columns, secret exclusion, and explicit `0` rendering for preserved explained zero-priced holding-reduction fields in `tests/unit/report_markdown_test.go` (reopened — BUG-001)
 - [X] T032 [P] [US2] ⚠️ Reopened Add unit coverage for single-activity currency context priority, explicit zero fee, missing fee, positive priced quantity, exact unit-price derivation, no cross-tier mixing, and explained zero-priced rows with preserved explicit zero-valued source fields in `tests/unit/report_activity_input_test.go` (reopened — BUG-001)
 - [X] T065 [P] [US2] Add reusable report fixtures for production-shaped explained zero-priced `SELL` rows that preserve explicit zero `unit_price`, `gross_value`, and `fee_amount` in `tests/testutil/report_fixtures.go`
+- [ ] T074 [P] [US2] Add shared diagnostic-report unit coverage that nullable source fields serialize as explicit `null` and that activity-specific report failures use original persisted `ActivityRecord` context in `internal/app/runtime/runtime_more_internal_test.go` and `internal/sync/model/diagnostic_context_internal_test.go`
+- [ ] T076 [P] [US2] Add integration regression coverage that existing synced-data diagnostics also serialize absent source fields as explicit `null` instead of omitting them in `tests/integration/sync_diagnostic_report_flow_test.go` and `tests/integration/diagnostic_redaction_test.go`
 
 ### Implementation for User Story 2
 
@@ -125,16 +129,17 @@ description: "Task list for Generate Yearly Gains And Losses Report implementati
 - [X] T036 [P] [US2] Implement Average Cost Basis pool state and zero-quantity pool reset in `internal/report/basis/average_cost.go`
 - [X] T037 [US2] Implement report calculation engine for asset timelines, source-year cutoff, opening and closing basis, inclusion rules, same-date reopening behavior, reference entries, summary entries, yearly net total, and shared report-calculation-currency enforcement in `internal/report/calculate/calculator.go`
 - [X] T038 [US2] ⚠️ Reopened Implement priced liquidation proceeds, proportional allocation, explained zero-priced holding reductions, and basis removal details in `internal/report/calculate/calculator.go`, preserving explicit zero-valued source fields without creating proceeds, gains, losses, or priced-liquidation behavior (reopened — BUG-001)
-- [X] T039 [US2] Implement non-secret report calculation error taxonomy with offending activity source ID and display label references in `internal/report/model/errors.go` and `internal/report/calculate/calculator.go`
+- [ ] T039 [US2] ⚠️ Reopened Implement non-secret report calculation error taxonomy with offending activity source ID and display label references in `internal/report/model/errors.go` and `internal/report/calculate/calculator.go`, and preserve the original offending persisted `ActivityRecord` for diagnostics without substituting derived report inputs (reopened — BUG-006)
 - [X] T040 [P] [US2] ⚠️ Reopened Implement Markdown rendering for the required header, summary, reference section, per-asset detail sections, activity rows, liquidation tables, empty states, explicit report-calculation-currency labels, canonical decimals, and preserved explicit zero-valued explained zero-priced holding-reduction fields in `internal/report/markdown/renderer.go` (reopened — BUG-001)
 - [X] T041 [P] [US2] Implement Documents directory resolution using Linux XDG user-dirs, macOS home Documents, and Windows user Documents conventions in `internal/report/output/documents.go`
 - [X] T042 [P] [US2] Implement timestamped filename slugging, suffix reservation, exclusive final write, and failed-write cleanup in `internal/report/output/writer.go`
 - [X] T043 [P] [US2] Implement OS default-app opener command adapter for Linux, macOS, and Windows with one post-save open request per successful run in `internal/report/output/opener.go`
-- [X] T044 [US2] Implement runtime report service orchestration for request validation, calculation, rendering, save, opener warning, failure cleanup, saved-path removal guidance, and transient outcome creation in `internal/app/runtime/report_service.go`
+- [ ] T044 [US2] ⚠️ Reopened Implement runtime report service orchestration for request validation, calculation, rendering, save, opener warning, failure cleanup, saved-path removal guidance, transient outcome creation, report-failure diagnostics generation state, and shared diagnostic-writer integration in `internal/app/runtime/report_service.go` (reopened — BUG-006)
 - [X] T045 [US2] Wire the concrete report service into application assembly and TUI dependencies in `internal/app/runtime/runtime.go` and `internal/tui/flow/model.go`
 - [X] T046 [P] [US2] Add report selection, report generation busy, and report result screen renderers in `internal/tui/screen/report_screen.go`
-- [X] T047 [US2] Implement report year selection, method selection shell, async generation command, result routing, `Generate Another Report`, and `Back To Sync and Reports` behavior in `internal/tui/flow/report_flow.go`
+- [ ] T047 [US2] ⚠️ Reopened Implement report year selection, method selection shell, async generation command, result routing, `Generate Another Report`, and `Back To Sync and Reports` behavior in `internal/tui/flow/report_flow.go`, including report-failure diagnostics generation status, generated-path disclosure, and production `Generate Diagnostic Report` handling (reopened — BUG-006)
 - [X] T048 [US2] Enforce no in-application report history by clearing saved path, rendered content, and outcome state on result dismissal and context exit in `internal/tui/flow/report_flow.go` and `internal/tui/flow/model.go`
+- [ ] T075 [P] [US2] Extend the shared diagnostics context and JSON writer so synced-data and report-failure diagnostics preserve nullable source fields as explicit `null` and can carry report-generation failure categories with original persisted activity records in `internal/sync/model/diagnostic_context.go`, `internal/app/runtime/diagnostic_report.go`, and `internal/app/runtime/report_types.go`
 
 **Checkpoint**: User Story 2 can generate, save, and open a Markdown report from protected synced data and recover safely from calculation or output failures.
 
@@ -171,11 +176,12 @@ description: "Task list for Generate Yearly Gains And Losses Report implementati
 
 - [X] T058 [P] Update report workflow, protected-storage boundary, Documents output behavior, user file-removal guidance, and no report history documentation in `README.md`
 - [X] T059 [P] Reconcile implemented commands, manual scenarios, mixed-currency, user file-removal guidance, artifact inspection, and output layout in `specs/005-generate-gains-report/quickstart.md`
-- [X] T060 [P] Add OWASP Top 10, cryptographic-storage boundary, report cleartext output, and dependency/API review evidence in `specs/005-generate-gains-report/checklists/requirements.md`
+- [ ] T060 [P] ⚠️ Reopened Add OWASP Top 10, cryptographic-storage boundary, report cleartext output, report-failure diagnostics artifact review, original persisted activity-data inclusion, explicit `null` rendering, and dependency/API review evidence in `specs/005-generate-gains-report/checklists/requirements.md` (reopened — BUG-006)
 - [X] T061 [P] Add opt-in deterministic 10,000-activity report performance coverage for one timed run of request validation, calculation, Markdown rendering, save, and opener stub invocation in `tests/integration/report_performance_flow_test.go`
-- [X] T062 Run `make test` and `make coverage`, then verify report-feature coverage artifacts in `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`
+- [ ] T062 ⚠️ Reopened Run `make test` and `make coverage`, then verify report-feature coverage artifacts in `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`, including the report-diagnostics and shared-sync-diagnostics explicit-`null` regression paths (reopened — BUG-006)
 - [X] T063 Run `GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1 go test ./tests/integration -run TestReportPerformanceFlowLargeHistoryFixture -count=1 -v` and record the single-run outcome in `specs/005-generate-gains-report/quickstart.md`
-- [X] T064 Inspect generated test artifacts and application-managed storage for cleartext report leakage, then document the result in `specs/005-generate-gains-report/checklists/requirements.md`
+- [ ] T064 ⚠️ Reopened Inspect generated test artifacts and application-managed storage for cleartext report leakage and report-failure diagnostics artifacts, then document the result in `specs/005-generate-gains-report/checklists/requirements.md` (reopened — BUG-006)
+- [ ] T077 [P] Reconcile report-failure diagnostics outcome state, failure-result workflow contract, and manual verification steps in `specs/005-generate-gains-report/data-model.md`, `specs/005-generate-gains-report/contracts/tui-workflows.md`, and `specs/005-generate-gains-report/quickstart.md`
 
 ---
 
@@ -224,9 +230,9 @@ Parallel-capable after Phase 2:
 - T001, T002, and T003 can run in parallel.
 - T004, T006, T008, T009, T010, T011, and T067 can run in parallel after Phase 1; T005, T007, T012, and T068 close after the related model, snapshot, and fixture decisions exist.
 - T013, T014, T015, T069, T071, and T073 can run in parallel for US1 before T016 through T024, T070, and T072.
-- T025 through T032 and T065 can run in parallel for US2; T033 through T036, T040 through T043, and T066 can then run in parallel before T037, T038, T044, T045, T047, and T048.
+- T025 through T032, T065, T074, and T076 can run in parallel for US2; T033 through T036, T040 through T043, T066, and T075 can then run in parallel before T037, T038, T044, T045, T047, and T048.
 - T049 through T051 can run in parallel for US3; T052, T054, and T056 can run in parallel before T053, T055, and T057 close the story.
-- T058, T059, T060, and T061 can run in parallel after story implementation; T062, T063, and T064 run after documentation and performance fixtures are in place.
+- T058, T059, T060, T061, and T077 can run in parallel after story implementation; T062, T063, and T064 run after documentation and performance fixtures are in place.
 
 ---
 
