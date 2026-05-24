@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	reportdecimal "github.com/benizzio/ghostfolio-cryptogains/internal/report/decimal"
+	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -106,20 +107,20 @@ func (state *AverageCostState) Dispose(quantity apd.Decimal) (AverageCostDisposa
 	}
 
 	if remainingQuantity.Sign() == 0 {
-		state.quantity = zeroDecimal()
-		state.basis = zeroDecimal()
+		state.quantity = supportmath.Zero()
+		state.basis = supportmath.Zero()
 		return AverageCostDisposalResult{
-			DisposedQuantity:  cloneDecimal(quantity),
+			DisposedQuantity:  supportmath.Clone(quantity),
 			AllocatedBasis:    allocatedBasis,
-			RemainingQuantity: zeroDecimal(),
-			RemainingBasis:    zeroDecimal(),
+			RemainingQuantity: supportmath.Zero(),
+			RemainingBasis:    supportmath.Zero(),
 		}, nil
 	}
 
 	state.quantity = remainingQuantity
 	state.basis = remainingBasis
 	return AverageCostDisposalResult{
-		DisposedQuantity:  cloneDecimal(quantity),
+		DisposedQuantity:  supportmath.Clone(quantity),
 		AllocatedBasis:    allocatedBasis,
 		RemainingQuantity: remainingQuantity,
 		RemainingBasis:    remainingBasis,
@@ -130,20 +131,20 @@ func (state *AverageCostState) Dispose(quantity apd.Decimal) (AverageCostDisposa
 // Authored by: OpenCode
 func (state *AverageCostState) Quantity() apd.Decimal {
 	if state == nil {
-		return zeroDecimal()
+		return supportmath.Zero()
 	}
 
-	return cloneDecimal(state.quantity)
+	return supportmath.Clone(state.quantity)
 }
 
 // Basis returns the current open pool basis.
 // Authored by: OpenCode
 func (state *AverageCostState) Basis() apd.Decimal {
 	if state == nil {
-		return zeroDecimal()
+		return supportmath.Zero()
 	}
 
-	return cloneDecimal(state.basis)
+	return supportmath.Clone(state.basis)
 }
 
 // AverageUnitCost returns the current moving average unit cost using the shared
@@ -154,7 +155,7 @@ func (state *AverageCostState) AverageUnitCost() (apd.Decimal, error) {
 		return apd.Decimal{}, fmt.Errorf("average cost state is required")
 	}
 	if state.quantity.Sign() == 0 {
-		return zeroDecimal(), nil
+		return supportmath.Zero(), nil
 	}
 
 	var average, err = reportdecimal.DivideRoundHalfUp(state.basis, state.quantity)

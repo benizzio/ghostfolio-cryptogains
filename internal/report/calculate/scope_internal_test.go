@@ -174,8 +174,6 @@ func TestScopeHelperBranches(t *testing.T) {
 // wrapper branch around reliable-scope resolution.
 // Authored by: OpenCode
 func TestResolveScopedAssetInputsWrapsReliableScopeFailures(t *testing.T) {
-	t.Parallel()
-
 	var previous = resolveReliableApplicableScopeFunc
 	defer func() {
 		resolveReliableApplicableScopeFunc = previous

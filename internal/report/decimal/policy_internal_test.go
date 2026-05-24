@@ -60,6 +60,23 @@ func TestDivideRoundHalfUp(t *testing.T) {
 	}
 }
 
+// TestRequireFinite verifies the report-local finite-decimal guard delegates to
+// the shared helper with stable labels.
+// Authored by: OpenCode
+func TestRequireFinite(t *testing.T) {
+	t.Parallel()
+
+	if err := RequireFinite(mustReportPolicyDecimal(t, "10.5"), "report value"); err != nil {
+		t.Fatalf("expected finite report decimal to pass, got %v", err)
+	}
+
+	var invalid apd.Decimal
+	invalid.Form = apd.Infinite
+	if err := RequireFinite(invalid, "report value"); err == nil || !strings.Contains(err.Error(), "report value") {
+		t.Fatalf("expected non-finite report decimal to fail with label, got %v", err)
+	}
+}
+
 // mustReportPolicyDecimal parses one exact decimal fixture for report policy
 // tests.
 // Authored by: OpenCode

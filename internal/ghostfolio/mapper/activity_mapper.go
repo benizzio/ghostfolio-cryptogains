@@ -14,6 +14,9 @@ import (
 	"github.com/cockroachdb/apd/v3"
 )
 
+// activityMoneyContext preserves each supported monetary tier exactly as mapped
+// from one Ghostfolio activity entry before later validation chooses one tier.
+// Authored by: OpenCode
 type activityMoneyContext struct {
 	orderCurrency         string
 	assetProfileCurrency  string

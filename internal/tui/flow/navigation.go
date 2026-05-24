@@ -85,70 +85,71 @@ func (m *Model) updateMainMenu(message tea.Msg) (tea.Model, tea.Cmd) {
 // updateSyncResult handles sync-result navigation.
 // Authored by: OpenCode
 func (m *Model) updateSyncResult(message tea.Msg) (tea.Model, tea.Cmd) {
-	switch typedMessage := message.(type) {
-	case diagnosticReportFinishedMsg:
-		return m.handleDiagnosticReportFinished(typedMessage)
+	if diagnosticMessage, ok := message.(diagnosticReportFinishedMsg); ok {
+		return m.handleDiagnosticReportFinished(diagnosticMessage)
 	}
 
 	var keyMessage, ok = message.(tea.KeyPressMsg)
-	if !ok {
+	if !ok || m.result.Busy {
 		return m, nil
 	}
-	if m.result.Busy {
-		return m, nil
-	}
-
-	var menuItems = m.resultMenuItems()
 
 	switch {
 	case key.Matches(keyMessage, upBinding()):
-		if m.result.MenuIndex > 0 {
-			m.result.MenuIndex--
-		}
+		m.moveSyncResultSelection(-1)
 	case key.Matches(keyMessage, downBinding()):
-		if m.result.MenuIndex < len(menuItems)-1 {
-			m.result.MenuIndex++
-		}
+		m.moveSyncResultSelection(1)
 	case key.Matches(keyMessage, enterBinding()):
-		if m.result.Outcome.Diagnostic.Eligible && m.result.Outcome.Diagnostic.Path == "" {
-			switch m.result.MenuIndex {
-			case 0:
-				return m.generateDiagnosticReport()
-			case 1:
-				if m.syncReports.Active {
-					return m, m.enterSyncWithContextToken()
-				}
-				return m, m.enterSync()
-			default:
-				m.enterMainMenu()
-				return m, nil
-			}
-		}
-		if m.result.MenuIndex == 0 {
-			if m.syncReports.Active {
-				return m, m.enterSyncWithContextToken()
-			}
-			return m, m.enterSync()
-		}
-		m.enterMainMenu()
+		return m.activateSyncResultSelection()
 	}
 
 	return m, nil
 }
 
+// moveSyncResultSelection advances the sync-result selection by one item.
+// Authored by: OpenCode
+func (m *Model) moveSyncResultSelection(step int) {
+	if step == 0 {
+		return
+	}
+
+	var nextIndex = m.result.MenuIndex + step
+	if nextIndex < 0 || nextIndex >= len(m.resultMenuItems()) {
+		return
+	}
+
+	m.result.MenuIndex = nextIndex
+}
+
+// activateSyncResultSelection runs the selected sync-result action.
+// Authored by: OpenCode
+func (m *Model) activateSyncResultSelection() (tea.Model, tea.Cmd) {
+	switch m.selectedResultMenuAction() {
+	case resultMenuActionGenerateDiagnostic:
+		return m.generateDiagnosticReport()
+	case resultMenuActionSyncAgain:
+		if m.syncReports.Active {
+			return m, m.enterSyncWithContextToken()
+		}
+		return m, m.enterSync()
+	case resultMenuActionBackToMainMenu:
+		m.enterMainMenu()
+		return m, nil
+	default:
+		return m, nil
+	}
+}
+
 // updateSyncReportsMenu handles unlocked Sync and Reports context navigation.
 // Authored by: OpenCode
 func (m *Model) updateSyncReportsMenu(message tea.Msg) (tea.Model, tea.Cmd) {
-	switch typedMessage := message.(type) {
-	case diagnosticReportFinishedMsg:
-		return m.handleDiagnosticReportFinished(typedMessage)
+	var handledModel, handledCmd, handled = m.handleSyncReportsMenuMessage(message)
+	if handled {
+		return handledModel, handledCmd
 	}
 
 	var keyMessage, ok = message.(tea.KeyPressMsg)
-	if !ok {
-		return m, nil
-	}
-	if m.syncReports.SyncResult.Busy {
+	if !ok || m.syncReports.SyncResult.Busy {
 		return m, nil
 	}
 
@@ -160,30 +161,73 @@ func (m *Model) updateSyncReportsMenu(message tea.Msg) (tea.Model, tea.Cmd) {
 	case key.Matches(keyMessage, downBinding()):
 		m.moveSyncReportsMenuSelection(1, menuItems)
 	case key.Matches(keyMessage, enterBinding()):
-		switch m.sync.MenuIndex {
-		case 0:
-			return m, m.enterSyncWithContextToken()
-		case 1:
-			if m.syncReports.ProtectedData.HasReadableSnapshot && len(m.syncReports.ProtectedData.AvailableReportYears) > 0 {
-				m.enterReportSelection()
-				return m, nil
-			}
-			return m, nil
-		case 2:
-			if m.syncReportsHasPendingDiagnostic() {
-				return m.generateDiagnosticReport()
-			}
-			m.enterMainMenu()
-			return m, nil
-		case 3:
-			m.enterMainMenu()
-			return m, nil
-		default:
-			return m, nil
-		}
+		return m.activateSyncReportsMenuSelection()
 	}
 
 	return m, nil
+}
+
+// handleSyncReportsMenuMessage handles non-key messages routed to the unlocked Sync and Reports menu.
+// Authored by: OpenCode
+func (m *Model) handleSyncReportsMenuMessage(message tea.Msg) (tea.Model, tea.Cmd, bool) {
+	if typedMessage, ok := message.(diagnosticReportFinishedMsg); ok {
+		updatedModel, cmd := m.handleDiagnosticReportFinished(typedMessage)
+		return updatedModel, cmd, true
+	}
+
+	return m, nil, false
+}
+
+// activateSyncReportsMenuSelection runs the currently selected unlocked-context action.
+// Authored by: OpenCode
+func (m *Model) activateSyncReportsMenuSelection() (tea.Model, tea.Cmd) {
+	var action = m.selectedSyncReportsMenuAction()
+	if m.shouldFallbackToSyncReportsBackAction(action) {
+		m.enterMainMenu()
+		return m, nil
+	}
+
+	switch action {
+	case syncReportsMenuActionSyncData:
+		return m, m.enterSyncWithContextToken()
+	case syncReportsMenuActionGenerateReport:
+		return m.activateSyncReportsGenerateReport()
+	case syncReportsMenuActionGenerateDiagnostic:
+		return m.activateSyncReportsGenerateDiagnostic()
+	case syncReportsMenuActionBackToMainMenu:
+		m.enterMainMenu()
+		return m, nil
+	default:
+		return m, nil
+	}
+}
+
+// activateSyncReportsGenerateReport routes into report selection when report generation is available.
+// Authored by: OpenCode
+func (m *Model) activateSyncReportsGenerateReport() (tea.Model, tea.Cmd) {
+	if m.reportUnavailable() {
+		return m, nil
+	}
+
+	m.enterReportSelection()
+	return m, nil
+}
+
+// activateSyncReportsGenerateDiagnostic runs diagnostic generation or falls back to the main menu.
+// Authored by: OpenCode
+func (m *Model) activateSyncReportsGenerateDiagnostic() (tea.Model, tea.Cmd) {
+	if m.syncReportsHasPendingDiagnostic() {
+		return m.generateDiagnosticReport()
+	}
+
+	m.enterMainMenu()
+	return m, nil
+}
+
+// shouldFallbackToSyncReportsBackAction preserves the legacy raw-index fallback for the final Back action row.
+// Authored by: OpenCode
+func (m *Model) shouldFallbackToSyncReportsBackAction(action menuActionID) bool {
+	return action == "" && m.sync.MenuIndex == 3
 }
 
 // moveSyncReportsMenuSelection advances the unlocked-context menu selection to
@@ -311,14 +355,14 @@ func (m *Model) updateServerReplacement(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.replacement.MenuIndex++
 		}
 	case key.Matches(keyMessage, enterBinding()):
-		if m.replacement.MenuIndex == 0 {
+		if m.selectedServerReplacementAction() == serverReplacementActionContinue {
 			return m.startConfirmedServerReplacement()
 		}
 		m.replacement.PendingToken = ""
 		m.sync.TokenInput.Reset()
 		if m.syncReports.Active {
 			m.active = syncReportsMenuScreenKey
-			m.sync.MenuIndex = 0
+			m.sync.MenuIndex = menuIndexForAction(m.syncReportsMenuActions(), syncReportsMenuActionSyncData)
 			return m, nil
 		}
 		m.enterSyncResult(runtime.SyncOutcome{Success: false, FailureReason: runtime.SyncFailureServerReplacementCancelled, DetailReason: string(runtime.SyncFailureServerReplacementCancelled)})

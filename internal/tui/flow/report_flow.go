@@ -15,6 +15,8 @@ import (
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 )
 
+// reportBusyStatusText is the shared busy-state message for one report run.
+// Authored by: OpenCode
 const reportBusyStatusText = "Generating capital gains report..."
 
 // updateReport handles report selection, busy-state completion, and result
@@ -57,65 +59,76 @@ func (m *Model) updateReport(message tea.Msg) (tea.Model, tea.Cmd) {
 func (m *Model) handleReportSelectionKey(message tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var yearCount = len(m.syncReports.ProtectedData.AvailableReportYears)
 	var methodCount = len(m.reportMethodItems())
-	var actionCount = len(m.reportSelectionMenuItems())
+	var actionCount = len(m.reportSelectionActions())
 
 	switch {
 	case key.Matches(message, focusBinding()):
+		m.advanceReportSelectionFocus()
+	case key.Matches(message, upBinding()):
+		m.moveReportSelection(-1, yearCount, methodCount, actionCount)
+	case key.Matches(message, downBinding()):
+		m.moveReportSelection(1, yearCount, methodCount, actionCount)
+	case key.Matches(message, enterBinding()):
+		return m.activateReportSelection()
+	}
+
+	m.syncSelectedReportYear(yearCount)
+	return m, nil
+}
+
+// advanceReportSelectionFocus cycles focus across year, method, and action panes.
+// Authored by: OpenCode
+func (m *Model) advanceReportSelectionFocus() {
+	if m.report.FocusArea < 2 {
+		m.report.FocusArea++
+		return
+	}
+
+	m.report.FocusArea = 0
+}
+
+// moveReportSelection advances the currently focused report-selection index by one step.
+// Authored by: OpenCode
+func (m *Model) moveReportSelection(step int, yearCount int, methodCount int, actionCount int) {
+	switch m.report.FocusArea {
+	case 0:
+		m.report.YearIndex = boundedMenuIndex(m.report.YearIndex, step, yearCount)
+	case 1:
+		m.report.MethodIndex = boundedMenuIndex(m.report.MethodIndex, step, methodCount)
+	case 2:
+		m.report.ActionIndex = boundedMenuIndex(m.report.ActionIndex, step, actionCount)
+	}
+}
+
+// activateReportSelection runs the selected report-selection action or advances focus.
+// Authored by: OpenCode
+func (m *Model) activateReportSelection() (tea.Model, tea.Cmd) {
+	if m.report.FocusArea != 2 {
 		if m.report.FocusArea < 2 {
 			m.report.FocusArea++
-		} else {
-			m.report.FocusArea = 0
 		}
-	case key.Matches(message, upBinding()):
-		switch m.report.FocusArea {
-		case 0:
-			if m.report.YearIndex > 0 {
-				m.report.YearIndex--
-			}
-		case 1:
-			if m.report.MethodIndex > 0 {
-				m.report.MethodIndex--
-			}
-		case 2:
-			if m.report.ActionIndex > 0 {
-				m.report.ActionIndex--
-			}
-		}
-	case key.Matches(message, downBinding()):
-		switch m.report.FocusArea {
-		case 0:
-			if m.report.YearIndex < yearCount-1 {
-				m.report.YearIndex++
-			}
-		case 1:
-			if m.report.MethodIndex < methodCount-1 {
-				m.report.MethodIndex++
-			}
-		case 2:
-			if m.report.ActionIndex < actionCount-1 {
-				m.report.ActionIndex++
-			}
-		}
-	case key.Matches(message, enterBinding()):
-		if m.report.FocusArea != 2 {
-			if m.report.FocusArea < 2 {
-				m.report.FocusArea++
-			}
-			break
-		}
-		if m.report.ActionIndex == 0 {
-			return m.startReportGeneration()
-		}
-		m.clearTransientReportState()
-		m.active = syncReportsMenuScreenKey
-		m.sync.MenuIndex = 1
 		return m, nil
 	}
 
+	switch m.selectedReportSelectionAction() {
+	case reportSelectionActionGenerateReport:
+		return m.startReportGeneration()
+	case reportSelectionActionBack:
+		m.clearTransientReportState()
+		m.active = syncReportsMenuScreenKey
+		m.sync.MenuIndex = m.syncReportsReportActionIndex()
+		return m, nil
+	default:
+		return m, nil
+	}
+}
+
+// syncSelectedReportYear applies the current year selection to the transient report state.
+// Authored by: OpenCode
+func (m *Model) syncSelectedReportYear(yearCount int) {
 	if yearCount > 0 && m.report.YearIndex >= 0 && m.report.YearIndex < yearCount {
 		m.report.SelectedYear = m.syncReports.ProtectedData.AvailableReportYears[m.report.YearIndex]
 	}
-	return m, nil
 }
 
 // startReportGeneration validates report prerequisites and starts one async
@@ -180,7 +193,7 @@ func (m *Model) handleReportFinished(message reportFinishedMsg) (tea.Model, tea.
 // handleReportResultKey routes completed report-result navigation.
 // Authored by: OpenCode
 func (m *Model) handleReportResultKey(message tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	var items = m.reportResultMenuItems()
+	var items = m.reportResultActions()
 
 	switch {
 	case key.Matches(message, upBinding()):
@@ -192,34 +205,41 @@ func (m *Model) handleReportResultKey(message tea.KeyPressMsg) (tea.Model, tea.C
 			m.report.ActionIndex++
 		}
 	case key.Matches(message, enterBinding()):
-		if m.reportOutcomeHasPendingDiagnostic() {
-			switch m.report.ActionIndex {
-			case 0:
-				return m.generateDiagnosticReport()
-			case 1:
-				m.clearTransientReportState()
-				m.active = syncReportsMenuScreenKey
-				m.sync.MenuIndex = 1
-				return m, nil
-			default:
-				m.clearTransientReportState()
-				m.enterReportSelection()
-				return m, nil
-			}
-		}
-
-		if m.report.ActionIndex == 0 {
-			m.clearTransientReportState()
-			m.active = syncReportsMenuScreenKey
-			m.sync.MenuIndex = 1
-			return m, nil
-		}
-		m.clearTransientReportState()
-		m.enterReportSelection()
-		return m, nil
+		return m.activateReportResultSelection()
 	}
 
 	return m, nil
+}
+
+// activateReportResultSelection runs the selected report-result action.
+// Authored by: OpenCode
+func (m *Model) activateReportResultSelection() (tea.Model, tea.Cmd) {
+	switch m.selectedReportResultAction() {
+	case reportResultActionGenerateDiagnostic:
+		return m.generateDiagnosticReport()
+	case reportResultActionBackToSyncReports:
+		m.clearTransientReportState()
+		m.active = syncReportsMenuScreenKey
+		m.sync.MenuIndex = m.syncReportsReportActionIndex()
+		return m, nil
+	case reportResultActionGenerateAnother:
+		m.clearTransientReportState()
+		m.enterReportSelection()
+		return m, nil
+	default:
+		return m, nil
+	}
+}
+
+// boundedMenuIndex applies one movement step while preserving menu bounds.
+// Authored by: OpenCode
+func boundedMenuIndex(current int, step int, count int) int {
+	var next = current + step
+	if count <= 0 || next < 0 || next >= count {
+		return current
+	}
+
+	return next
 }
 
 // clearTransientReportState removes transient in-memory report output and result

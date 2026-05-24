@@ -4,6 +4,7 @@
 package calculate
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	reportbasis "github.com/benizzio/ghostfolio-cryptogains/internal/report/basis"
 	reportdecimal "github.com/benizzio/ghostfolio-cryptogains/internal/report/decimal"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/cockroachdb/apd/v3"
 )
@@ -329,26 +331,34 @@ func selectAssetInputGroupsThroughYear(records []syncmodel.ActivityRecord, selec
 func calculateAssetGroup(method reportmodel.CostBasisMethod, selectedYear int, cache syncmodel.ProtectedActivityCache, group assetInputGroup) (assetCalculationResult, error) {
 	var basisState, err = newAssetBasisStateFunc(method)
 	if err != nil {
-		return assetCalculationResult{}, reportmodel.NewCalculationError(
-			reportmodel.CalculationErrorKindUnsupportedCostBasisMethod,
-			err.Error(),
-			"",
-			group.DisplayLabel,
-			err,
-		)
+		return assetCalculationResult{}, newGroupCalculationError(reportmodel.CalculationErrorKindUnsupportedCostBasisMethod, group, err.Error(), err)
 	}
 
-	var replayState assetReplayState
 	var scopedInputs []scopedActivityInput
 	scopedInputs, err = resolveScopedInputsFunc(method, group)
 	if err != nil {
 		return assetCalculationResult{}, err
 	}
 
+	var replayState assetReplayState
+	replayState, err = replayAssetGroup(basisState, scopedInputs, selectedYear)
+	if err != nil {
+		return assetCalculationResult{}, wrapAssetGroupReplayError(group, err)
+	}
+
+	return buildAssetCalculationResult(group, replayState)
+}
+
+// replayAssetGroup replays one asset input history through the selected-year cutoff.
+// Authored by: OpenCode
+func replayAssetGroup(basisState assetBasisState, scopedInputs []scopedActivityInput, selectedYear int) (assetReplayState, error) {
+	var replayState assetReplayState
+	var err error
+
 	for index, scopedInput := range scopedInputs {
 		var input = scopedInput.Input
 		if err = captureOpeningPositionIfNeeded(&replayState, basisState, input.SourceYear, selectedYear); err != nil {
-			return assetCalculationResult{}, newInputCalculationError(
+			return assetReplayState{}, newInputCalculationError(
 				reportmodel.CalculationErrorKindBasisAllocation,
 				input,
 				"could not determine the opening position carried into the selected year",
@@ -359,59 +369,82 @@ func calculateAssetGroup(method reportmodel.CostBasisMethod, selectedYear int, c
 		var replayResult assetInputReplayResult
 		replayResult, err = replayAssetInputFunc(basisState, scopedInput, index+1, selectedYear)
 		if err != nil {
-			return assetCalculationResult{}, err
+			return assetReplayState{}, err
 		}
 
-		if replayResult.reachedZero {
-			replayState.fullLiquidationCount++
-			if input.SourceYear == selectedYear {
-				replayState.hadInYearFullLiquidation = true
-			}
-		}
-		if replayResult.activityRow != nil {
-			replayState.activityRows = append(replayState.activityRows, *replayResult.activityRow)
-		}
-		if replayResult.liquidationSummary != nil {
-			replayState.liquidationSummaries = append(replayState.liquidationSummaries, *replayResult.liquidationSummary)
-		}
-
-		replayState.yearlyNet, err = addCalculationDecimal(replayState.yearlyNet, replayResult.yearlyNetDelta)
+		err = applyReplayResult(&replayState, input, replayResult, selectedYear)
 		if err != nil {
-			return assetCalculationResult{}, newInputCalculationError(
-				reportmodel.CalculationErrorKindBasisAllocation,
-				input,
-				"could not accumulate the asset yearly gain or loss",
-				err,
-			)
+			return assetReplayState{}, err
 		}
 	}
 
-	replayState.closingQuantity, err = basisState.OpenQuantity()
+	return finalizeReplayState(basisState, replayState)
+}
+
+// applyReplayResult accumulates one replayed activity into the asset replay state.
+// Authored by: OpenCode
+func applyReplayResult(state *assetReplayState, input reportmodel.ActivityCalculationInput, replayResult assetInputReplayResult, selectedYear int) error {
+	if replayResult.reachedZero {
+		state.fullLiquidationCount++
+		if input.SourceYear == selectedYear {
+			state.hadInYearFullLiquidation = true
+		}
+	}
+	if replayResult.activityRow != nil {
+		state.activityRows = append(state.activityRows, *replayResult.activityRow)
+	}
+	if replayResult.liquidationSummary != nil {
+		state.liquidationSummaries = append(state.liquidationSummaries, *replayResult.liquidationSummary)
+	}
+
+	var nextYearlyNet, err = addCalculationDecimal(state.yearlyNet, replayResult.yearlyNetDelta)
 	if err != nil {
-		return assetCalculationResult{}, reportmodel.NewCalculationError(
+		return newInputCalculationError(
 			reportmodel.CalculationErrorKindBasisAllocation,
-			"could not determine the asset closing quantity",
-			"",
-			group.DisplayLabel,
+			input,
+			"could not accumulate the asset yearly gain or loss",
 			err,
 		)
+	}
+	state.yearlyNet = nextYearlyNet
+	return nil
+}
+
+// finalizeReplayState snapshots one asset's closing state after replay.
+// Authored by: OpenCode
+func finalizeReplayState(basisState assetBasisState, replayState assetReplayState) (assetReplayState, error) {
+	var err error
+	replayState.closingQuantity, err = basisState.OpenQuantity()
+	if err != nil {
+		return assetReplayState{}, fmt.Errorf("could not determine the asset closing quantity: %w", err)
 	}
 	replayState.closingBasis, err = basisState.OpenBasis()
 	if err != nil {
-		return assetCalculationResult{}, reportmodel.NewCalculationError(
-			reportmodel.CalculationErrorKindBasisAllocation,
-			"could not determine the asset closing basis",
-			"",
-			group.DisplayLabel,
-			err,
-		)
+		return assetReplayState{}, fmt.Errorf("could not determine the asset closing basis: %w", err)
 	}
 	if !replayState.openingCaptured {
 		replayState.openingQuantity = replayState.closingQuantity
 		replayState.openingBasis = replayState.closingBasis
 	}
 
-	return buildAssetCalculationResult(group, replayState)
+	return replayState, nil
+}
+
+// wrapAssetGroupReplayError preserves group context for replay-finalization failures.
+// Authored by: OpenCode
+func wrapAssetGroupReplayError(group assetInputGroup, err error) error {
+	var calculationErr *reportmodel.CalculationError
+	if errors.As(err, &calculationErr) {
+		return err
+	}
+
+	return newGroupCalculationError(reportmodel.CalculationErrorKindBasisAllocation, group, err.Error(), err)
+}
+
+// newGroupCalculationError creates one structured calculation error from grouped asset context.
+// Authored by: OpenCode
+func newGroupCalculationError(kind reportmodel.CalculationErrorKind, group assetInputGroup, message string, cause error) error {
+	return reportmodel.NewCalculationError(kind, message, "", group.DisplayLabel, cause)
 }
 
 // captureOpeningPositionIfNeeded snapshots the carried holdings state at the
@@ -1006,38 +1039,14 @@ func sourceCalendarDate(occurredAt time.Time) time.Time {
 // addCalculationDecimal adds two exact calculation decimals.
 // Authored by: OpenCode
 func addCalculationDecimal(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-	if err := requireFiniteDecimal(left, "left calculation decimal"); err != nil {
-		return apd.Decimal{}, err
-	}
-	if err := requireFiniteDecimal(right, "right calculation decimal"); err != nil {
-		return apd.Decimal{}, err
-	}
-
-	var sum apd.Decimal
-	if _, err := addCalculationOperation(&sum, &left, &right); err != nil {
-		return apd.Decimal{}, fmt.Errorf("add calculation decimals: %w", err)
-	}
-
-	return sum, nil
+	return supportmath.ApplyBinaryOperation(left, right, "left calculation decimal", "right calculation decimal", "add calculation decimals", addCalculationOperation)
 }
 
 // subtractCalculationDecimal subtracts one exact calculation decimal from
 // another.
 // Authored by: OpenCode
 func subtractCalculationDecimal(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-	if err := requireFiniteDecimal(left, "left calculation decimal"); err != nil {
-		return apd.Decimal{}, err
-	}
-	if err := requireFiniteDecimal(right, "right calculation decimal"); err != nil {
-		return apd.Decimal{}, err
-	}
-
-	var difference apd.Decimal
-	if _, err := subtractCalculationOperation(&difference, &left, &right); err != nil {
-		return apd.Decimal{}, fmt.Errorf("subtract calculation decimals: %w", err)
-	}
-
-	return difference, nil
+	return supportmath.ApplyBinaryOperation(left, right, "left calculation decimal", "right calculation decimal", "subtract calculation decimals", subtractCalculationOperation)
 }
 
 // newRecordCalculationError creates one structured calculation error from a

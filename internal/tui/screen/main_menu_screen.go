@@ -52,9 +52,9 @@ func MainMenuScreenView(params MainMenuScreenParams) string {
 		params.Width,
 		params.Height,
 		"Main Menu",
-		"Sync and Reports is the business workflow entry for this slice.",
+		component.MainMenuSubtitleText,
 		body,
-		"Choose Sync and Reports to enter the token-unlocked workflow context. Protected sync metadata and reporting readiness stay hidden on the main menu.",
+		component.MainMenuStatusText,
 		params.HelpText,
 	)
 }

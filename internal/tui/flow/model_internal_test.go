@@ -18,6 +18,7 @@ import (
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/component"
 )
 
 type testSyncService struct {
@@ -1603,6 +1604,11 @@ func TestUpdateMainMenuCoversEnterAndDefaultKey(t *testing.T) {
 	if cmd != nil || updated.(*Model).active != mainMenuScreenKey {
 		t.Fatalf("expected unrelated main-menu key to be ignored")
 	}
+
+	updated, cmd = model.updateMainMenu(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	if cmd == nil || updated.(*Model).active != syncReportsUnlockScreenKey {
+		t.Fatalf("expected direct main-menu enter handler to route to unlock screen")
+	}
 }
 
 // TestGenerateDiagnosticReportAndServerReplacementIgnoreBranches verifies the
@@ -1672,6 +1678,74 @@ func TestGenerateDiagnosticReportAndServerReplacementIgnoreBranches(t *testing.T
 	updated, cmd = model.Update(struct{}{})
 	if cmd != nil || updated.(*Model).active != syncResultScreenKey {
 		t.Fatalf("expected non-key sync-result message to be ignored")
+	}
+
+	model = newTestModel(t, &config)
+	model.active = syncReportsMenuScreenKey
+	updated, cmd = model.activateSyncReportsGenerateDiagnostic()
+	if cmd != nil || updated.(*Model).active != mainMenuScreenKey {
+		t.Fatalf("expected sync-reports diagnostic fallback without pending diagnostic to return main menu")
+	}
+
+	model = newTestModel(t, &config)
+	model.active = syncResultScreenKey
+	model.moveSyncResultSelection(0)
+	if model.result.MenuIndex != 0 {
+		t.Fatalf("expected zero-step sync-result move to keep selection")
+	}
+	model.moveSyncResultSelection(-1)
+	if model.result.MenuIndex != 0 {
+		t.Fatalf("expected out-of-bounds sync-result move to keep selection")
+	}
+	updated, cmd = model.activateSyncResultSelection()
+	if cmd == nil || updated.(*Model).active != syncScreenKey {
+		t.Fatalf("expected default sync-result action to reopen sync")
+	}
+
+	model = newTestModel(t, &config)
+	model.active = syncResultScreenKey
+	model.result.MenuIndex = 99
+	updated, cmd = model.activateSyncResultSelection()
+	if cmd != nil || updated.(*Model).active != syncResultScreenKey {
+		t.Fatalf("expected unsupported sync-result action to be ignored")
+	}
+
+	model = newTestModel(t, &config)
+	model.result.Outcome = runtime.SyncOutcome{Success: false, Diagnostic: runtime.DiagnosticReportState{Eligible: true, Path: "/tmp/report.diagnostic.json"}}
+	if items := model.resultMenuItems(); len(items) != 2 || items[0].Label != component.SyncAgainActionLabel || items[1].Label != component.BackToMainMenuActionLabel {
+		t.Fatalf("expected settled sync-result menu items without diagnostic action, got %#v", items)
+	}
+	model.result.Outcome = runtime.SyncOutcome{Success: false, Diagnostic: runtime.DiagnosticReportState{Eligible: true}}
+	if items := model.resultMenuItems(); len(items) != 3 || !items[0].Enabled || !items[1].Enabled || !items[2].Enabled {
+		t.Fatalf("expected pending-diagnostic sync-result menu items to stay enabled, got %#v", items)
+	}
+
+	model = newTestModel(t, &config)
+	model.active = reportSelectionScreenKey
+	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024, 2025}}
+	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
+	updated, cmd = model.activateReportSelection()
+	if cmd != nil || updated.(*Model).report.FocusArea != 1 {
+		t.Fatalf("expected report selection activation before actions to advance focus")
+	}
+
+	model = newTestModel(t, &config)
+	model.active = reportSelectionScreenKey
+	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
+	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
+	model.report.FocusArea = 2
+	model.report.ActionIndex = 99
+	updated, cmd = model.activateReportSelection()
+	if cmd != nil || updated.(*Model).active != reportSelectionScreenKey {
+		t.Fatalf("expected unsupported report-selection action to be ignored")
+	}
+
+	model = newTestModel(t, &config)
+	model.active = reportResultScreenKey
+	model.report.ActionIndex = 99
+	updated, cmd = model.activateReportResultSelection()
+	if cmd != nil || updated.(*Model).active != reportResultScreenKey {
+		t.Fatalf("expected unsupported report-result action to be ignored")
 	}
 
 	model = newTestModel(t, &config)

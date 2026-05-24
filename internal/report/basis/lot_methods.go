@@ -10,7 +10,7 @@ import (
 	"time"
 
 	reportdecimal "github.com/benizzio/ghostfolio-cryptogains/internal/report/decimal"
-	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -124,50 +124,23 @@ func (state *LotMethodState) Dispose(quantity apd.Decimal) (LotDisposalResult, e
 		return LotDisposalResult{}, err
 	}
 
-	var remainingQuantity = cloneDecimal(quantity)
+	var remainingQuantity = supportmath.Clone(quantity)
 	var orderedIndexes = state.openLotIndexes()
 	var matches []LotMatch
-	var allocatedBasis = zeroDecimal()
+	var allocatedBasis = supportmath.Zero()
 
 	for _, index := range orderedIndexes {
-		if remainingQuantity.Sign() == 0 {
+		if disposalComplete(remainingQuantity) {
 			break
 		}
 
-		var currentLot = &state.lots[index]
-		var matchedQuantity = minimumDecimal(currentLot.RemainingQuantity, remainingQuantity)
-
-		var matchedBasis, err = exactProportionalBasis(currentLot.RemainingBasis, currentLot.RemainingQuantity, matchedQuantity)
+		var disposalMatch LotMatch
+		var err error
+		remainingQuantity, allocatedBasis, disposalMatch, err = state.disposeFromLot(index, remainingQuantity, allocatedBasis)
 		if err != nil {
-			return LotDisposalResult{}, fmt.Errorf("dispose from lot %q: %w", strings.TrimSpace(currentLot.SourceID), err)
+			return LotDisposalResult{}, err
 		}
-
-		var remainingLotQuantity, errSubtractQuantity = lotSubtractDecimal(currentLot.RemainingQuantity, matchedQuantity)
-		if errSubtractQuantity != nil {
-			return LotDisposalResult{}, fmt.Errorf("dispose from lot %q quantity: %w", strings.TrimSpace(currentLot.SourceID), errSubtractQuantity)
-		}
-		var remainingLotBasis, errSubtractBasis = lotSubtractDecimal(currentLot.RemainingBasis, matchedBasis)
-		if errSubtractBasis != nil {
-			return LotDisposalResult{}, fmt.Errorf("dispose from lot %q basis: %w", strings.TrimSpace(currentLot.SourceID), errSubtractBasis)
-		}
-		var nextRemainingQuantity, errSubtractRemaining = lotSubtractDecimal(remainingQuantity, matchedQuantity)
-		if errSubtractRemaining != nil {
-			return LotDisposalResult{}, fmt.Errorf("dispose remaining quantity: %w", errSubtractRemaining)
-		}
-		var nextAllocatedBasis, errAddBasis = lotAddDecimal(allocatedBasis, matchedBasis)
-		if errAddBasis != nil {
-			return LotDisposalResult{}, fmt.Errorf("accumulate allocated basis: %w", errAddBasis)
-		}
-
-		currentLot.RemainingQuantity = remainingLotQuantity
-		currentLot.RemainingBasis = remainingLotBasis
-		remainingQuantity = nextRemainingQuantity
-		allocatedBasis = nextAllocatedBasis
-		matches = append(matches, LotMatch{
-			AcquisitionSourceID: strings.TrimSpace(currentLot.SourceID),
-			MatchedQuantity:     matchedQuantity,
-			MatchedBasis:        matchedBasis,
-		})
+		matches = append(matches, disposalMatch)
 	}
 
 	if remainingQuantity.Sign() != 0 {
@@ -175,6 +148,75 @@ func (state *LotMethodState) Dispose(quantity apd.Decimal) (LotDisposalResult, e
 	}
 
 	return LotDisposalResult{Matches: matches, AllocatedBasis: allocatedBasis}, nil
+}
+
+// disposalComplete reports whether one disposal has consumed the full requested quantity.
+// Authored by: OpenCode
+func disposalComplete(remainingQuantity apd.Decimal) bool {
+	return remainingQuantity.Sign() == 0
+}
+
+// disposeFromLot allocates one lot fragment and mutates the tracked lot state.
+// Authored by: OpenCode
+func (state *LotMethodState) disposeFromLot(index int, remainingQuantity apd.Decimal, allocatedBasis apd.Decimal) (apd.Decimal, apd.Decimal, LotMatch, error) {
+	var currentLot = &state.lots[index]
+	var matchedQuantity = supportmath.Minimum(currentLot.RemainingQuantity, remainingQuantity)
+
+	var matchedBasis, err = exactProportionalBasis(currentLot.RemainingBasis, currentLot.RemainingQuantity, matchedQuantity)
+	if err != nil {
+		return apd.Decimal{}, apd.Decimal{}, LotMatch{}, fmt.Errorf("dispose from lot %q: %w", strings.TrimSpace(currentLot.SourceID), err)
+	}
+
+	var nextState disposalLotState
+	nextState, err = nextLotDisposalState(*currentLot, matchedQuantity, matchedBasis, remainingQuantity, allocatedBasis)
+	if err != nil {
+		return apd.Decimal{}, apd.Decimal{}, LotMatch{}, err
+	}
+
+	currentLot.RemainingQuantity = nextState.remainingLotQuantity
+	currentLot.RemainingBasis = nextState.remainingLotBasis
+	return nextState.remainingQuantity, nextState.allocatedBasis, LotMatch{
+		AcquisitionSourceID: strings.TrimSpace(currentLot.SourceID),
+		MatchedQuantity:     matchedQuantity,
+		MatchedBasis:        matchedBasis,
+	}, nil
+}
+
+// disposalLotState stores one intermediate lot-disposal mutation result.
+// Authored by: OpenCode
+type disposalLotState struct {
+	remainingLotQuantity apd.Decimal
+	remainingLotBasis    apd.Decimal
+	remainingQuantity    apd.Decimal
+	allocatedBasis       apd.Decimal
+}
+
+// nextLotDisposalState calculates the next lot and disposal accumulator state.
+// Authored by: OpenCode
+func nextLotDisposalState(lot LotAcquisition, matchedQuantity apd.Decimal, matchedBasis apd.Decimal, remainingQuantity apd.Decimal, allocatedBasis apd.Decimal) (disposalLotState, error) {
+	var remainingLotQuantity, errSubtractQuantity = lotSubtractDecimal(lot.RemainingQuantity, matchedQuantity)
+	if errSubtractQuantity != nil {
+		return disposalLotState{}, fmt.Errorf("dispose from lot %q quantity: %w", strings.TrimSpace(lot.SourceID), errSubtractQuantity)
+	}
+	var remainingLotBasis, errSubtractBasis = lotSubtractDecimal(lot.RemainingBasis, matchedBasis)
+	if errSubtractBasis != nil {
+		return disposalLotState{}, fmt.Errorf("dispose from lot %q basis: %w", strings.TrimSpace(lot.SourceID), errSubtractBasis)
+	}
+	var nextRemainingQuantity, errSubtractRemaining = lotSubtractDecimal(remainingQuantity, matchedQuantity)
+	if errSubtractRemaining != nil {
+		return disposalLotState{}, fmt.Errorf("dispose remaining quantity: %w", errSubtractRemaining)
+	}
+	var nextAllocatedBasis, errAddBasis = lotAddDecimal(allocatedBasis, matchedBasis)
+	if errAddBasis != nil {
+		return disposalLotState{}, fmt.Errorf("accumulate allocated basis: %w", errAddBasis)
+	}
+
+	return disposalLotState{
+		remainingLotQuantity: remainingLotQuantity,
+		remainingLotBasis:    remainingLotBasis,
+		remainingQuantity:    nextRemainingQuantity,
+		allocatedBasis:       nextAllocatedBasis,
+	}, nil
 }
 
 // Method returns the configured lot-selection method.
@@ -326,7 +368,7 @@ func compareUnitCostsCrossMultiply(left LotAcquisition, right LotAcquisition) (i
 		return 0, err
 	}
 
-	return leftCross.Cmp(&rightCross), nil
+	return supportmath.Compare(leftCross, rightCross, "left lot unit-cost cross product", "right lot unit-cost cross product")
 }
 
 // validateLotMethod rejects unsupported lot-selection methods.
@@ -363,88 +405,74 @@ func validateLotAcquisition(acquisition LotAcquisition) error {
 // internal report-calculation precision when the proportional division repeats.
 // Authored by: OpenCode
 func exactProportionalBasis(totalBasis apd.Decimal, totalQuantity apd.Decimal, matchedQuantity apd.Decimal) (apd.Decimal, error) {
-	if err := validateNonNegativeDecimal(totalBasis, "total basis"); err != nil {
-		return apd.Decimal{}, err
-	}
-	if err := validatePositiveDecimal(totalQuantity, "total quantity"); err != nil {
-		return apd.Decimal{}, err
-	}
-	if err := validatePositiveDecimal(matchedQuantity, "matched quantity"); err != nil {
-		return apd.Decimal{}, err
-	}
-	if matchedQuantity.Cmp(&totalQuantity) > 0 {
-		return apd.Decimal{}, fmt.Errorf("matched quantity exceeds total quantity")
-	}
-	if matchedQuantity.Cmp(&totalQuantity) == 0 {
-		return cloneDecimal(totalBasis), nil
-	}
-
-	var numerator, err = lotMultiplyDecimal(totalBasis, matchedQuantity)
-	if err != nil {
-		return apd.Decimal{}, err
-	}
-
-	var quotient, divideErr = reportdecimal.DivideRoundHalfUp(numerator, totalQuantity)
-	if divideErr != nil {
-		return apd.Decimal{}, fmt.Errorf("allocate basis proportionally: %w", divideErr)
-	}
-
-	return quotient, nil
+	return supportmath.AllocateProportional(
+		totalBasis,
+		totalQuantity,
+		matchedQuantity,
+		"total basis",
+		"total quantity",
+		"matched quantity",
+		"allocate basis proportionally",
+		lotMultiplyDecimal,
+		reportdecimal.DivideRoundHalfUp,
+	)
 }
 
 // addDecimal adds two exact decimals.
 // Authored by: OpenCode
 func addDecimal(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-	var sum apd.Decimal
-	if _, err := apd.BaseContext.Add(&sum, &left, &right); err != nil {
+	var result, err = supportmath.ApplyBinaryOperation(left, right, "left decimal", "right decimal", "add decimals", func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
+		return apd.BaseContext.Add(result, left, right)
+	})
+	if err != nil && !strings.Contains(err.Error(), "add decimals") {
 		return apd.Decimal{}, fmt.Errorf("add decimals: %w", err)
 	}
 
-	return sum, nil
+	return result, err
 }
 
 // subtractDecimal subtracts one exact decimal from another.
 // Authored by: OpenCode
 func subtractDecimal(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-	var difference apd.Decimal
-	if _, err := apd.BaseContext.Sub(&difference, &left, &right); err != nil {
+	var result, err = supportmath.ApplyBinaryOperation(left, right, "left decimal", "right decimal", "subtract decimals", func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
+		return apd.BaseContext.Sub(result, left, right)
+	})
+	if err != nil && !strings.Contains(err.Error(), "subtract decimals") {
 		return apd.Decimal{}, fmt.Errorf("subtract decimals: %w", err)
 	}
 
-	return difference, nil
+	return result, err
 }
 
 // multiplyDecimal multiplies two exact decimals.
 // Authored by: OpenCode
 func multiplyDecimal(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-	var product apd.Decimal
-	if _, err := apd.BaseContext.Mul(&product, &left, &right); err != nil {
+	var result, err = supportmath.ApplyBinaryOperation(left, right, "left decimal", "right decimal", "multiply decimals", func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
+		return apd.BaseContext.Mul(result, left, right)
+	})
+	if err != nil && !strings.Contains(err.Error(), "multiply decimals") {
 		return apd.Decimal{}, fmt.Errorf("multiply decimals: %w", err)
 	}
 
-	return product, nil
+	return result, err
 }
 
 // minimumDecimal returns the smaller of two exact decimal values.
 // Authored by: OpenCode
 func minimumDecimal(left apd.Decimal, right apd.Decimal) apd.Decimal {
-	if left.Cmp(&right) <= 0 {
-		return cloneDecimal(left)
-	}
-
-	return cloneDecimal(right)
+	return supportmath.Minimum(left, right)
 }
 
 // zeroDecimal returns one finite zero value.
 // Authored by: OpenCode
 func zeroDecimal() apd.Decimal {
-	return apd.Decimal{}
+	return supportmath.Zero()
 }
 
 // cloneDecimal returns a copy of one exact decimal value.
 // Authored by: OpenCode
 func cloneDecimal(value apd.Decimal) apd.Decimal {
-	return value
+	return supportmath.Clone(value)
 }
 
 // cloneLotAcquisition returns a defensive copy of one lot acquisition.
@@ -462,8 +490,8 @@ func cloneLotAcquisition(acquisition LotAcquisition) LotAcquisition {
 // validatePositiveDecimal verifies one positive finite decimal value.
 // Authored by: OpenCode
 func validatePositiveDecimal(value apd.Decimal, label string) error {
-	if _, err := decimalsupport.CanonicalString(value); err != nil {
-		return fmt.Errorf("%s: %w", label, err)
+	if err := supportmath.RequireFinite(value, label); err != nil {
+		return err
 	}
 	if value.Sign() <= 0 {
 		return fmt.Errorf("%s must be greater than zero", label)
@@ -475,8 +503,8 @@ func validatePositiveDecimal(value apd.Decimal, label string) error {
 // validateNonNegativeDecimal verifies one non-negative finite decimal value.
 // Authored by: OpenCode
 func validateNonNegativeDecimal(value apd.Decimal, label string) error {
-	if _, err := decimalsupport.CanonicalString(value); err != nil {
-		return fmt.Errorf("%s: %w", label, err)
+	if err := supportmath.RequireFinite(value, label); err != nil {
+		return err
 	}
 	if value.Sign() < 0 {
 		return fmt.Errorf("%s must not be negative", label)

@@ -214,7 +214,7 @@ func firstExplicitZeroValue(values ...*apd.Decimal) *apd.Decimal {
 // precondition before tier selection.
 // Authored by: OpenCode
 func requirePositivePricedQuantity(record syncmodel.ActivityRecord) error {
-	var comparison, err = compareDecimals(record.Quantity, reportDecimalZero)
+	var comparison, err = compareDecimals(record.Quantity, apd.Decimal{})
 	if err != nil {
 		return fmt.Errorf("activity %q quantity is invalid: %w", strings.TrimSpace(record.SourceID), err)
 	}

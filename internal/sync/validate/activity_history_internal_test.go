@@ -305,7 +305,7 @@ func TestDirectValidationHelpersCoverRemainingBranches(t *testing.T) {
 
 	var zero apd.Decimal
 	record := validationTestRecord(t, "missing-unit-price", syncmodel.ActivityTypeBuy)
-	if err := validateActivityType(record, syncmodel.ResolvedActivityAmounts{}, &zero); err == nil {
+	if err := validateActivityType(record, resolvedActivityAmounts{}, &zero); err == nil {
 		t.Fatalf("expected missing resolved unit price to fail")
 	}
 

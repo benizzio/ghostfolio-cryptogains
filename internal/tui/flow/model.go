@@ -322,8 +322,8 @@ func (m *Model) View() tea.View {
 				Height:                  m.height,
 				ScreenTitle:             "Sync and Reports",
 				ScreenSubtitle:          "Unlock the active sync and reporting context.",
-				IntroText:               "Enter the Ghostfolio security token once to unlock Sync Data and future reporting actions for this run.",
-				IdleStatusText:          "Enter the Ghostfolio security token to unlock Sync and Reports for this run.",
+				IntroText:               component.SyncReportsUnlockIntroText,
+				IdleStatusText:          component.SyncReportsUnlockIdleStatusText,
 				ValidationMessage:       m.syncReportsUnlockValidationMessage(),
 				ShowProtectedDataStatus: false,
 				MenuItems:               m.syncMenuItems(),
@@ -499,7 +499,7 @@ func (m *Model) setupMenuItems() []component.MenuItem {
 // mainMenuItems builds the primary main-menu actions for the current render.
 // Authored by: OpenCode
 func (m *Model) mainMenuItems() []component.MenuItem {
-	return []component.MenuItem{{Label: "Sync and Reports", Enabled: true}}
+	return []component.MenuItem{{Label: component.SyncAndReportsActionLabel, Enabled: true}}
 }
 
 // syncMenuItems builds the primary sync-entry actions for the current render.
@@ -511,13 +511,13 @@ func (m *Model) syncMenuItems() []component.MenuItem {
 	if m.active == syncReportsUnlockScreenKey {
 		var unlockEnabled = m.syncReports.UnlockFailure != runtime.SyncFailureRejectedToken
 		return []component.MenuItem{
-			{Label: "Unlock", Enabled: unlockEnabled},
-			{Label: "Back", Enabled: true},
+			{Label: component.UnlockActionLabel, Enabled: unlockEnabled},
+			{Label: component.BackActionLabel, Enabled: true},
 		}
 	}
 	return []component.MenuItem{
-		{Label: "Start Sync", Enabled: true},
-		{Label: "Back", Enabled: true},
+		{Label: component.StartSyncActionLabel, Enabled: true},
+		{Label: component.BackActionLabel, Enabled: true},
 	}
 }
 
@@ -526,22 +526,22 @@ func (m *Model) syncMenuItems() []component.MenuItem {
 func (m *Model) resultMenuItems() []component.MenuItem {
 	if m.result.Busy {
 		return []component.MenuItem{
-			{Label: "Generate Diagnostic Report", Enabled: false},
-			{Label: "Sync Again", Enabled: false},
-			{Label: "Back To Main Menu", Enabled: false},
+			{Label: component.GenerateDiagnosticReportActionLabel, Enabled: false},
+			{Label: component.SyncAgainActionLabel, Enabled: false},
+			{Label: component.BackToMainMenuActionLabel, Enabled: false},
 		}
 	}
 	if m.result.Outcome.Diagnostic.Eligible && m.result.Outcome.Diagnostic.Path == "" {
 		return []component.MenuItem{
-			{Label: "Generate Diagnostic Report", Enabled: true},
-			{Label: "Sync Again", Enabled: true},
-			{Label: "Back To Main Menu", Enabled: true},
+			{Label: component.GenerateDiagnosticReportActionLabel, Enabled: true},
+			{Label: component.SyncAgainActionLabel, Enabled: true},
+			{Label: component.BackToMainMenuActionLabel, Enabled: true},
 		}
 	}
 
 	return []component.MenuItem{
-		{Label: "Sync Again", Enabled: true},
-		{Label: "Back To Main Menu", Enabled: true},
+		{Label: component.SyncAgainActionLabel, Enabled: true},
+		{Label: component.BackToMainMenuActionLabel, Enabled: true},
 	}
 }
 
@@ -551,13 +551,13 @@ func (m *Model) syncReportsMenuItems() []component.MenuItem {
 	var reportEnabled = m.syncReports.ProtectedData.HasReadableSnapshot && len(m.syncReports.ProtectedData.AvailableReportYears) > 0
 	var contextBusy = m.syncReports.SyncResult.Busy
 	var items = []component.MenuItem{
-		{Label: "Sync Data", Enabled: !contextBusy},
-		{Label: "Generate Capital Gains Report", Enabled: reportEnabled && !contextBusy},
+		{Label: component.SyncDataActionLabel, Enabled: !contextBusy},
+		{Label: component.GenerateCapitalGainsReportActionLabel, Enabled: reportEnabled && !contextBusy},
 	}
 	if m.syncReportsHasPendingDiagnostic() {
-		items = append(items, component.MenuItem{Label: "Generate Diagnostic Report", Enabled: !contextBusy})
+		items = append(items, component.MenuItem{Label: component.GenerateDiagnosticReportActionLabel, Enabled: !contextBusy})
 	}
-	items = append(items, component.MenuItem{Label: "Back To Main Menu", Enabled: !contextBusy})
+	items = append(items, component.MenuItem{Label: component.BackToMainMenuActionLabel, Enabled: !contextBusy})
 	return items
 }
 
@@ -575,7 +575,7 @@ func (m *Model) reportMethodItems() []component.MenuItem {
 // reportSelectionMenuItems builds the report-selection action menu.
 // Authored by: OpenCode
 func (m *Model) reportSelectionMenuItems() []component.MenuItem {
-	return []component.MenuItem{{Label: "Generate Report", Enabled: true}, {Label: "Back", Enabled: true}}
+	return []component.MenuItem{{Label: component.GenerateReportActionLabel, Enabled: true}, {Label: component.BackActionLabel, Enabled: true}}
 }
 
 // reportResultMenuItems builds the completed report-result action menu.
@@ -583,14 +583,14 @@ func (m *Model) reportSelectionMenuItems() []component.MenuItem {
 func (m *Model) reportResultMenuItems() []component.MenuItem {
 	var items []component.MenuItem
 	if m.report.Busy {
-		items = append(items, component.MenuItem{Label: "Generate Diagnostic Report", Enabled: false})
+		items = append(items, component.MenuItem{Label: component.GenerateDiagnosticReportActionLabel, Enabled: false})
 	}
 	if m.reportOutcomeHasPendingDiagnostic() {
-		items = append(items, component.MenuItem{Label: "Generate Diagnostic Report", Enabled: true})
+		items = append(items, component.MenuItem{Label: component.GenerateDiagnosticReportActionLabel, Enabled: true})
 	}
-	items = append(items, component.MenuItem{Label: "Back To Sync and Reports", Enabled: !m.report.Busy})
+	items = append(items, component.MenuItem{Label: component.BackToSyncReportsActionLabel, Enabled: !m.report.Busy})
 	if m.syncReports.ProtectedData.HasReadableSnapshot && len(m.syncReports.ProtectedData.AvailableReportYears) > 0 {
-		items = append(items, component.MenuItem{Label: "Generate Another Report", Enabled: !m.report.Busy})
+		items = append(items, component.MenuItem{Label: component.GenerateAnotherReportActionLabel, Enabled: !m.report.Busy})
 	}
 	return items
 }
@@ -598,7 +598,7 @@ func (m *Model) reportResultMenuItems() []component.MenuItem {
 // serverReplacementMenuItems builds the primary server-replacement confirmation actions.
 // Authored by: OpenCode
 func (m *Model) serverReplacementMenuItems() []component.MenuItem {
-	return []component.MenuItem{{Label: "Continue And Replace", Enabled: true}, {Label: "Cancel", Enabled: true}}
+	return []component.MenuItem{{Label: component.ContinueAndReplaceActionLabel, Enabled: true}, {Label: component.CancelActionLabel, Enabled: true}}
 }
 
 // setupHelpText renders the visible hotkeys for the setup screen.
@@ -819,7 +819,7 @@ func (m *Model) enterSyncReportsMenu(unlocked runtime.SyncReportsContextResult, 
 	m.sync = newSyncState()
 	m.sync.InputFocused = false
 	m.sync.TokenInput.Blur()
-	m.sync.MenuIndex = 0
+	m.sync.MenuIndex = menuIndexForAction(m.syncReportsMenuActions(), syncReportsMenuActionSyncData)
 	m.syncReports.Active = true
 	m.syncReports.RuntimeToken = token
 	m.syncReports.SelectedServerOrigin = m.currentServerOrigin()
@@ -848,7 +848,7 @@ func (m *Model) syncReportsUnlockValidationMessage() string {
 func (m *Model) enterReportSelection() {
 	m.active = reportSelectionScreenKey
 	m.report = newReportState(m.syncReports.ProtectedData.AvailableReportYears)
-	m.report.ActionIndex = 0
+	m.report.ActionIndex = menuIndexForAction(m.reportSelectionActions(), reportSelectionActionGenerateReport)
 }
 
 // enterReportResult routes the application to the report result screen.
@@ -880,7 +880,7 @@ func (m *Model) enterSyncWithContextToken() tea.Cmd {
 	m.sync.UseContextToken = true
 	m.sync.InputFocused = false
 	m.sync.TokenInput.Blur()
-	m.sync.MenuIndex = 0
+	m.sync.MenuIndex = menuIndexForAction(m.syncMenuActions(), syncMenuActionStartSync)
 	return nil
 }
 
@@ -901,7 +901,7 @@ func (m *Model) enterSyncResult(outcome runtime.SyncOutcome) {
 	m.active = syncResultScreenKey
 	m.result = resultState{Outcome: outcome}
 	if outcome.Success {
-		m.result.MenuIndex = 1
+		m.result.MenuIndex = menuIndexForAction(m.resultMenuActions(), resultMenuActionBackToMainMenu)
 	}
 }
 
@@ -926,11 +926,7 @@ func (m *Model) syncReportsHasPendingDiagnostic() bool {
 // after one sync attempt completes.
 // Authored by: OpenCode
 func (m *Model) syncReportsDefaultMenuIndex() int {
-	if m.syncReportsHasPendingDiagnostic() {
-		return 2
-	}
-
-	return 0
+	return menuIndexForAction(m.syncReportsMenuActions(), m.syncReportsDefaultMenuAction())
 }
 
 // quitCmd returns a Bubble Tea quit message.

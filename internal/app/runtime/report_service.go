@@ -381,15 +381,14 @@ func reportRenderDiagnosticError(request reportmodel.ReportRequest, err error) e
 // runtime taxonomy.
 // Authored by: OpenCode
 func reportWriteFailureReason(err error) ReportFailureReason {
-	var text = strings.ToLower(strings.TrimSpace(err.Error()))
-	if strings.Contains(text, "resolve user home directory") ||
-		strings.Contains(text, "user home directory is empty") ||
-		strings.Contains(text, "documents directory resolution") ||
-		strings.Contains(text, "read linux xdg user-dirs config") ||
-		strings.Contains(text, "linux xdg documents entry") ||
-		strings.Contains(text, "inspect documents directory") ||
-		strings.Contains(text, "documents path") {
-		return ReportFailureDocumentsFolderUnavailable
+	var category, ok = reportoutput.FailureCategoryOf(err)
+	if ok {
+		switch category {
+		case reportoutput.FailureCategoryDocumentsDirectoryUnavailable:
+			return ReportFailureDocumentsFolderUnavailable
+		case reportoutput.FailureCategoryReportFileWriteFailed:
+			return ReportFailureReportFileWriteFailed
+		}
 	}
 
 	return ReportFailureReportFileWriteFailed

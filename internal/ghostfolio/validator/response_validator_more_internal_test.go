@@ -269,11 +269,6 @@ func TestBasisDerivationHelpersCoverRemainingBranches(t *testing.T) {
 		t.Fatalf("expected negative rounded validator unit price, got %q", got)
 	}
 
-	var numerator, denominator = finiteDecimalFraction(mustValidatorDecimal(t, "-1.25"))
-	if numerator.String() != "-125" || denominator.String() != "100" {
-		t.Fatalf("expected exact negative finite decimal fraction, got %s/%s", numerator.String(), denominator.String())
-	}
-
 	entry = validActivityPageEntry()
 	entry.UnitPrice = json.Number("")
 	entry.UnitPriceInAssetProfileCurrency = json.Number("")

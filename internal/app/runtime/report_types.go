@@ -115,6 +115,23 @@ type SyncReportsContextResult struct {
 type ReportService interface {
 	// Generate validates the request, calculates the report, renders Markdown,
 	// writes the final file, and returns one transient user-visible outcome.
+	//
+	// Callers should pass the currently unlocked runtime context together with one
+	// fully validated `ReportGenerationRequest` that identifies the selected year,
+	// cost-basis method, attempt identifier, current server origin, and whether
+	// explicit development-mode diagnostics are allowed. The returned
+	// `ReportOutcome` is intended for immediate workflow rendering only. It does
+	// not imply any retained in-memory report history beyond the current screen.
+	//
+	// Example:
+	//
+	//	request := runtime.ReportGenerationRequest{
+	//		Request:   validatedRequest,
+	//		AttemptID: "attempt-1",
+	//	}
+	//	outcome := reportService.Generate(context.Background(), request)
+	//	_ = outcome.Success
+	//
 	// Authored by: OpenCode
 	Generate(context.Context, ReportGenerationRequest) ReportOutcome
 }

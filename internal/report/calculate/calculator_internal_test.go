@@ -1003,8 +1003,6 @@ func TestApplyBasisInputRoutesActivities(t *testing.T) {
 // guardrails and wrapped per-fragment failure branches.
 // Authored by: OpenCode
 func TestBuildPricedLiquidationMatchesCoversRemainingBranches(t *testing.T) {
-	t.Parallel()
-
 	var originalReportDivideRoundHalfUp = reportDivideRoundHalfUp
 	defer func() {
 		reportDivideRoundHalfUp = originalReportDivideRoundHalfUp

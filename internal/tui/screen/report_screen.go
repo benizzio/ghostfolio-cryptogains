@@ -149,7 +149,7 @@ func ReportResultScreenView(params ReportResultScreenParams) string {
 		"Report Result",
 		"Review the saved-path outcome and choose the next step.",
 		body,
-		"Saved paths are transient and are cleared when this result is dismissed.",
+		component.ReportSavedPathsTransientStatusText,
 		params.HelpText,
 	)
 }
@@ -198,7 +198,7 @@ func reportResultSummary(outcome runtime.ReportOutcome) string {
 		lines = append(lines, fmt.Sprintf("Diagnostic Report Path: %s", outcome.Diagnostic.Path))
 	}
 	if outcome.Diagnostic.Eligible && outcome.Diagnostic.Path == "" && strings.TrimSpace(outcome.Diagnostic.GenerationMessage) == "" {
-		lines = append(lines, "Generate Diagnostic Report is available for this failure from this screen.")
+		lines = append(lines, component.ReportDiagnosticAvailableFromScreenMessage)
 	}
 
 	return strings.Join(lines, "\n\n")

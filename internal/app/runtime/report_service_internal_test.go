@@ -14,6 +14,7 @@ import (
 	"time"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	reportoutput "github.com/benizzio/ghostfolio-cryptogains/internal/report/output"
 	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
@@ -271,7 +272,10 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 				return reportDocumentFixture(t, report, "# Report\n"), nil
 			},
 			write: func(reportmodel.ReportDocument) (reportmodel.ReportOutputFile, error) {
-				return reportmodel.ReportOutputFile{}, errors.New("resolve user home directory: boom")
+				return reportmodel.ReportOutputFile{}, reportoutputFailure(
+					reportoutput.FailureCategoryDocumentsDirectoryUnavailable,
+					"resolve user home directory: boom",
+				)
 			},
 			open: func(string) error { return nil },
 		}
@@ -295,7 +299,10 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 				return reportDocumentFixture(t, report, "# Report\n"), nil
 			},
 			write: func(reportmodel.ReportDocument) (reportmodel.ReportOutputFile, error) {
-				return reportmodel.ReportOutputFile{}, errors.New("write report file \"/tmp/report.md\": permission denied")
+				return reportmodel.ReportOutputFile{}, reportoutputFailure(
+					reportoutput.FailureCategoryReportFileWriteFailed,
+					"write report file \"/tmp/report.md\": permission denied",
+				)
 			},
 			open: func(string) error { return nil },
 		}
@@ -462,11 +469,17 @@ func TestReportServiceHelperFunctionsCoverRemainingBranches(t *testing.T) {
 	if eligibleOutcome.Diagnostic.GenerationMessage == "" {
 		t.Fatalf("expected explicit development mode to attempt immediate diagnostic generation, got %#v", eligibleOutcome.Diagnostic)
 	}
-	if reason := reportWriteFailureReason(errors.New("documents path: missing")); reason != ReportFailureDocumentsFolderUnavailable {
+	if reason := reportWriteFailureReason(reportoutputFailure(reportoutput.FailureCategoryDocumentsDirectoryUnavailable, "documents path: missing")); reason != ReportFailureDocumentsFolderUnavailable {
 		t.Fatalf("expected documents-path text to classify as folder unavailable, got %q", reason)
 	}
-	if reason := reportWriteFailureReason(errors.New("permission denied")); reason != ReportFailureReportFileWriteFailed {
+	if reason := reportWriteFailureReason(reportoutputFailure(reportoutput.FailureCategoryReportFileWriteFailed, "permission denied")); reason != ReportFailureReportFileWriteFailed {
 		t.Fatalf("expected generic write error to classify as final write failure, got %q", reason)
+	}
+	if reason := reportWriteFailureReason(reportoutputFailure(reportoutput.FailureCategory("unexpected"), "permission denied")); reason != ReportFailureReportFileWriteFailed {
+		t.Fatalf("expected unknown typed write error to fall back to final write failure, got %q", reason)
+	}
+	if reason := reportWriteFailureReason(errors.New("plain write error")); reason != ReportFailureReportFileWriteFailed {
+		t.Fatalf("expected untyped write error to fall back to final write failure, got %q", reason)
 	}
 	if got := joinAvailableYears(nil); got != "" {
 		t.Fatalf("expected nil available years to join empty string, got %q", got)
@@ -519,6 +532,12 @@ func reportRequestFixture(t *testing.T, year int, method reportmodel.CostBasisMe
 	}
 
 	return request
+}
+
+// reportoutputFailure returns one typed report-output failure for runtime tests.
+// Authored by: OpenCode
+func reportoutputFailure(category reportoutput.FailureCategory, message string) error {
+	return reportoutput.NewFailure(category, errors.New(message))
 }
 
 // capitalGainsReportFixture returns one minimal valid calculated report for

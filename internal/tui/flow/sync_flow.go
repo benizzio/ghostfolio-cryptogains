@@ -185,7 +185,7 @@ func (m *Model) updateSyncTokenInput(message tea.Msg) (tea.Model, tea.Cmd) {
 // Authored by: OpenCode
 func (m *Model) releaseSyncInputToSyncMenu() (tea.Model, tea.Cmd, bool) {
 	m.blurSyncTokenInput()
-	m.sync.MenuIndex = 0
+	m.sync.MenuIndex = menuIndexForAction(m.syncMenuActions(), m.syncPrimaryMenuAction())
 	return m, nil, true
 }
 
@@ -222,10 +222,10 @@ func (m *Model) activateSyncSelection() (tea.Model, tea.Cmd) {
 		return m.activateSyncReportsUnlockSelection()
 	}
 
-	switch m.sync.MenuIndex {
-	case 0:
+	switch m.selectedSyncMenuAction() {
+	case syncMenuActionStartSync:
 		return m.startSync()
-	case 1:
+	case syncMenuActionBack:
 		return m.leaveSync()
 	default:
 		return m, nil
@@ -240,10 +240,20 @@ func (m *Model) activateSyncReportsUnlockSelection() (tea.Model, tea.Cmd) {
 	if m.sync.MenuIndex < 0 || m.sync.MenuIndex >= len(menuItems) || !menuItems[m.sync.MenuIndex].Enabled {
 		return m, nil
 	}
-	if m.sync.MenuIndex == 0 {
+	if m.selectedSyncMenuAction() == syncMenuActionUnlock {
 		return m.unlockSyncReportsContext()
 	}
 	return m.leaveSyncReportsUnlock()
+}
+
+// syncPrimaryMenuAction returns the primary action for the current sync screen.
+// Authored by: OpenCode
+func (m *Model) syncPrimaryMenuAction() menuActionID {
+	if m.active == syncReportsUnlockScreenKey {
+		return syncMenuActionUnlock
+	}
+
+	return syncMenuActionStartSync
 }
 
 // startSync validates token input and starts one asynchronous sync run.

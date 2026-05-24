@@ -163,10 +163,10 @@ func validateActivityFields(record syncmodel.ActivityRecord, zero *apd.Decimal) 
 
 // validateCurrencyContext rejects preserved monetary concepts that remain uninformed across all supported currency tiers.
 // Authored by: OpenCode
-func validateCurrencyContext(record syncmodel.ActivityRecord) (syncmodel.ResolvedActivityAmounts, error) {
-	resolvedAmounts, err := syncmodel.ResolveActivityAmounts(record)
+func validateCurrencyContext(record syncmodel.ActivityRecord) (resolvedActivityAmounts, error) {
+	resolvedAmounts, err := resolveActivityAmounts(record)
 	if err != nil {
-		return syncmodel.ResolvedActivityAmounts{}, newValidationError(err.Error(), record)
+		return resolvedActivityAmounts{}, newValidationError(err.Error(), record)
 	}
 
 	return resolvedAmounts, nil
@@ -174,7 +174,7 @@ func validateCurrencyContext(record syncmodel.ActivityRecord) (syncmodel.Resolve
 
 // validateActivityType enforces the supported BUY and SELL price rules for one normalized record.
 // Authored by: OpenCode
-func validateActivityType(record syncmodel.ActivityRecord, resolvedAmounts syncmodel.ResolvedActivityAmounts, zero *apd.Decimal) error {
+func validateActivityType(record syncmodel.ActivityRecord, resolvedAmounts resolvedActivityAmounts, zero *apd.Decimal) error {
 	if resolvedAmounts.UnitPrice == nil {
 		return newValidationError(fmt.Sprintf("activity %q unit price basis input is required", record.SourceID), record)
 	}

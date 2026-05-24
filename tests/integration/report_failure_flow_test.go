@@ -5,7 +5,6 @@ package integration
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,7 +14,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	reportoutput "github.com/benizzio/ghostfolio-cryptogains/internal/report/output"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
@@ -83,13 +81,16 @@ func TestReportGenerationEmptyMainSectionWritesEmptyMarkdownReport(t *testing.T)
 // Authored by: OpenCode
 func TestReportGenerationWriteFailureGeneratesWrappedDiagnosticCauseChain(t *testing.T) {
 	if os.Getenv("GHOSTFOLIO_CRYPTOGAINS_HELPER_WRITE_FAILURE") == "2" {
-		reportoutput.InstallWriteFailureAfterCreateForTesting(errors.New("forced write failure"))
 		runReportGenerationWriteFailureDiagnosticScenario(t)
 		return
 	}
 
 	var command = exec.Command(os.Args[0], "-test.run=TestReportGenerationWriteFailureGeneratesWrappedDiagnosticCauseChain$")
-	command.Env = append(os.Environ(), "GHOSTFOLIO_CRYPTOGAINS_HELPER_WRITE_FAILURE=2")
+	command.Env = append(
+		os.Environ(),
+		"GHOSTFOLIO_CRYPTOGAINS_HELPER_WRITE_FAILURE=2",
+		"GHOSTFOLIO_CRYPTOGAINS_OUTPUT_FAIL_WRITE_AFTER_CREATE=forced write failure",
+	)
 	var output, err = command.CombinedOutput()
 	if err != nil {
 		t.Fatalf("run write-failure diagnostic helper process: %v\n%s", err, string(output))
@@ -327,13 +328,16 @@ func TestReportGenerationDocumentsUnavailableShowsFailure(t *testing.T) {
 // Authored by: OpenCode
 func TestReportGenerationWriteFailureRemovesPartialFileAndShowsFailure(t *testing.T) {
 	if os.Getenv("GHOSTFOLIO_CRYPTOGAINS_HELPER_WRITE_FAILURE") == "1" {
-		reportoutput.InstallWriteFailureAfterCreateForTesting(errors.New("forced write failure"))
 		runReportGenerationWriteFailureScenario(t)
 		return
 	}
 
 	var command = exec.Command(os.Args[0], "-test.run=TestReportGenerationWriteFailureRemovesPartialFileAndShowsFailure$")
-	command.Env = append(os.Environ(), "GHOSTFOLIO_CRYPTOGAINS_HELPER_WRITE_FAILURE=1")
+	command.Env = append(
+		os.Environ(),
+		"GHOSTFOLIO_CRYPTOGAINS_HELPER_WRITE_FAILURE=1",
+		"GHOSTFOLIO_CRYPTOGAINS_OUTPUT_FAIL_WRITE_AFTER_CREATE=forced write failure",
+	)
 	var output, err = command.CombinedOutput()
 	if err != nil {
 		t.Fatalf("run write-failure helper process: %v\n%s", err, string(output))

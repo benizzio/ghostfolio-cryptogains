@@ -308,7 +308,7 @@ func TestWriteReportDocumentAdditionalBranches(t *testing.T) {
 	t.Run("install write failure after create uses provided error", func(t *testing.T) {
 		var fixtureDir = t.TempDir()
 		var reservedPath = filepath.Join(fixtureDir, "report.md")
-		var restore = InstallWriteFailureAfterCreateForTesting(errors.New("custom write failure"))
+		var restore = installWriteFailureAfterCreateForTesting(errors.New("custom write failure"))
 		defer restore()
 
 		var file, err = openWritableFile(reservedPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
@@ -357,7 +357,7 @@ func TestWriteReportDocumentAdditionalBranches(t *testing.T) {
 			openWritableFile = previousOpenWritableFile
 		}()
 
-		var restore = InstallWriteFailureAfterCreateForTesting(errors.New("should not matter"))
+		var restore = installWriteFailureAfterCreateForTesting(errors.New("should not matter"))
 		defer restore()
 
 		if _, err := openWritableFile(filepath.Join(t.TempDir(), "missing-parent", "report.md"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600); err == nil {

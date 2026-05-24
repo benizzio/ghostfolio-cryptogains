@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -100,7 +101,7 @@ func (state *ScopeLocalHybridState) AddAcquisition(acquisition ScopeLocalHybridA
 		scopeState.provenanceLots = append(scopeState.provenanceLots, scopeLocalProvenanceLot{
 			AcquiredAt:         acquisition.AcquiredAt,
 			DeterministicOrder: acquisition.DeterministicOrder,
-			RemainingQuantity:  cloneDecimal(acquisition.Quantity),
+			RemainingQuantity:  supportmath.Clone(acquisition.Quantity),
 		})
 		return nil
 	}
@@ -166,10 +167,10 @@ func (state *ScopeLocalHybridState) Dispose(scopeKey string, quantity apd.Decima
 // Authored by: OpenCode
 func (state *ScopeLocalHybridState) TotalOpenQuantity() (apd.Decimal, error) {
 	if state == nil {
-		return zeroDecimal(), nil
+		return supportmath.Zero(), nil
 	}
 
-	var total = zeroDecimal()
+	var total = supportmath.Zero()
 	for _, scopeState := range state.scopes {
 		var scopeQuantity apd.Decimal
 		var err error
@@ -194,10 +195,10 @@ func (state *ScopeLocalHybridState) TotalOpenQuantity() (apd.Decimal, error) {
 // Authored by: OpenCode
 func (state *ScopeLocalHybridState) TotalOpenBasis() (apd.Decimal, error) {
 	if state == nil {
-		return zeroDecimal(), nil
+		return supportmath.Zero(), nil
 	}
 
-	var total = zeroDecimal()
+	var total = supportmath.Zero()
 	for _, scopeState := range state.scopes {
 		var scopeBasis apd.Decimal
 		var err error
@@ -296,7 +297,7 @@ func (state *scopeLocalOpenState) activateFallback() error {
 		state.provenanceLots = append(state.provenanceLots, scopeLocalProvenanceLot{
 			AcquiredAt:         lot.AcquiredAt,
 			DeterministicOrder: lot.DeterministicOrder,
-			RemainingQuantity:  cloneDecimal(lot.RemainingQuantity),
+			RemainingQuantity:  supportmath.Clone(lot.RemainingQuantity),
 		})
 	}
 
@@ -308,14 +309,14 @@ func (state *scopeLocalOpenState) activateFallback() error {
 // provenance queue.
 // Authored by: OpenCode
 func (state *scopeLocalOpenState) consumeFallbackProvenance(quantity apd.Decimal) error {
-	var remainingQuantity = cloneDecimal(quantity)
+	var remainingQuantity = supportmath.Clone(quantity)
 
 	for index := range state.provenanceLots {
 		if remainingQuantity.Sign() == 0 {
 			break
 		}
 
-		var matchedQuantity = minimumDecimal(state.provenanceLots[index].RemainingQuantity, remainingQuantity)
+		var matchedQuantity = supportmath.Minimum(state.provenanceLots[index].RemainingQuantity, remainingQuantity)
 		if matchedQuantity.Sign() == 0 {
 			continue
 		}

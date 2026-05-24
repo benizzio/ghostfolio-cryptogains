@@ -304,7 +304,7 @@ func TestInstallWriteFailureAfterCreateForTestingDefaultsAndRestores(t *testing.
 		openWritableFile = previousOpenWritableFile
 	})
 
-	var restore = InstallWriteFailureAfterCreateForTesting(nil)
+	var restore = installWriteFailureAfterCreateForTesting(nil)
 	var file, err = openWritableFile(reservedPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		t.Fatalf("reserve test file with injected write failure: %v", err)
@@ -338,5 +338,20 @@ func TestInstallWriteFailureAfterCreateForTestingDefaultsAndRestores(t *testing.
 	}
 	if err = os.Remove(restoredPath); err != nil && !os.IsNotExist(err) {
 		t.Fatalf("remove restored test file: %v", err)
+	}
+}
+
+// TestFailureCategoryOf verifies typed output failure extraction.
+// Authored by: OpenCode
+func TestFailureCategoryOf(t *testing.T) {
+	var wrapped = wrapFailure(FailureCategoryDocumentsDirectoryUnavailable, errors.New("boom"))
+	var category, ok = FailureCategoryOf(wrapped)
+	if !ok || category != FailureCategoryDocumentsDirectoryUnavailable {
+		t.Fatalf("expected typed documents-directory failure, got category=%q ok=%t", category, ok)
+	}
+
+	category, ok = FailureCategoryOf(errors.New("plain"))
+	if ok || category != "" {
+		t.Fatalf("expected plain error not to expose an output failure category, got category=%q ok=%t", category, ok)
 	}
 }

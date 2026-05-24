@@ -66,10 +66,16 @@ func WriteReportDocument(document reportmodel.ReportDocument) (reportmodel.Repor
 
 	var info, statErr = statPath(documentsDir)
 	if statErr != nil {
-		return reportmodel.ReportOutputFile{}, fmt.Errorf("inspect documents directory %q: %w", documentsDir, statErr)
+		return reportmodel.ReportOutputFile{}, wrapFailure(
+			FailureCategoryDocumentsDirectoryUnavailable,
+			fmt.Errorf("inspect documents directory %q: %w", documentsDir, statErr),
+		)
 	}
 	if !info.IsDir() {
-		return reportmodel.ReportOutputFile{}, fmt.Errorf("documents path %q is not a directory", documentsDir)
+		return reportmodel.ReportOutputFile{}, wrapFailure(
+			FailureCategoryDocumentsDirectoryUnavailable,
+			fmt.Errorf("documents path %q is not a directory", documentsDir),
+		)
 	}
 
 	var filename, path, file, reserveErr = reserveReportFile(documentsDir, document.Year, document.CostBasisMethod, savedAt)
@@ -87,13 +93,22 @@ func WriteReportDocument(document reportmodel.ReportDocument) (reportmodel.Repor
 	}()
 
 	if _, err = file.Write([]byte(document.Content)); err != nil {
-		return reportmodel.ReportOutputFile{}, fmt.Errorf("write report file %q: %w", path, err)
+		return reportmodel.ReportOutputFile{}, wrapFailure(
+			FailureCategoryReportFileWriteFailed,
+			fmt.Errorf("write report file %q: %w", path, err),
+		)
 	}
 	if err = file.Sync(); err != nil {
-		return reportmodel.ReportOutputFile{}, fmt.Errorf("sync report file %q: %w", path, err)
+		return reportmodel.ReportOutputFile{}, wrapFailure(
+			FailureCategoryReportFileWriteFailed,
+			fmt.Errorf("sync report file %q: %w", path, err),
+		)
 	}
 	if err = file.Close(); err != nil {
-		return reportmodel.ReportOutputFile{}, fmt.Errorf("close report file %q: %w", path, err)
+		return reportmodel.ReportOutputFile{}, wrapFailure(
+			FailureCategoryReportFileWriteFailed,
+			fmt.Errorf("close report file %q: %w", path, err),
+		)
 	}
 
 	cleanupPath = false
@@ -122,7 +137,10 @@ func reserveReportFile(documentsDir string, year int, method reportmodel.CostBas
 			continue
 		}
 
-		return "", "", nil, fmt.Errorf("reserve report file %q: %w", path, err)
+		return "", "", nil, wrapFailure(
+			FailureCategoryReportFileWriteFailed,
+			fmt.Errorf("reserve report file %q: %w", path, err),
+		)
 	}
 }
 

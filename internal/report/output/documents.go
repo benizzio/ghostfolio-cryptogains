@@ -45,14 +45,14 @@ func ResolveDocumentsDirectory() (string, error) {
 func ResolveDocumentsDirectoryForOS(goos string) (string, error) {
 	var homeDir, err = resolveHomeDirectory(goos)
 	if err != nil {
-		return "", err
+		return "", wrapFailure(FailureCategoryDocumentsDirectoryUnavailable, err)
 	}
 
 	switch goos {
 	case "linux":
 		var documentsDir, configured, resolveErr = resolveLinuxDocumentsDirectory(homeDir)
 		if resolveErr != nil {
-			return "", resolveErr
+			return "", wrapFailure(FailureCategoryDocumentsDirectoryUnavailable, resolveErr)
 		}
 		if configured {
 			return documentsDir, nil
@@ -63,7 +63,10 @@ func ResolveDocumentsDirectoryForOS(goos string) (string, error) {
 	case "windows":
 		return filepath.Join(homeDir, "Documents"), nil
 	default:
-		return "", fmt.Errorf("documents directory resolution is unsupported on %q", goos)
+		return "", wrapFailure(
+			FailureCategoryDocumentsDirectoryUnavailable,
+			fmt.Errorf("documents directory resolution is unsupported on %q", goos),
+		)
 	}
 }
 
@@ -103,40 +106,90 @@ func parseXDGDocumentsDirectory(configBody string, homeDir string) (string, bool
 	var lines = strings.Split(configBody, "\n")
 	for _, line := range lines {
 		var trimmed = strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		if !strings.HasPrefix(trimmed, "XDG_DOCUMENTS_DIR=") {
+		if isIgnoredXDGUserDirsLine(trimmed) {
 			continue
 		}
 
-		var rawValue = strings.TrimSpace(strings.TrimPrefix(trimmed, "XDG_DOCUMENTS_DIR="))
-		if len(rawValue) < 2 || rawValue[0] != '"' || rawValue[len(rawValue)-1] != '"' {
-			return "", false, fmt.Errorf("Linux XDG Documents entry must be a quoted path")
+		var rawValue, found = xdgDocumentsDirectoryValue(trimmed)
+		if !found {
+			continue
 		}
 
-		var unescaped, err = unescapeXDGPath(rawValue[1 : len(rawValue)-1])
+		var documentsDir, err = parseQuotedXDGDocumentsDirectoryValue(rawValue, homeDir)
 		if err != nil {
 			return "", false, err
 		}
-		if strings.TrimSpace(unescaped) == "" {
-			return "", false, fmt.Errorf("Linux XDG Documents entry must not be empty")
-		}
 
-		if strings.HasPrefix(unescaped, "$HOME/") {
-			return filepath.Join(homeDir, filepath.FromSlash(strings.TrimPrefix(unescaped, "$HOME/"))), true, nil
-		}
-		if unescaped == "$HOME" {
-			return homeDir, true, nil
-		}
-		if filepath.IsAbs(unescaped) {
-			return filepath.Clean(unescaped), true, nil
-		}
-
-		return "", false, fmt.Errorf("Linux XDG Documents entry %q is not absolute", unescaped)
+		return documentsDir, true, nil
 	}
 
 	return "", false, nil
+}
+
+// isIgnoredXDGUserDirsLine reports whether one user-dirs line is blank or a
+// comment.
+// Authored by: OpenCode
+func isIgnoredXDGUserDirsLine(line string) bool {
+	return line == "" || strings.HasPrefix(line, "#")
+}
+
+// xdgDocumentsDirectoryValue extracts the raw XDG documents value from one
+// trimmed user-dirs line.
+// Authored by: OpenCode
+func xdgDocumentsDirectoryValue(line string) (string, bool) {
+	if !strings.HasPrefix(line, "XDG_DOCUMENTS_DIR=") {
+		return "", false
+	}
+
+	return strings.TrimSpace(strings.TrimPrefix(line, "XDG_DOCUMENTS_DIR=")), true
+}
+
+// parseQuotedXDGDocumentsDirectoryValue validates, unescapes, and resolves one
+// quoted XDG documents path value.
+// Authored by: OpenCode
+func parseQuotedXDGDocumentsDirectoryValue(rawValue string, homeDir string) (string, error) {
+	var unescaped, err = unescapeAndValidateQuotedXDGPath(rawValue)
+	if err != nil {
+		return "", err
+	}
+
+	return resolveXDGDocumentsDirectoryPath(unescaped, homeDir)
+}
+
+// unescapeAndValidateQuotedXDGPath validates the quoted XDG path wrapper and
+// decodes the contained escape sequences.
+// Authored by: OpenCode
+func unescapeAndValidateQuotedXDGPath(rawValue string) (string, error) {
+	if len(rawValue) < 2 || rawValue[0] != '"' || rawValue[len(rawValue)-1] != '"' {
+		return "", fmt.Errorf("Linux XDG Documents entry must be a quoted path")
+	}
+
+	var unescaped, err = unescapeXDGPath(rawValue[1 : len(rawValue)-1])
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(unescaped) == "" {
+		return "", fmt.Errorf("Linux XDG Documents entry must not be empty")
+	}
+
+	return unescaped, nil
+}
+
+// resolveXDGDocumentsDirectoryPath expands one validated XDG documents path to
+// the final filesystem path.
+// Authored by: OpenCode
+func resolveXDGDocumentsDirectoryPath(pathValue string, homeDir string) (string, error) {
+	if strings.HasPrefix(pathValue, "$HOME/") {
+		return filepath.Join(homeDir, filepath.FromSlash(strings.TrimPrefix(pathValue, "$HOME/"))), nil
+	}
+	if pathValue == "$HOME" {
+		return homeDir, nil
+	}
+	if filepath.IsAbs(pathValue) {
+		return filepath.Clean(pathValue), nil
+	}
+
+	return "", fmt.Errorf("Linux XDG Documents entry %q is not absolute", pathValue)
 }
 
 // unescapeXDGPath decodes the minimal quoted escaping used by XDG user-dirs.

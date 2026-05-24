@@ -73,20 +73,20 @@ func SyncReportsScreenView(params SyncReportsScreenParams) string {
 func syncReportsReadinessSummary(state runtime.ProtectedDataState, unavailableMessage string) string {
 	var lines []string
 	if !state.HasReadableSnapshot {
-		lines = append(lines, "Sync Data: no synced data available")
-		lines = append(lines, fmt.Sprintf("Generate Capital Gains Report: unavailable - %s", syncReportsUnavailableReason(unavailableMessage)))
+		lines = append(lines, fmt.Sprintf("%s: no synced data available", component.SyncDataActionLabel))
+		lines = append(lines, fmt.Sprintf("%s: unavailable - %s", component.GenerateCapitalGainsReportActionLabel, syncReportsUnavailableReason(unavailableMessage)))
 		return strings.Join(lines, "\n")
 	}
 
-	lines = append(lines, fmt.Sprintf("Sync Data: last successful sync %s", formatSyncReportsLastSuccessfulSync(state.LastSuccessfulSyncAt)))
+	lines = append(lines, fmt.Sprintf("%s: last successful sync %s", component.SyncDataActionLabel, formatSyncReportsLastSuccessfulSync(state.LastSuccessfulSyncAt)))
 	lines = append(lines, fmt.Sprintf("Protected Activity Count: %d", state.ActivityCount))
 	if len(state.AvailableReportYears) == 0 {
-		lines = append(lines, fmt.Sprintf("Generate Capital Gains Report: unavailable - %s", syncReportsUnavailableReason(unavailableMessage)))
+		lines = append(lines, fmt.Sprintf("%s: unavailable - %s", component.GenerateCapitalGainsReportActionLabel, syncReportsUnavailableReason(unavailableMessage)))
 		return strings.Join(lines, "\n")
 	}
 
 	lines = append(lines, fmt.Sprintf("Available Report Years: %s", formatSyncReportsAvailableYears(state.AvailableReportYears)))
-	lines = append(lines, "Generate Capital Gains Report: available")
+	lines = append(lines, fmt.Sprintf("%s: available", component.GenerateCapitalGainsReportActionLabel))
 	return strings.Join(lines, "\n")
 }
 
@@ -98,24 +98,24 @@ func syncReportsStatusText(state runtime.ProtectedDataState, outcome runtime.Syn
 		return statusMessage
 	}
 	if busy {
-		return "Generating a local synced-data diagnostic report for this failure."
+		return component.SyncDiagnosticGeneratingMessage
 	}
 	if outcome.Diagnostic.Path != "" {
-		return fmt.Sprintf("A synced-data diagnostic report was generated at %s.", outcome.Diagnostic.Path)
+		return component.SyncDiagnosticReportGeneratedMessage(outcome.Diagnostic.Path)
 	}
 	if outcome.Diagnostic.Eligible {
 		return "A synced-data diagnostic report is available for this failure from this context."
 	}
 	if !outcome.Success && outcome.FailureReason != "" {
-		return fmt.Sprintf("The last sync attempt failed with category %s. Sync Data stays available from this context.", outcome.FailureReason)
+		return fmt.Sprintf("The last sync attempt failed with category %s. %s stays available from this context.", outcome.FailureReason, component.SyncDataActionLabel)
 	}
 	if !state.HasReadableSnapshot {
-		return fmt.Sprintf("Sync Data is available now. Generate Capital Gains Report stays unavailable until %s.", syncReportsUnavailableReason(unavailableMessage))
+		return fmt.Sprintf("%s is available now. %s stays unavailable until %s.", component.SyncDataActionLabel, component.GenerateCapitalGainsReportActionLabel, syncReportsUnavailableReason(unavailableMessage))
 	}
 	if len(state.AvailableReportYears) == 0 {
 		return fmt.Sprintf("Protected synced data is readable, but report generation stays unavailable until %s.", syncReportsUnavailableReason(unavailableMessage))
 	}
-	return "Protected synced data is ready. Sync Data stays available, and report generation is available from this context."
+	return fmt.Sprintf("Protected synced data is ready. %s stays available, and report generation is available from this context.", component.SyncDataActionLabel)
 }
 
 // syncReportsUnavailableReason normalizes the current report-unavailable reason.
@@ -160,16 +160,16 @@ func syncReportsSyncFeedback(outcome runtime.SyncOutcome, busy bool) string {
 	lines = append(lines, "")
 	lines = append(lines, "Latest Sync Result")
 	if outcome.Success {
-		lines = append(lines, "Activity data was stored securely for future use.")
+		lines = append(lines, component.ProtectedDataStoredMessage)
 		return "\n" + strings.Join(lines, "\n")
 	}
 	lines = append(lines, fmt.Sprintf("Failure Category: %s", outcome.FailureReason))
 	if busy {
 		lines = append(lines, "Generating diagnostic report...")
 	} else if outcome.Diagnostic.Path != "" {
-		lines = append(lines, fmt.Sprintf("A synced-data diagnostic report was generated at %s.", outcome.Diagnostic.Path))
+		lines = append(lines, component.SyncDiagnosticReportGeneratedMessage(outcome.Diagnostic.Path))
 	} else if outcome.Diagnostic.Eligible {
-		lines = append(lines, "Generate Diagnostic Report is available for this failure from this context.")
+		lines = append(lines, component.SyncDiagnosticAvailableFromContextMessage)
 	}
 
 	return "\n" + strings.Join(lines, "\n")

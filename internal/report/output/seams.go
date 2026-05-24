@@ -8,8 +8,15 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
 )
+
+// deterministicWriteFailureAfterCreateEnvName enables one package-internal
+// deterministic write failure after the final report path has already been
+// created on disk.
+// Authored by: OpenCode
+const deterministicWriteFailureAfterCreateEnvName = "GHOSTFOLIO_CRYPTOGAINS_OUTPUT_FAIL_WRITE_AFTER_CREATE"
 
 // Test seams wrap platform and filesystem behavior so output tests can verify
 // failure handling without mutating the host system.
@@ -41,7 +48,12 @@ var statPath = os.Stat
 // write failures safely.
 // Authored by: OpenCode
 var openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
-	return os.OpenFile(path, flag, perm)
+	var file, err = os.OpenFile(path, flag, perm)
+	if err != nil {
+		return nil, err
+	}
+
+	return wrapDeterministicWriteFailure(file), nil
 }
 
 // Test seams wrap file removal so output tests can verify cleanup behavior.
@@ -60,18 +72,35 @@ var runOpenCommand = func(command OpenCommand) error {
 	return process.Run()
 }
 
-// InstallWriteFailureAfterCreateForTesting overrides report-file reservation so
-// the returned write handle fails after the final path has already been created
-// on disk. Use this only in tests that need to verify partial-file cleanup
-// through higher-level runtime workflows.
-//
-// Example:
-//
-//	restore := output.InstallWriteFailureAfterCreateForTesting(errors.New("forced write failure"))
-//	defer restore()
-//
+// wrapDeterministicWriteFailure applies one package-internal deterministic
+// write failure configuration to a newly created writable file.
 // Authored by: OpenCode
-func InstallWriteFailureAfterCreateForTesting(writeErr error) func() {
+func wrapDeterministicWriteFailure(file *os.File) writeSyncCloser {
+	var writeErr = deterministicWriteFailureAfterCreateError()
+	if writeErr == nil {
+		return file
+	}
+
+	return failingWriteSyncCloser{writeSyncCloser: file, writeErr: writeErr}
+}
+
+// deterministicWriteFailureAfterCreateError returns the configured package-
+// internal deterministic write failure, if any.
+// Authored by: OpenCode
+func deterministicWriteFailureAfterCreateError() error {
+	var value, ok = lookupEnv(deterministicWriteFailureAfterCreateEnvName)
+	if !ok || strings.TrimSpace(value) == "" {
+		return nil
+	}
+
+	return errors.New(strings.TrimSpace(value))
+}
+
+// installWriteFailureAfterCreateForTesting overrides report-file reservation so
+// the returned write handle fails after the final path has already been created
+// on disk. Use this only in package-local tests.
+// Authored by: OpenCode
+func installWriteFailureAfterCreateForTesting(writeErr error) func() {
 	if writeErr == nil {
 		writeErr = errors.New("forced write failure")
 	}
