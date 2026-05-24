@@ -3,8 +3,6 @@
 package unit
 
 import (
-	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -93,14 +91,14 @@ func TestHIFOTieBreakingUsesOlderLotThenDeterministicOrder(t *testing.T) {
 	})
 }
 
-// TestCalculateFailsWhenAverageCostRequiresNonTerminatingDivision verifies the
-// no-rounding exact-division rule for average cost basis.
+// TestCalculateRoundsAverageCostWhenDivisionRepeats verifies the shared
+// 16-decimal internal precision for average-cost liquidation math.
 // Authored by: OpenCode
-func TestCalculateFailsWhenAverageCostRequiresNonTerminatingDivision(t *testing.T) {
+func TestCalculateRoundsAverageCostWhenDivisionRepeats(t *testing.T) {
 	t.Parallel()
 
 	var request = mustReportRequest(t, 2024, reportmodel.CostBasisMethodAverageCost)
-	_, err := reportcalculate.Calculate(request, calculationCache(
+	var report, err = reportcalculate.Calculate(request, calculationCache(
 		2024,
 		calculationActivity(t, calculationActivityInput{
 			SourceID:         "avg-buy-2023-001",
@@ -129,26 +127,24 @@ func TestCalculateFailsWhenAverageCostRequiresNonTerminatingDivision(t *testing.
 			OrderUnitPrice:   "5",
 		}),
 	))
-	if err == nil {
-		t.Fatalf("expected exact-division failure")
+	if err != nil {
+		t.Fatalf("calculate rounded average-cost report: %v", err)
 	}
 
-	var calculationError *reportmodel.CalculationError
-	if !errors.As(err, &calculationError) {
-		t.Fatalf("expected structured calculation error, got %T", err)
+	assertCalculationDecimalString(t, summaryEntryByAsset(t, report, "asset-avg-001").NetGainOrLoss, "1.6666666666666667", "rounded average-cost asset net")
+	assertCalculationDecimalString(t, report.YearlyNetTotal, "1.6666666666666667", "rounded average-cost yearly net")
+
+	var detail = detailSectionByAsset(t, report, "asset-avg-001")
+	assertCalculationDecimalString(t, detail.OpeningQuantity, "3", "rounded average-cost opening quantity")
+	assertCalculationDecimalString(t, detail.OpeningCostBasis, "10", "rounded average-cost opening basis")
+	assertCalculationDecimalString(t, detail.ClosingQuantity, "2", "rounded average-cost closing quantity")
+	assertCalculationDecimalString(t, detail.ClosingCostBasis, "6.6666666666666667", "rounded average-cost closing basis")
+	if len(detail.LiquidationSummaries) != 1 {
+		t.Fatalf("unexpected rounded average-cost liquidation count: got %d want 1", len(detail.LiquidationSummaries))
 	}
-	if calculationError.Kind() != reportmodel.CalculationErrorKindBasisAllocation {
-		t.Fatalf("unexpected calculation error kind: got %q want %q", calculationError.Kind(), reportmodel.CalculationErrorKindBasisAllocation)
-	}
-	if calculationError.SourceID() != "avg-sell-2024-001" || calculationError.DisplayLabel() != "AVG" {
-		t.Fatalf("expected offending activity references, got source=%q label=%q", calculationError.SourceID(), calculationError.DisplayLabel())
-	}
-	if !strings.Contains(calculationError.Error(), "could not allocate basis for the priced liquidation") {
-		t.Fatalf("expected wrapped exact-division failure detail, got %v", calculationError)
-	}
-	if calculationError.Unwrap() == nil || !strings.Contains(calculationError.Unwrap().Error(), "allocate basis exactly") {
-		t.Fatalf("expected underlying exact-division failure, got %v", calculationError.Unwrap())
-	}
+	assertCalculationDecimalString(t, detail.LiquidationSummaries[0].AllocatedBasis, "3.3333333333333333", "rounded average-cost allocated basis")
+	assertCalculationDecimalString(t, detail.LiquidationSummaries[0].NetLiquidationProceeds, "5", "rounded average-cost net proceeds")
+	assertCalculationDecimalString(t, detail.LiquidationSummaries[0].GainOrLoss, "1.6666666666666667", "rounded average-cost gain")
 }
 
 // TestCalculateScopeLocalHybridNarrowsReliableScopeTimeline verifies that one

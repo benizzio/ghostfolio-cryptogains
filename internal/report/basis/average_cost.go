@@ -6,7 +6,7 @@ package basis
 import (
 	"fmt"
 
-	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	reportdecimal "github.com/benizzio/ghostfolio-cryptogains/internal/report/decimal"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -75,8 +75,8 @@ func (state *AverageCostState) AddAcquisition(quantity apd.Decimal, basis apd.De
 	return nil
 }
 
-// Dispose removes one quantity from the moving pool using exact average-cost
-// allocation with no rounding.
+// Dispose removes one quantity from the moving pool using the shared internal
+// report-calculation precision for proportional allocation when needed.
 // Authored by: OpenCode
 func (state *AverageCostState) Dispose(quantity apd.Decimal) (AverageCostDisposalResult, error) {
 	if state == nil {
@@ -146,7 +146,8 @@ func (state *AverageCostState) Basis() apd.Decimal {
 	return cloneDecimal(state.basis)
 }
 
-// AverageUnitCost returns the exact current moving average unit cost.
+// AverageUnitCost returns the current moving average unit cost using the shared
+// internal report-calculation precision when division does not terminate.
 // Authored by: OpenCode
 func (state *AverageCostState) AverageUnitCost() (apd.Decimal, error) {
 	if state == nil {
@@ -156,9 +157,9 @@ func (state *AverageCostState) AverageUnitCost() (apd.Decimal, error) {
 		return zeroDecimal(), nil
 	}
 
-	var average, _, err = decimalsupport.DivideExact(state.basis, state.quantity)
+	var average, err = reportdecimal.DivideRoundHalfUp(state.basis, state.quantity)
 	if err != nil {
-		return apd.Decimal{}, fmt.Errorf("calculate average unit cost exactly: %w", err)
+		return apd.Decimal{}, fmt.Errorf("calculate average unit cost: %w", err)
 	}
 
 	return average, nil

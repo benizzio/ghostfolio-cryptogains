@@ -429,6 +429,59 @@ func TestCalculateReturnsStructuredActivityReferencesForInputFailures(t *testing
 	}
 }
 
+// TestCalculateRoundsPartialLotBasisAllocation verifies shared 16-decimal
+// internal precision for repeating partial-lot basis allocation.
+// Authored by: OpenCode
+func TestCalculateRoundsPartialLotBasisAllocation(t *testing.T) {
+	t.Parallel()
+
+	var request = mustReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO)
+	var report, err = reportcalculate.Calculate(request, calculationCache(
+		2024,
+		calculationActivity(t, calculationActivityInput{
+			SourceID:         "lot-buy-2023-001",
+			OccurredAt:       "2023-01-01T10:00:00Z",
+			ActivityType:     syncmodel.ActivityTypeBuy,
+			AssetIdentityKey: "asset-lot-001",
+			AssetSymbol:      "LOT",
+			AssetName:        "Lot Asset",
+			Quantity:         "3",
+			OrderCurrency:    "USD",
+			OrderGrossValue:  "10",
+			OrderFeeAmount:   "0",
+			OrderUnitPrice:   "3.333333333333333333333333333333333",
+		}),
+		calculationActivity(t, calculationActivityInput{
+			SourceID:         "lot-sell-2024-001",
+			OccurredAt:       "2024-02-01T10:00:00Z",
+			ActivityType:     syncmodel.ActivityTypeSell,
+			AssetIdentityKey: "asset-lot-001",
+			AssetSymbol:      "LOT",
+			AssetName:        "Lot Asset",
+			Quantity:         "1",
+			OrderCurrency:    "USD",
+			OrderGrossValue:  "5",
+			OrderFeeAmount:   "0",
+			OrderUnitPrice:   "5",
+		}),
+	))
+	if err != nil {
+		t.Fatalf("calculate rounded partial-lot report: %v", err)
+	}
+
+	assertCalculationDecimalString(t, summaryEntryByAsset(t, report, "asset-lot-001").NetGainOrLoss, "1.6666666666666667", "rounded partial-lot asset net")
+	assertCalculationDecimalString(t, report.YearlyNetTotal, "1.6666666666666667", "rounded partial-lot yearly net")
+
+	var detail = detailSectionByAsset(t, report, "asset-lot-001")
+	assertCalculationDecimalString(t, detail.ClosingCostBasis, "6.6666666666666667", "rounded partial-lot closing basis")
+	if len(detail.LiquidationSummaries) != 1 {
+		t.Fatalf("unexpected rounded partial-lot liquidation count: got %d want 1", len(detail.LiquidationSummaries))
+	}
+	assertCalculationDecimalString(t, detail.LiquidationSummaries[0].AllocatedBasis, "3.3333333333333333", "rounded partial-lot allocated basis")
+	assertCalculationDecimalString(t, detail.LiquidationSummaries[0].NetLiquidationProceeds, "5", "rounded partial-lot net proceeds")
+	assertCalculationDecimalString(t, detail.LiquidationSummaries[0].GainOrLoss, "1.6666666666666667", "rounded partial-lot gain")
+}
+
 // calculationActivityInput stores one compact report-calculation activity test
 // declaration before conversion into the normalized sync model.
 // Authored by: OpenCode

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	reportdecimal "github.com/benizzio/ghostfolio-cryptogains/internal/report/decimal"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/cockroachdb/apd/v3"
 )
@@ -358,7 +359,8 @@ func validateLotAcquisition(acquisition LotAcquisition) error {
 	return nil
 }
 
-// exactProportionalBasis allocates one matched basis fragment without rounding.
+// exactProportionalBasis allocates one matched basis fragment using the shared
+// internal report-calculation precision when the proportional division repeats.
 // Authored by: OpenCode
 func exactProportionalBasis(totalBasis apd.Decimal, totalQuantity apd.Decimal, matchedQuantity apd.Decimal) (apd.Decimal, error) {
 	if err := validateNonNegativeDecimal(totalBasis, "total basis"); err != nil {
@@ -382,9 +384,9 @@ func exactProportionalBasis(totalBasis apd.Decimal, totalQuantity apd.Decimal, m
 		return apd.Decimal{}, err
 	}
 
-	var quotient, _, divideErr = decimalsupport.DivideExact(numerator, totalQuantity)
+	var quotient, divideErr = reportdecimal.DivideRoundHalfUp(numerator, totalQuantity)
 	if divideErr != nil {
-		return apd.Decimal{}, fmt.Errorf("allocate basis exactly: %w", divideErr)
+		return apd.Decimal{}, fmt.Errorf("allocate basis proportionally: %w", divideErr)
 	}
 
 	return quotient, nil

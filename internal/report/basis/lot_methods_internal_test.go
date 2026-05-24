@@ -121,8 +121,12 @@ func TestLotMethodValidationAndHelperPaths(t *testing.T) {
 		t.Fatalf("expected negative remaining basis to fail, got %v", err)
 	}
 
-	if _, err := exactProportionalBasis(decimalFromInt(1), decimalFromInt(3), decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "allocate basis exactly") {
-		t.Fatalf("expected non-terminating proportional basis allocation to fail, got %v", err)
+	var roundedBasis, roundedErr = exactProportionalBasis(decimalFromInt(1), decimalFromInt(3), decimalFromInt(1))
+	if roundedErr != nil {
+		t.Fatalf("expected non-terminating proportional basis allocation to round successfully, got %v", roundedErr)
+	}
+	if roundedBasis.Cmp(apd.New(3333333333333333, -16)) != 0 {
+		t.Fatalf("expected rounded proportional basis allocation, got %v", roundedBasis)
 	}
 
 	var left = validLotAcquisition()
@@ -421,6 +425,27 @@ func TestLotMethodWrapsInjectedDecimalFailures(t *testing.T) {
 	}
 	if _, err = compareUnitCostsCrossMultiply(validLotAcquisition(), validLotAcquisition()); err == nil || !strings.Contains(err.Error(), "multiply second boom") {
 		t.Fatalf("expected injected second unit-cost multiply failure, got %v", err)
+	}
+}
+
+// TestExactProportionalBasisWrapsRoundedDivisionFailure verifies the defensive
+// proportional-allocation wrapper around report-local division failures.
+// Authored by: OpenCode
+func TestExactProportionalBasisWrapsRoundedDivisionFailure(t *testing.T) {
+	var previousMultiply = lotMultiplyDecimal
+	defer func() {
+		lotMultiplyDecimal = previousMultiply
+	}()
+
+	lotMultiplyDecimal = func(apd.Decimal, apd.Decimal) (apd.Decimal, error) {
+		var invalid apd.Decimal
+		invalid.Form = apd.Infinite
+		return invalid, nil
+	}
+
+	_, err := exactProportionalBasis(decimalFromInt(1), decimalFromInt(2), decimalFromInt(1))
+	if err == nil || !strings.Contains(err.Error(), "allocate basis proportionally") {
+		t.Fatalf("expected wrapped proportional-allocation failure, got %v", err)
 	}
 }
 

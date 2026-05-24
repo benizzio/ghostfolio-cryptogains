@@ -229,6 +229,30 @@ func TestCalculateWrapsCalculatedReportValidationFailure(t *testing.T) {
 // calculator wrapper branches through package-local seams.
 // Authored by: OpenCode
 func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
+	t.Run("propagates asset-group calculation failure", func(t *testing.T) {
+		var originalCalculateAssetGroupFunc = calculateAssetGroupFunc
+		defer func() {
+			calculateAssetGroupFunc = originalCalculateAssetGroupFunc
+		}()
+
+		calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ syncmodel.ProtectedActivityCache, _ assetInputGroup) (assetCalculationResult, error) {
+			return assetCalculationResult{}, errors.New("asset group boom")
+		}
+
+		_, err := Calculate(
+			validReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO),
+			syncmodel.ProtectedActivityCache{
+				AvailableReportYears: []int{2024},
+				Activities: []syncmodel.ActivityRecord{
+					zeroPricedHoldingReductionRecord(t, "btc-sell-1", "2024-01-02T10:00:00Z", "asset-btc", "BTC", "Bitcoin"),
+				},
+			},
+		)
+		if err == nil || !strings.Contains(err.Error(), "asset group boom") {
+			t.Fatalf("expected asset-group failure to propagate, got %v", err)
+		}
+	})
+
 	t.Run("wraps yearly total accumulation failure", func(t *testing.T) {
 		var originalCalculateAssetGroupFunc = calculateAssetGroupFunc
 		var originalAddCalculationOperation = addCalculationOperation
@@ -612,6 +636,22 @@ func TestReplayAssetInputCoversYearBoundariesAndWrappedStateFailures(t *testing.
 		t.Fatalf("expected wrapped pre-open failure, got %q", calcErr.Error())
 	}
 
+	_, err = replayAssetInput(stubAssetBasisState{
+		openQuantityFunc: func() (apd.Decimal, error) { return mustReportDecimal(t, "1"), nil },
+	}, scopedActivityInput{Input: reportmodel.ActivityCalculationInput{
+		SourceID:         "unsupported-activity",
+		OccurredAt:       time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
+		SourceYear:       2024,
+		ActivityType:     syncmodel.ActivityType("SWAP"),
+		AssetIdentityKey: "asset-btc",
+		DisplayLabel:     "BTC",
+		Quantity:         mustReportDecimal(t, "1"),
+	}}, 1, 2024)
+	calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindActivityInput)
+	if !strings.Contains(calcErr.Error(), "unsupported activity type") {
+		t.Fatalf("expected apply-basis failure to propagate, got %q", calcErr.Error())
+	}
+
 	var priorYearCalls int
 	var replayResult assetInputReplayResult
 	replayResult, err = replayAssetInput(stubAssetBasisState{
@@ -863,6 +903,24 @@ func TestApplyBasisInputRoutesActivities(t *testing.T) {
 		FeeAmount:        decimalPointer(t, "1"),
 	}})
 	requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+
+	_, err = applyPricedLiquidation(stubAssetBasisState{disposeFunc: func(basisDisposalInput) (basisDisposalResult, error) {
+		return basisDisposalResult{}, errors.New("dispose boom")
+	}}, scopedActivityInput{Input: reportmodel.ActivityCalculationInput{
+		SourceID:         "sell-dispose-fail",
+		OccurredAt:       time.Date(2024, time.January, 3, 0, 0, 0, 0, time.UTC),
+		SourceYear:       2024,
+		ActivityType:     syncmodel.ActivityTypeSell,
+		AssetIdentityKey: "asset-btc",
+		DisplayLabel:     "BTC",
+		Quantity:         mustReportDecimal(t, "1"),
+		GrossValue:       decimalPointer(t, "12"),
+		FeeAmount:        decimalPointer(t, "1"),
+	}})
+	var calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+	if !strings.Contains(calcErr.Error(), "could not allocate basis for the priced liquidation") {
+		t.Fatalf("expected priced-liquidation dispose failure, got %q", calcErr.Error())
+	}
 
 	_, err = applyPricedLiquidation(stubAssetBasisState{disposeFunc: func(basisDisposalInput) (basisDisposalResult, error) {
 		var allocated apd.Decimal
@@ -1177,6 +1235,10 @@ func TestNewAssetBasisStateAndCalculationHelpers(t *testing.T) {
 	var lotWrapper = lotBasisState{}
 	if _, err = lotWrapper.Dispose(basisDisposalInput{Quantity: mustReportDecimal(t, "1")}); err == nil {
 		t.Fatalf("expected nil lot wrapper state disposal to fail")
+	}
+	var averageWrapper = averageCostBasisState{}
+	if _, err = averageWrapper.Dispose(basisDisposalInput{Quantity: mustReportDecimal(t, "1")}); err == nil || !strings.Contains(err.Error(), "average cost state is required") {
+		t.Fatalf("expected nil average-cost wrapper state disposal to fail, got %v", err)
 	}
 	lotStateTotalOpenQuantity = func(*reportbasis.LotMethodState) (apd.Decimal, error) {
 		return apd.Decimal{}, errors.New("total quantity boom")

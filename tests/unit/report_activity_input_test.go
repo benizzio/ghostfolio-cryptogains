@@ -151,11 +151,11 @@ func TestSelectActivityCalculationInputRejectsMissingFeeInsteadOfTreatingZero(t 
 	}
 }
 
-// TestSelectActivityCalculationInputSkipsNonDerivableHigherTier verifies that a
-// later explicit-currency tier may still satisfy the input when an earlier
-// explicit-currency tier cannot derive one exact unit price safely.
+// TestSelectActivityCalculationInputUsesRoundedHigherTierBeforeLowerTier
+// verifies that a higher-priority explicit-currency tier remains selectable when
+// same-tier unit-price derivation requires rounded internal division.
 // Authored by: OpenCode
-func TestSelectActivityCalculationInputSkipsNonDerivableHigherTier(t *testing.T) {
+func TestSelectActivityCalculationInputUsesRoundedHigherTierBeforeLowerTier(t *testing.T) {
 	t.Parallel()
 
 	var record = pricedActivityRecord()
@@ -172,7 +172,7 @@ func TestSelectActivityCalculationInputSkipsNonDerivableHigherTier(t *testing.T)
 		t.Fatalf("select activity input: %v", err)
 	}
 
-	assertSelectedContext(t, input, reportmodel.SelectedCurrencyContextBase, "GBP", "300", "0", "100")
+	assertSelectedContext(t, input, reportmodel.SelectedCurrencyContextOrder, "USD", "1", "0", "0.3333333333333333")
 }
 
 // TestSelectActivityCalculationInputRejectsNonPositivePricedQuantity verifies
@@ -202,10 +202,10 @@ func TestSelectActivityCalculationInputRejectsNonPositivePricedQuantity(t *testi
 	}
 }
 
-// TestSelectActivityCalculationInputRejectsNonTerminatingUnitPriceDerivation
-// verifies failure when exact division does not terminate.
+// TestSelectActivityCalculationInputRoundsNonTerminatingUnitPriceDerivation
+// verifies shared 16-decimal unit-price derivation for repeating divisions.
 // Authored by: OpenCode
-func TestSelectActivityCalculationInputRejectsNonTerminatingUnitPriceDerivation(t *testing.T) {
+func TestSelectActivityCalculationInputRoundsNonTerminatingUnitPriceDerivation(t *testing.T) {
 	t.Parallel()
 
 	var record = pricedActivityRecord()
@@ -214,13 +214,12 @@ func TestSelectActivityCalculationInputRejectsNonTerminatingUnitPriceDerivation(
 	record.BaseGrossValue = decimalPointer(t, "1")
 	record.BaseFeeAmount = decimalPointer(t, "0")
 
-	_, err := reportcalculate.SelectActivityCalculationInput(record)
-	if err == nil {
-		t.Fatalf("expected non-terminating unit-price derivation to fail")
+	input, err := reportcalculate.SelectActivityCalculationInput(record)
+	if err != nil {
+		t.Fatalf("select activity input: %v", err)
 	}
-	if !strings.Contains(err.Error(), "cannot be derived exactly") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+
+	assertSelectedContext(t, input, reportmodel.SelectedCurrencyContextBase, "USD", "1", "0", "0.3333333333333333")
 }
 
 // TestSelectActivityCalculationInputPrefersGrossValueDerivation verifies that a

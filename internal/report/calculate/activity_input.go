@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
+	reportdecimal "github.com/benizzio/ghostfolio-cryptogains/internal/report/decimal"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
-	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/cockroachdb/apd/v3"
 )
@@ -319,8 +319,8 @@ func selectTierGrossValue(record syncmodel.ActivityRecord, tier activityMoneyTie
 	return &derivedGrossValue, nil
 }
 
-// selectTierUnitPrice returns one tier unit price, deriving it only when exact
-// same-tier division is available.
+// selectTierUnitPrice returns one tier unit price, deriving it only from same-
+// tier inputs under the shared report-calculation decimal policy.
 // Authored by: OpenCode
 func selectTierUnitPrice(record syncmodel.ActivityRecord, tier activityMoneyTier, grossValue *apd.Decimal) (*apd.Decimal, error) {
 	if tier.unitPrice != nil {
@@ -332,10 +332,10 @@ func selectTierUnitPrice(record syncmodel.ActivityRecord, tier activityMoneyTier
 
 	var derivedUnitPrice apd.Decimal
 	var err error
-	derivedUnitPrice, _, err = decimalsupport.DivideExact(*grossValue, record.Quantity)
+	derivedUnitPrice, err = reportdecimal.DivideRoundHalfUp(*grossValue, record.Quantity)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"activity %q %s unit price cannot be derived exactly from gross value and quantity: %w",
+			"activity %q %s unit price cannot be derived from gross value and quantity: %w",
 			strings.TrimSpace(record.SourceID),
 			tier.name,
 			err,

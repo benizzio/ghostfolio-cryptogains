@@ -8,10 +8,14 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
+	"github.com/cockroachdb/apd/v3"
 )
 
 // TestReportGenerationSuccessWritesMarkdownAndReturnsToUnlockedContext verifies
@@ -210,4 +214,174 @@ func TestReportGenerationSkipsCurrencylessOrderTier(t *testing.T) {
 		t.Fatalf("expected saved report to skip the currencyless order-tier monetary values, got %q", reportText)
 	}
 	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
+}
+
+// TestReportGenerationRoundsSameTierUnitPriceDerivation verifies that
+// repeating same-tier division succeeds and the rendered report reuses the
+// rounded 16-decimal internal result without extra boundary rounding.
+// Authored by: OpenCode
+func TestReportGenerationRoundsSameTierUnitPriceDerivation(t *testing.T) {
+	var reportIO = testutil.NewReportIOFixture(t)
+	var openLogPath = installOpenCommandRecorder(t, 0)
+	var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
+	var cache = roundedUnitPriceProtectedActivityCache(t)
+
+	seedProtectedSnapshot(t, harness, "token-123", cache)
+
+	var model = unlockSyncReportsContext(t, harness.Model, "token-123")
+	model = openReportSelectionFromContext(t, model)
+	model = selectReportYear(t, model, 2024)
+	model, cmd := startReportGenerationFromSelection(t, model)
+	model = applyBatchCmd(t, model, cmd)
+
+	if model.ActiveScreen() != "report_result" {
+		t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
+	}
+
+	var files = mustMarkdownFiles(t, reportIO.DocumentsDir)
+	if len(files) != 1 {
+		t.Fatalf("expected one saved Markdown file, got %#v", files)
+	}
+	var reportPath = files[0]
+	var openerRequests = readOpenCommandRequests(t, openLogPath)
+	if len(openerRequests) != 1 || openerRequests[0] != reportPath {
+		t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
+	}
+
+	var rawReport, err = os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read saved report %q: %v", reportPath, err)
+	}
+	var reportText = string(rawReport)
+	for _, expected := range []string{
+		"| unit-buy-2024-001 | BUY | 3 | 1 | 0 | USD | 1 | NOT APPLICABLE | 3 |",
+		"| unit-sell-2024-001 | SELL | 1 | 1 | 0 | USD | 0.6666666666666667 | NOT APPLICABLE | 2 |",
+		"| unit-sell-2024-001 | 1 | USD | 0.3333333333333333 | 1 | 0.6666666666666667 | NOT APPLICABLE |",
+	} {
+		if !strings.Contains(reportText, expected) {
+			t.Fatalf("expected rounded report to contain %q, got %q", expected, reportText)
+		}
+	}
+	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
+}
+
+// roundedUnitPriceProtectedActivityCache builds one deterministic cache where a
+// same-tier unit-price derivation requires repeating decimal rounding.
+// Authored by: OpenCode
+func roundedUnitPriceProtectedActivityCache(t *testing.T) syncmodel.ProtectedActivityCache {
+	t.Helper()
+
+	return syncmodel.ProtectedActivityCache{
+		SyncedAt:             mustReportFixtureTime(t, "2026-05-20T15:04:05Z"),
+		RetrievedCount:       2,
+		ActivityCount:        2,
+		AvailableReportYears: []int{2024},
+		Activities: []syncmodel.ActivityRecord{
+			roundedReportActivity(t, roundedReportActivityInput{
+				SourceID:         "unit-buy-2024-001",
+				OccurredAt:       "2024-01-01T10:00:00Z",
+				ActivityType:     syncmodel.ActivityTypeBuy,
+				AssetIdentityKey: "asset-unit-001",
+				AssetSymbol:      "UNIT",
+				AssetName:        "Unit Asset",
+				Quantity:         "3",
+				OrderCurrency:    "USD",
+				OrderGrossValue:  "1",
+				OrderFeeAmount:   "0",
+			}),
+			roundedReportActivity(t, roundedReportActivityInput{
+				SourceID:         "unit-sell-2024-001",
+				OccurredAt:       "2024-03-01T10:00:00Z",
+				ActivityType:     syncmodel.ActivityTypeSell,
+				AssetIdentityKey: "asset-unit-001",
+				AssetSymbol:      "UNIT",
+				AssetName:        "Unit Asset",
+				Quantity:         "1",
+				OrderCurrency:    "USD",
+				OrderGrossValue:  "1",
+				OrderFeeAmount:   "0",
+				OrderUnitPrice:   "1",
+			}),
+		},
+	}
+}
+
+// roundedReportActivityInput stores one compact rounded-division integration
+// fixture before conversion into a normalized activity record.
+// Authored by: OpenCode
+type roundedReportActivityInput struct {
+	SourceID         string
+	OccurredAt       string
+	ActivityType     syncmodel.ActivityType
+	AssetIdentityKey string
+	AssetSymbol      string
+	AssetName        string
+	Quantity         string
+	OrderCurrency    string
+	OrderUnitPrice   string
+	OrderGrossValue  string
+	OrderFeeAmount   string
+}
+
+// roundedReportActivity converts one compact rounded-division integration
+// fixture into the normalized activity record used by the runtime flow.
+// Authored by: OpenCode
+func roundedReportActivity(t *testing.T, input roundedReportActivityInput) syncmodel.ActivityRecord {
+	t.Helper()
+
+	return syncmodel.ActivityRecord{
+		SourceID:         input.SourceID,
+		OccurredAt:       input.OccurredAt,
+		ActivityType:     input.ActivityType,
+		AssetIdentityKey: input.AssetIdentityKey,
+		AssetSymbol:      input.AssetSymbol,
+		AssetName:        input.AssetName,
+		Quantity:         mustRoundedIntegrationDecimal(t, input.Quantity),
+		OrderCurrency:    input.OrderCurrency,
+		OrderUnitPrice:   roundedIntegrationDecimalPointer(t, input.OrderUnitPrice),
+		OrderGrossValue:  roundedIntegrationDecimalPointer(t, input.OrderGrossValue),
+		OrderFeeAmount:   roundedIntegrationDecimalPointer(t, input.OrderFeeAmount),
+	}
+}
+
+// mustReportFixtureTime parses one RFC3339 fixture timestamp for integration
+// caches.
+// Authored by: OpenCode
+func mustReportFixtureTime(t *testing.T, raw string) time.Time {
+	t.Helper()
+
+	var parsed, err = time.Parse(time.RFC3339, raw)
+	if err != nil {
+		t.Fatalf("parse report fixture time %q: %v", raw, err)
+	}
+
+	return parsed
+}
+
+// roundedIntegrationDecimalPointer parses one optional decimal fixture for
+// rounded-division integration tests.
+// Authored by: OpenCode
+func roundedIntegrationDecimalPointer(t *testing.T, raw string) *apd.Decimal {
+	t.Helper()
+
+	if raw == "" {
+		return nil
+	}
+
+	var value = mustRoundedIntegrationDecimal(t, raw)
+	return &value
+}
+
+// mustRoundedIntegrationDecimal parses one decimal fixture for rounded-
+// division integration tests.
+// Authored by: OpenCode
+func mustRoundedIntegrationDecimal(t *testing.T, raw string) apd.Decimal {
+	t.Helper()
+
+	var value, _, err = decimalsupport.ParseString(raw)
+	if err != nil {
+		t.Fatalf("parse rounded integration decimal %q: %v", raw, err)
+	}
+
+	return value
 }

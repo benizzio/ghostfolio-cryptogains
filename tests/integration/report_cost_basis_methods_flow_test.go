@@ -109,6 +109,70 @@ func TestReportGenerationMatchesControlledLedgersAcrossCostBasisMethods(t *testi
 	}
 }
 
+// TestReportGenerationSupportsRoundedRepeatingDecimalHistoryAcrossMethods
+// verifies that a deterministic repeating-decimal history remains reportable for
+// every supported cost-basis method.
+// Authored by: OpenCode
+func TestReportGenerationSupportsRoundedRepeatingDecimalHistoryAcrossMethods(t *testing.T) {
+	var methods = []reportmodel.CostBasisMethod{
+		reportmodel.CostBasisMethodFIFO,
+		reportmodel.CostBasisMethodLIFO,
+		reportmodel.CostBasisMethodHIFO,
+		reportmodel.CostBasisMethodAverageCost,
+		reportmodel.CostBasisMethodScopeLocalHybrid,
+	}
+
+	for _, method := range methods {
+		var method = method
+		t.Run(string(method), func(t *testing.T) {
+			var reportIO = testutil.NewReportIOFixture(t)
+			var openLogPath = installOpenCommandRecorder(t, 0)
+			var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
+
+			seedProtectedSnapshot(t, harness, "token-123", roundedUnitPriceProtectedActivityCache(t))
+
+			var model = unlockSyncReportsContext(t, harness.Model, "token-123")
+			model = openReportSelectionFromContext(t, model)
+			model = selectReportYear(t, model, 2024)
+			model = selectReportMethod(t, model, method.Label())
+			model, cmd := startReportGenerationFromSelection(t, model)
+			model = applyBatchCmd(t, model, cmd)
+
+			if model.ActiveScreen() != "report_result" {
+				t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
+			}
+			var content = normalizeRenderedText(model.View().Content)
+			if !strings.Contains(content, "Saved Markdown Path:") || !strings.Contains(content, "Cost Basis Method: "+method.Label()) {
+				t.Fatalf("expected successful rounded report result for %q, got %q", method.Label(), content)
+			}
+
+			var files = mustMarkdownFiles(t, reportIO.DocumentsDir)
+			if len(files) != 1 {
+				t.Fatalf("expected one saved Markdown file, got %#v", files)
+			}
+			var reportPath = files[0]
+			var openerRequests = readOpenCommandRequests(t, openLogPath)
+			if len(openerRequests) != 1 || openerRequests[0] != reportPath {
+				t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
+			}
+
+			var rawReport, err = os.ReadFile(reportPath)
+			if err != nil {
+				t.Fatalf("read saved report %q: %v", reportPath, err)
+			}
+			var reportText = string(rawReport)
+			for _, expected := range []string{
+				"0.3333333333333333",
+				"0.6666666666666667",
+			} {
+				if !strings.Contains(reportText, expected) {
+					t.Fatalf("expected rounded repeating-decimal fragment %q in report %q", expected, reportText)
+				}
+			}
+		})
+	}
+}
+
 // assertExpectedReportLedger verifies the rendered Markdown against one
 // controlled expected report ledger.
 // Authored by: OpenCode

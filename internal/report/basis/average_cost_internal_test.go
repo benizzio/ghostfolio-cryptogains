@@ -50,9 +50,12 @@ func TestAverageCostStateNilAndResetPaths(t *testing.T) {
 	if err = repeatingState.AddAcquisition(decimalFromInt(3), decimalFromInt(1)); err != nil {
 		t.Fatalf("add repeating-decimal acquisition: %v", err)
 	}
-	_, err = repeatingState.AverageUnitCost()
-	if err == nil || !strings.Contains(err.Error(), "calculate average unit cost exactly") {
-		t.Fatalf("expected repeating-decimal average-cost failure, got %v", err)
+	average, err = repeatingState.AverageUnitCost()
+	if err != nil {
+		t.Fatalf("average unit cost for repeating-decimal state: %v", err)
+	}
+	if average.Cmp(apd.New(3333333333333333, -16)) != 0 {
+		t.Fatalf("expected rounded repeating average unit cost, got %v", average)
 	}
 
 	if err = state.AddAcquisition(decimalFromInt(2), decimalFromInt(10)); err != nil {
@@ -142,6 +145,25 @@ func TestAverageCostStatePartialDisposalAndFiniteValidation(t *testing.T) {
 	state.basis = invalid
 	if _, err = state.Dispose(decimalFromInt(1)); err == nil {
 		t.Fatalf("expected corrupted basis state to fail disposal")
+	}
+}
+
+// TestAverageCostStateWrapsAverageUnitCostDivisionFailure verifies the
+// average-unit-cost wrapper around report-local rounded division failures.
+// Authored by: OpenCode
+func TestAverageCostStateWrapsAverageUnitCostDivisionFailure(t *testing.T) {
+	t.Parallel()
+
+	var invalid apd.Decimal
+	invalid.Form = apd.NaNSignaling
+
+	var state = NewAverageCostState()
+	state.quantity = decimalFromInt(1)
+	state.basis = invalid
+
+	_, err := state.AverageUnitCost()
+	if err == nil || !strings.Contains(err.Error(), "calculate average unit cost") {
+		t.Fatalf("expected wrapped average unit cost failure, got %v", err)
 	}
 }
 

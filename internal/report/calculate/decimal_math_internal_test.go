@@ -5,15 +5,16 @@ import (
 	"strings"
 	"testing"
 
+	reportdecimal "github.com/benizzio/ghostfolio-cryptogains/internal/report/decimal"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/cockroachdb/apd/v3"
 )
 
-// TestReportDecimalMathReusesSharedExactDivisionAndFormatting verifies that
-// report-local multiplication works alongside shared exact division and
-// canonical formatting helpers.
+// TestReportDecimalMathReusesSharedFormattingAndReportDivision verifies that
+// report-local multiplication works alongside shared canonical formatting and
+// the shared 16-decimal division policy.
 // Authored by: OpenCode
-func TestReportDecimalMathReusesSharedExactDivisionAndFormatting(t *testing.T) {
+func TestReportDecimalMathReusesSharedFormattingAndReportDivision(t *testing.T) {
 	t.Parallel()
 
 	var left = mustReportDecimal(t, "1.25")
@@ -32,12 +33,16 @@ func TestReportDecimalMathReusesSharedExactDivisionAndFormatting(t *testing.T) {
 		t.Fatalf("unexpected canonical product: %q", canonical)
 	}
 
-	quotient, canonical, err := decimalsupport.DivideExact(product, right)
+	quotient, err := reportdecimal.DivideRoundHalfUp(product, right)
 	if err != nil {
-		t.Fatalf("divide exact: %v", err)
+		t.Fatalf("divide with report policy: %v", err)
+	}
+	canonical, err = decimalsupport.CanonicalString(quotient)
+	if err != nil {
+		t.Fatalf("canonicalize quotient: %v", err)
 	}
 	if canonical != "1.25" {
-		t.Fatalf("unexpected exact quotient canonical string: %q", canonical)
+		t.Fatalf("unexpected rounded quotient canonical string: %q", canonical)
 	}
 
 	comparison, err := compareDecimals(quotient, left)

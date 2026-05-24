@@ -3,7 +3,7 @@ package calculate
 import (
 	"fmt"
 
-	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	reportdecimal "github.com/benizzio/ghostfolio-cryptogains/internal/report/decimal"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -67,9 +67,5 @@ func compareDecimals(left apd.Decimal, right apd.Decimal) (int, error) {
 // arithmetic or comparisons.
 // Authored by: OpenCode
 func requireFiniteDecimal(value apd.Decimal, label string) error {
-	if _, err := decimalsupport.CanonicalString(value); err != nil {
-		return fmt.Errorf("%s: %w", label, err)
-	}
-
-	return nil
+	return reportdecimal.RequireFinite(value, label)
 }

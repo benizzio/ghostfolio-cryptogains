@@ -130,6 +130,36 @@ func TestActivityInputTierHelpersCoverRemainingBranches(t *testing.T) {
 		}
 	})
 
+	t.Run("surfaces unit-price derivation failure from an explicit tier", func(t *testing.T) {
+		var invalid apd.Decimal
+		invalid.Form = apd.Infinite
+
+		var record = validActivityInputRecord(t)
+		_, err := selectExplicitCurrencyTier(record, activityMoneyTier{
+			name:         reportmodel.SelectedCurrencyContextBase,
+			currencyCode: "USD",
+			grossValue:   &invalid,
+			feeAmount:    activityInputDecimalPointer(t, "0"),
+			hasAnyValue:  true,
+		})
+		if err == nil || !strings.Contains(err.Error(), `activity "activity-1" base unit price cannot be derived from gross value and quantity`) {
+			t.Fatalf("expected explicit-tier unit-price derivation failure, got %v", err)
+		}
+	})
+
+	t.Run("surfaces direct unit-price derivation failure", func(t *testing.T) {
+		var invalid apd.Decimal
+		invalid.Form = apd.Infinite
+
+		_, err := selectTierUnitPrice(validActivityInputRecord(t), activityMoneyTier{
+			name:         reportmodel.SelectedCurrencyContextOrder,
+			currencyCode: "USD",
+		}, &invalid)
+		if err == nil || !strings.Contains(err.Error(), `activity "activity-1" order unit price cannot be derived from gross value and quantity`) {
+			t.Fatalf("expected direct unit-price derivation failure, got %v", err)
+		}
+	})
+
 	t.Run("covers informed gross-value guard and success branches", func(t *testing.T) {
 		if value := informedGrossValue(activityInputDecimalPointer(t, "2"), "", mustActivityInputDecimal(t, "3")); value != nil {
 			t.Fatalf("expected uninformed tier gross value to stay nil, got %v", value)
