@@ -3,10 +3,10 @@
 package basis
 
 import (
-	"errors"
 	"strings"
 	"testing"
 
+	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -146,6 +146,18 @@ func TestAverageCostStatePartialDisposalAndFiniteValidation(t *testing.T) {
 	if _, err = state.Dispose(decimalFromInt(1)); err == nil {
 		t.Fatalf("expected corrupted basis state to fail disposal")
 	}
+
+	state = NewAverageCostState()
+	state.quantity = invalid
+	if err = state.AddAcquisition(decimalFromInt(1), decimalFromInt(1)); err == nil {
+		t.Fatalf("expected corrupted quantity state to fail acquisition")
+	}
+
+	state = NewAverageCostState()
+	state.basis = invalid
+	if err = state.AddAcquisition(decimalFromInt(1), decimalFromInt(1)); err == nil {
+		t.Fatalf("expected corrupted basis state to fail acquisition")
+	}
 }
 
 // TestAverageCostStateWrapsAverageUnitCostDivisionFailure verifies the
@@ -167,71 +179,31 @@ func TestAverageCostStateWrapsAverageUnitCostDivisionFailure(t *testing.T) {
 	}
 }
 
-// TestAverageCostStateWrapsInjectedDecimalFailures verifies direct wrapper
-// branches through average-cost decimal-operation seams.
-// Authored by: OpenCode
-func TestAverageCostStateWrapsInjectedDecimalFailures(t *testing.T) {
-	var previousAdd = averageCostAddDecimal
-	var previousSubtract = averageCostSubtractDecimal
-	defer func() {
-		averageCostAddDecimal = previousAdd
-		averageCostSubtractDecimal = previousSubtract
-	}()
-
-	averageCostAddDecimal = func(apd.Decimal, apd.Decimal) (apd.Decimal, error) {
-		return apd.Decimal{}, errors.New("add boom")
-	}
-	if err := NewAverageCostState().AddAcquisition(decimalFromInt(1), decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "add boom") {
-		t.Fatalf("expected injected add failure, got %v", err)
-	}
-
-	averageCostAddDecimal = previousAdd
-	averageCostSubtractDecimal = func(apd.Decimal, apd.Decimal) (apd.Decimal, error) {
-		return apd.Decimal{}, errors.New("subtract boom")
-	}
-
-	var state = NewAverageCostState()
-	if err := state.AddAcquisition(decimalFromInt(2), decimalFromInt(10)); err != nil {
-		t.Fatalf("seed average-cost state: %v", err)
-	}
-	if _, err := state.Dispose(decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "subtract boom") {
-		t.Fatalf("expected injected subtract failure, got %v", err)
-	}
-
-	averageCostSubtractDecimal = previousSubtract
-	var addCalls int
-	averageCostAddDecimal = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-		addCalls++
-		if addCalls == 2 {
-			return apd.Decimal{}, errors.New("add second boom")
-		}
-		return previousAdd(left, right)
-	}
-	if err := NewAverageCostState().AddAcquisition(decimalFromInt(1), decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "add second boom") {
-		t.Fatalf("expected injected second add failure, got %v", err)
-	}
-
-	averageCostAddDecimal = previousAdd
-	var subtractCalls int
-	averageCostSubtractDecimal = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-		subtractCalls++
-		if subtractCalls == 2 {
-			return apd.Decimal{}, errors.New("subtract second boom")
-		}
-		return previousSubtract(left, right)
-	}
-
-	state = NewAverageCostState()
-	if err := state.AddAcquisition(decimalFromInt(2), decimalFromInt(10)); err != nil {
-		t.Fatalf("seed average-cost state for second subtract failure: %v", err)
-	}
-	if _, err := state.Dispose(decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "subtract second boom") {
-		t.Fatalf("expected injected second subtract failure, got %v", err)
-	}
-}
-
 // decimalFromInt returns one finite integer decimal for basis tests.
 // Authored by: OpenCode
 func decimalFromInt(value int64) apd.Decimal {
 	return *apd.New(value, 0)
+}
+
+// TestAverageCostStateRejectsSharedMathFailures verifies that corrupted state
+// still surfaces the shared decimal guardrails after the helper refactor.
+// Authored by: OpenCode
+func TestAverageCostStateRejectsSharedMathFailures(t *testing.T) {
+	t.Parallel()
+
+	var invalid apd.Decimal
+	invalid.Form = apd.Infinite
+
+	if _, err := supportmath.Add(invalid, decimalFromInt(1), "left decimal", "right decimal", "add decimals"); err == nil || !strings.Contains(err.Error(), "left decimal") {
+		t.Fatalf("expected shared add helper to reject invalid left decimal, got %v", err)
+	}
+	if _, err := supportmath.Subtract(decimalFromInt(1), invalid, "left decimal", "right decimal", "subtract decimals"); err == nil || !strings.Contains(err.Error(), "right decimal") {
+		t.Fatalf("expected shared subtract helper to reject invalid right decimal, got %v", err)
+	}
+	if err := supportmath.RequirePositive(decimalFromInt(0), "average cost disposal quantity"); err == nil || !strings.Contains(err.Error(), "must be greater than zero") {
+		t.Fatalf("expected shared positive guard to reject zero quantity, got %v", err)
+	}
+	if err := supportmath.RequireNonNegative(decimalFromInt(-1), "average cost acquisition basis"); err == nil || !strings.Contains(err.Error(), "must not be negative") {
+		t.Fatalf("expected shared non-negative guard to reject negative basis, got %v", err)
+	}
 }

@@ -7,6 +7,7 @@ import (
 
 	reportdecimal "github.com/benizzio/ghostfolio-cryptogains/internal/report/decimal"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/cockroachdb/apd/v3"
 )
@@ -183,7 +184,7 @@ func allPresentDecimalsAreZero(values []*apd.Decimal) (bool, error) {
 			continue
 		}
 
-		var isZero, err = decimalIsZero(*value)
+		var isZero, err = supportmath.IsZero(*value, "report decimal")
 		if err != nil {
 			return false, err
 		}
@@ -214,7 +215,7 @@ func firstExplicitZeroValue(values ...*apd.Decimal) *apd.Decimal {
 // precondition before tier selection.
 // Authored by: OpenCode
 func requirePositivePricedQuantity(record syncmodel.ActivityRecord) error {
-	var comparison, err = compareDecimals(record.Quantity, apd.Decimal{})
+	var comparison, err = supportmath.Compare(record.Quantity, apd.Decimal{}, "left report decimal", "right report decimal")
 	if err != nil {
 		return fmt.Errorf("activity %q quantity is invalid: %w", strings.TrimSpace(record.SourceID), err)
 	}
@@ -306,7 +307,7 @@ func selectTierGrossValue(record syncmodel.ActivityRecord, tier activityMoneyTie
 		return nil, nil
 	}
 
-	var derivedGrossValue, err = multiplyDecimal(record.Quantity, *tier.unitPrice)
+	var derivedGrossValue, err = supportmath.Multiply(record.Quantity, *tier.unitPrice, "left report decimal", "right report decimal", "multiply report decimals")
 	if err != nil {
 		return nil, fmt.Errorf(
 			"activity %q %s gross value cannot be derived from quantity and unit price: %w",
@@ -410,7 +411,7 @@ func informedGrossValue(unitPrice *apd.Decimal, currency string, quantity apd.De
 		return nil
 	}
 
-	var grossValue, err = multiplyDecimal(quantity, *unitPrice)
+	var grossValue, err = supportmath.Multiply(quantity, *unitPrice, "left report decimal", "right report decimal", "multiply report decimals")
 	if err != nil {
 		return nil
 	}

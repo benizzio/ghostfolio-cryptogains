@@ -10,6 +10,7 @@ import (
 
 	reportbasis "github.com/benizzio/ghostfolio-cryptogains/internal/report/basis"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/cockroachdb/apd/v3"
 )
@@ -255,10 +256,8 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 
 	t.Run("wraps yearly total accumulation failure", func(t *testing.T) {
 		var originalCalculateAssetGroupFunc = calculateAssetGroupFunc
-		var originalAddCalculationOperation = addCalculationOperation
 		defer func() {
 			calculateAssetGroupFunc = originalCalculateAssetGroupFunc
-			addCalculationOperation = originalAddCalculationOperation
 		}()
 
 		calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ syncmodel.ProtectedActivityCache, _ assetInputGroup) (assetCalculationResult, error) {
@@ -266,11 +265,8 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 				IncludeInMain: true,
 				SummaryEntry:  validAssetSummaryEntry(t, "asset-btc", "BTC", "1"),
 				DetailSection: validAssetDetailSection(t, "asset-btc", "BTC"),
-				YearlyNet:     mustReportDecimal(t, "1"),
+				YearlyNet:     reportInvalidDecimalForCalculator(),
 			}, nil
-		}
-		addCalculationOperation = func(*apd.Decimal, *apd.Decimal, *apd.Decimal) (apd.Condition, error) {
-			return 0, errors.New("add boom")
 		}
 
 		_, err := Calculate(
@@ -476,15 +472,8 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 			t.Fatalf("expected wrapped closing-basis failure, got %q", calcErr.Error())
 		}
 
-		var originalAddCalculationOperation = addCalculationOperation
-		defer func() {
-			addCalculationOperation = originalAddCalculationOperation
-		}()
-		addCalculationOperation = func(*apd.Decimal, *apd.Decimal, *apd.Decimal) (apd.Condition, error) {
-			return 0, errors.New("asset yearly net boom")
-		}
 		replayAssetInputFunc = func(assetBasisState, scopedActivityInput, int, int) (assetInputReplayResult, error) {
-			return assetInputReplayResult{yearlyNetDelta: mustReportDecimal(t, "1")}, nil
+			return assetInputReplayResult{yearlyNetDelta: reportInvalidDecimalForCalculator()}, nil
 		}
 		newAssetBasisStateFunc = func(reportmodel.CostBasisMethod) (assetBasisState, error) {
 			return stubAssetBasisState{
@@ -1260,19 +1249,14 @@ func TestBuildAssetCalculationResultCoversReferenceOnlyIncludedAndValidationFail
 }
 
 // TestNewAssetBasisStateAndCalculationHelpers verifies method selection,
-// seam-propagated constructor failures, decimal helpers, and structured error
-// wrappers.
+// seam-propagated constructor failures, and structured error wrappers.
 // Authored by: OpenCode
 func TestNewAssetBasisStateAndCalculationHelpers(t *testing.T) {
 	var originalNewLotMethodState = newLotMethodState
 	var originalLotStateTotalOpenQuantity = lotStateTotalOpenQuantity
-	var originalAddCalculationOperation = addCalculationOperation
-	var originalSubtractCalculationOperation = subtractCalculationOperation
 	defer func() {
 		newLotMethodState = originalNewLotMethodState
 		lotStateTotalOpenQuantity = originalLotStateTotalOpenQuantity
-		addCalculationOperation = originalAddCalculationOperation
-		subtractCalculationOperation = originalSubtractCalculationOperation
 	}()
 
 	var fifoState, err = newAssetBasisState(reportmodel.CostBasisMethodFIFO)
@@ -1340,45 +1324,6 @@ func TestNewAssetBasisStateAndCalculationHelpers(t *testing.T) {
 		t.Fatalf("expected unsupported basis method failure, got %v", err)
 	}
 
-	var sum apd.Decimal
-	sum, err = addCalculationDecimal(mustReportDecimal(t, "2"), mustReportDecimal(t, "3"))
-	if err != nil || sum.Cmp(apd.New(5, 0)) != 0 {
-		t.Fatalf("expected exact calculation sum, got %v err=%v", sum, err)
-	}
-	var difference apd.Decimal
-	difference, err = subtractCalculationDecimal(mustReportDecimal(t, "5"), mustReportDecimal(t, "3"))
-	if err != nil || difference.Cmp(apd.New(2, 0)) != 0 {
-		t.Fatalf("expected exact calculation difference, got %v err=%v", difference, err)
-	}
-
-	var invalid apd.Decimal
-	invalid.Form = apd.Infinite
-	if _, err = addCalculationDecimal(invalid, mustReportDecimal(t, "1")); err == nil || !strings.Contains(err.Error(), "left calculation decimal") {
-		t.Fatalf("expected invalid left addend to fail, got %v", err)
-	}
-	if _, err = addCalculationDecimal(mustReportDecimal(t, "1"), invalid); err == nil || !strings.Contains(err.Error(), "right calculation decimal") {
-		t.Fatalf("expected invalid right addend to fail, got %v", err)
-	}
-	if _, err = subtractCalculationDecimal(invalid, mustReportDecimal(t, "1")); err == nil || !strings.Contains(err.Error(), "left calculation decimal") {
-		t.Fatalf("expected invalid left minuend to fail, got %v", err)
-	}
-	if _, err = subtractCalculationDecimal(mustReportDecimal(t, "1"), invalid); err == nil || !strings.Contains(err.Error(), "right calculation decimal") {
-		t.Fatalf("expected invalid right subtrahend to fail, got %v", err)
-	}
-	addCalculationOperation = func(*apd.Decimal, *apd.Decimal, *apd.Decimal) (apd.Condition, error) {
-		return 0, errors.New("add boom")
-	}
-	if _, err = addCalculationDecimal(mustReportDecimal(t, "1"), mustReportDecimal(t, "2")); err == nil || !strings.Contains(err.Error(), "add calculation decimals") {
-		t.Fatalf("expected injected add operation failure, got %v", err)
-	}
-	addCalculationOperation = originalAddCalculationOperation
-	subtractCalculationOperation = func(*apd.Decimal, *apd.Decimal, *apd.Decimal) (apd.Condition, error) {
-		return 0, errors.New("subtract boom")
-	}
-	if _, err = subtractCalculationDecimal(mustReportDecimal(t, "2"), mustReportDecimal(t, "1")); err == nil || !strings.Contains(err.Error(), "subtract calculation decimals") {
-		t.Fatalf("expected injected subtract operation failure, got %v", err)
-	}
-
 	var recordErr = newRecordCalculationError(reportmodel.CalculationErrorKindActivityInput, syncmodel.ActivityRecord{
 		SourceID:    " rec-1 ",
 		AssetSymbol: " BTC ",
@@ -1438,6 +1383,19 @@ func reportInvalidDecimalForCalculator() apd.Decimal {
 	var invalid apd.Decimal
 	invalid.Form = apd.Infinite
 	return invalid
+}
+
+// mustReportDecimal parses one exact decimal for report calculation tests.
+// Authored by: OpenCode
+func mustReportDecimal(t *testing.T, raw string) apd.Decimal {
+	t.Helper()
+
+	var value, _, err = decimalsupport.ParseString(raw)
+	if err != nil {
+		t.Fatalf("parse report decimal %q: %v", raw, err)
+	}
+
+	return value
 }
 
 // requireCalculationError verifies one wrapped calculation error kind.

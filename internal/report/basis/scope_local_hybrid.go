@@ -63,7 +63,9 @@ var (
 	scopeLocalNewLotMethodState    = NewLotMethodState
 	scopeLocalLotTotalOpenBasis    = func(state *LotMethodState) (apd.Decimal, error) { return state.TotalOpenBasis() }
 	scopeLocalLotTotalOpenQuantity = func(state *LotMethodState) (apd.Decimal, error) { return state.TotalOpenQuantity() }
-	scopeLocalSubtractDecimal      = subtractDecimal
+	scopeLocalSubtractDecimal      = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+		return supportmath.Subtract(left, right, "left decimal", "right decimal", "subtract decimals")
+	}
 )
 
 // NewScopeLocalHybridState creates one empty scope-local hybrid basis state.
@@ -124,7 +126,7 @@ func (state *ScopeLocalHybridState) Dispose(scopeKey string, quantity apd.Decima
 	if strings.TrimSpace(scopeKey) == "" {
 		return ScopeLocalHybridDisposalResult{}, fmt.Errorf("scope-local hybrid disposal scope key is required")
 	}
-	if err := validatePositiveDecimal(quantity, "scope-local hybrid disposal quantity"); err != nil {
+	if err := supportmath.RequirePositive(quantity, "scope-local hybrid disposal quantity"); err != nil {
 		return ScopeLocalHybridDisposalResult{}, err
 	}
 
@@ -182,7 +184,7 @@ func (state *ScopeLocalHybridState) TotalOpenQuantity() (apd.Decimal, error) {
 				return apd.Decimal{}, err
 			}
 		}
-		total, err = addDecimal(total, scopeQuantity)
+		total, err = supportmath.Add(total, scopeQuantity, "left decimal", "right decimal", "add decimals")
 		if err != nil {
 			return apd.Decimal{}, err
 		}
@@ -210,7 +212,7 @@ func (state *ScopeLocalHybridState) TotalOpenBasis() (apd.Decimal, error) {
 				return apd.Decimal{}, err
 			}
 		}
-		total, err = addDecimal(total, scopeBasis)
+		total, err = supportmath.Add(total, scopeBasis, "left decimal", "right decimal", "add decimals")
 		if err != nil {
 			return apd.Decimal{}, err
 		}

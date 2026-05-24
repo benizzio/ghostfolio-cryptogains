@@ -53,6 +53,59 @@ func ApplyBinaryOperation(
 	return result, nil
 }
 
+// Add validates two finite decimal operands and returns their exact sum.
+//
+// Example:
+//
+//	sum, err := math.Add(left, right, "left calculation decimal", "right calculation decimal", "add calculation decimals")
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = sum
+//
+// Authored by: OpenCode
+func Add(left apd.Decimal, right apd.Decimal, leftLabel string, rightLabel string, errorPrefix string) (apd.Decimal, error) {
+	return ApplyBinaryOperation(left, right, leftLabel, rightLabel, errorPrefix, func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
+		return apd.BaseContext.Add(result, left, right)
+	})
+}
+
+// Subtract validates two finite decimal operands and returns their exact
+// difference.
+//
+// Example:
+//
+//	difference, err := math.Subtract(left, right, "left calculation decimal", "right calculation decimal", "subtract calculation decimals")
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = difference
+//
+// Authored by: OpenCode
+func Subtract(left apd.Decimal, right apd.Decimal, leftLabel string, rightLabel string, errorPrefix string) (apd.Decimal, error) {
+	return ApplyBinaryOperation(left, right, leftLabel, rightLabel, errorPrefix, func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
+		return apd.BaseContext.Sub(result, left, right)
+	})
+}
+
+// Multiply validates two finite decimal operands and returns their exact
+// product.
+//
+// Example:
+//
+//	product, err := math.Multiply(left, right, "left report decimal", "right report decimal", "multiply report decimals")
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = product
+//
+// Authored by: OpenCode
+func Multiply(left apd.Decimal, right apd.Decimal, leftLabel string, rightLabel string, errorPrefix string) (apd.Decimal, error) {
+	return ApplyBinaryOperation(left, right, leftLabel, rightLabel, errorPrefix, func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
+		return apd.BaseContext.Mul(result, left, right)
+	})
+}
+
 // Compare validates two finite decimal operands and returns their ordering.
 //
 // Example:
@@ -93,6 +146,48 @@ func IsZero(value apd.Decimal, label string) (bool, error) {
 	}
 
 	return value.Cmp(&apd.Decimal{}) == 0, nil
+}
+
+// RequirePositive rejects non-finite or non-positive decimal values.
+//
+// Example:
+//
+//	err := math.RequirePositive(quantity, "disposal quantity")
+//	if err != nil {
+//		panic(err)
+//	}
+//
+// Authored by: OpenCode
+func RequirePositive(value apd.Decimal, label string) error {
+	if err := RequireFinite(value, label); err != nil {
+		return err
+	}
+	if value.Sign() <= 0 {
+		return fmt.Errorf("%s must be greater than zero", label)
+	}
+
+	return nil
+}
+
+// RequireNonNegative rejects non-finite or negative decimal values.
+//
+// Example:
+//
+//	err := math.RequireNonNegative(basis, "remaining basis")
+//	if err != nil {
+//		panic(err)
+//	}
+//
+// Authored by: OpenCode
+func RequireNonNegative(value apd.Decimal, label string) error {
+	if err := RequireFinite(value, label); err != nil {
+		return err
+	}
+	if value.Sign() < 0 {
+		return fmt.Errorf("%s must not be negative", label)
+	}
+
+	return nil
 }
 
 // Minimum returns the smaller of two exact decimal values.

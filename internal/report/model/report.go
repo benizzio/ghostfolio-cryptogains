@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/cockroachdb/apd/v3"
 )
@@ -779,35 +779,17 @@ func validateOptionalDecimal(value *apd.Decimal, label string) error {
 // validatePositiveDecimal verifies one positive exact decimal value.
 // Authored by: OpenCode
 func validatePositiveDecimal(value apd.Decimal, label string) error {
-	if err := validateFiniteDecimal(value, label); err != nil {
-		return err
-	}
-	if value.Sign() <= 0 {
-		return fmt.Errorf("%s must be greater than zero", label)
-	}
-
-	return nil
+	return supportmath.RequirePositive(value, label)
 }
 
 // validateNonNegativeDecimal verifies one non-negative exact decimal value.
 // Authored by: OpenCode
 func validateNonNegativeDecimal(value apd.Decimal, label string) error {
-	if err := validateFiniteDecimal(value, label); err != nil {
-		return err
-	}
-	if value.Sign() < 0 {
-		return fmt.Errorf("%s must not be negative", label)
-	}
-
-	return nil
+	return supportmath.RequireNonNegative(value, label)
 }
 
 // validateFiniteDecimal verifies one finite exact decimal value.
 // Authored by: OpenCode
 func validateFiniteDecimal(value apd.Decimal, label string) error {
-	if _, err := decimalsupport.CanonicalString(value); err != nil {
-		return fmt.Errorf("%s: %w", label, err)
-	}
-
-	return nil
+	return supportmath.RequireFinite(value, label)
 }

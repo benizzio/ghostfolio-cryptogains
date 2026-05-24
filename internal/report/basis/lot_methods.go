@@ -70,9 +70,15 @@ type LotMethodState struct {
 // Test seams keep defensive lot wrapper branches directly coverable.
 // Authored by: OpenCode
 var (
-	lotAddDecimal      = addDecimal
-	lotSubtractDecimal = subtractDecimal
-	lotMultiplyDecimal = multiplyDecimal
+	lotAddDecimal = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+		return supportmath.Add(left, right, "left decimal", "right decimal", "add decimals")
+	}
+	lotSubtractDecimal = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+		return supportmath.Subtract(left, right, "left decimal", "right decimal", "subtract decimals")
+	}
+	lotMultiplyDecimal = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+		return supportmath.Multiply(left, right, "left decimal", "right decimal", "multiply decimals")
+	}
 )
 
 // NewLotMethodState creates one empty exact-lot basis state for the requested
@@ -120,7 +126,7 @@ func (state *LotMethodState) Dispose(quantity apd.Decimal) (LotDisposalResult, e
 	if state == nil {
 		return LotDisposalResult{}, fmt.Errorf("lot method state is required")
 	}
-	if err := validatePositiveDecimal(quantity, "disposal quantity"); err != nil {
+	if err := supportmath.RequirePositive(quantity, "disposal quantity"); err != nil {
 		return LotDisposalResult{}, err
 	}
 
@@ -256,10 +262,10 @@ func (state *LotMethodState) OpenLotCount() int {
 // TotalOpenQuantity returns the exact open quantity tracked across all lots.
 // Authored by: OpenCode
 func (state *LotMethodState) TotalOpenQuantity() (apd.Decimal, error) {
-	var total = zeroDecimal()
+	var total = supportmath.Zero()
 
 	for _, lot := range state.OpenLots() {
-		var nextTotal, err = addDecimal(total, lot.RemainingQuantity)
+		var nextTotal, err = supportmath.Add(total, lot.RemainingQuantity, "left decimal", "right decimal", "add decimals")
 		if err != nil {
 			return apd.Decimal{}, err
 		}
@@ -272,10 +278,10 @@ func (state *LotMethodState) TotalOpenQuantity() (apd.Decimal, error) {
 // TotalOpenBasis returns the exact remaining basis tracked across all open lots.
 // Authored by: OpenCode
 func (state *LotMethodState) TotalOpenBasis() (apd.Decimal, error) {
-	var total = zeroDecimal()
+	var total = supportmath.Zero()
 
 	for _, lot := range state.OpenLots() {
-		var nextTotal, err = addDecimal(total, lot.RemainingBasis)
+		var nextTotal, err = supportmath.Add(total, lot.RemainingBasis, "left decimal", "right decimal", "add decimals")
 		if err != nil {
 			return apd.Decimal{}, err
 		}
@@ -391,10 +397,10 @@ func validateLotAcquisition(acquisition LotAcquisition) error {
 	if acquisition.AcquiredAt.IsZero() {
 		return fmt.Errorf("lot acquisition time is required")
 	}
-	if err := validatePositiveDecimal(acquisition.RemainingQuantity, "lot acquisition remaining quantity"); err != nil {
+	if err := supportmath.RequirePositive(acquisition.RemainingQuantity, "lot acquisition remaining quantity"); err != nil {
 		return err
 	}
-	if err := validateNonNegativeDecimal(acquisition.RemainingBasis, "lot acquisition remaining basis"); err != nil {
+	if err := supportmath.RequireNonNegative(acquisition.RemainingBasis, "lot acquisition remaining basis"); err != nil {
 		return err
 	}
 
@@ -418,63 +424,6 @@ func exactProportionalBasis(totalBasis apd.Decimal, totalQuantity apd.Decimal, m
 	)
 }
 
-// addDecimal adds two exact decimals.
-// Authored by: OpenCode
-func addDecimal(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-	var result, err = supportmath.ApplyBinaryOperation(left, right, "left decimal", "right decimal", "add decimals", func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
-		return apd.BaseContext.Add(result, left, right)
-	})
-	if err != nil && !strings.Contains(err.Error(), "add decimals") {
-		return apd.Decimal{}, fmt.Errorf("add decimals: %w", err)
-	}
-
-	return result, err
-}
-
-// subtractDecimal subtracts one exact decimal from another.
-// Authored by: OpenCode
-func subtractDecimal(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-	var result, err = supportmath.ApplyBinaryOperation(left, right, "left decimal", "right decimal", "subtract decimals", func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
-		return apd.BaseContext.Sub(result, left, right)
-	})
-	if err != nil && !strings.Contains(err.Error(), "subtract decimals") {
-		return apd.Decimal{}, fmt.Errorf("subtract decimals: %w", err)
-	}
-
-	return result, err
-}
-
-// multiplyDecimal multiplies two exact decimals.
-// Authored by: OpenCode
-func multiplyDecimal(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-	var result, err = supportmath.ApplyBinaryOperation(left, right, "left decimal", "right decimal", "multiply decimals", func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
-		return apd.BaseContext.Mul(result, left, right)
-	})
-	if err != nil && !strings.Contains(err.Error(), "multiply decimals") {
-		return apd.Decimal{}, fmt.Errorf("multiply decimals: %w", err)
-	}
-
-	return result, err
-}
-
-// minimumDecimal returns the smaller of two exact decimal values.
-// Authored by: OpenCode
-func minimumDecimal(left apd.Decimal, right apd.Decimal) apd.Decimal {
-	return supportmath.Minimum(left, right)
-}
-
-// zeroDecimal returns one finite zero value.
-// Authored by: OpenCode
-func zeroDecimal() apd.Decimal {
-	return supportmath.Zero()
-}
-
-// cloneDecimal returns a copy of one exact decimal value.
-// Authored by: OpenCode
-func cloneDecimal(value apd.Decimal) apd.Decimal {
-	return supportmath.Clone(value)
-}
-
 // cloneLotAcquisition returns a defensive copy of one lot acquisition.
 // Authored by: OpenCode
 func cloneLotAcquisition(acquisition LotAcquisition) LotAcquisition {
@@ -482,33 +431,7 @@ func cloneLotAcquisition(acquisition LotAcquisition) LotAcquisition {
 		SourceID:           strings.TrimSpace(acquisition.SourceID),
 		AcquiredAt:         acquisition.AcquiredAt,
 		DeterministicOrder: acquisition.DeterministicOrder,
-		RemainingQuantity:  cloneDecimal(acquisition.RemainingQuantity),
-		RemainingBasis:     cloneDecimal(acquisition.RemainingBasis),
+		RemainingQuantity:  supportmath.Clone(acquisition.RemainingQuantity),
+		RemainingBasis:     supportmath.Clone(acquisition.RemainingBasis),
 	}
-}
-
-// validatePositiveDecimal verifies one positive finite decimal value.
-// Authored by: OpenCode
-func validatePositiveDecimal(value apd.Decimal, label string) error {
-	if err := supportmath.RequireFinite(value, label); err != nil {
-		return err
-	}
-	if value.Sign() <= 0 {
-		return fmt.Errorf("%s must be greater than zero", label)
-	}
-
-	return nil
-}
-
-// validateNonNegativeDecimal verifies one non-negative finite decimal value.
-// Authored by: OpenCode
-func validateNonNegativeDecimal(value apd.Decimal, label string) error {
-	if err := supportmath.RequireFinite(value, label); err != nil {
-		return err
-	}
-	if value.Sign() < 0 {
-		return fmt.Errorf("%s must not be negative", label)
-	}
-
-	return nil
 }

@@ -69,6 +69,9 @@ func TestActivityInputHelperBranches(t *testing.T) {
 	if value := informedGrossValue(&invalid, "USD", mustActivityInputDecimal(t, "1")); value != nil {
 		t.Fatalf("expected invalid gross-value derivation to return nil, got %v", value)
 	}
+	if value := informedGrossValue(activityInputDecimalPointer(t, "2"), "USD", mustActivityInputDecimal(t, "3")); value == nil || value.Cmp(apd.New(6, 0)) != 0 {
+		t.Fatalf("expected informed gross-value derivation to return 6, got %v", value)
+	}
 }
 
 // TestActivityInputTierHelpersCoverRemainingBranches verifies direct helper
@@ -160,21 +163,9 @@ func TestActivityInputTierHelpersCoverRemainingBranches(t *testing.T) {
 		}
 	})
 
-	t.Run("covers informed gross-value guard and success branches", func(t *testing.T) {
+	t.Run("covers informed gross-value guard branch", func(t *testing.T) {
 		if value := informedGrossValue(activityInputDecimalPointer(t, "2"), "", mustActivityInputDecimal(t, "3")); value != nil {
 			t.Fatalf("expected uninformed tier gross value to stay nil, got %v", value)
-		}
-
-		var value = informedGrossValue(activityInputDecimalPointer(t, "2"), "USD", mustActivityInputDecimal(t, "3"))
-		if value == nil {
-			t.Fatalf("expected informed gross-value derivation to succeed")
-		}
-		var canonical, err = decimalsupport.CanonicalString(*value)
-		if err != nil {
-			t.Fatalf("canonicalize derived gross value: %v", err)
-		}
-		if canonical != "6" {
-			t.Fatalf("unexpected informed gross-value derivation: got %q want %q", canonical, "6")
 		}
 	})
 }

@@ -104,6 +104,24 @@ func TestDecimalOpsAndAllocationHelpers(t *testing.T) {
 		t.Fatalf("unexpected sum: %q err=%v", got, canonicalErr)
 	}
 
+	var difference apd.Decimal
+	difference, err = Subtract(mustMathDecimal(t, "5"), mustMathDecimal(t, "3"), "left decimal", "right decimal", "subtract decimals")
+	if err != nil {
+		t.Fatalf("subtract decimals: %v", err)
+	}
+	if got, canonicalErr := decimalsupport.CanonicalString(difference); canonicalErr != nil || got != "2" {
+		t.Fatalf("unexpected difference: %q err=%v", got, canonicalErr)
+	}
+
+	var product apd.Decimal
+	product, err = Multiply(mustMathDecimal(t, "1.25"), mustMathDecimal(t, "4"), "left decimal", "right decimal", "multiply decimals")
+	if err != nil {
+		t.Fatalf("multiply decimals: %v", err)
+	}
+	if got, canonicalErr := decimalsupport.CanonicalString(product); canonicalErr != nil || got != "5" {
+		t.Fatalf("unexpected product: %q err=%v", got, canonicalErr)
+	}
+
 	var comparison int
 	comparison, err = Compare(mustMathDecimal(t, "2"), mustMathDecimal(t, "10"), "left decimal", "right decimal")
 	if err != nil || comparison >= 0 {
@@ -125,6 +143,13 @@ func TestDecimalOpsAndAllocationHelpers(t *testing.T) {
 	var zero = Zero()
 	if zero.Sign() != 0 {
 		t.Fatalf("expected zero helper to return zero")
+	}
+
+	if err = RequirePositive(mustMathDecimal(t, "1"), "positive decimal"); err != nil {
+		t.Fatalf("require positive decimal: %v", err)
+	}
+	if err = RequireNonNegative(mustMathDecimal(t, "0"), "non-negative decimal"); err != nil {
+		t.Fatalf("require non-negative decimal: %v", err)
 	}
 
 	var allocated apd.Decimal
@@ -182,6 +207,21 @@ func TestDecimalOpsAndAllocationHelpers(t *testing.T) {
 	}
 	if _, err = IsZero(invalid, "test decimal"); err == nil || !strings.Contains(err.Error(), "test decimal") {
 		t.Fatalf("expected invalid zero operand to fail, got %v", err)
+	}
+	if _, err = Add(invalid, mustMathDecimal(t, "1"), "left decimal", "right decimal", "add decimals"); err == nil || !strings.Contains(err.Error(), "left decimal") {
+		t.Fatalf("expected invalid add operand to fail, got %v", err)
+	}
+	if _, err = Subtract(mustMathDecimal(t, "1"), invalid, "left decimal", "right decimal", "subtract decimals"); err == nil || !strings.Contains(err.Error(), "right decimal") {
+		t.Fatalf("expected invalid subtract operand to fail, got %v", err)
+	}
+	if _, err = Multiply(mustMathDecimal(t, "1"), invalid, "left decimal", "right decimal", "multiply decimals"); err == nil || !strings.Contains(err.Error(), "right decimal") {
+		t.Fatalf("expected invalid multiply operand to fail, got %v", err)
+	}
+	if err = RequirePositive(mustMathDecimal(t, "0"), "positive decimal"); err == nil || !strings.Contains(err.Error(), "must be greater than zero") {
+		t.Fatalf("expected non-positive decimal to fail, got %v", err)
+	}
+	if err = RequireNonNegative(mustMathDecimal(t, "-1"), "non-negative decimal"); err == nil || !strings.Contains(err.Error(), "must not be negative") {
+		t.Fatalf("expected negative decimal to fail, got %v", err)
 	}
 	if _, err = ApplyBinaryOperation(mustMathDecimal(t, "1"), mustMathDecimal(t, "1"), "left decimal", "right decimal", "add decimals", nil); err == nil || !strings.Contains(err.Error(), "operation is required") {
 		t.Fatalf("expected missing operation to fail, got %v", err)

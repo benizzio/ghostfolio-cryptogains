@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -147,7 +148,7 @@ func TestLotMethodValidationAndHelperPaths(t *testing.T) {
 		t.Fatalf("expected greater unit cost to compare higher, got %d", comparison)
 	}
 
-	var minimum = minimumDecimal(decimalFromInt(2), decimalFromInt(1))
+	var minimum = supportmath.Minimum(decimalFromInt(2), decimalFromInt(1))
 	if minimum.Cmp(apd.New(1, 0)) != 0 {
 		t.Fatalf("expected minimum decimal helper to return the smaller value, got %v", minimum)
 	}
@@ -160,16 +161,16 @@ func TestLotMethodValidationAndHelperPaths(t *testing.T) {
 	if _, err = exactProportionalBasis(decimalFromInt(1), decimalFromInt(1), invalid); err == nil || !strings.Contains(err.Error(), "matched quantity") {
 		t.Fatalf("expected invalid matched quantity to fail, got %v", err)
 	}
-	if _, err = addDecimal(decimalFromInt(1), invalid); err == nil || !strings.Contains(err.Error(), "add decimals") {
+	if _, err = supportmath.Add(decimalFromInt(1), invalid, "left decimal", "right decimal", "add decimals"); err == nil || !strings.Contains(err.Error(), "right decimal") {
 		t.Fatalf("expected invalid add decimal to fail, got %v", err)
 	}
-	if _, err = subtractDecimal(decimalFromInt(1), invalid); err == nil || !strings.Contains(err.Error(), "subtract decimals") {
+	if _, err = supportmath.Subtract(decimalFromInt(1), invalid, "left decimal", "right decimal", "subtract decimals"); err == nil || !strings.Contains(err.Error(), "right decimal") {
 		t.Fatalf("expected invalid subtract decimal to fail, got %v", err)
 	}
-	if _, err = multiplyDecimal(decimalFromInt(1), invalid); err == nil || !strings.Contains(err.Error(), "multiply decimals") {
+	if _, err = supportmath.Multiply(decimalFromInt(1), invalid, "left decimal", "right decimal", "multiply decimals"); err == nil || !strings.Contains(err.Error(), "right decimal") {
 		t.Fatalf("expected invalid multiply decimal to fail, got %v", err)
 	}
-	if err = validateNonNegativeDecimal(invalid, "non-negative"); err == nil || !strings.Contains(err.Error(), "non-negative") {
+	if err = supportmath.RequireNonNegative(invalid, "non-negative"); err == nil || !strings.Contains(err.Error(), "non-negative") {
 		t.Fatalf("expected non-finite non-negative decimal to fail, got %v", err)
 	}
 }

@@ -31,12 +31,6 @@ var (
 	replayAssetInputFunc      = replayAssetInput
 	lotStateTotalOpenQuantity = func(state *reportbasis.LotMethodState) (apd.Decimal, error) { return state.TotalOpenQuantity() }
 	reportDivideRoundHalfUp   = reportdecimal.DivideRoundHalfUp
-	addCalculationOperation   = func(sum *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
-		return apd.BaseContext.Add(sum, left, right)
-	}
-	subtractCalculationOperation = func(difference *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
-		return apd.BaseContext.Sub(difference, left, right)
-	}
 )
 
 // Calculate replays the protected synced activity cache through one selected
@@ -102,7 +96,7 @@ func Calculate(request reportmodel.ReportRequest, cache syncmodel.ProtectedActiv
 		summaryEntries = append(summaryEntries, assetResult.SummaryEntry)
 		detailSections = append(detailSections, assetResult.DetailSection)
 
-		yearlyNetTotal, err = addCalculationDecimal(yearlyNetTotal, assetResult.YearlyNet)
+		yearlyNetTotal, err = supportmath.Add(yearlyNetTotal, assetResult.YearlyNet, "left calculation decimal", "right calculation decimal", "add calculation decimals")
 		if err != nil {
 			return reportmodel.CapitalGainsReport{}, reportmodel.NewCalculationError(
 				reportmodel.CalculationErrorKindBasisAllocation,
@@ -397,7 +391,7 @@ func applyReplayResult(state *assetReplayState, input reportmodel.ActivityCalcul
 		state.liquidationSummaries = append(state.liquidationSummaries, *replayResult.liquidationSummary)
 	}
 
-	var nextYearlyNet, err = addCalculationDecimal(state.yearlyNet, replayResult.yearlyNetDelta)
+	var nextYearlyNet, err = supportmath.Add(state.yearlyNet, replayResult.yearlyNetDelta, "left calculation decimal", "right calculation decimal", "add calculation decimals")
 	if err != nil {
 		return newInputCalculationError(
 			reportmodel.CalculationErrorKindBasisAllocation,
@@ -561,7 +555,7 @@ func applyAcquisition(basisState assetBasisState, scopedInput scopedActivityInpu
 		)
 	}
 
-	var acquisitionBasis, err = addCalculationDecimal(*input.GrossValue, *input.FeeAmount)
+	var acquisitionBasis, err = supportmath.Add(*input.GrossValue, *input.FeeAmount, "left calculation decimal", "right calculation decimal", "add calculation decimals")
 	if err != nil {
 		return basisApplicationResult{}, newInputCalculationError(
 			reportmodel.CalculationErrorKindBasisAllocation,
@@ -623,7 +617,7 @@ func applyPricedLiquidation(basisState assetBasisState, scopedInput scopedActivi
 		)
 	}
 
-	var netProceeds, err = subtractCalculationDecimal(*input.GrossValue, *input.FeeAmount)
+	var netProceeds, err = supportmath.Subtract(*input.GrossValue, *input.FeeAmount, "left calculation decimal", "right calculation decimal", "subtract calculation decimals")
 	if err != nil {
 		return basisApplicationResult{}, newInputCalculationError(
 			reportmodel.CalculationErrorKindBasisAllocation,
@@ -645,7 +639,7 @@ func applyPricedLiquidation(basisState assetBasisState, scopedInput scopedActivi
 	}
 
 	var gainOrLoss apd.Decimal
-	gainOrLoss, err = subtractCalculationDecimal(netProceeds, disposal.AllocatedBasis)
+	gainOrLoss, err = supportmath.Subtract(netProceeds, disposal.AllocatedBasis, "left calculation decimal", "right calculation decimal", "subtract calculation decimals")
 	if err != nil {
 		return basisApplicationResult{}, newInputCalculationError(
 			reportmodel.CalculationErrorKindBasisAllocation,
@@ -682,13 +676,13 @@ func buildPricedLiquidationMatches(matches []reportmodel.BasisMatch, disposedQua
 	if len(matches) == 0 {
 		return nil, nil
 	}
-	if err := requireFiniteDecimal(disposedQuantity, "disposed quantity"); err != nil {
+	if err := supportmath.RequireFinite(disposedQuantity, "disposed quantity"); err != nil {
 		return nil, err
 	}
 	if disposedQuantity.Sign() <= 0 {
 		return nil, fmt.Errorf("disposed quantity must be greater than zero")
 	}
-	if err := requireFiniteDecimal(netProceeds, "net proceeds"); err != nil {
+	if err := supportmath.RequireFinite(netProceeds, "net proceeds"); err != nil {
 		return nil, err
 	}
 
@@ -701,12 +695,12 @@ func buildPricedLiquidationMatches(matches []reportmodel.BasisMatch, disposedQua
 	for _, match := range matches {
 		var matchCopy = match
 		var matchedProceeds apd.Decimal
-		matchedProceeds, err = multiplyDecimal(proceedsPerUnit, match.MatchedQuantity)
+		matchedProceeds, err = supportmath.Multiply(proceedsPerUnit, match.MatchedQuantity, "left report decimal", "right report decimal", "multiply report decimals")
 		if err != nil {
 			return nil, fmt.Errorf("calculate matched proceeds for acquisition %q: %w", strings.TrimSpace(match.AcquisitionSourceID), err)
 		}
 		var matchedGainOrLoss apd.Decimal
-		matchedGainOrLoss, err = subtractCalculationDecimal(matchedProceeds, match.MatchedBasis)
+		matchedGainOrLoss, err = supportmath.Subtract(matchedProceeds, match.MatchedBasis, "left calculation decimal", "right calculation decimal", "subtract calculation decimals")
 		if err != nil {
 			return nil, fmt.Errorf("calculate matched gain or loss for acquisition %q: %w", strings.TrimSpace(match.AcquisitionSourceID), err)
 		}
@@ -1034,19 +1028,6 @@ func (state averageCostBasisState) OpenBasis() (apd.Decimal, error) {
 func sourceCalendarDate(occurredAt time.Time) time.Time {
 	var year, month, day = occurredAt.Date()
 	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
-}
-
-// addCalculationDecimal adds two exact calculation decimals.
-// Authored by: OpenCode
-func addCalculationDecimal(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-	return supportmath.ApplyBinaryOperation(left, right, "left calculation decimal", "right calculation decimal", "add calculation decimals", addCalculationOperation)
-}
-
-// subtractCalculationDecimal subtracts one exact calculation decimal from
-// another.
-// Authored by: OpenCode
-func subtractCalculationDecimal(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-	return supportmath.ApplyBinaryOperation(left, right, "left calculation decimal", "right calculation decimal", "subtract calculation decimals", subtractCalculationOperation)
 }
 
 // newRecordCalculationError creates one structured calculation error from a

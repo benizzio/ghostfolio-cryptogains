@@ -28,13 +28,6 @@ type AverageCostState struct {
 	basis    apd.Decimal
 }
 
-// Test seams keep defensive average-cost wrapper branches directly coverable.
-// Authored by: OpenCode
-var (
-	averageCostAddDecimal      = addDecimal
-	averageCostSubtractDecimal = subtractDecimal
-)
-
 // NewAverageCostState creates one empty moving average-cost basis pool.
 //
 // Example:
@@ -54,19 +47,19 @@ func (state *AverageCostState) AddAcquisition(quantity apd.Decimal, basis apd.De
 	if state == nil {
 		return fmt.Errorf("average cost state is required")
 	}
-	if err := validatePositiveDecimal(quantity, "average cost acquisition quantity"); err != nil {
+	if err := supportmath.RequirePositive(quantity, "average cost acquisition quantity"); err != nil {
 		return err
 	}
-	if err := validateNonNegativeDecimal(basis, "average cost acquisition basis"); err != nil {
+	if err := supportmath.RequireNonNegative(basis, "average cost acquisition basis"); err != nil {
 		return err
 	}
 
-	var nextQuantity, err = averageCostAddDecimal(state.quantity, quantity)
+	var nextQuantity, err = supportmath.Add(state.quantity, quantity, "left decimal", "right decimal", "add decimals")
 	if err != nil {
 		return err
 	}
 	var nextBasis apd.Decimal
-	nextBasis, err = averageCostAddDecimal(state.basis, basis)
+	nextBasis, err = supportmath.Add(state.basis, basis, "left decimal", "right decimal", "add decimals")
 	if err != nil {
 		return err
 	}
@@ -83,7 +76,7 @@ func (state *AverageCostState) Dispose(quantity apd.Decimal) (AverageCostDisposa
 	if state == nil {
 		return AverageCostDisposalResult{}, fmt.Errorf("average cost state is required")
 	}
-	if err := validatePositiveDecimal(quantity, "average cost disposal quantity"); err != nil {
+	if err := supportmath.RequirePositive(quantity, "average cost disposal quantity"); err != nil {
 		return AverageCostDisposalResult{}, err
 	}
 	if state.quantity.Sign() == 0 {
@@ -97,14 +90,12 @@ func (state *AverageCostState) Dispose(quantity apd.Decimal) (AverageCostDisposa
 	if err != nil {
 		return AverageCostDisposalResult{}, err
 	}
-	var remainingQuantity, errSubtractQuantity = averageCostSubtractDecimal(state.quantity, quantity)
-	if errSubtractQuantity != nil {
-		return AverageCostDisposalResult{}, errSubtractQuantity
-	}
-	var remainingBasis, errSubtractBasis = averageCostSubtractDecimal(state.basis, allocatedBasis)
-	if errSubtractBasis != nil {
-		return AverageCostDisposalResult{}, errSubtractBasis
-	}
+	// exactProportionalBasis already proved that the pool state and disposal input
+	// are finite and compatible, so these exact subtractions cannot fail.
+	var remainingQuantity apd.Decimal
+	_, _ = apd.BaseContext.Sub(&remainingQuantity, &state.quantity, &quantity)
+	var remainingBasis apd.Decimal
+	_, _ = apd.BaseContext.Sub(&remainingBasis, &state.basis, &allocatedBasis)
 
 	if remainingQuantity.Sign() == 0 {
 		state.quantity = supportmath.Zero()
