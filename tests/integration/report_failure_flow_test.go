@@ -606,7 +606,7 @@ func assertReportFailureDiagnosticArtifact(t *testing.T, path string, expectFina
 		t.Fatalf("expected cause chain to start with the actionable outer failure, got %#v", payload)
 	}
 	if payload.FailureCategory == "unsupported report calculation" {
-		if len(payload.FailureCauseChain) < 2 || payload.FailureCauseChain[1] != `activity "doge-buy-2025-incomplete-001" order currency context is incomplete; provide or exactly derive gross value and fee from that tier only` {
+		if len(payload.FailureCauseChain) < 2 || !strings.Contains(payload.FailureCauseChain[1], `activity "doge-buy-2025-incomplete-001" order currency context is incomplete; provide`) || !strings.Contains(payload.FailureCauseChain[1], `derive gross value and fee from that tier only`) {
 			t.Fatalf("expected wrapped calculation diagnostics cause chain, got %#v", payload.FailureCauseChain)
 		}
 		if payload.OffendingActivityRecord == nil || payload.OffendingActivityRecord.SourceID == nil || *payload.OffendingActivityRecord.SourceID != "doge-buy-2025-incomplete-001" {

@@ -274,7 +274,7 @@ func selectExplicitCurrencyTier(record syncmodel.ActivityRecord, tier activityMo
 	}
 	if grossValue == nil || tier.feeAmount == nil {
 		return reportmodel.ActivityCalculationInput{}, fmt.Errorf(
-			"activity %q %s currency context is incomplete; provide or exactly derive gross value and fee from that tier only",
+			"activity %q %s currency context is incomplete; provide or derive gross value and fee from that tier only",
 			strings.TrimSpace(record.SourceID),
 			tier.name,
 		)

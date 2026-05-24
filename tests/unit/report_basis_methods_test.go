@@ -147,6 +147,82 @@ func TestCalculateRoundsAverageCostWhenDivisionRepeats(t *testing.T) {
 	assertCalculationDecimalString(t, detail.LiquidationSummaries[0].GainOrLoss, "1.6666666666666667", "rounded average-cost gain")
 }
 
+// TestAverageCostStateUsesDirectRoundedProportionalAllocation verifies the
+// current shared 16-decimal proportional-allocation path for the differentiating
+// 2-of-3 disposal shape.
+// Authored by: OpenCode
+func TestAverageCostStateUsesDirectRoundedProportionalAllocation(t *testing.T) {
+	t.Parallel()
+
+	var state = reportbasis.NewAverageCostState()
+	if err := state.AddAcquisition(mustCalculationDecimal(t, "3"), mustCalculationDecimal(t, "1")); err != nil {
+		t.Fatalf("add average-cost acquisition: %v", err)
+	}
+
+	var averageUnitCost, averageErr = state.AverageUnitCost()
+	if averageErr != nil {
+		t.Fatalf("average unit cost: %v", averageErr)
+	}
+	assertCalculationDecimalString(t, averageUnitCost, "0.3333333333333333", "average unit cost")
+
+	var disposal, err = state.Dispose(mustCalculationDecimal(t, "2"))
+	if err != nil {
+		t.Fatalf("dispose average-cost quantity: %v", err)
+	}
+
+	assertCalculationDecimalString(t, disposal.AllocatedBasis, "0.6666666666666667", "average-cost allocated basis")
+	assertCalculationDecimalString(t, disposal.RemainingBasis, "0.3333333333333333", "average-cost remaining basis")
+
+	var proportionalShortcut = mustCalculationDecimal(t, "0.6666666666666666")
+	if disposal.AllocatedBasis.Cmp(&proportionalShortcut) == 0 {
+		t.Fatalf("expected direct proportional allocation to stay distinguishable from rounded-unit-cost-then-multiply shortcut")
+	}
+}
+
+// TestLotMethodStateUsesRoundedProportionalFragmentAllocation verifies the
+// current direct proportional allocation result for a partial lot whose unit
+// cost repeats.
+// Authored by: OpenCode
+func TestLotMethodStateUsesRoundedProportionalFragmentAllocation(t *testing.T) {
+	t.Parallel()
+
+	var state, err = reportbasis.NewLotMethodState(reportbasis.LotMethodFIFO)
+	if err != nil {
+		t.Fatalf("new lot method state: %v", err)
+	}
+	if err = state.AddAcquisition(reportbasis.LotAcquisition{
+		SourceID:           "lot-rounding-001",
+		AcquiredAt:         time.Date(2024, time.January, 10, 0, 0, 0, 0, time.UTC),
+		DeterministicOrder: 1,
+		RemainingQuantity:  mustCalculationDecimal(t, "3"),
+		RemainingBasis:     mustCalculationDecimal(t, "1"),
+	}); err != nil {
+		t.Fatalf("add FIFO acquisition: %v", err)
+	}
+
+	var disposal, disposeErr = state.Dispose(mustCalculationDecimal(t, "2"))
+	if disposeErr != nil {
+		t.Fatalf("dispose FIFO lot quantity: %v", disposeErr)
+	}
+
+	assertCalculationDecimalString(t, disposal.AllocatedBasis, "0.6666666666666667", "lot allocated basis")
+	if len(disposal.Matches) != 1 {
+		t.Fatalf("unexpected lot match count: got %d want 1", len(disposal.Matches))
+	}
+	assertCalculationDecimalString(t, disposal.Matches[0].MatchedBasis, "0.6666666666666667", "lot matched basis")
+
+	var openLots = state.OpenLots()
+	if len(openLots) != 1 {
+		t.Fatalf("unexpected open lot count after disposal: got %d want 1", len(openLots))
+	}
+	assertCalculationDecimalString(t, openLots[0].RemainingBasis, "0.3333333333333333", "lot remaining basis")
+
+	var proportionalShortcut = mustCalculationDecimal(t, "0.6666666666666666")
+	if disposal.AllocatedBasis.Cmp(&proportionalShortcut) == 0 {
+		t.Fatalf("expected lot allocation to remain distinguishable from rounded-unit-cost-then-multiply shortcut")
+	}
+}
+
 // TestCalculateScopeLocalHybridNarrowsReliableScopeTimeline verifies that one
 // asset with reliable scope data still narrows correctly even when other asset
 // timelines make the cache-wide scope summary partial.
@@ -227,6 +303,15 @@ func TestScopeLocalHybridFallbackCarriesForwardUntilZero(t *testing.T) {
 	if secondDisposal.ReachedZero {
 		t.Fatalf("expected scope to remain open until the last unit is disposed")
 	}
+
+	var finalDisposal, finalErr = state.Dispose("scope-a", mustCalculationDecimal(t, "1"))
+	if finalErr != nil {
+		t.Fatalf("dispose final fallback quantity: %v", finalErr)
+	}
+	assertCalculationDecimalString(t, finalDisposal.AllocatedBasis, "350", "final fallback allocated basis")
+	if !finalDisposal.ReachedZero {
+		t.Fatalf("expected fallback scope to reset once quantity reaches zero")
+	}
 }
 
 // TestScopeLocalHybridResetsAfterZeroAndKeepsScopesIndependent verifies that one
@@ -285,6 +370,76 @@ func TestScopeLocalHybridResetsAfterZeroAndKeepsScopesIndependent(t *testing.T) 
 	assertCalculationDecimalString(t, resetDisposal.AllocatedBasis, "50", "scope-a reset exact-match basis")
 	if !resetDisposal.ReachedZero {
 		t.Fatalf("expected reacquired scope-a position to reach zero")
+	}
+}
+
+// TestCalculateScopeLocalHybridUsesScopeLocalReliableResolution verifies that a
+// reliable scoped liquidation uses its own applicable scope even when another
+// open scope for the same asset holds a lower basis.
+// Authored by: OpenCode
+func TestCalculateScopeLocalHybridUsesScopeLocalReliableResolution(t *testing.T) {
+	t.Parallel()
+
+	var request = mustReportRequest(t, 2024, reportmodel.CostBasisMethodScopeLocalHybrid)
+	var report, err = reportcalculate.Calculate(request, syncmodel.ProtectedActivityCache{
+		ActivityCount:        3,
+		AvailableReportYears: []int{2024},
+		ScopeReliability:     syncmodel.ScopeReliabilityReliable,
+		Activities: []syncmodel.ActivityRecord{
+			scopeLocalActivityRecord(t, "atom-buy-alpha-2023-001", "2023-01-10T10:00:00Z", syncmodel.ActivityTypeBuy, "asset-atom-001", "ATOM", "Cosmos", "1", "100", "0", scopeLocalReliableWallet("wallet-atom-alpha")),
+			scopeLocalActivityRecord(t, "atom-buy-beta-2023-001", "2023-06-10T10:00:00Z", syncmodel.ActivityTypeBuy, "asset-atom-001", "ATOM", "Cosmos", "1", "20", "0", scopeLocalReliableWallet("wallet-atom-beta")),
+			scopeLocalActivityRecord(t, "atom-sell-alpha-2024-001", "2024-08-15T10:00:00Z", syncmodel.ActivityTypeSell, "asset-atom-001", "ATOM", "Cosmos", "1", "250", "0", scopeLocalReliableWallet("wallet-atom-alpha")),
+		},
+	})
+	if err != nil {
+		t.Fatalf("calculate reliable scope-local report: %v", err)
+	}
+
+	assertCalculationDecimalString(t, summaryEntryByAsset(t, report, "asset-atom-001").NetGainOrLoss, "150", "reliable scope-local net gain")
+	var detail = detailSectionByAsset(t, report, "asset-atom-001")
+	assertCalculationDecimalString(t, detail.ClosingCostBasis, "20", "reliable scope-local closing basis")
+	if len(detail.LiquidationSummaries) != 1 {
+		t.Fatalf("unexpected reliable scope-local liquidation count: got %d want 1", len(detail.LiquidationSummaries))
+	}
+	assertCalculationDecimalString(t, detail.LiquidationSummaries[0].AllocatedBasis, "100", "reliable scope-local allocated basis")
+	assertCalculationDecimalString(t, detail.LiquidationSummaries[0].GainOrLoss, "150", "reliable scope-local gain or loss")
+}
+
+// TestScopeLocalHybridFallbackAllocationUsesCurrentProportionalRule verifies the
+// differentiating 2-of-3 disposal shape inside one fallback scope.
+// Authored by: OpenCode
+func TestScopeLocalHybridFallbackAllocationUsesCurrentProportionalRule(t *testing.T) {
+	t.Parallel()
+
+	var state = reportbasis.NewScopeLocalHybridState()
+	for _, acquisition := range []reportbasis.ScopeLocalHybridAcquisition{
+		scopeLocalAcquisition(t, "scope-rounding-001", "scope-a", "2023-01-10T00:00:00Z", 1, "1", "0.2"),
+		scopeLocalAcquisition(t, "scope-rounding-002", "scope-a", "2023-02-10T00:00:00Z", 2, "1", "0.3"),
+		scopeLocalAcquisition(t, "scope-rounding-003", "scope-a", "2023-03-10T00:00:00Z", 3, "1", "0.5"),
+	} {
+		if err := state.AddAcquisition(acquisition); err != nil {
+			t.Fatalf("add rounding acquisition %q: %v", acquisition.SourceID, err)
+		}
+	}
+
+	var disposal, err = state.Dispose("scope-a", mustCalculationDecimal(t, "2"))
+	if err != nil {
+		t.Fatalf("dispose fallback rounding quantity: %v", err)
+	}
+	assertCalculationDecimalString(t, disposal.AllocatedBasis, "0.6666666666666667", "scope-local fallback allocated basis")
+	if disposal.ReachedZero {
+		t.Fatalf("expected fallback scope to remain open after disposing 2 of 3 units")
+	}
+
+	var totalBasis, totalBasisErr = state.TotalOpenBasis()
+	if totalBasisErr != nil {
+		t.Fatalf("remaining fallback basis: %v", totalBasisErr)
+	}
+	assertCalculationDecimalString(t, totalBasis, "0.3333333333333333", "scope-local fallback remaining basis")
+
+	var proportionalShortcut = mustCalculationDecimal(t, "0.6666666666666666")
+	if disposal.AllocatedBasis.Cmp(&proportionalShortcut) == 0 {
+		t.Fatalf("expected fallback allocation to remain distinguishable from rounded-unit-cost-then-multiply shortcut")
 	}
 }
 

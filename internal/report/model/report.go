@@ -132,6 +132,16 @@ type AssetActivityRow struct {
 	LiquidationCalculation      *LiquidationCalculation
 }
 
+// BasisMatch stores one acquisition fragment consumed by one liquidation.
+// Authored by: OpenCode
+type BasisMatch struct {
+	AcquisitionSourceID string
+	MatchedQuantity     apd.Decimal
+	MatchedBasis        apd.Decimal
+	MatchedProceeds     *apd.Decimal
+	MatchedGainOrLoss   *apd.Decimal
+}
+
 // LiquidationCalculation stores one priced liquidation calculation rendered in
 // an asset detail section.
 // Authored by: OpenCode
@@ -144,6 +154,7 @@ type LiquidationCalculation struct {
 	GainOrLoss             apd.Decimal
 	ActivityCurrency       string
 	CalculationCurrency    string
+	Matches                []BasisMatch
 }
 
 // NewReportRequest creates one validated report-generation request.
@@ -199,7 +210,12 @@ func (request ReportRequest) Validate() error {
 //	_ = entry.DisplayLabel
 //
 // Authored by: OpenCode
-func NewAssetSummaryEntry(assetIdentityKey string, displayLabel string, netGainOrLoss apd.Decimal, reportCalculationCurrency string) (AssetSummaryEntry, error) {
+func NewAssetSummaryEntry(
+	assetIdentityKey string,
+	displayLabel string,
+	netGainOrLoss apd.Decimal,
+	reportCalculationCurrency string,
+) (AssetSummaryEntry, error) {
 	var entry = AssetSummaryEntry{
 		AssetIdentityKey:          strings.TrimSpace(assetIdentityKey),
 		DisplayLabel:              strings.TrimSpace(displayLabel),
@@ -238,7 +254,12 @@ func (entry AssetSummaryEntry) Validate() error {
 //	_ = entry.MainSectionStatus
 //
 // Authored by: OpenCode
-func NewReferenceLiquidationEntry(assetIdentityKey string, displayLabel string, fullLiquidationCountThroughYearEnd int, mainSectionStatus ReferenceSectionStatus) (ReferenceLiquidationEntry, error) {
+func NewReferenceLiquidationEntry(
+	assetIdentityKey string,
+	displayLabel string,
+	fullLiquidationCountThroughYearEnd int,
+	mainSectionStatus ReferenceSectionStatus,
+) (ReferenceLiquidationEntry, error) {
 	var entry = ReferenceLiquidationEntry{
 		AssetIdentityKey:                   strings.TrimSpace(assetIdentityKey),
 		DisplayLabel:                       strings.TrimSpace(displayLabel),
@@ -299,8 +320,8 @@ func NewAssetDetailSection(
 		ClosingQuantity:      closingQuantity,
 		ClosingCostBasis:     closingCostBasis,
 		CalculationCurrency:  strings.TrimSpace(calculationCurrency),
-		ActivityRows:         append([]AssetActivityRow(nil), activityRows...),
-		LiquidationSummaries: append([]LiquidationCalculation(nil), liquidationSummaries...),
+		ActivityRows:         cloneAssetActivityRows(activityRows),
+		LiquidationSummaries: cloneLiquidationCalculations(liquidationSummaries),
 	}
 
 	if err := section.Validate(); err != nil {
@@ -319,13 +340,19 @@ func (section AssetDetailSection) Validate() error {
 	if err := validateNonNegativeDecimal(section.OpeningQuantity, "asset detail section opening quantity"); err != nil {
 		return err
 	}
-	if err := validateNonNegativeDecimal(section.OpeningCostBasis, "asset detail section opening cost basis"); err != nil {
+	if err := validateNonNegativeDecimal(
+		section.OpeningCostBasis,
+		"asset detail section opening cost basis",
+	); err != nil {
 		return err
 	}
 	if err := validateNonNegativeDecimal(section.ClosingQuantity, "asset detail section closing quantity"); err != nil {
 		return err
 	}
-	if err := validateNonNegativeDecimal(section.ClosingCostBasis, "asset detail section closing cost basis"); err != nil {
+	if err := validateNonNegativeDecimal(
+		section.ClosingCostBasis,
+		"asset detail section closing cost basis",
+	); err != nil {
 		return err
 	}
 
@@ -382,6 +409,28 @@ func (row AssetActivityRow) Validate() error {
 	return nil
 }
 
+// Validate verifies one matched acquisition fragment used by a liquidation.
+// Authored by: OpenCode
+func (match BasisMatch) Validate() error {
+	if strings.TrimSpace(match.AcquisitionSourceID) == "" {
+		return fmt.Errorf("basis match acquisition source ID is required")
+	}
+	if err := validatePositiveDecimal(match.MatchedQuantity, "basis match matched quantity"); err != nil {
+		return err
+	}
+	if err := validateNonNegativeDecimal(match.MatchedBasis, "basis match matched basis"); err != nil {
+		return err
+	}
+	if err := validateOptionalDecimal(match.MatchedProceeds, "basis match matched proceeds"); err != nil {
+		return err
+	}
+	if err := validateOptionalDecimal(match.MatchedGainOrLoss, "basis match matched gain or loss"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Validate verifies one priced liquidation calculation row.
 // Authored by: OpenCode
 func (calculation LiquidationCalculation) Validate() error {
@@ -391,13 +440,22 @@ func (calculation LiquidationCalculation) Validate() error {
 	if calculation.OccurredAt.IsZero() {
 		return fmt.Errorf("liquidation calculation occurred-at timestamp is required")
 	}
-	if err := validatePositiveDecimal(calculation.DisposedQuantity, "liquidation calculation disposed quantity"); err != nil {
+	if err := validatePositiveDecimal(
+		calculation.DisposedQuantity,
+		"liquidation calculation disposed quantity",
+	); err != nil {
 		return err
 	}
-	if err := validateNonNegativeDecimal(calculation.AllocatedBasis, "liquidation calculation allocated basis"); err != nil {
+	if err := validateNonNegativeDecimal(
+		calculation.AllocatedBasis,
+		"liquidation calculation allocated basis",
+	); err != nil {
 		return err
 	}
-	if err := validateFiniteDecimal(calculation.NetLiquidationProceeds, "liquidation calculation net liquidation proceeds"); err != nil {
+	if err := validateFiniteDecimal(
+		calculation.NetLiquidationProceeds,
+		"liquidation calculation net liquidation proceeds",
+	); err != nil {
 		return err
 	}
 	if err := validateFiniteDecimal(calculation.GainOrLoss, "liquidation calculation gain or loss"); err != nil {
@@ -406,8 +464,72 @@ func (calculation LiquidationCalculation) Validate() error {
 	if strings.TrimSpace(calculation.ActivityCurrency) == "" {
 		return fmt.Errorf("liquidation calculation activity currency is required")
 	}
+	for index, match := range calculation.Matches {
+		if err := match.Validate(); err != nil {
+			return fmt.Errorf("liquidation calculation basis match %d: %w", index, err)
+		}
+	}
 
 	return nil
+}
+
+// cloneAssetActivityRows returns a defensive copy of one activity-row slice.
+// Authored by: OpenCode
+func cloneAssetActivityRows(rows []AssetActivityRow) []AssetActivityRow {
+	var cloned = make([]AssetActivityRow, 0, len(rows))
+	for _, row := range rows {
+		var rowCopy = row
+		if row.LiquidationCalculation != nil {
+			var liquidationCopy = cloneLiquidationCalculation(*row.LiquidationCalculation)
+			rowCopy.LiquidationCalculation = &liquidationCopy
+		}
+		cloned = append(cloned, rowCopy)
+	}
+
+	return cloned
+}
+
+// cloneLiquidationCalculations returns a defensive copy of one liquidation slice.
+// Authored by: OpenCode
+func cloneLiquidationCalculations(calculations []LiquidationCalculation) []LiquidationCalculation {
+	var cloned = make([]LiquidationCalculation, 0, len(calculations))
+	for _, calculation := range calculations {
+		cloned = append(cloned, cloneLiquidationCalculation(calculation))
+	}
+
+	return cloned
+}
+
+// cloneLiquidationCalculation returns a defensive copy of one liquidation.
+// Authored by: OpenCode
+func cloneLiquidationCalculation(calculation LiquidationCalculation) LiquidationCalculation {
+	var calculationCopy = calculation
+	calculationCopy.Matches = cloneBasisMatches(calculation.Matches)
+	return calculationCopy
+}
+
+// cloneBasisMatches returns a defensive copy of one basis-match slice.
+// Authored by: OpenCode
+func cloneBasisMatches(matches []BasisMatch) []BasisMatch {
+	var cloned = make([]BasisMatch, 0, len(matches))
+	for _, match := range matches {
+		var matchCopy = match
+		matchCopy.MatchedProceeds = cloneOptionalDecimal(match.MatchedProceeds)
+		matchCopy.MatchedGainOrLoss = cloneOptionalDecimal(match.MatchedGainOrLoss)
+		cloned = append(cloned, matchCopy)
+	}
+
+	return cloned
+}
+
+// cloneOptionalDecimal returns one defensive copy of one optional decimal.
+// Authored by: OpenCode
+func cloneOptionalDecimal(value *apd.Decimal) *apd.Decimal {
+	if value == nil {
+		return nil
+	}
+
+	return new(*value)
 }
 
 // NewCapitalGainsReport creates one validated calculated report model.
@@ -498,7 +620,13 @@ func (report CapitalGainsReport) Validate() error {
 //	_ = document.Content
 //
 // Authored by: OpenCode
-func NewReportDocument(documentType ReportDocumentType, content string, year int, method CostBasisMethod, generatedAt time.Time) (ReportDocument, error) {
+func NewReportDocument(
+	documentType ReportDocumentType,
+	content string,
+	year int,
+	method CostBasisMethod,
+	generatedAt time.Time,
+) (ReportDocument, error) {
 	var document = ReportDocument{
 		DocumentType:    documentType,
 		Content:         content,
@@ -547,7 +675,14 @@ func (document ReportDocument) Validate() error {
 //	_ = outputFile.Path
 //
 // Authored by: OpenCode
-func NewReportOutputFile(documentsDirectory string, filename string, path string, savedAt time.Time, openRequested bool, openError string) (ReportOutputFile, error) {
+func NewReportOutputFile(
+	documentsDirectory string,
+	filename string,
+	path string,
+	savedAt time.Time,
+	openRequested bool,
+	openError string,
+) (ReportOutputFile, error) {
 	var outputFile = ReportOutputFile{
 		DocumentsDirectory: strings.TrimSpace(documentsDirectory),
 		Filename:           strings.TrimSpace(filename),

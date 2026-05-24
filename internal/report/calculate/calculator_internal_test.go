@@ -938,6 +938,158 @@ func TestApplyBasisInputRoutesActivities(t *testing.T) {
 		FeeAmount:        decimalPointer(t, "1"),
 	}})
 	requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+
+	result, err := applyPricedLiquidation(stubAssetBasisState{disposeFunc: func(basisDisposalInput) (basisDisposalResult, error) {
+		return basisDisposalResult{
+			AllocatedBasis: mustReportDecimal(t, "1"),
+			Matches: []reportmodel.BasisMatch{{
+				AcquisitionSourceID: "buy-1",
+				MatchedQuantity:     mustReportDecimal(t, "2"),
+				MatchedBasis:        mustReportDecimal(t, "1"),
+			}},
+		}, nil
+	}}, scopedActivityInput{Input: reportmodel.ActivityCalculationInput{
+		SourceID:             "sell-fragment-success",
+		OccurredAt:           time.Date(2024, time.January, 3, 0, 0, 0, 0, time.UTC),
+		SourceYear:           2024,
+		ActivityType:         syncmodel.ActivityTypeSell,
+		AssetIdentityKey:     "asset-btc",
+		DisplayLabel:         "BTC",
+		Quantity:             mustReportDecimal(t, "3"),
+		GrossValue:           decimalPointer(t, "2"),
+		FeeAmount:            decimalPointer(t, "0"),
+		SelectedCurrencyCode: "USD",
+	}})
+	if err != nil {
+		t.Fatalf("apply priced liquidation with fragment matches: %v", err)
+	}
+	if len(result.basisMatches) != 1 || result.basisMatches[0].MatchedProceeds == nil || result.basisMatches[0].MatchedGainOrLoss == nil {
+		t.Fatalf("expected fragment-level priced liquidation matches, got %#v", result.basisMatches)
+	}
+	if result.basisMatches[0].MatchedProceeds.Cmp(decimalPointer(t, "1.3333333333333334")) != 0 {
+		t.Fatalf("unexpected matched proceeds: %#v", result.basisMatches[0])
+	}
+	if result.basisMatches[0].MatchedGainOrLoss.Cmp(decimalPointer(t, "0.3333333333333334")) != 0 {
+		t.Fatalf("unexpected matched gain or loss: %#v", result.basisMatches[0])
+	}
+
+	_, err = applyPricedLiquidation(stubAssetBasisState{disposeFunc: func(basisDisposalInput) (basisDisposalResult, error) {
+		return basisDisposalResult{
+			AllocatedBasis: mustReportDecimal(t, "1"),
+			Matches: []reportmodel.BasisMatch{{
+				AcquisitionSourceID: "buy-invalid-fragment",
+				MatchedQuantity:     reportInvalidDecimalForCalculator(),
+				MatchedBasis:        mustReportDecimal(t, "1"),
+			}},
+		}, nil
+	}}, scopedActivityInput{Input: reportmodel.ActivityCalculationInput{
+		SourceID:         "sell-fragment-fail",
+		OccurredAt:       time.Date(2024, time.January, 3, 0, 0, 0, 0, time.UTC),
+		SourceYear:       2024,
+		ActivityType:     syncmodel.ActivityTypeSell,
+		AssetIdentityKey: "asset-btc",
+		DisplayLabel:     "BTC",
+		Quantity:         mustReportDecimal(t, "1"),
+		GrossValue:       decimalPointer(t, "2"),
+		FeeAmount:        decimalPointer(t, "0"),
+	}})
+	calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+	if !strings.Contains(calcErr.Error(), "could not calculate fragment-level priced liquidation matches") {
+		t.Fatalf("expected priced-liquidation fragment-match failure, got %q", calcErr.Error())
+	}
+}
+
+// TestBuildPricedLiquidationMatchesCoversRemainingBranches verifies the helper
+// guardrails and wrapped per-fragment failure branches.
+// Authored by: OpenCode
+func TestBuildPricedLiquidationMatchesCoversRemainingBranches(t *testing.T) {
+	t.Parallel()
+
+	var originalReportDivideRoundHalfUp = reportDivideRoundHalfUp
+	defer func() {
+		reportDivideRoundHalfUp = originalReportDivideRoundHalfUp
+	}()
+
+	var matches, err = buildPricedLiquidationMatches(nil, mustReportDecimal(t, "1"), mustReportDecimal(t, "1"))
+	if err != nil || matches != nil {
+		t.Fatalf("expected nil fragment matches to short-circuit, got matches=%#v err=%v", matches, err)
+	}
+
+	reportDivideRoundHalfUp = func(apd.Decimal, apd.Decimal) (apd.Decimal, error) {
+		return apd.Decimal{}, errors.New("divide boom")
+	}
+	_, err = buildPricedLiquidationMatches(
+		[]reportmodel.BasisMatch{{AcquisitionSourceID: "buy-divide", MatchedQuantity: mustReportDecimal(t, "1"), MatchedBasis: mustReportDecimal(t, "1")}},
+		mustReportDecimal(t, "1"),
+		mustReportDecimal(t, "1"),
+	)
+	if err == nil || !strings.Contains(err.Error(), "calculate proceeds per unit") {
+		t.Fatalf("expected wrapped proceeds-per-unit failure, got %v", err)
+	}
+	reportDivideRoundHalfUp = originalReportDivideRoundHalfUp
+
+	_, err = buildPricedLiquidationMatches(
+		[]reportmodel.BasisMatch{{AcquisitionSourceID: "buy-1", MatchedQuantity: mustReportDecimal(t, "1"), MatchedBasis: mustReportDecimal(t, "1")}},
+		reportInvalidDecimalForCalculator(),
+		mustReportDecimal(t, "1"),
+	)
+	if err == nil || !strings.Contains(err.Error(), "disposed quantity") {
+		t.Fatalf("expected non-finite disposed quantity to fail, got %v", err)
+	}
+
+	_, err = buildPricedLiquidationMatches(
+		[]reportmodel.BasisMatch{{AcquisitionSourceID: "buy-1", MatchedQuantity: mustReportDecimal(t, "1"), MatchedBasis: mustReportDecimal(t, "1")}},
+		mustReportDecimal(t, "0"),
+		mustReportDecimal(t, "1"),
+	)
+	if err == nil || !strings.Contains(err.Error(), "disposed quantity must be greater than zero") {
+		t.Fatalf("expected zero disposed quantity to fail, got %v", err)
+	}
+
+	_, err = buildPricedLiquidationMatches(
+		[]reportmodel.BasisMatch{{AcquisitionSourceID: "buy-1", MatchedQuantity: mustReportDecimal(t, "1"), MatchedBasis: mustReportDecimal(t, "1")}},
+		mustReportDecimal(t, "1"),
+		reportInvalidDecimalForCalculator(),
+	)
+	if err == nil || !strings.Contains(err.Error(), "net proceeds") {
+		t.Fatalf("expected non-finite net proceeds to fail, got %v", err)
+	}
+
+	_, err = buildPricedLiquidationMatches(
+		[]reportmodel.BasisMatch{{AcquisitionSourceID: "buy-proceeds", MatchedQuantity: reportInvalidDecimalForCalculator(), MatchedBasis: mustReportDecimal(t, "1")}},
+		mustReportDecimal(t, "1"),
+		mustReportDecimal(t, "1"),
+	)
+	if err == nil || !strings.Contains(err.Error(), "calculate matched proceeds") {
+		t.Fatalf("expected invalid matched quantity to fail proceeds allocation, got %v", err)
+	}
+
+	_, err = buildPricedLiquidationMatches(
+		[]reportmodel.BasisMatch{{AcquisitionSourceID: "buy-gain", MatchedQuantity: mustReportDecimal(t, "1"), MatchedBasis: reportInvalidDecimalForCalculator()}},
+		mustReportDecimal(t, "1"),
+		mustReportDecimal(t, "1"),
+	)
+	if err == nil || !strings.Contains(err.Error(), "calculate matched gain or loss") {
+		t.Fatalf("expected invalid matched basis to fail gain-or-loss allocation, got %v", err)
+	}
+
+	matches, err = buildPricedLiquidationMatches(
+		[]reportmodel.BasisMatch{{AcquisitionSourceID: "buy-round", MatchedQuantity: mustReportDecimal(t, "1"), MatchedBasis: mustReportDecimal(t, "0")}},
+		mustReportDecimal(t, "6"),
+		mustReportDecimal(t, "1"),
+	)
+	if err != nil {
+		t.Fatalf("expected rounded proceeds-per-unit success, got %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("expected one rounded fragment match, got %#v", matches)
+	}
+	if matches[0].MatchedProceeds == nil {
+		t.Fatalf("expected rounded helper matched proceeds, got %#v", matches[0])
+	}
+	if got := matches[0].MatchedProceeds.Text('f'); got != "0.1666666666666667" {
+		t.Fatalf("unexpected rounded helper matched proceeds: got %q want %q", got, "0.1666666666666667")
+	}
 }
 
 // TestBuildInYearArtifactsCoversZeroPricedPricedAndValidationFailures verifies
@@ -991,6 +1143,13 @@ func TestBuildInYearArtifactsCoversZeroPricedPricedAndValidationFailures(t *test
 			allocatedBasis: decimalPointer(t, "7"),
 			netProceeds:    decimalPointer(t, "10"),
 			gainOrLoss:     decimalPointer(t, "3"),
+			basisMatches: []reportmodel.BasisMatch{{
+				AcquisitionSourceID: "buy-1",
+				MatchedQuantity:     mustReportDecimal(t, "1"),
+				MatchedBasis:        mustReportDecimal(t, "7"),
+				MatchedProceeds:     decimalPointer(t, "10"),
+				MatchedGainOrLoss:   decimalPointer(t, "3"),
+			}},
 		},
 	)
 	if err != nil {
@@ -998,6 +1157,9 @@ func TestBuildInYearArtifactsCoversZeroPricedPricedAndValidationFailures(t *test
 	}
 	if row == nil || liquidation == nil || yearlyNet.Cmp(apd.New(3, 0)) != 0 || row.LiquidationCalculation == nil || row.ActivityCurrency != "USD" {
 		t.Fatalf("unexpected priced row artifacts: row=%#v liquidation=%#v yearlyNet=%v", row, liquidation, yearlyNet)
+	}
+	if len(liquidation.Matches) != 1 || liquidation.Matches[0].MatchedProceeds == nil || liquidation.Matches[0].MatchedGainOrLoss == nil {
+		t.Fatalf("expected one liquidation basis match, got %#v", liquidation.Matches)
 	}
 
 	_, _, _, err = buildInYearArtifacts(
@@ -1017,6 +1179,11 @@ func TestBuildInYearArtifactsCoversZeroPricedPricedAndValidationFailures(t *test
 			allocatedBasis: decimalPointer(t, "7"),
 			netProceeds:    decimalPointer(t, "10"),
 			gainOrLoss:     decimalPointer(t, "3"),
+			basisMatches: []reportmodel.BasisMatch{{
+				AcquisitionSourceID: "buy-1",
+				MatchedQuantity:     mustReportDecimal(t, "1"),
+				MatchedBasis:        mustReportDecimal(t, "7"),
+			}},
 		},
 	)
 	var calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)

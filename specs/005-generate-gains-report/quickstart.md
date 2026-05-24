@@ -321,7 +321,7 @@ Use deterministic fixtures that include:
 - at least one realized loss
 - a production-shaped explained zero-priced `SELL` holding reduction that preserves explicit zero `unit_price`, `gross_value`, and `fee_amount`
 - a priced activity with explicit fee `0`
-- a priced `BUY` where order financial fields exist but `order_currency` is absent and the asset-profile or base tier can still supply or exactly derive same-tier values
+- a priced `BUY` where order financial fields exist but `order_currency` is absent and the asset-profile or base tier can still supply or derive same-tier values under the shared 16-decimal internal round-half-up policy
 - a priced activity with incomplete monetary context
 - mixed available monetary tiers for single-activity currency context selection
 - unreliable or missing source scope for scope-local fallback

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/dto"
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -20,6 +21,7 @@ func TestValidateActivityPageResponseAndEntryCoverBranches(t *testing.T) {
 		{name: "zero count with activities", response: dto.ActivityPageResponse{Count: 0, Activities: []dto.ActivityPageEntry{validActivityPageEntry()}}, wantErr: true},
 		{name: "positive count without activities", response: dto.ActivityPageResponse{Count: 1, Activities: []dto.ActivityPageEntry{}}, wantErr: true},
 		{name: "activities exceed count", response: dto.ActivityPageResponse{Count: 1, Activities: []dto.ActivityPageEntry{validActivityPageEntry(), validActivityPageEntry()}}, wantErr: true},
+		{name: "invalid entry in page", response: dto.ActivityPageResponse{Count: 1, Activities: []dto.ActivityPageEntry{{}}}, wantErr: true},
 		{name: "valid empty history", response: dto.ActivityPageResponse{Count: 0, Activities: []dto.ActivityPageEntry{}}, wantErr: false},
 		{name: "valid page", response: dto.ActivityPageResponse{Count: 1, Activities: []dto.ActivityPageEntry{validActivityPageEntry()}}, wantErr: false},
 	}
@@ -147,7 +149,7 @@ func TestValidateActivityPageResponseAndEntryCoverBranches(t *testing.T) {
 			entry.Value = json.Number("1")
 			entry.Quantity = json.Number("3")
 			return entry
-		}(), wantErr: true},
+		}(), wantErr: false},
 		{name: "valid page entry", entry: validActivityPageEntry(), wantErr: false},
 		{name: "nullable order currency and comment stay allowed", entry: func() dto.ActivityPageEntry {
 			entry := validActivityPageEntry()
@@ -214,6 +216,67 @@ func TestBasisDerivationHelpersCoverRemainingBranches(t *testing.T) {
 	entry = validActivityPageEntry()
 	entry.UnitPrice = json.Number("")
 	entry.UnitPriceInAssetProfileCurrency = json.Number("")
+	entry.Value = json.Number("1")
+	entry.ValueInBaseCurrency = json.Number("")
+	entry.Quantity = json.Number("3")
+	if err := requireDerivableUnitPrice(entry); err != nil {
+		t.Fatalf("expected repeating unit-price derivation to succeed, got %v", err)
+	}
+	if err := requireBasisInput(entry); err != nil {
+		t.Fatalf("expected basis validation to allow repeating unit-price derivation, got %v", err)
+	}
+	derivedUnitPrice, err := deriveRoundedUnitPrice(mustValidatorDecimal(t, "1"), mustValidatorDecimal(t, "3"))
+	if err != nil {
+		t.Fatalf("derive rounded validator unit price: %v", err)
+	}
+	if got := derivedUnitPrice.Text('f'); got != "0.3333333333333333" {
+		t.Fatalf("expected rounded repeating unit price, got %q", got)
+	}
+
+	entry = validActivityPageEntry()
+	entry.UnitPrice = json.Number("")
+	entry.UnitPriceInAssetProfileCurrency = json.Number("")
+	entry.Value = json.Number("1")
+	entry.ValueInBaseCurrency = json.Number("")
+	entry.Quantity = json.Number("0")
+	if err := requireDerivableUnitPrice(entry); err == nil {
+		t.Fatalf("expected zero quantity to fail unit-price derivation")
+	}
+	if err := requireBasisInput(entry); err == nil {
+		t.Fatalf("expected basis validation to fail when rounded unit-price derivation is impossible")
+	}
+
+	var invalidDecimal apd.Decimal
+	invalidDecimal.Form = apd.Infinite
+	if _, err := deriveRoundedUnitPrice(invalidDecimal, mustValidatorDecimal(t, "3")); err == nil {
+		t.Fatalf("expected non-finite gross value to fail rounded unit-price derivation")
+	}
+	if _, err := deriveRoundedUnitPrice(mustValidatorDecimal(t, "1"), invalidDecimal); err == nil {
+		t.Fatalf("expected non-finite quantity to fail rounded unit-price derivation")
+	}
+	derivedUnitPrice, err = deriveRoundedUnitPrice(mustValidatorDecimal(t, "1"), mustValidatorDecimal(t, "6"))
+	if err != nil {
+		t.Fatalf("derive rounded validator half-up unit price: %v", err)
+	}
+	if got := derivedUnitPrice.Text('f'); got != "0.1666666666666667" {
+		t.Fatalf("expected half-up rounded validator unit price, got %q", got)
+	}
+	derivedUnitPrice, err = deriveRoundedUnitPrice(mustValidatorDecimal(t, "-1"), mustValidatorDecimal(t, "3"))
+	if err != nil {
+		t.Fatalf("derive rounded negative validator unit price: %v", err)
+	}
+	if got := derivedUnitPrice.Text('f'); got != "-0.3333333333333333" {
+		t.Fatalf("expected negative rounded validator unit price, got %q", got)
+	}
+
+	var numerator, denominator = finiteDecimalFraction(mustValidatorDecimal(t, "-1.25"))
+	if numerator.String() != "-125" || denominator.String() != "100" {
+		t.Fatalf("expected exact negative finite decimal fraction, got %s/%s", numerator.String(), denominator.String())
+	}
+
+	entry = validActivityPageEntry()
+	entry.UnitPrice = json.Number("")
+	entry.UnitPriceInAssetProfileCurrency = json.Number("")
 	entry.Quantity = json.Number("bad")
 	if err := requireDerivableUnitPrice(entry); err == nil {
 		t.Fatalf("expected unreadable quantity to fail unit-price derivation")
@@ -263,4 +326,17 @@ func TestBasisDerivationHelpersCoverRemainingBranches(t *testing.T) {
 	if err := requireDerivableGrossValue(entry); err == nil {
 		t.Fatalf("expected injected multiplication failure to fail gross-value derivation")
 	}
+}
+
+// mustValidatorDecimal parses one exact decimal fixture for validator tests.
+// Authored by: OpenCode
+func mustValidatorDecimal(t *testing.T, raw string) apd.Decimal {
+	t.Helper()
+
+	value, _, err := decimalsupport.ParseString(raw)
+	if err != nil {
+		t.Fatalf("parse validator decimal: %v", err)
+	}
+
+	return value
 }

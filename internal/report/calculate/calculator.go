@@ -9,6 +9,7 @@ import (
 	"time"
 
 	reportbasis "github.com/benizzio/ghostfolio-cryptogains/internal/report/basis"
+	reportdecimal "github.com/benizzio/ghostfolio-cryptogains/internal/report/decimal"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/cockroachdb/apd/v3"
@@ -27,6 +28,7 @@ var (
 	resolveScopedInputsFunc   = resolveScopedAssetInputs
 	replayAssetInputFunc      = replayAssetInput
 	lotStateTotalOpenQuantity = func(state *reportbasis.LotMethodState) (apd.Decimal, error) { return state.TotalOpenQuantity() }
+	reportDivideRoundHalfUp   = reportdecimal.DivideRoundHalfUp
 	addCalculationOperation   = func(sum *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
 		return apd.BaseContext.Add(sum, left, right)
 	}
@@ -184,6 +186,7 @@ type basisApplicationResult struct {
 	allocatedBasis *apd.Decimal
 	netProceeds    *apd.Decimal
 	gainOrLoss     *apd.Decimal
+	basisMatches   []reportmodel.BasisMatch
 	reachedZero    bool
 }
 
@@ -239,6 +242,7 @@ type basisDisposalInput struct {
 // Authored by: OpenCode
 type basisDisposalResult struct {
 	AllocatedBasis apd.Decimal
+	Matches        []reportmodel.BasisMatch
 	ReachedZero    bool
 }
 
@@ -569,7 +573,7 @@ func applyZeroPricedHoldingReduction(basisState assetBasisState, scopedInput sco
 		)
 	}
 
-	return basisApplicationResult{allocatedBasis: &disposal.AllocatedBasis, reachedZero: disposal.ReachedZero}, nil
+	return basisApplicationResult{allocatedBasis: &disposal.AllocatedBasis, basisMatches: disposal.Matches, reachedZero: disposal.ReachedZero}, nil
 }
 
 // applyPricedLiquidation removes basis and calculates net proceeds and realized
@@ -618,12 +622,68 @@ func applyPricedLiquidation(basisState assetBasisState, scopedInput scopedActivi
 		)
 	}
 
+	var basisMatches []reportmodel.BasisMatch
+	basisMatches, err = buildPricedLiquidationMatches(disposal.Matches, input.Quantity, netProceeds)
+	if err != nil {
+		return basisApplicationResult{}, newInputCalculationError(
+			reportmodel.CalculationErrorKindBasisAllocation,
+			input,
+			"could not calculate fragment-level priced liquidation matches",
+			err,
+		)
+	}
+
 	return basisApplicationResult{
 		allocatedBasis: &disposal.AllocatedBasis,
 		netProceeds:    &netProceeds,
 		gainOrLoss:     &gainOrLoss,
+		basisMatches:   basisMatches,
 		reachedZero:    disposal.ReachedZero,
 	}, nil
+}
+
+// buildPricedLiquidationMatches allocates one liquidation's proceeds through the
+// rounded proceeds-per-unit intermediate defined by the report rules.
+// Authored by: OpenCode
+func buildPricedLiquidationMatches(matches []reportmodel.BasisMatch, disposedQuantity apd.Decimal, netProceeds apd.Decimal) ([]reportmodel.BasisMatch, error) {
+	if len(matches) == 0 {
+		return nil, nil
+	}
+	if err := requireFiniteDecimal(disposedQuantity, "disposed quantity"); err != nil {
+		return nil, err
+	}
+	if disposedQuantity.Sign() <= 0 {
+		return nil, fmt.Errorf("disposed quantity must be greater than zero")
+	}
+	if err := requireFiniteDecimal(netProceeds, "net proceeds"); err != nil {
+		return nil, err
+	}
+
+	var proceedsPerUnit, err = reportDivideRoundHalfUp(netProceeds, disposedQuantity)
+	if err != nil {
+		return nil, fmt.Errorf("calculate proceeds per unit: %w", err)
+	}
+
+	var enriched = make([]reportmodel.BasisMatch, 0, len(matches))
+	for _, match := range matches {
+		var matchCopy = match
+		var matchedProceeds apd.Decimal
+		matchedProceeds, err = multiplyDecimal(proceedsPerUnit, match.MatchedQuantity)
+		if err != nil {
+			return nil, fmt.Errorf("calculate matched proceeds for acquisition %q: %w", strings.TrimSpace(match.AcquisitionSourceID), err)
+		}
+		var matchedGainOrLoss apd.Decimal
+		matchedGainOrLoss, err = subtractCalculationDecimal(matchedProceeds, match.MatchedBasis)
+		if err != nil {
+			return nil, fmt.Errorf("calculate matched gain or loss for acquisition %q: %w", strings.TrimSpace(match.AcquisitionSourceID), err)
+		}
+
+		matchCopy.MatchedProceeds = &matchedProceeds
+		matchCopy.MatchedGainOrLoss = &matchedGainOrLoss
+		enriched = append(enriched, matchCopy)
+	}
+
+	return enriched, nil
 }
 
 // buildInYearArtifacts creates the detail-row and liquidation-summary values
@@ -676,6 +736,7 @@ func buildInYearArtifacts(
 		GainOrLoss:             *application.gainOrLoss,
 		ActivityCurrency:       input.SelectedCurrencyCode,
 		CalculationCurrency:    reportCalculationCurrencyLabel,
+		Matches:                append([]reportmodel.BasisMatch(nil), application.basisMatches...),
 	}
 	if err := liquidation.Validate(); err != nil {
 		return nil, nil, apd.Decimal{}, newInputCalculationError(
@@ -828,7 +889,16 @@ func (state lotBasisState) Dispose(input basisDisposalInput) (basisDisposalResul
 		return basisDisposalResult{}, err
 	}
 
-	return basisDisposalResult{AllocatedBasis: result.AllocatedBasis, ReachedZero: remainingQuantity.Sign() == 0}, nil
+	var matches = make([]reportmodel.BasisMatch, 0, len(result.Matches))
+	for _, match := range result.Matches {
+		matches = append(matches, reportmodel.BasisMatch{
+			AcquisitionSourceID: strings.TrimSpace(match.AcquisitionSourceID),
+			MatchedQuantity:     match.MatchedQuantity,
+			MatchedBasis:        match.MatchedBasis,
+		})
+	}
+
+	return basisDisposalResult{AllocatedBasis: result.AllocatedBasis, Matches: matches, ReachedZero: remainingQuantity.Sign() == 0}, nil
 }
 
 // OpenQuantity returns the exact remaining lot quantity.
@@ -858,7 +928,7 @@ func (state averageCostBasisState) Dispose(input basisDisposalInput) (basisDispo
 		return basisDisposalResult{}, err
 	}
 
-	return basisDisposalResult{AllocatedBasis: result.AllocatedBasis, ReachedZero: result.RemainingQuantity.Sign() == 0}, nil
+	return basisDisposalResult{AllocatedBasis: result.AllocatedBasis, Matches: []reportmodel.BasisMatch{{AcquisitionSourceID: "AVERAGE_COST_POOL", MatchedQuantity: result.DisposedQuantity, MatchedBasis: result.AllocatedBasis}}, ReachedZero: result.RemainingQuantity.Sign() == 0}, nil
 }
 
 // AddAcquisition adds one acquisition into one scope-local scope partition.
@@ -882,7 +952,23 @@ func (state scopeLocalHybridBasisState) Dispose(input basisDisposalInput) (basis
 		return basisDisposalResult{}, err
 	}
 
-	return basisDisposalResult{AllocatedBasis: result.AllocatedBasis, ReachedZero: result.ReachedZero}, nil
+	var matches = make([]reportmodel.BasisMatch, 0, len(result.Matches))
+	for _, match := range result.Matches {
+		matches = append(matches, reportmodel.BasisMatch{
+			AcquisitionSourceID: strings.TrimSpace(match.AcquisitionSourceID),
+			MatchedQuantity:     match.MatchedQuantity,
+			MatchedBasis:        match.MatchedBasis,
+		})
+	}
+	if len(matches) == 0 {
+		matches = []reportmodel.BasisMatch{{
+			AcquisitionSourceID: strings.TrimSpace(input.ApplicableScopeKey),
+			MatchedQuantity:     input.Quantity,
+			MatchedBasis:        result.AllocatedBasis,
+		}}
+	}
+
+	return basisDisposalResult{AllocatedBasis: result.AllocatedBasis, Matches: matches, ReachedZero: result.ReachedZero}, nil
 }
 
 // OpenQuantity returns the exact remaining quantity across all open scopes.

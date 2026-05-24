@@ -272,7 +272,7 @@ Before Markdown rendering, the calculator supplies a complete `CapitalGainsRepor
 - detail sections
 - report calculation currency label
 - activity-row `Activity Currency` values that already reflect the first eligible explicit-currency tier selected by the calculator, including lower-priority tiers when higher-priority tiers were skipped for lacking a currency code
-- selected activity inputs that already reflect any same-tier exact derivation needed to satisfy the chosen context, with gross-value multiplication completed before any division-based unit-price fallback
+- selected activity inputs that already reflect any same-tier derivation needed to satisfy the chosen context under the shared 16-decimal internal round-half-up policy, with gross-value multiplication completed before any division-based unit-price fallback
 
 Markdown rendering must not:
 

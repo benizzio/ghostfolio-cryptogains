@@ -95,6 +95,50 @@ func TestActivityValidationFlowAllowsProdLikeOrderTierPrecisionDifferences(t *te
 	}
 }
 
+// TestActivityValidationFlowAllowsRepeatingGrossValueOnlyUnitPriceDerivation
+// verifies that same-tier gross-value-only rows survive the full sync boundary
+// when unit-price derivation needs 16-decimal round-half-up handling.
+// Authored by: OpenCode
+func TestActivityValidationFlowAllowsRepeatingGrossValueOnlyUnitPriceDerivation(t *testing.T) {
+	t.Parallel()
+
+	baseDir := t.TempDir()
+	server := newTokenAwareStorageServer(t)
+	server.SetTokenPages("token-one", []storagePageFixture{{
+		Count: 2,
+		ActivitiesJSON: `[
+			{"id":"repeat-buy-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":3,"valueInBaseCurrency":1,"feeInBaseCurrency":0,"baseCurrency":"USD","SymbolProfile":{"id":"asset-repeat-validation-flow-001","symbol":"RPT","name":"Repeat Asset","currency":"USD"}},
+			{"id":"repeat-sell-1","date":"2024-02-01T10:00:00Z","type":"SELL","quantity":1,"valueInBaseCurrency":1,"unitPriceInAssetProfileCurrency":1,"feeInBaseCurrency":0,"baseCurrency":"USD","SymbolProfile":{"id":"asset-repeat-validation-flow-001","symbol":"RPT","name":"Repeat Asset","currency":"USD"}}
+		]`,
+	}})
+	service := newActivityValidationSyncService(baseDir, server)
+	config := mustActivityValidationConfig(t, server.URL())
+	inspector := snapshotstore.NewEncryptedStore(baseDir, nil)
+
+	outcome := service.Run(context.Background(), runtime.SyncRequest{Config: config, SecurityToken: "token-one"})
+	if !outcome.Success {
+		t.Fatalf("expected repeating gross-value-only sync success, got %#v", outcome)
+	}
+
+	candidates, err := snapshotstore.DiscoverServerCandidates(context.Background(), inspector, server.URL())
+	if err != nil {
+		t.Fatalf("discover candidates: %v", err)
+	}
+	if len(candidates) == 0 {
+		t.Fatalf("expected discovered snapshot candidates")
+	}
+	payload, err := inspector.Read(context.Background(), snapshotstore.ReadRequest{Candidate: candidates[0], SecurityToken: "token-one"})
+	if err != nil {
+		t.Fatalf("read payload: %v", err)
+	}
+	if payload.ProtectedActivityCache.ActivityCount != 2 {
+		t.Fatalf("expected persisted repeating-derivation activities, got %#v", payload.ProtectedActivityCache)
+	}
+	if payload.ProtectedActivityCache.Activities[0].BaseGrossValue == nil || payload.ProtectedActivityCache.Activities[0].BaseCurrency != "USD" {
+		t.Fatalf("expected preserved same-tier base gross-value inputs, got %#v", payload.ProtectedActivityCache.Activities[0])
+	}
+}
+
 // TestActivityValidationFlowNormalizesDuplicatesAndSameAssetSameDayOrdering
 // verifies duplicate removal and persisted same-day ordering through the full sync flow.
 // Authored by: OpenCode

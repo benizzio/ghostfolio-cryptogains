@@ -35,7 +35,7 @@
 - No clarification markers remain.
 - Revalidated after the `spec-fixes.md` updates: the workflow now centers on the unlocked `Sync and Reports` context, the report structure is defined explicitly, and single-activity currency-context rules are separated from exact-decimal rules.
 - Revalidated on 2026-05-23 for BUG-006 artifact consistency: `data-model.md`, `contracts/tui-workflows.md`, `quickstart.md`, and this checklist now align on diagnostics outcome state, diagnostics-path disclosure, source-faithful persisted `ActivityRecord` use, and explicit `null` rendering.
-- Revalidated on 2026-05-23 for BUG-007 artifact consistency: `research.md`, `data-model.md`, `contracts/markdown-report.md`, `quickstart.md`, and this checklist now align on explicit-currency tier eligibility, skipping currencyless tiers before completeness validation, same-tier exact derivation, multiplication-before-division precedence, and lower-priority selected activity-currency output when earlier tiers are currencyless.
+- Revalidated on 2026-05-23 for BUG-007 artifact consistency: `research.md`, `data-model.md`, `contracts/markdown-report.md`, `quickstart.md`, and this checklist now align on explicit-currency tier eligibility, skipping currencyless tiers before completeness validation, same-tier derivation under the shared 16-decimal internal round-half-up policy, multiplication-before-division precedence, and lower-priority selected activity-currency output when earlier tiers are currencyless.
 - Revalidated on 2026-05-23 for BUG-008 artifact consistency: `data-model.md`, `quickstart.md`, this checklist, and `specs/004-source-faithful-diagnostics/spec.md` now align on preserving actionable `failure_detail`, ordered `failure_cause_chain`, and nested-cause redaction or suppression rules for shared diagnostics artifacts.
 - Runtime-backed verification for regenerated coverage and fresh artifact inspection remains tracked separately by `T062` and `T064`; the evidence below distinguishes current documented evidence from those pending reruns.
 
@@ -97,7 +97,7 @@
 
 ### Currency-Context Selection Evidence
 
-- `spec.md` now requires explicit-currency tier eligibility before context selection, same-tier exact derivation, multiplication-before-division precedence, and terminal failure only after explicit-currency tiers are exhausted.
+- `spec.md` now requires explicit-currency tier eligibility before context selection, same-tier derivation under the shared 16-decimal internal round-half-up policy, multiplication-before-division precedence, and terminal failure only after explicit-currency tiers are exhausted.
 - `research.md` now records the design decision that currencyless tiers are skipped and that same-tier multiplication to gross value precedes division-based fallback.
 - `data-model.md` now constrains `ActivityCalculationInput` so a chosen context requires `selected_currency_code`, eligible tiers must have explicit currency, and derivations stay inside one selected tier.
 - `contracts/markdown-report.md` now states that priced-row `Activity Currency` reflects the actual selected lower-priority explicit tier when higher-priority tiers were skipped for missing currency.

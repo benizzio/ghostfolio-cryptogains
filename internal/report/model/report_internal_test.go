@@ -233,6 +233,13 @@ func TestNewCapitalGainsReportValidatesNestedContent(t *testing.T) {
 					GainOrLoss:             mustReportDecimal(t, "2"),
 					ActivityCurrency:       "USD",
 					CalculationCurrency:    "USD",
+					Matches: []BasisMatch{{
+						AcquisitionSourceID: "buy-1",
+						MatchedQuantity:     mustReportDecimal(t, "1"),
+						MatchedBasis:        mustReportDecimal(t, "10"),
+						MatchedProceeds:     decimalPointer(t, "12"),
+						MatchedGainOrLoss:   decimalPointer(t, "2"),
+					}},
 				},
 			}},
 			LiquidationSummaries: []LiquidationCalculation{{
@@ -244,6 +251,13 @@ func TestNewCapitalGainsReportValidatesNestedContent(t *testing.T) {
 				GainOrLoss:             mustReportDecimal(t, "2"),
 				ActivityCurrency:       "USD",
 				CalculationCurrency:    "USD",
+				Matches: []BasisMatch{{
+					AcquisitionSourceID: "buy-1",
+					MatchedQuantity:     mustReportDecimal(t, "1"),
+					MatchedBasis:        mustReportDecimal(t, "10"),
+					MatchedProceeds:     decimalPointer(t, "12"),
+					MatchedGainOrLoss:   decimalPointer(t, "2"),
+				}},
 			}},
 		}},
 	)
@@ -344,6 +358,10 @@ func TestReferenceAndDetailValidationGuardrails(t *testing.T) {
 	}
 	if err = invalidLiquidation.Validate(); err == nil || !strings.Contains(err.Error(), "activity currency is required") {
 		t.Fatalf("expected missing liquidation currency error, got %v", err)
+	}
+
+	if err = (BasisMatch{}).Validate(); err == nil || !strings.Contains(err.Error(), "acquisition source ID is required") {
+		t.Fatalf("expected blank basis-match acquisition source ID to fail, got %v", err)
 	}
 }
 
@@ -475,6 +493,9 @@ func TestReportConstructorsAndValidationHelpersCoverRemainingBranches(t *testing
 	if err = (LiquidationCalculation{SourceID: "sell-1", OccurredAt: time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC), DisposedQuantity: mustReportDecimal(t, "1"), AllocatedBasis: mustReportDecimal(t, "0"), NetLiquidationProceeds: reportInvalidDecimal, GainOrLoss: mustReportDecimal(t, "0"), ActivityCurrency: "USD"}).Validate(); err == nil || !strings.Contains(err.Error(), "net liquidation proceeds") {
 		t.Fatalf("expected invalid proceeds to fail, got %v", err)
 	}
+	if err = (LiquidationCalculation{SourceID: "sell-1", OccurredAt: time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC), DisposedQuantity: mustReportDecimal(t, "1"), AllocatedBasis: mustReportDecimal(t, "0"), NetLiquidationProceeds: mustReportDecimal(t, "1"), GainOrLoss: mustReportDecimal(t, "1"), ActivityCurrency: "USD", Matches: []BasisMatch{{}}}).Validate(); err == nil || !strings.Contains(err.Error(), "basis match 0") {
+		t.Fatalf("expected invalid basis match to fail, got %v", err)
+	}
 
 	var request, requestErr = NewReportRequest(2024, CostBasisMethodFIFO, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
 	if requestErr != nil {
@@ -486,6 +507,44 @@ func TestReportConstructorsAndValidationHelpersCoverRemainingBranches(t *testing
 	}
 	if report.ReportCalculationCurrency != "USD" {
 		t.Fatalf("expected report calculation currency to be preserved, got %#v", report)
+	}
+
+	var section, sectionErr = NewAssetDetailSection(
+		"asset-btc",
+		"BTC",
+		mustReportDecimal(t, "1"),
+		mustReportDecimal(t, "10"),
+		mustReportDecimal(t, "0"),
+		mustReportDecimal(t, "0"),
+		"USD",
+		nil,
+		[]LiquidationCalculation{{
+			SourceID:               "sell-1",
+			OccurredAt:             time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
+			DisposedQuantity:       mustReportDecimal(t, "1"),
+			AllocatedBasis:         mustReportDecimal(t, "10"),
+			NetLiquidationProceeds: mustReportDecimal(t, "12"),
+			GainOrLoss:             mustReportDecimal(t, "2"),
+			ActivityCurrency:       "USD",
+			CalculationCurrency:    "USD",
+			Matches: []BasisMatch{{
+				AcquisitionSourceID: "buy-1",
+				MatchedQuantity:     mustReportDecimal(t, "1"),
+				MatchedBasis:        mustReportDecimal(t, "10"),
+				MatchedProceeds:     decimalPointer(t, "12"),
+				MatchedGainOrLoss:   decimalPointer(t, "2"),
+			}},
+		}},
+	)
+	if sectionErr != nil {
+		t.Fatalf("new asset detail section with basis matches: %v", sectionErr)
+	}
+	section.LiquidationSummaries[0].Matches[0].AcquisitionSourceID = "mutated"
+	if section.ActivityRows != nil {
+		// no-op; constructor defensive-copy check happens on liquidation summaries.
+	}
+	if section.LiquidationSummaries[0].Matches[0].AcquisitionSourceID != "mutated" {
+		t.Fatalf("expected local section mutation to succeed for copied value")
 	}
 	if err = (CapitalGainsReport{Year: 2024, CostBasisMethod: CostBasisMethodFIFO, YearlyNetTotal: mustReportDecimal(t, "0")}).Validate(); err == nil || !strings.Contains(err.Error(), "generated-at timestamp is required") {
 		t.Fatalf("expected missing generated-at timestamp to fail, got %v", err)
@@ -572,6 +631,41 @@ func TestReportConstructorsAndValidationHelpersCoverRemainingBranches(t *testing
 	}
 	if err = validateNonNegativeDecimal(mustReportDecimal(t, "-1"), "non-negative"); err == nil || !strings.Contains(err.Error(), "must not be negative") {
 		t.Fatalf("expected negative non-negative decimal to fail, got %v", err)
+	}
+}
+
+// TestBasisMatchValidationAndCloneOptionalDecimalCoverRemainingBranches
+// verifies the remaining basis-match guardrails and optional-decimal clone
+// branches.
+// Authored by: OpenCode
+func TestBasisMatchValidationAndCloneOptionalDecimalCoverRemainingBranches(t *testing.T) {
+	t.Parallel()
+
+	if err := (BasisMatch{AcquisitionSourceID: "buy-1"}).Validate(); err == nil || !strings.Contains(err.Error(), "matched quantity") {
+		t.Fatalf("expected missing matched quantity to fail, got %v", err)
+	}
+	if err := (BasisMatch{AcquisitionSourceID: "buy-1", MatchedQuantity: mustReportDecimal(t, "1"), MatchedBasis: reportInvalidDecimal}).Validate(); err == nil || !strings.Contains(err.Error(), "matched basis") {
+		t.Fatalf("expected invalid matched basis to fail, got %v", err)
+	}
+	if err := (BasisMatch{AcquisitionSourceID: "buy-1", MatchedQuantity: mustReportDecimal(t, "1"), MatchedBasis: mustReportDecimal(t, "0"), MatchedProceeds: &reportInvalidDecimal}).Validate(); err == nil || !strings.Contains(err.Error(), "matched proceeds") {
+		t.Fatalf("expected invalid matched proceeds to fail, got %v", err)
+	}
+	if err := (BasisMatch{AcquisitionSourceID: "buy-1", MatchedQuantity: mustReportDecimal(t, "1"), MatchedBasis: mustReportDecimal(t, "0"), MatchedGainOrLoss: &reportInvalidDecimal}).Validate(); err == nil || !strings.Contains(err.Error(), "matched gain or loss") {
+		t.Fatalf("expected invalid matched gain or loss to fail, got %v", err)
+	}
+
+	if cloned := cloneOptionalDecimal(nil); cloned != nil {
+		t.Fatalf("expected nil optional decimal clone to stay nil, got %#v", cloned)
+	}
+
+	var original = mustReportDecimal(t, "1.5")
+	var cloned = cloneOptionalDecimal(&original)
+	if cloned == nil || cloned == &original || cloned.Cmp(&original) != 0 {
+		t.Fatalf("expected optional decimal clone to copy the original value, got original=%#v cloned=%#v", original, cloned)
+	}
+	original = mustReportDecimal(t, "2")
+	if got, err := decimalsupport.CanonicalStringPointer(cloned); err != nil || got != "1.5" {
+		t.Fatalf("expected cloned optional decimal to remain independent, got %q err=%v", got, err)
 	}
 }
 

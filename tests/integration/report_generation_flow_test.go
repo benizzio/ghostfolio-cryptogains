@@ -4,6 +4,7 @@
 package integration
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,8 +13,14 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
+	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
+	ghostfolioclient "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/client"
+	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
+	syncnormalize "github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
+	syncvalidate "github.com/benizzio/ghostfolio-cryptogains/internal/sync/validate"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 	"github.com/cockroachdb/apd/v3"
 )
@@ -265,6 +272,78 @@ func TestReportGenerationRoundsSameTierUnitPriceDerivation(t *testing.T) {
 	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
 }
 
+// TestReportGenerationAfterSyncAllowsRepeatingGrossValueOnlyUnitPriceDerivation
+// verifies that a raw Ghostfolio activity shape with repeating same-tier
+// gross-value-only unit-price derivation survives sync-boundary validation and
+// remains reportable through the runtime-backed report workflow.
+// Authored by: OpenCode
+func TestReportGenerationAfterSyncAllowsRepeatingGrossValueOnlyUnitPriceDerivation(t *testing.T) {
+	var reportIO = testutil.NewReportIOFixture(t)
+	var openLogPath = installOpenCommandRecorder(t, 0)
+	var baseDir = t.TempDir()
+	var server = newTokenAwareStorageServer(t)
+	server.SetTokenPages("token-123", []storagePageFixture{{
+		Count: 2,
+		ActivitiesJSON: `[
+			{"id":"repeat-buy-1","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":3,"valueInBaseCurrency":1,"feeInBaseCurrency":0,"baseCurrency":"USD","SymbolProfile":{"id":"asset-repeat-report-flow-001","symbol":"RPT","name":"Repeat Asset","currency":"USD"}},
+			{"id":"repeat-sell-1","date":"2024-02-01T10:00:00Z","type":"SELL","quantity":1,"valueInBaseCurrency":1,"unitPriceInAssetProfileCurrency":1,"feeInBaseCurrency":0,"baseCurrency":"USD","SymbolProfile":{"id":"asset-repeat-report-flow-001","symbol":"RPT","name":"Repeat Asset","currency":"USD"}}
+		]`,
+	}})
+
+	var syncConfig = mustReportGenerationSyncConfig(t, server.URL())
+	var syncService = runtime.NewSyncService(
+		ghostfolioclient.New(server.Client()),
+		time.Second,
+		baseDir,
+		true,
+		decimalsupport.NewService(),
+		syncnormalize.NewNormalizer(),
+		syncvalidate.NewValidator(),
+		snapshotstore.NewEncryptedStore(baseDir, nil),
+	)
+	var syncOutcome = syncService.Run(context.Background(), runtime.SyncRequest{Config: syncConfig, SecurityToken: "token-123"})
+	if !syncOutcome.Success {
+		t.Fatalf("expected sync success for repeating gross-value-only report fixture, got %#v", syncOutcome)
+	}
+
+	var harness = newRuntimeBackedFlowHarness(t, baseDir, syncConfig, true)
+	var model = unlockSyncReportsContext(t, harness.Model, "token-123")
+	model = openReportSelectionFromContext(t, model)
+	model = selectReportYear(t, model, 2024)
+	model, cmd := startReportGenerationFromSelection(t, model)
+	model = applyBatchCmd(t, model, cmd)
+
+	if model.ActiveScreen() != "report_result" {
+		t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
+	}
+
+	var files = mustMarkdownFiles(t, reportIO.DocumentsDir)
+	if len(files) != 1 {
+		t.Fatalf("expected one saved Markdown file, got %#v", files)
+	}
+	var reportPath = files[0]
+	var openerRequests = readOpenCommandRequests(t, openLogPath)
+	if len(openerRequests) != 1 || openerRequests[0] != reportPath {
+		t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
+	}
+
+	var rawReport, err = os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read saved report %q: %v", reportPath, err)
+	}
+	var reportText = string(rawReport)
+	for _, expected := range []string{
+		"| repeat-buy-1 | BUY | 3 | 1 | 0 | USD | 1 | NOT APPLICABLE | 3 |",
+		"| repeat-sell-1 | SELL | 1 | 1 | 0 | USD | 0.6666666666666667 | NOT APPLICABLE | 2 |",
+		"| repeat-sell-1 | 1 | USD | 0.3333333333333333 | 1 | 0.6666666666666667 | NOT APPLICABLE |",
+	} {
+		if !strings.Contains(reportText, expected) {
+			t.Fatalf("expected synced repeating-derivation report to contain %q, got %q", expected, reportText)
+		}
+	}
+	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
+}
+
 // roundedUnitPriceProtectedActivityCache builds one deterministic cache where a
 // same-tier unit-price derivation requires repeating decimal rounding.
 // Authored by: OpenCode
@@ -342,6 +421,20 @@ func roundedReportActivity(t *testing.T, input roundedReportActivityInput) syncm
 		OrderGrossValue:  roundedIntegrationDecimalPointer(t, input.OrderGrossValue),
 		OrderFeeAmount:   roundedIntegrationDecimalPointer(t, input.OrderFeeAmount),
 	}
+}
+
+// mustReportGenerationSyncConfig returns one custom-origin config for sync then
+// runtime-backed report generation within the same base directory.
+// Authored by: OpenCode
+func mustReportGenerationSyncConfig(t *testing.T, origin string) configmodel.AppSetupConfig {
+	t.Helper()
+
+	config, err := configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, origin, true, time.Now())
+	if err != nil {
+		t.Fatalf("new report-generation sync config: %v", err)
+	}
+
+	return config
 }
 
 // mustReportFixtureTime parses one RFC3339 fixture timestamp for integration

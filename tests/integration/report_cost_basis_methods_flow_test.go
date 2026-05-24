@@ -8,9 +8,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
+	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
@@ -173,6 +175,51 @@ func TestReportGenerationSupportsRoundedRepeatingDecimalHistoryAcrossMethods(t *
 	}
 }
 
+// TestReportCalculationRetainsFragmentLevelPricedLiquidationMatchesAcrossMethods
+// verifies that every supported method retains fragment-level priced
+// liquidation matches when report calculation is executed against the synced
+// snapshot input.
+// Authored by: OpenCode
+func TestReportCalculationRetainsFragmentLevelPricedLiquidationMatchesAcrossMethods(t *testing.T) {
+	var methods = []reportmodel.CostBasisMethod{
+		reportmodel.CostBasisMethodFIFO,
+		reportmodel.CostBasisMethodLIFO,
+		reportmodel.CostBasisMethodHIFO,
+		reportmodel.CostBasisMethodAverageCost,
+		reportmodel.CostBasisMethodScopeLocalHybrid,
+	}
+
+	for _, method := range methods {
+		var method = method
+		t.Run(string(method), func(t *testing.T) {
+			var request, err = reportmodel.NewReportRequest(2024, method, mustIntegrationTime())
+			if err != nil {
+				t.Fatalf("new report request: %v", err)
+			}
+
+			var report reportmodel.CapitalGainsReport
+			report, err = reportcalculate.Calculate(request, roundedUnitPriceProtectedActivityCache(t))
+			if err != nil {
+				t.Fatalf("calculate report for %q: %v", method, err)
+			}
+
+			if len(report.DetailSections) != 1 || len(report.DetailSections[0].LiquidationSummaries) != 1 {
+				t.Fatalf("expected one detail section and liquidation summary, got %#v", report.DetailSections)
+			}
+
+			var liquidation = report.DetailSections[0].LiquidationSummaries[0]
+			if len(liquidation.Matches) == 0 {
+				t.Fatalf("expected fragment-level liquidation matches for %q, got %#v", method, liquidation)
+			}
+			for index, match := range liquidation.Matches {
+				if match.MatchedProceeds == nil || match.MatchedGainOrLoss == nil {
+					t.Fatalf("expected priced fragment values for method %q match %d, got %#v", method, index, match)
+				}
+			}
+		})
+	}
+}
+
 // assertExpectedReportLedger verifies the rendered Markdown against one
 // controlled expected report ledger.
 // Authored by: OpenCode
@@ -287,4 +334,10 @@ func assertIntegrationDecimalString(t *testing.T, value apd.Decimal, want string
 	if canonical != want {
 		t.Fatalf("unexpected %s: got %q want %q", label, canonical, want)
 	}
+}
+
+// mustIntegrationTime returns one stable timestamp for report requests.
+// Authored by: OpenCode
+func mustIntegrationTime() time.Time {
+	return time.Date(2026, time.May, 24, 12, 0, 0, 0, time.UTC)
 }

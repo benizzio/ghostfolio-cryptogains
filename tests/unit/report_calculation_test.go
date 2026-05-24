@@ -482,6 +482,148 @@ func TestCalculateRoundsPartialLotBasisAllocation(t *testing.T) {
 	assertCalculationDecimalString(t, detail.LiquidationSummaries[0].GainOrLoss, "1.6666666666666667", "rounded partial-lot gain")
 }
 
+// TestCalculateRetainsFragmentLevelPricedLiquidationMatches verifies that one
+// multi-fragment priced liquidation carries fragment-level matched proceeds and
+// matched gain or loss into the calculated report model.
+// Authored by: OpenCode
+func TestCalculateRetainsFragmentLevelPricedLiquidationMatches(t *testing.T) {
+	t.Parallel()
+
+	var request = mustReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO)
+	var report, err = reportcalculate.Calculate(request, calculationCache(
+		2024,
+		calculationActivity(t, calculationActivityInput{
+			SourceID:         "frag-buy-2023-001",
+			OccurredAt:       "2023-01-01T10:00:00Z",
+			ActivityType:     syncmodel.ActivityTypeBuy,
+			AssetIdentityKey: "asset-frag-001",
+			AssetSymbol:      "FRAG",
+			AssetName:        "Fragment Asset",
+			Quantity:         "1",
+			OrderCurrency:    "USD",
+			OrderGrossValue:  "10",
+			OrderFeeAmount:   "0",
+			OrderUnitPrice:   "10",
+		}),
+		calculationActivity(t, calculationActivityInput{
+			SourceID:         "frag-buy-2023-002",
+			OccurredAt:       "2023-02-01T10:00:00Z",
+			ActivityType:     syncmodel.ActivityTypeBuy,
+			AssetIdentityKey: "asset-frag-001",
+			AssetSymbol:      "FRAG",
+			AssetName:        "Fragment Asset",
+			Quantity:         "2",
+			OrderCurrency:    "USD",
+			OrderGrossValue:  "20",
+			OrderFeeAmount:   "0",
+			OrderUnitPrice:   "10",
+		}),
+		calculationActivity(t, calculationActivityInput{
+			SourceID:         "frag-sell-2024-001",
+			OccurredAt:       "2024-03-01T10:00:00Z",
+			ActivityType:     syncmodel.ActivityTypeSell,
+			AssetIdentityKey: "asset-frag-001",
+			AssetSymbol:      "FRAG",
+			AssetName:        "Fragment Asset",
+			Quantity:         "2",
+			OrderCurrency:    "USD",
+			OrderGrossValue:  "30",
+			OrderFeeAmount:   "0",
+			OrderUnitPrice:   "15",
+		}),
+	))
+	if err != nil {
+		t.Fatalf("calculate fragment-level priced liquidation report: %v", err)
+	}
+
+	var detail = detailSectionByAsset(t, report, "asset-frag-001")
+	if len(detail.LiquidationSummaries) != 1 {
+		t.Fatalf("unexpected liquidation summary count: got %d want 1", len(detail.LiquidationSummaries))
+	}
+	var liquidation = detail.LiquidationSummaries[0]
+	if len(liquidation.Matches) != 2 {
+		t.Fatalf("unexpected liquidation basis-match count: got %d want 2", len(liquidation.Matches))
+	}
+
+	assertCalculationDecimalString(t, liquidation.Matches[0].MatchedQuantity, "1", "first matched quantity")
+	assertCalculationDecimalString(t, liquidation.Matches[0].MatchedBasis, "10", "first matched basis")
+	assertCalculationDecimalPointerString(t, liquidation.Matches[0].MatchedProceeds, "15", "first matched proceeds")
+	assertCalculationDecimalPointerString(t, liquidation.Matches[0].MatchedGainOrLoss, "5", "first matched gain or loss")
+	assertCalculationDecimalString(t, liquidation.Matches[1].MatchedQuantity, "1", "second matched quantity")
+	assertCalculationDecimalString(t, liquidation.Matches[1].MatchedBasis, "10", "second matched basis")
+	assertCalculationDecimalPointerString(t, liquidation.Matches[1].MatchedProceeds, "15", "second matched proceeds")
+	assertCalculationDecimalPointerString(t, liquidation.Matches[1].MatchedGainOrLoss, "5", "second matched gain or loss")
+}
+
+// TestCalculateRoundsFragmentLevelProceedsWithRoundedIntermediate verifies the
+// rounded proceeds-per-unit intermediate is applied before per-fragment
+// multiplication for repeating proportional-proceeds allocation.
+// Authored by: OpenCode
+func TestCalculateRoundsFragmentLevelProceedsWithRoundedIntermediate(t *testing.T) {
+	t.Parallel()
+
+	var request = mustReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO)
+	var report, err = reportcalculate.Calculate(request, calculationCache(
+		2024,
+		calculationActivity(t, calculationActivityInput{
+			SourceID:         "round-buy-2023-001",
+			OccurredAt:       "2023-01-01T10:00:00Z",
+			ActivityType:     syncmodel.ActivityTypeBuy,
+			AssetIdentityKey: "asset-round-001",
+			AssetSymbol:      "RND",
+			AssetName:        "Rounded Asset",
+			Quantity:         "1",
+			OrderCurrency:    "USD",
+			OrderGrossValue:  "0.4",
+			OrderFeeAmount:   "0",
+			OrderUnitPrice:   "0.4",
+		}),
+		calculationActivity(t, calculationActivityInput{
+			SourceID:         "round-buy-2023-002",
+			OccurredAt:       "2023-02-01T10:00:00Z",
+			ActivityType:     syncmodel.ActivityTypeBuy,
+			AssetIdentityKey: "asset-round-001",
+			AssetSymbol:      "RND",
+			AssetName:        "Rounded Asset",
+			Quantity:         "2",
+			OrderCurrency:    "USD",
+			OrderGrossValue:  "0.6",
+			OrderFeeAmount:   "0",
+			OrderUnitPrice:   "0.3",
+		}),
+		calculationActivity(t, calculationActivityInput{
+			SourceID:         "round-sell-2024-001",
+			OccurredAt:       "2024-03-01T10:00:00Z",
+			ActivityType:     syncmodel.ActivityTypeSell,
+			AssetIdentityKey: "asset-round-001",
+			AssetSymbol:      "RND",
+			AssetName:        "Rounded Asset",
+			Quantity:         "3",
+			OrderCurrency:    "USD",
+			OrderGrossValue:  "2",
+			OrderFeeAmount:   "0",
+			OrderUnitPrice:   "0.6666666666666666666666666666666667",
+		}),
+	))
+	if err != nil {
+		t.Fatalf("calculate rounded fragment-level proceeds report: %v", err)
+	}
+
+	var detail = detailSectionByAsset(t, report, "asset-round-001")
+	var liquidation = detail.LiquidationSummaries[0]
+	if len(liquidation.Matches) != 2 {
+		t.Fatalf("unexpected liquidation basis-match count: got %d want 2", len(liquidation.Matches))
+	}
+
+	assertCalculationDecimalPointerString(t, liquidation.Matches[0].MatchedProceeds, "0.6666666666666667", "rounded first matched proceeds")
+	assertCalculationDecimalPointerString(t, liquidation.Matches[1].MatchedProceeds, "1.3333333333333334", "rounded second matched proceeds")
+	assertCalculationDecimalPointerString(t, liquidation.Matches[0].MatchedGainOrLoss, "0.2666666666666667", "rounded first matched gain or loss")
+	assertCalculationDecimalPointerString(t, liquidation.Matches[1].MatchedGainOrLoss, "0.7333333333333334", "rounded second matched gain or loss")
+	assertCalculationDecimalString(t, liquidation.AllocatedBasis, "1", "rounded fragment allocated basis")
+	assertCalculationDecimalString(t, liquidation.NetLiquidationProceeds, "2", "rounded fragment net liquidation proceeds")
+	assertCalculationDecimalString(t, liquidation.GainOrLoss, "1", "rounded fragment overall gain")
+}
+
 // calculationActivityInput stores one compact report-calculation activity test
 // declaration before conversion into the normalized sync model.
 // Authored by: OpenCode

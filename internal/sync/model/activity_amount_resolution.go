@@ -5,11 +5,14 @@ package model
 
 import (
 	"fmt"
+	"math/big"
 	"strings"
 
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/cockroachdb/apd/v3"
 )
+
+const activityAmountResolutionScale int32 = 16
 
 // ResolvedActivityAmounts stores the transient current-slice money view derived
 // from one persisted activity record.
@@ -112,10 +115,10 @@ func resolveUnitPrice(
 
 	if grossValue != nil && strings.TrimSpace(grossValueCurrency) != "" {
 		var unitPrice apd.Decimal
-		unitPrice, _, err = decimalsupport.DivideExact(*grossValue, record.Quantity)
+		unitPrice, err = divideActivityAmountRoundHalfUp(*grossValue, record.Quantity)
 		if err != nil {
 			return nil, "", fmt.Errorf(
-				"activity %q unit price basis input is not exact: %w",
+				"activity %q unit price basis input is invalid: %w",
 				strings.TrimSpace(record.SourceID),
 				err,
 			)
@@ -275,4 +278,83 @@ func multiplyActivityAmount(left apd.Decimal, right apd.Decimal) (apd.Decimal, e
 	}
 
 	return product, nil
+}
+
+// divideActivityAmountRoundHalfUp derives one transient amount using the shared
+// 16-decimal round-half-up policy for repeating divisions.
+// Authored by: OpenCode
+func divideActivityAmountRoundHalfUp(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, error) {
+	if _, err := decimalsupport.CanonicalString(dividend); err != nil {
+		return apd.Decimal{}, fmt.Errorf("derive activity amount from gross value and quantity: %w", err)
+	}
+	if _, err := decimalsupport.CanonicalString(divisor); err != nil {
+		return apd.Decimal{}, fmt.Errorf("derive activity amount from gross value and quantity: %w", err)
+	}
+	if divisor.Sign() == 0 {
+		return apd.Decimal{}, fmt.Errorf("derive activity amount from gross value and quantity: non-zero divisor is required")
+	}
+
+	var scaledQuotient = scaledRoundedActivityQuotient(dividend, divisor, activityAmountResolutionScale)
+	var magnitude = new(big.Int).Set(scaledQuotient)
+	var negative = magnitude.Sign() < 0
+	if negative {
+		magnitude.Abs(magnitude)
+	}
+
+	var coefficient apd.BigInt
+	coefficient.SetMathBigInt(magnitude)
+
+	return apd.Decimal{
+		Form:     apd.Finite,
+		Negative: negative,
+		Exponent: -activityAmountResolutionScale,
+		Coeff:    coefficient,
+	}, nil
+}
+
+// scaledRoundedActivityQuotient computes one fixed-scale quotient rounded half up.
+// Authored by: OpenCode
+func scaledRoundedActivityQuotient(dividend apd.Decimal, divisor apd.Decimal, scale int32) *big.Int {
+	var dividendNumerator, dividendDenominator = finiteActivityDecimalFraction(dividend)
+	var divisorNumerator, divisorDenominator = finiteActivityDecimalFraction(divisor)
+
+	var signNegative = (dividendNumerator.Sign() < 0) != (divisorNumerator.Sign() < 0)
+	var numerator = new(big.Int).Mul(new(big.Int).Abs(dividendNumerator), divisorDenominator)
+	numerator.Mul(numerator, activityPowerOfTen(scale))
+
+	var denominator = new(big.Int).Mul(dividendDenominator, new(big.Int).Abs(divisorNumerator))
+	var quotient = new(big.Int)
+	var remainder = new(big.Int)
+	quotient.QuoRem(numerator, denominator, remainder)
+
+	var doubledRemainder = new(big.Int).Lsh(new(big.Int).Set(remainder), 1)
+	if doubledRemainder.Cmp(denominator) >= 0 {
+		quotient.Add(quotient, big.NewInt(1))
+	}
+	if signNegative && quotient.Sign() != 0 {
+		quotient.Neg(quotient)
+	}
+
+	return quotient
+}
+
+// finiteActivityDecimalFraction converts one finite decimal into an exact fraction.
+// Authored by: OpenCode
+func finiteActivityDecimalFraction(value apd.Decimal) (*big.Int, *big.Int) {
+	var numerator = new(big.Int).Set(value.Coeff.MathBigInt())
+	if value.Negative {
+		numerator.Neg(numerator)
+	}
+	if value.Exponent >= 0 {
+		numerator.Mul(numerator, activityPowerOfTen(value.Exponent))
+		return numerator, big.NewInt(1)
+	}
+
+	return numerator, activityPowerOfTen(-value.Exponent)
+}
+
+// activityPowerOfTen returns 10 raised to one non-negative exponent.
+// Authored by: OpenCode
+func activityPowerOfTen(exponent int32) *big.Int {
+	return new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(exponent)), nil)
 }

@@ -119,8 +119,6 @@ func TestReportDecimalMathRejectsNonFiniteInputs(t *testing.T) {
 // multiply wrapper branch around the decimal operation seam.
 // Authored by: OpenCode
 func TestReportDecimalMathWrapsMultiplyOperationFailure(t *testing.T) {
-	t.Parallel()
-
 	var previous = reportMultiplyOperation
 	defer func() {
 		reportMultiplyOperation = previous

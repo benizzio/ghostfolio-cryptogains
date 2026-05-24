@@ -28,6 +28,7 @@ type ScopeLocalHybridAcquisition struct {
 // Authored by: OpenCode
 type ScopeLocalHybridDisposalResult struct {
 	AllocatedBasis apd.Decimal
+	Matches        []LotMatch
 	ReachedZero    bool
 }
 
@@ -148,9 +149,9 @@ func (state *ScopeLocalHybridState) Dispose(scopeKey string, quantity apd.Decima
 		}
 		if remainingQuantity.Sign() == 0 {
 			delete(state.scopes, normalizedScopeKey)
-			return ScopeLocalHybridDisposalResult{AllocatedBasis: exactResult.AllocatedBasis, ReachedZero: true}, nil
+			return ScopeLocalHybridDisposalResult{AllocatedBasis: exactResult.AllocatedBasis, Matches: append([]LotMatch(nil), exactResult.Matches...), ReachedZero: true}, nil
 		}
-		return ScopeLocalHybridDisposalResult{AllocatedBasis: exactResult.AllocatedBasis, ReachedZero: false}, nil
+		return ScopeLocalHybridDisposalResult{AllocatedBasis: exactResult.AllocatedBasis, Matches: append([]LotMatch(nil), exactResult.Matches...), ReachedZero: false}, nil
 	}
 
 	err := scopeState.activateFallback()

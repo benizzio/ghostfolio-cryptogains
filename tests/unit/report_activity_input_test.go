@@ -222,6 +222,26 @@ func TestSelectActivityCalculationInputRoundsNonTerminatingUnitPriceDerivation(t
 	assertSelectedContext(t, input, reportmodel.SelectedCurrencyContextBase, "USD", "1", "0", "0.3333333333333333")
 }
 
+// TestSelectActivityCalculationInputRoundsHalfUpAtSharedPrecision verifies the
+// shared 16-decimal round-half-up policy on same-tier repeating division.
+// Authored by: OpenCode
+func TestSelectActivityCalculationInputRoundsHalfUpAtSharedPrecision(t *testing.T) {
+	t.Parallel()
+
+	var record = pricedActivityRecord()
+	record.Quantity = mustDecimal(t, "6")
+	record.BaseCurrency = "USD"
+	record.BaseGrossValue = decimalPointer(t, "1")
+	record.BaseFeeAmount = decimalPointer(t, "0")
+
+	input, err := reportcalculate.SelectActivityCalculationInput(record)
+	if err != nil {
+		t.Fatalf("select activity input: %v", err)
+	}
+
+	assertSelectedContext(t, input, reportmodel.SelectedCurrencyContextBase, "USD", "1", "0", "0.1666666666666667")
+}
+
 // TestSelectActivityCalculationInputPrefersGrossValueDerivation verifies that a
 // selected tier may derive gross value by multiplication before considering any
 // division-based fallback or lower-priority tier.
