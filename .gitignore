@@ -2,6 +2,7 @@
 .idea/
 .vscode/
 .cache
+.specify/extensions/.cache/
 Thumbs.db
 .env*
 *.exe

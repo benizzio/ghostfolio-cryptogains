@@ -1,6 +1,7 @@
 ---
-description: "Generate data-model-diagram.mmd from data-model.md via agent inference"
+description: Generate data-model-diagram.mmd from data-model.md via agent inference
 ---
+
 
 <!-- Extension: data-model-diagram -->
 <!-- Config: .specify/extensions/data-model-diagram/ -->

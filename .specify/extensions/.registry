@@ -19,20 +19,6 @@
       "registered_skills": [],
       "installed_at": "2026-05-01T18:52:14.638134+00:00"
     },
-    "data-model-diagram": {
-      "version": "0.1.0",
-      "source": "local",
-      "manifest_hash": "sha256:1e3225136ffc533278aa894275c770a74089e413842e89c3250a6515891bd2e0",
-      "enabled": true,
-      "priority": 5,
-      "registered_commands": {
-        "opencode": [
-          "speckit.data-model-diagram.generate"
-        ]
-      },
-      "registered_skills": [],
-      "installed_at": "2026-05-02T13:04:18.867868+00:00"
-    },
     "bugfix": {
       "version": "1.1.0",
       "source": "local",
@@ -61,6 +47,26 @@
       },
       "registered_skills": [],
       "installed_at": "2026-05-26T18:29:23.776328+00:00"
+    },
+    "data-model-diagram": {
+      "version": "0.2.0",
+      "source": "local",
+      "manifest_hash": "sha256:116fdb968dc800cb05e961caf7bc160e3ca2b40c37cb3be2c8043b7cbeab879d",
+      "enabled": true,
+      "priority": 5,
+      "registered_commands": {
+        "agy": [
+          "speckit.data-model-diagram.generate"
+        ],
+        "codex": [
+          "speckit.data-model-diagram.generate"
+        ],
+        "opencode": [
+          "speckit.data-model-diagram.generate"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-05-26T21:16:46.216656+00:00"
     }
   }
 }

@@ -1,9 +1,12 @@
 ---
-description: "Generate data-model-diagram.mmd from data-model.md via agent inference"
+name: speckit-data-model-diagram-generate
+description: Generate data-model-diagram.mmd from data-model.md via agent inference
+compatibility: Requires spec-kit project structure with .specify/ directory
+metadata:
+  author: github-spec-kit
+  source: data-model-diagram:commands/speckit.data-model-diagram.generate.md
 ---
 
-<!-- Extension: data-model-diagram -->
-<!-- Config: .specify/extensions/data-model-diagram/ -->
 # Generate Data Model Diagram
 
 Generate a Mermaid ER diagram for the active Spec Kit feature directory.
