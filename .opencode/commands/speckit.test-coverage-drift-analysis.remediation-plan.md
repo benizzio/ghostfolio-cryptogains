@@ -28,8 +28,8 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 2. Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` from repo root and parse the absolute `FEATURE_DIR`.
 3. Verify `FEATURE_DIR/test-coverage-drift-report.md` and `FEATURE_DIR/tasks.md` exist. If the report is missing, stop and instruct the user to run `/speckit.test-coverage-drift-analysis.report` first.
 4. Load the current local Spec Kit task format references before editing `tasks.md`:
-   - `.opencode/command/speckit.tasks.md` when present
-   - `.opencode/command/speckit.implement.md` when present
+   - `.opencode/commands/speckit.tasks.md` when present
+   - `.opencode/commands/speckit.implement.md` when present
    - `.specify/templates/tasks-template.md` when present
    - the existing `FEATURE_DIR/tasks.md`
 5. Using the task state syntax from the current local Spec Kit installation and the existing task file, verify there are no open, unchecked, pending, or reopened tasks in `FEATURE_DIR/tasks.md`. If any are present, stop without editing `tasks.md` and instruct the user to finish implementation with `/speckit.implement` before planning coverage drift remediation.
