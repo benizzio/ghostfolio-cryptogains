@@ -1,9 +1,9 @@
 installed:
-  - git
-  - bugfix
-  - data-model-diagram
-  - coding-standards-drift-analysis
-  - test-coverage-drift-analysis
+- bugfix
+- coding-standards-drift-analysis
+- data-model-diagram
+- git
+- test-coverage-drift-analysis
 settings:
   auto_execute_hooks: true
 hooks:
@@ -132,14 +132,16 @@ hooks:
     enabled: true
     optional: true
     prompt: Run coding-standards drift analysis after implementation?
-    description: Generate or refresh the coding-standards drift report for the active feature
+    description: Generate or refresh the coding-standards drift report for the active
+      feature
     condition: null
   - extension: test-coverage-drift-analysis
     command: speckit.test-coverage-drift-analysis.report
     enabled: true
     optional: true
     prompt: Run test-coverage drift analysis after implementation?
-    description: Generate or refresh the test-coverage drift report for the active feature
+    description: Generate or refresh the test-coverage drift report for the active
+      feature
     condition: null
   - extension: git
     command: speckit.git.commit
