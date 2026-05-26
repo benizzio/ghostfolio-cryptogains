@@ -40,6 +40,18 @@
       "enabled": true,
       "priority": 10,
       "registered_commands": {
+        "agy": [
+          "speckit.bugfix.report",
+          "speckit.bugfix.patch",
+          "speckit.bugfix.switch",
+          "speckit.bugfix.verify"
+        ],
+        "codex": [
+          "speckit.bugfix.report",
+          "speckit.bugfix.patch",
+          "speckit.bugfix.switch",
+          "speckit.bugfix.verify"
+        ],
         "opencode": [
           "speckit.bugfix.report",
           "speckit.bugfix.patch",
@@ -48,7 +60,7 @@
         ]
       },
       "registered_skills": [],
-      "installed_at": "2026-05-10T14:25:17.822555+00:00"
+      "installed_at": "2026-05-26T18:29:23.776328+00:00"
     }
   }
 }
