@@ -1,10 +1,7 @@
 ---
-description: Initialize a Git repository with an initial commit
+description: "Initialize a Git repository with an initial commit"
 ---
 
-
-<!-- Extension: git -->
-<!-- Config: .specify/extensions/git/ -->
 # Initialize Git Repository
 
 Initialize a Git repository in the current project directory if one does not already exist.

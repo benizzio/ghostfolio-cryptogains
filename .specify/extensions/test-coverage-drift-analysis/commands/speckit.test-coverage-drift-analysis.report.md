@@ -28,9 +28,7 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 1. Verify a Spec Kit project exists by checking for `.specify/`.
 2. Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` from repo root and parse the absolute `FEATURE_DIR`.
 3. Verify `spec.md`, `plan.md`, and `tasks.md` exist in `FEATURE_DIR`.
-4. Load the current local Spec Kit task format references before interpreting task state:
-   - `.opencode/command/speckit.tasks.md` when present
-   - `.opencode/command/speckit.implement.md` when present
+4. Load the current Spec Kit task format references before interpreting task state:
    - `.specify/templates/tasks-template.md` when present
    - the existing `FEATURE_DIR/tasks.md`
 5. Using the task state syntax from the current local Spec Kit installation and the existing task file, verify there are no open, unchecked, pending, or reopened tasks in `FEATURE_DIR/tasks.md`. If any are present, stop without writing the report and instruct the user to finish implementation with `/speckit.implement` before running coverage drift analysis.

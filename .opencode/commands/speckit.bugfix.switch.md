@@ -1,7 +1,10 @@
 ---
-description: "Switch to a different bugfix context"
+description: Switch to a different bugfix context
 ---
 
+
+<!-- Extension: bugfix -->
+<!-- Config: .specify/extensions/bugfix/ -->
 # Switch bugfix context
 
 Update current context into an existing feature. The feature identity is defined by user.
