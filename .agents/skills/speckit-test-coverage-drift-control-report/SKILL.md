@@ -1,9 +1,14 @@
 ---
-description: "Generate or refresh test-coverage-drift-report.md for the active feature"
+name: speckit-test-coverage-drift-control-report
+description: Generate or refresh test-coverage-drift-report.md for the active feature
+compatibility: Requires spec-kit project structure with .specify/ directory
+metadata:
+  author: github-spec-kit
+  source: test-coverage-drift-control:commands/speckit.test-coverage-drift-control.report.md
 ---
 
-<!-- Extension: test-coverage-drift-analysis -->
-<!-- Config: .specify/extensions/test-coverage-drift-analysis/ -->
+<!-- Extension: test-coverage-drift-control -->
+<!-- Config: .specify/extensions/test-coverage-drift-control/ -->
 # Generate Test Coverage Drift Report
 
 Review the active feature implementation for divergences from the repository test-coverage baseline and write a structured drift report.
@@ -92,7 +97,7 @@ Write a Markdown report with this structure:
 **Purpose**: Record concrete deviations between the current implementation and the repository test-coverage baseline for the active feature slice.
 **Created**: [YYYY-MM-DD]
 **Feature**: [spec.md](./spec.md)
-**Correction Tracking**: Coverage drift remediation tasks are added to [tasks.md](./tasks.md) by `/speckit.test-coverage-drift-analysis.remediation-plan`.
+**Correction Tracking**: Coverage drift remediation tasks are added to [tasks.md](./tasks.md) by `/speckit.test-coverage-drift-control.remediation-plan`.
 
 ## Scope
 

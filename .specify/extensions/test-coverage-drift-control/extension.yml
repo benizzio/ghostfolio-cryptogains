@@ -1,0 +1,37 @@
+schema_version: "1.0"
+
+extension:
+  id: test-coverage-drift-control
+  name: "Test Coverage Drift Control"
+  version: "0.2.0"
+  description: "Generate coverage drift reports and remediation tasks after implementation"
+  author: "Igor Benicio de Mesquita"
+  repository: "https://github.com/benizzio/spec-kit-test-coverage-drift-control"
+  homepage: "https://github.com/benizzio/spec-kit-test-coverage-drift-control"
+  license: MIT
+
+requires:
+  speckit_version: ">=0.2.0"
+
+provides:
+  commands:
+    - name: speckit.test-coverage-drift-control.report
+      file: commands/speckit.test-coverage-drift-control.report.md
+      description: "Generate or refresh test-coverage-drift-report.md for the active feature"
+    - name: speckit.test-coverage-drift-control.remediation-plan
+      file: commands/speckit.test-coverage-drift-control.remediation-plan.md
+      description: "Append Spec Kit coverage remediation tasks to tasks.md from the drift report"
+
+hooks:
+  after_implement:
+    command: speckit.test-coverage-drift-control.report
+    optional: true
+    prompt: "Run test coverage drift control after implementation?"
+    description: "Generate or refresh the test coverage drift report for the active feature"
+
+tags:
+  - "analysis"
+  - "coverage"
+  - "testing"
+  - "quality"
+  - "maintenance"

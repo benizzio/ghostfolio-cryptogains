@@ -90,6 +90,29 @@
       },
       "registered_skills": [],
       "installed_at": "2026-05-27T19:52:28.902435+00:00"
+    },
+    "test-coverage-drift-control": {
+      "version": "0.2.0",
+      "source": "local",
+      "manifest_hash": "sha256:961244c6e8fcfa021fcb5b1339b54cd59d395e3424a01fbedabd94e5301b4153",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "agy": [
+          "speckit.test-coverage-drift-control.report",
+          "speckit.test-coverage-drift-control.remediation-plan"
+        ],
+        "codex": [
+          "speckit.test-coverage-drift-control.report",
+          "speckit.test-coverage-drift-control.remediation-plan"
+        ],
+        "opencode": [
+          "speckit.test-coverage-drift-control.report",
+          "speckit.test-coverage-drift-control.remediation-plan"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-05-27T20:52:53.716045+00:00"
     }
   }
 }

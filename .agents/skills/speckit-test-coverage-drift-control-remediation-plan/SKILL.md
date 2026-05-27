@@ -1,9 +1,15 @@
 ---
-description: "Append Spec Kit coverage remediation tasks to tasks.md from the drift report"
+name: speckit-test-coverage-drift-control-remediation-plan
+description: Append Spec Kit coverage remediation tasks to tasks.md from the drift
+  report
+compatibility: Requires spec-kit project structure with .specify/ directory
+metadata:
+  author: github-spec-kit
+  source: test-coverage-drift-control:commands/speckit.test-coverage-drift-control.remediation-plan.md
 ---
 
-<!-- Extension: test-coverage-drift-analysis -->
-<!-- Config: .specify/extensions/test-coverage-drift-analysis/ -->
+<!-- Extension: test-coverage-drift-control -->
+<!-- Config: .specify/extensions/test-coverage-drift-control/ -->
 # Generate Test Coverage Drift Remediation Plan
 
 Append a coverage drift remediation phase to the active feature `tasks.md` from the current test-coverage drift report.
@@ -26,7 +32,7 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 
 1. Verify a Spec Kit project exists by checking for `.specify/`.
 2. Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` from repo root and parse the absolute `FEATURE_DIR`.
-3. Verify `FEATURE_DIR/test-coverage-drift-report.md` and `FEATURE_DIR/tasks.md` exist. If the report is missing, stop and instruct the user to run `/speckit.test-coverage-drift-analysis.report` first.
+3. Verify `FEATURE_DIR/test-coverage-drift-report.md` and `FEATURE_DIR/tasks.md` exist. If the report is missing, stop and instruct the user to run `/speckit.test-coverage-drift-control.report` first.
 4. Load the current Spec Kit task format references before editing `tasks.md`:
    - `.specify/templates/tasks-template.md` when present
    - the existing `FEATURE_DIR/tasks.md`
