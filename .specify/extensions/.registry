@@ -67,6 +67,29 @@
       },
       "registered_skills": [],
       "installed_at": "2026-05-26T21:16:46.216656+00:00"
+    },
+    "coding-standards-drift-control": {
+      "version": "0.3.0",
+      "source": "local",
+      "manifest_hash": "sha256:90f1d653f6c2b16d00654e7ed9f4f7b92ee9a8d813e80d76d422fefe7096da3f",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "agy": [
+          "speckit.coding-standards-drift-control.report",
+          "speckit.coding-standards-drift-control.remediation-plan"
+        ],
+        "codex": [
+          "speckit.coding-standards-drift-control.report",
+          "speckit.coding-standards-drift-control.remediation-plan"
+        ],
+        "opencode": [
+          "speckit.coding-standards-drift-control.report",
+          "speckit.coding-standards-drift-control.remediation-plan"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-05-27T19:52:28.902435+00:00"
     }
   }
 }

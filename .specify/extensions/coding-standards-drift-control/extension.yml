@@ -1,0 +1,36 @@
+schema_version: "1.0"
+
+extension:
+  id: coding-standards-drift-control
+  name: "Coding Standards Drift Control"
+  version: "0.3.0"
+  description: "Generate coding-standards drift reports and remediation tasks for active Spec Kit features"
+  author: "Igor Benicio de Mesquita"
+  repository: "https://github.com/benizzio/spec-kit-coding-standards-drift-control"
+  homepage: "https://github.com/benizzio/spec-kit-coding-standards-drift-control"
+  license: "MIT"
+
+requires:
+  speckit_version: ">=0.2.0"
+
+provides:
+  commands:
+    - name: speckit.coding-standards-drift-control.report
+      file: commands/speckit.coding-standards-drift-control.report.md
+      description: "Generate or refresh coding-standards-drift-report.md for the active feature"
+    - name: speckit.coding-standards-drift-control.remediation-plan
+      file: commands/speckit.coding-standards-drift-control.remediation-plan.md
+      description: "Append Spec Kit remediation tasks to tasks.md from the drift report"
+
+hooks:
+  after_implement:
+    command: speckit.coding-standards-drift-control.report
+    optional: true
+    prompt: "Run coding-standards drift analysis after implementation?"
+    description: "Generate or refresh the coding-standards drift report for the active feature"
+
+tags:
+  - "analysis"
+  - "standards"
+  - "quality"
+  - "maintenance"

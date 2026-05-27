@@ -1,9 +1,14 @@
 ---
-description: "Generate or refresh coding-standards-drift-report.md for the active feature"
+name: speckit-coding-standards-drift-control-report
+description: Generate or refresh coding-standards-drift-report.md for the active feature
+compatibility: Requires spec-kit project structure with .specify/ directory
+metadata:
+  author: github-spec-kit
+  source: coding-standards-drift-control:commands/speckit.coding-standards-drift-control.report.md
 ---
 
-<!-- Extension: coding-standards-drift-analysis -->
-<!-- Config: .specify/extensions/coding-standards-drift-analysis/ -->
+<!-- Extension: coding-standards-drift-control -->
+<!-- Config: .specify/extensions/coding-standards-drift-control/ -->
 # Generate Coding Standards Drift Report
 
 Review the active feature implementation for divergences from the repository coding-standards baseline and write a structured drift report.
@@ -20,7 +25,7 @@ You **MUST** consider the user input before proceeding (if not empty). The user 
 
 - Focus on coding standards and software engineering practices only.
 - Do not review domain correctness, product behavior, contract compliance, or feature completeness unless that context is required to explain a coding-standards drift.
-- This command is rerunnable. Overwrite the report with a fresh snapshot, but preserve existing `DRIFT-###` identifiers for substantively unchanged findings when possible.
+- This command is rerunnable. Overwrite the report with a fresh snapshot, but preserve existing `CODE-STAND-DRIFT-###` identifiers for substantively unchanged findings when possible. If an existing report still uses legacy `DRIFT-###` identifiers, rewrite equivalent findings to `CODE-STAND-DRIFT-###` while preserving the numeric suffix.
 - Run only after the active feature's normal Spec Kit implementation tasks are complete.
 
 ## Prerequisites
@@ -65,7 +70,7 @@ Prioritize the loaded baseline rules around:
 
 ## Outline
 
-1. Load the existing `coding-standards-drift-report.md` if it exists. Use it only to preserve stable `DRIFT-###` identifiers for equivalent findings and to keep the correction-tracking link consistent.
+1. Load the existing `coding-standards-drift-report.md` if it exists. Use it to preserve stable `CODE-STAND-DRIFT-###` identifiers for equivalent findings and to keep the correction-tracking link consistent. If the report still uses legacy `DRIFT-###` identifiers, migrate them to `CODE-STAND-DRIFT-###`.
 2. Read the feature artifacts:
    - `spec.md`
    - `plan.md`
@@ -77,7 +82,7 @@ Prioritize the loaded baseline rules around:
    - `High`: architectural boundary drift, mixed responsibilities across layers, or duplication and cohesion problems with clear maintenance or evolution risk
    - `Medium`: decomposition, documentation, or consistency drift that weakens maintainability but is not immediately architecture-breaking
    - `Low`: local style, attribution, or minor consistency drift with limited structural risk
-6. Reuse existing `DRIFT-###` IDs when the finding is substantively the same. Assign new IDs sequentially after the highest existing drift number only for new findings.
+6. Reuse existing `CODE-STAND-DRIFT-###` IDs when the finding is substantively the same. When matching a legacy `DRIFT-###` finding from an existing report, convert it to `CODE-STAND-DRIFT-###` with the same numeric suffix. Assign new IDs sequentially after the highest existing drift number across both formats only for new findings.
 7. Write `FEATURE_DIR/coding-standards-drift-report.md`, overwriting the previous file.
 
 ## Output Format
@@ -90,7 +95,7 @@ Write a Markdown report with this structure:
 **Purpose**: Record concrete deviations between the current implementation and the repository coding standards baseline for the active feature slice.
 **Created**: [YYYY-MM-DD]
 **Feature**: [spec.md](./spec.md)
-**Correction Tracking**: Drift remediation tasks are added to [tasks.md](./tasks.md) by `/speckit.coding-standards-drift-analysis.remediation-plan`.
+**Correction Tracking**: Drift remediation tasks are added to [tasks.md](./tasks.md) by `/speckit.coding-standards-drift-control.remediation-plan`.
 
 ## Scope
 
@@ -104,7 +109,7 @@ Write a Markdown report with this structure:
 
 ## Findings
 
-### DRIFT-001: [Short Title]
+### CODE-STAND-DRIFT-001: [Short Title]
 
 **Severity**: [High | Medium | Low]
 **Diverges from**:
@@ -132,6 +137,8 @@ Write a Markdown report with this structure:
 - Every finding MUST cite exact file references.
 - Every finding MUST map to an explicit repo policy source.
 - The `## Standards Baseline` section MUST list every loaded agent-instruction or constitution file used as review evidence.
+- Use `CODE-STAND-DRIFT-###` as the identifier format in the written report.
+- When migrating a legacy `DRIFT-###` finding, keep the numeric suffix stable.
 - Do not include remediation task checkboxes in this report. Remediation tasks belong in `tasks.md`.
 - If no drift is found, still write the report with `## Findings` stating that no coding-standards drift was identified in the reviewed scope.
 - Keep wording grounded and empirical.

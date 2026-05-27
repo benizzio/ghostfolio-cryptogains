@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- Rename the extension ID and command namespace from `coding-standards-drift-analysis` to `coding-standards-drift-control`
+- Prepare the extension for standalone publishing in `benizzio/spec-kit-coding-standards-drift-control`
+- Replace `DRIFT-###` finding identifiers with `CODE-STAND-DRIFT-###` and migrate legacy IDs by preserving numeric suffixes
+- Keep beta versioning and omit backward-compatible aliases for the previous namespace
+
 ## 0.2.0
 
 - Rename the checklist command to `remediation-plan`
