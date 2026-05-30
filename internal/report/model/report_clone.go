@@ -1,0 +1,83 @@
+// Package model defines runtime report models shared across calculation,
+// rendering, output, and runtime orchestration packages.
+// Authored by: OpenCode
+package model
+
+import "github.com/cockroachdb/apd/v3"
+
+// cloneAssetActivityRows returns a defensive copy of one activity-row slice.
+// Authored by: OpenCode
+func cloneAssetActivityRows(rows []AssetActivityRow) []AssetActivityRow {
+	var cloned = make([]AssetActivityRow, 0, len(rows))
+	for _, row := range rows {
+		var rowCopy = row
+		rowCopy.UnitPrice = cloneOptionalDecimal(row.UnitPrice)
+		rowCopy.GrossValue = cloneOptionalDecimal(row.GrossValue)
+		rowCopy.FeeAmount = cloneOptionalDecimal(row.FeeAmount)
+		if row.LiquidationCalculation != nil {
+			var liquidationCopy = cloneLiquidationCalculation(*row.LiquidationCalculation)
+			rowCopy.LiquidationCalculation = &liquidationCopy
+		}
+		cloned = append(cloned, rowCopy)
+	}
+
+	return cloned
+}
+
+// cloneAssetDetailSections returns a defensive copy of one detail-section slice.
+// Authored by: OpenCode
+func cloneAssetDetailSections(sections []AssetDetailSection) []AssetDetailSection {
+	var cloned = make([]AssetDetailSection, 0, len(sections))
+	for _, section := range sections {
+		var sectionCopy = section
+		sectionCopy.ActivityRows = cloneAssetActivityRows(section.ActivityRows)
+		sectionCopy.LiquidationSummaries = cloneLiquidationCalculations(section.LiquidationSummaries)
+		cloned = append(cloned, sectionCopy)
+	}
+
+	return cloned
+}
+
+// cloneLiquidationCalculations returns a defensive copy of one liquidation slice.
+// Authored by: OpenCode
+func cloneLiquidationCalculations(calculations []LiquidationCalculation) []LiquidationCalculation {
+	var cloned = make([]LiquidationCalculation, 0, len(calculations))
+	for _, calculation := range calculations {
+		cloned = append(cloned, cloneLiquidationCalculation(calculation))
+	}
+
+	return cloned
+}
+
+// cloneLiquidationCalculation returns a defensive copy of one liquidation.
+// Authored by: OpenCode
+func cloneLiquidationCalculation(calculation LiquidationCalculation) LiquidationCalculation {
+	var calculationCopy = calculation
+	calculationCopy.Matches = cloneBasisMatches(calculation.Matches)
+	return calculationCopy
+}
+
+// cloneBasisMatches returns a defensive copy of one basis-match slice.
+// Authored by: OpenCode
+func cloneBasisMatches(matches []BasisMatch) []BasisMatch {
+	var cloned = make([]BasisMatch, 0, len(matches))
+	for _, match := range matches {
+		var matchCopy = match
+		matchCopy.MatchedProceeds = cloneOptionalDecimal(match.MatchedProceeds)
+		matchCopy.MatchedGainOrLoss = cloneOptionalDecimal(match.MatchedGainOrLoss)
+		cloned = append(cloned, matchCopy)
+	}
+
+	return cloned
+}
+
+// cloneOptionalDecimal returns one defensive copy of one optional decimal.
+// Authored by: OpenCode
+func cloneOptionalDecimal(value *apd.Decimal) *apd.Decimal {
+	if value == nil {
+		return nil
+	}
+
+	var cloned = *value
+	return &cloned
+}
