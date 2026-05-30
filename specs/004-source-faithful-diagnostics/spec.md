@@ -16,7 +16,6 @@ Synced-data diagnostic reports should keep each offending record close to the ac
 - Stop using preferred or derived diagnostic amount helpers for generic offending-record context.
 - Keep production diagnostic reports redacting remaining source financial values.
 - Preserve diagnostic usefulness by keeping failure stage, failure detail, identity, activity, asset, source-scope, comment, data source, and source currency context.
-- When diagnostics are generated from wrapped failures, preserve the actionable `failure detail` as the top-level summary and, separately, preserve any eligible ordered non-secret wrapped-cause chain using the same redaction and suppression rules applied to the rest of the diagnostics record.
 
 ## Out of Scope
 

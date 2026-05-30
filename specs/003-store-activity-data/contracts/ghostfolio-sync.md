@@ -215,7 +215,6 @@ Verified from Ghostfolio `main` as of 2026-05-17:
   - `SymbolProfile`
 - Non-null in the upstream persisted `Order` model, but not separately required by this slice as an independent JSON field when the nested `SymbolProfile` object is present:
   - `symbolProfileId`
-- Nested `SymbolProfile.id` is the stable upstream asset identity source used for later reporting slices. This slice may preserve the asset identity through the nested `SymbolProfile` object instead of relying on the top-level `symbolProfileId` field name in the activity response shape.
 - Present in the public `Activity` interface but nullable in the upstream persisted order model or optional in the shared interface:
   - `currency`: nullable because `Order.currency` is `String?`
   - `comment`: nullable because `Order.comment` is `String?`
