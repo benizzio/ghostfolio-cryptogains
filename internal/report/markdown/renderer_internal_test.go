@@ -11,7 +11,6 @@ import (
 	"time"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
-	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -146,7 +145,7 @@ func TestRendererInternalErrorBranches(t *testing.T) {
 			ActivityRows: []reportmodel.AssetActivityRow{{
 				SourceID:            "row-1",
 				OccurredAt:          time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
-				ActivityType:        syncmodel.ActivityTypeBuy,
+				ActivityType:        reportmodel.ActivityTypeBuy,
 				Quantity:            *apd.New(1, 0),
 				GrossValue:          &invalid,
 				BasisAfterRow:       *apd.New(1, 0),
@@ -373,7 +372,7 @@ func TestRenderCoversDetailAndLiquidationBranches(t *testing.T) {
 				ActivityRows: []reportmodel.AssetActivityRow{{
 					SourceID:            "sell-1",
 					OccurredAt:          time.Date(2024, time.January, 2, 3, 4, 5, 0, time.UTC),
-					ActivityType:        syncmodel.ActivityTypeSell,
+					ActivityType:        reportmodel.ActivityTypeSell,
 					Quantity:            *apd.New(1, 0),
 					GrossValue:          apdDecimalPointer(12),
 					FeeAmount:           apdDecimalPointer(2),
@@ -430,7 +429,7 @@ func TestRenderCoversDetailAndLiquidationBranches(t *testing.T) {
 				ActivityRows: []reportmodel.AssetActivityRow{{
 					SourceID:            "row-1",
 					OccurredAt:          time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
-					ActivityType:        syncmodel.ActivityTypeBuy,
+					ActivityType:        reportmodel.ActivityTypeBuy,
 					Quantity:            *apd.New(1, 0),
 					GrossValue:          infiniteDecimalPointer(),
 					BasisAfterRow:       *apd.New(1, 0),
@@ -481,7 +480,7 @@ func TestRendererAdditionalHelperFailures(t *testing.T) {
 	if err := writeActivityBlock(&builder, reportmodel.AssetDetailSection{ActivityRows: []reportmodel.AssetActivityRow{{
 		SourceID:            "row-quantity",
 		OccurredAt:          time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
-		ActivityType:        syncmodel.ActivityTypeBuy,
+		ActivityType:        reportmodel.ActivityTypeBuy,
 		Quantity:            reportInvalidDecimalForRenderer(),
 		BasisAfterRow:       *apd.New(1, 0),
 		CalculationCurrency: "USD",
@@ -494,7 +493,7 @@ func TestRendererAdditionalHelperFailures(t *testing.T) {
 	if err := writeActivityBlock(&builder, reportmodel.AssetDetailSection{ActivityRows: []reportmodel.AssetActivityRow{{
 		SourceID:            "row-fee",
 		OccurredAt:          time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
-		ActivityType:        syncmodel.ActivityTypeBuy,
+		ActivityType:        reportmodel.ActivityTypeBuy,
 		Quantity:            *apd.New(1, 0),
 		FeeAmount:           infiniteDecimalPointer(),
 		BasisAfterRow:       *apd.New(1, 0),
@@ -508,7 +507,7 @@ func TestRendererAdditionalHelperFailures(t *testing.T) {
 	if err := writeActivityBlock(&builder, reportmodel.AssetDetailSection{ActivityRows: []reportmodel.AssetActivityRow{{
 		SourceID:            "row-basis",
 		OccurredAt:          time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
-		ActivityType:        syncmodel.ActivityTypeBuy,
+		ActivityType:        reportmodel.ActivityTypeBuy,
 		Quantity:            *apd.New(1, 0),
 		BasisAfterRow:       reportInvalidDecimalForRenderer(),
 		CalculationCurrency: "USD",
@@ -521,7 +520,7 @@ func TestRendererAdditionalHelperFailures(t *testing.T) {
 	if err := writeActivityBlock(&builder, reportmodel.AssetDetailSection{ActivityRows: []reportmodel.AssetActivityRow{{
 		SourceID:            "row-after",
 		OccurredAt:          time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
-		ActivityType:        syncmodel.ActivityTypeBuy,
+		ActivityType:        reportmodel.ActivityTypeBuy,
 		Quantity:            *apd.New(1, 0),
 		BasisAfterRow:       *apd.New(1, 0),
 		CalculationCurrency: "USD",

@@ -11,7 +11,6 @@ import (
 	reportmarkdown "github.com/benizzio/ghostfolio-cryptogains/internal/report/markdown"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
-	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -174,7 +173,7 @@ func populatedMarkdownReportFixture() reportmodel.CapitalGainsReport {
 				ActivityRows: []reportmodel.AssetActivityRow{{
 					SourceID:            "btc-sell-2024-001",
 					OccurredAt:          time.Date(2024, time.January, 1, 0, 15, 0, 0, time.Local),
-					ActivityType:        syncmodel.ActivityTypeSell,
+					ActivityType:        reportmodel.ActivityTypeSell,
 					Quantity:            mustMarkdownDecimal(nil, "1.000"),
 					GrossValue:          markdownDecimalPointer(nil, "25000.000"),
 					FeeAmount:           markdownDecimalPointer(nil, "0.000"),
@@ -205,7 +204,7 @@ func populatedMarkdownReportFixture() reportmodel.CapitalGainsReport {
 				ActivityRows: []reportmodel.AssetActivityRow{{
 					SourceID:                    "xrp-reduction-2024-001",
 					OccurredAt:                  time.Date(2024, time.April, 1, 12, 0, 0, 0, time.Local),
-					ActivityType:                syncmodel.ActivityTypeSell,
+					ActivityType:                reportmodel.ActivityTypeSell,
 					Quantity:                    mustMarkdownDecimal(nil, "200.000"),
 					UnitPrice:                   markdownDecimalPointer(nil, "0.000"),
 					GrossValue:                  markdownDecimalPointer(nil, "0.000"),
