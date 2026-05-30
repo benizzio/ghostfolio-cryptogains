@@ -5,23 +5,15 @@ package markdown
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
 	"github.com/cockroachdb/apd/v3"
 )
 
 const notApplicableCalculationCurrency = "NOT APPLICABLE"
-
-var markdownSecretPatterns = []struct {
-	pattern     *regexp.Regexp
-	replacement string
-}{
-	{pattern: regexp.MustCompile(`(?i)\b(token|jwt|payload)\s*[:=]\s*[^\s]+`), replacement: `$1=[REDACTED]`},
-	{pattern: regexp.MustCompile(`(?i)\bBearer\s+[^\s]+`), replacement: `Bearer [REDACTED]`},
-}
 
 // Test seams keep exported Render wrapper branches directly coverable without
 // weakening the validated helper behavior.
@@ -376,11 +368,7 @@ func activityCurrencyColumn(row reportmodel.AssetActivityRow) string {
 // line of text for safe Markdown output.
 // Authored by: OpenCode
 func sanitizeInlineText(raw string) string {
-	var sanitized = raw
-	for _, secretPattern := range markdownSecretPatterns {
-		sanitized = secretPattern.pattern.ReplaceAllString(sanitized, secretPattern.replacement)
-	}
-
+	var sanitized = redact.Text(raw)
 	sanitized = strings.ReplaceAll(sanitized, "\r", " ")
 	sanitized = strings.ReplaceAll(sanitized, "\n", " ")
 	sanitized = strings.ReplaceAll(sanitized, "\t", " ")
