@@ -304,6 +304,60 @@ func TestScopeLocalHybridOperationalBranches(t *testing.T) {
 	}
 }
 
+// TestScopeLocalHybridFallbackAcquisitionPreservesChronologicalProvenance verifies
+// fallback-mode acquisitions are inserted into oldest-first provenance order.
+// Authored by: OpenCode
+func TestScopeLocalHybridFallbackAcquisitionPreservesChronologicalProvenance(t *testing.T) {
+	var state = NewScopeLocalHybridState()
+	for _, acquisition := range []ScopeLocalHybridAcquisition{
+		{
+			SourceID:           "scope-a-lot-1",
+			ScopeKey:           "scope-a",
+			AcquiredAt:         time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
+			DeterministicOrder: 2,
+			Quantity:           decimalFromInt(1),
+			Basis:              decimalFromInt(10),
+		},
+		{
+			SourceID:           "scope-a-lot-2",
+			ScopeKey:           "scope-a",
+			AcquiredAt:         time.Date(2024, time.January, 3, 0, 0, 0, 0, time.UTC),
+			DeterministicOrder: 3,
+			Quantity:           decimalFromInt(1),
+			Basis:              decimalFromInt(20),
+		},
+	} {
+		if err := state.AddAcquisition(acquisition); err != nil {
+			t.Fatalf("add pre-fallback acquisition %q: %v", acquisition.SourceID, err)
+		}
+	}
+
+	if _, err := state.Dispose("scope-a", decimalFromInt(1)); err != nil {
+		t.Fatalf("activate fallback with first disposal: %v", err)
+	}
+	if err := state.AddAcquisition(ScopeLocalHybridAcquisition{
+		SourceID:           "scope-a-lot-0",
+		ScopeKey:           "scope-a",
+		AcquiredAt:         time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
+		DeterministicOrder: 1,
+		Quantity:           decimalFromInt(1),
+		Basis:              decimalFromInt(30),
+	}); err != nil {
+		t.Fatalf("add fallback acquisition: %v", err)
+	}
+
+	var scopeState = state.scopes["scope-a"]
+	if len(scopeState.provenanceLots) != 3 || scopeState.provenanceLots[0].SourceID != "scope-a-lot-0" || scopeState.provenanceLots[1].SourceID != "scope-a-lot-1" || scopeState.provenanceLots[2].SourceID != "scope-a-lot-2" {
+		t.Fatalf("expected fallback provenance to stay chronological after fallback acquisition, got %#v", scopeState.provenanceLots)
+	}
+	if _, err := state.Dispose("scope-a", decimalFromInt(1)); err != nil {
+		t.Fatalf("dispose fallback acquisition by provenance order: %v", err)
+	}
+	if scopeState.provenanceLots[0].RemainingQuantity.Sign() != 0 || scopeState.provenanceLots[2].RemainingQuantity.Cmp(apd.New(1, 0)) != 0 {
+		t.Fatalf("expected oldest fallback acquisition to be consumed first, got %#v", scopeState.provenanceLots)
+	}
+}
+
 // TestScopeLocalHybridWrapsInjectedHelperFailures verifies direct wrapper
 // branches through scope-local helper seams.
 // Authored by: OpenCode
@@ -410,24 +464,26 @@ func TestScopeLocalHybridWrapsInjectedHelperFailures(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed exact scope-local state: %v", err)
 	}
-	var previousLotSubtract = lotSubtractDecimal
-	var lotSubtractCalls int
-	lotSubtractDecimal = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-		lotSubtractCalls++
-		if lotSubtractCalls == 1 {
-			var invalidQuantity apd.Decimal
-			invalidQuantity.Form = apd.NaNSignaling
-			return invalidQuantity, nil
+	func() {
+		var previousLotSubtract = lotSubtractDecimal
+		var lotSubtractCalls int
+		lotSubtractDecimal = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+			lotSubtractCalls++
+			if lotSubtractCalls == 1 {
+				var invalidQuantity apd.Decimal
+				invalidQuantity.Form = apd.NaNSignaling
+				return invalidQuantity, nil
+			}
+			return previousLotSubtract(left, right)
 		}
-		return previousLotSubtract(left, right)
-	}
-	state.scopes = map[string]*scopeLocalOpenState{
-		"scope-c": {exactState: exactState},
-	}
-	if _, err = state.Dispose("scope-c", decimalFromInt(1)); err == nil {
-		t.Fatalf("expected exact one-lot disposal to fail while reading remaining quantity")
-	}
-	lotSubtractDecimal = previousLotSubtract
+		defer func() { lotSubtractDecimal = previousLotSubtract }()
+		state.scopes = map[string]*scopeLocalOpenState{
+			"scope-c": {exactState: exactState},
+		}
+		if _, err = state.Dispose("scope-c", decimalFromInt(1)); err == nil {
+			t.Fatalf("expected exact one-lot disposal to fail while reading remaining quantity")
+		}
+	}()
 
 	exactState, err = NewLotMethodState(LotMethodFIFO)
 	if err != nil {

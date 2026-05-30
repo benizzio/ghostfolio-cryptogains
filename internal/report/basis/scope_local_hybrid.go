@@ -52,6 +52,7 @@ type scopeLocalOpenState struct {
 // scope remains in average-cost fallback mode.
 // Authored by: OpenCode
 type scopeLocalProvenanceLot struct {
+	SourceID           string
 	AcquiredAt         time.Time
 	DeterministicOrder int
 	RemainingQuantity  apd.Decimal
@@ -101,10 +102,12 @@ func (state *ScopeLocalHybridState) AddAcquisition(acquisition ScopeLocalHybridA
 			return err
 		}
 		scopeState.provenanceLots = append(scopeState.provenanceLots, scopeLocalProvenanceLot{
+			SourceID:           acquisition.SourceID,
 			AcquiredAt:         acquisition.AcquiredAt,
 			DeterministicOrder: acquisition.DeterministicOrder,
 			RemainingQuantity:  supportmath.Clone(acquisition.Quantity),
 		})
+		scopeState.sortFallbackProvenance()
 		return nil
 	}
 
@@ -297,6 +300,7 @@ func (state *scopeLocalOpenState) activateFallback() error {
 			return err
 		}
 		state.provenanceLots = append(state.provenanceLots, scopeLocalProvenanceLot{
+			SourceID:           lot.SourceID,
 			AcquiredAt:         lot.AcquiredAt,
 			DeterministicOrder: lot.DeterministicOrder,
 			RemainingQuantity:  supportmath.Clone(lot.RemainingQuantity),
@@ -342,6 +346,25 @@ func (state *scopeLocalOpenState) consumeFallbackProvenance(quantity apd.Decimal
 	}
 
 	return nil
+}
+
+// sortFallbackProvenance keeps fallback provenance in the same oldest-first
+// order used when fallback starts.
+// Authored by: OpenCode
+func (state *scopeLocalOpenState) sortFallbackProvenance() {
+	sort.SliceStable(state.provenanceLots, func(left int, right int) bool {
+		var leftLot = LotAcquisition{
+			SourceID:           state.provenanceLots[left].SourceID,
+			AcquiredAt:         state.provenanceLots[left].AcquiredAt,
+			DeterministicOrder: state.provenanceLots[left].DeterministicOrder,
+		}
+		var rightLot = LotAcquisition{
+			SourceID:           state.provenanceLots[right].SourceID,
+			AcquiredAt:         state.provenanceLots[right].AcquiredAt,
+			DeterministicOrder: state.provenanceLots[right].DeterministicOrder,
+		}
+		return compareLotChronology(leftLot, rightLot) < 0
+	})
 }
 
 // validateScopeLocalHybridAcquisition verifies one scope-local acquisition.
