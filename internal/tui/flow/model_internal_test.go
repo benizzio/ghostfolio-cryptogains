@@ -1149,6 +1149,18 @@ func TestUpdateReportCoversIgnoredAndFallbackBranches(t *testing.T) {
 	if items := model.reportResultMenuItems(); len(items) != 2 || items[0].Label != "Generate Diagnostic Report" || items[1].Label != "Back To Sync and Reports" || items[0].Enabled || items[1].Enabled {
 		t.Fatalf("expected busy report-result menu to disable visible actions, got %#v", items)
 	}
+	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
+	model.syncReports.ReportResult = runtime.ReportOutcome{FailureReason: runtime.ReportFailureUnsupportedReportCalculation}
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	model = updated.(*Model)
+	if cmd != nil || model.report.ActionIndex != 0 || model.active != reportResultScreenKey {
+		t.Fatalf("expected busy report-result navigation to be ignored, got active=%s index=%d cmd=%v", model.active, model.report.ActionIndex, cmd)
+	}
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = updated.(*Model)
+	if cmd != nil || model.active != reportResultScreenKey || !model.report.Busy || model.syncReports.ReportResult.FailureReason != runtime.ReportFailureUnsupportedReportCalculation {
+		t.Fatalf("expected busy report-result action to be ignored, got active=%s busy=%t outcome=%#v cmd=%v", model.active, model.report.Busy, model.syncReports.ReportResult, cmd)
+	}
 
 	model = newTestModel(t, &config)
 	model.active = reportResultScreenKey

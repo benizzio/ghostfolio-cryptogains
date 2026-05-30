@@ -193,6 +193,10 @@ func (m *Model) handleReportFinished(message reportFinishedMsg) (tea.Model, tea.
 // handleReportResultKey routes completed report-result navigation.
 // Authored by: OpenCode
 func (m *Model) handleReportResultKey(message tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.report.Busy {
+		return m, nil
+	}
+
 	var items = m.reportResultActions()
 
 	switch {
