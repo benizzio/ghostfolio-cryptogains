@@ -11,6 +11,9 @@ func TestCostBasisMethodFallbacks(t *testing.T) {
 	t.Parallel()
 
 	var methods = SupportedCostBasisMethods()
+	if len(methods) == 0 {
+		t.Fatalf("expected supported cost-basis methods to include at least one method")
+	}
 	methods[0] = CostBasisMethod("mutated")
 	if SupportedCostBasisMethods()[0] != CostBasisMethodFIFO {
 		t.Fatalf("expected supported cost-basis methods to return a defensive copy")

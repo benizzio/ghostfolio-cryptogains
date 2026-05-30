@@ -83,14 +83,16 @@ func NewCalculationError(kind CalculationErrorKind, message string, sourceID str
 		detail = "unsupported report calculation"
 	}
 
-	return &CalculationError{
+	var calculationError = &CalculationError{
 		kind:         kind,
 		message:      detail,
 		sourceID:     strings.TrimSpace(sourceID),
 		displayLabel: strings.TrimSpace(displayLabel),
 		cause:        cause,
-		causeChain:   calculationErrorCauseChain(detail, cause),
 	}
+	calculationError.causeChain = calculationErrorCauseChain(calculationError.Error(), cause)
+
+	return calculationError
 }
 
 // Error returns the non-secret user-visible calculation failure detail.
@@ -175,7 +177,7 @@ func (e *CalculationError) DiagnosticFailureCauseChain() []string {
 		return nil
 	}
 
-	return slices.Clone(calculationErrorCauseChain(e.Error(), e.cause))
+	return slices.Clone(e.causeChain)
 }
 
 // calculationErrorCauseChain builds one deterministic outer-to-inner wrapped
