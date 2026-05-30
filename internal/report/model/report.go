@@ -478,11 +478,28 @@ func cloneAssetActivityRows(rows []AssetActivityRow) []AssetActivityRow {
 	var cloned = make([]AssetActivityRow, 0, len(rows))
 	for _, row := range rows {
 		var rowCopy = row
+		rowCopy.UnitPrice = cloneOptionalDecimal(row.UnitPrice)
+		rowCopy.GrossValue = cloneOptionalDecimal(row.GrossValue)
+		rowCopy.FeeAmount = cloneOptionalDecimal(row.FeeAmount)
 		if row.LiquidationCalculation != nil {
 			var liquidationCopy = cloneLiquidationCalculation(*row.LiquidationCalculation)
 			rowCopy.LiquidationCalculation = &liquidationCopy
 		}
 		cloned = append(cloned, rowCopy)
+	}
+
+	return cloned
+}
+
+// cloneAssetDetailSections returns a defensive copy of one detail-section slice.
+// Authored by: OpenCode
+func cloneAssetDetailSections(sections []AssetDetailSection) []AssetDetailSection {
+	var cloned = make([]AssetDetailSection, 0, len(sections))
+	for _, section := range sections {
+		var sectionCopy = section
+		sectionCopy.ActivityRows = cloneAssetActivityRows(section.ActivityRows)
+		sectionCopy.LiquidationSummaries = cloneLiquidationCalculations(section.LiquidationSummaries)
+		cloned = append(cloned, sectionCopy)
 	}
 
 	return cloned
@@ -528,7 +545,8 @@ func cloneOptionalDecimal(value *apd.Decimal) *apd.Decimal {
 		return nil
 	}
 
-	return new(*value)
+	var cloned = *value
+	return &cloned
 }
 
 // NewCapitalGainsReport creates one validated calculated report model.
@@ -563,7 +581,7 @@ func NewCapitalGainsReport(
 		SummaryEntries:            append([]AssetSummaryEntry(nil), summaryEntries...),
 		YearlyNetTotal:            yearlyNetTotal,
 		ReferenceEntries:          append([]ReferenceLiquidationEntry(nil), referenceEntries...),
-		DetailSections:            append([]AssetDetailSection(nil), detailSections...),
+		DetailSections:            cloneAssetDetailSections(detailSections),
 	}
 
 	if err := report.Validate(); err != nil {

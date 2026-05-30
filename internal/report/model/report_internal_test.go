@@ -269,6 +269,140 @@ func TestNewCapitalGainsReportValidatesNestedContent(t *testing.T) {
 	}
 }
 
+// TestReportConstructorsCloneOptionalDetailDecimals verifies that report detail
+// constructors do not alias caller-owned optional decimal pointers.
+// Authored by: OpenCode
+func TestReportConstructorsCloneOptionalDetailDecimals(t *testing.T) {
+	t.Parallel()
+
+	var sectionUnitPrice = decimalPointer(t, "11")
+	var sectionGrossValue = decimalPointer(t, "12")
+	var sectionFeeAmount = decimalPointer(t, "1")
+	var sectionMatchedProceeds = decimalPointer(t, "12")
+	var sectionMatchedGainOrLoss = decimalPointer(t, "2")
+	var section, sectionErr = NewAssetDetailSection(
+		"asset-btc",
+		"BTC",
+		mustReportDecimal(t, "1"),
+		mustReportDecimal(t, "10"),
+		mustReportDecimal(t, "0"),
+		mustReportDecimal(t, "0"),
+		"USD",
+		[]AssetActivityRow{{
+			SourceID:         "sell-1",
+			OccurredAt:       time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
+			ActivityType:     ActivityTypeSell,
+			Quantity:         mustReportDecimal(t, "1"),
+			UnitPrice:        sectionUnitPrice,
+			GrossValue:       sectionGrossValue,
+			FeeAmount:        sectionFeeAmount,
+			BasisAfterRow:    mustReportDecimal(t, "0"),
+			QuantityAfterRow: mustReportDecimal(t, "0"),
+		}},
+		[]LiquidationCalculation{{
+			SourceID:               "sell-1",
+			OccurredAt:             time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
+			DisposedQuantity:       mustReportDecimal(t, "1"),
+			AllocatedBasis:         mustReportDecimal(t, "10"),
+			NetLiquidationProceeds: mustReportDecimal(t, "12"),
+			GainOrLoss:             mustReportDecimal(t, "2"),
+			ActivityCurrency:       "USD",
+			CalculationCurrency:    "USD",
+			Matches: []BasisMatch{{
+				AcquisitionSourceID: "buy-1",
+				MatchedQuantity:     mustReportDecimal(t, "1"),
+				MatchedBasis:        mustReportDecimal(t, "10"),
+				MatchedProceeds:     sectionMatchedProceeds,
+				MatchedGainOrLoss:   sectionMatchedGainOrLoss,
+			}},
+		}},
+	)
+	if sectionErr != nil {
+		t.Fatalf("new asset detail section: %v", sectionErr)
+	}
+
+	*sectionUnitPrice = mustReportDecimal(t, "101")
+	*sectionGrossValue = mustReportDecimal(t, "102")
+	*sectionFeeAmount = mustReportDecimal(t, "103")
+	*sectionMatchedProceeds = mustReportDecimal(t, "104")
+	*sectionMatchedGainOrLoss = mustReportDecimal(t, "105")
+	assertOptionalDecimalString(t, section.ActivityRows[0].UnitPrice, "11")
+	assertOptionalDecimalString(t, section.ActivityRows[0].GrossValue, "12")
+	assertOptionalDecimalString(t, section.ActivityRows[0].FeeAmount, "1")
+	assertOptionalDecimalString(t, section.LiquidationSummaries[0].Matches[0].MatchedProceeds, "12")
+	assertOptionalDecimalString(t, section.LiquidationSummaries[0].Matches[0].MatchedGainOrLoss, "2")
+
+	var reportUnitPrice = decimalPointer(t, "21")
+	var reportGrossValue = decimalPointer(t, "22")
+	var reportFeeAmount = decimalPointer(t, "3")
+	var reportMatchedProceeds = decimalPointer(t, "22")
+	var reportMatchedGainOrLoss = decimalPointer(t, "4")
+	var reportSections = []AssetDetailSection{{
+		AssetIdentityKey:    "asset-eth",
+		DisplayLabel:        "ETH",
+		OpeningQuantity:     mustReportDecimal(t, "1"),
+		OpeningCostBasis:    mustReportDecimal(t, "18"),
+		ClosingQuantity:     mustReportDecimal(t, "0"),
+		ClosingCostBasis:    mustReportDecimal(t, "0"),
+		CalculationCurrency: "USD",
+		ActivityRows: []AssetActivityRow{{
+			SourceID:         "sell-2",
+			OccurredAt:       time.Date(2024, time.January, 3, 0, 0, 0, 0, time.UTC),
+			ActivityType:     ActivityTypeSell,
+			Quantity:         mustReportDecimal(t, "1"),
+			UnitPrice:        reportUnitPrice,
+			GrossValue:       reportGrossValue,
+			FeeAmount:        reportFeeAmount,
+			BasisAfterRow:    mustReportDecimal(t, "0"),
+			QuantityAfterRow: mustReportDecimal(t, "0"),
+		}},
+		LiquidationSummaries: []LiquidationCalculation{{
+			SourceID:               "sell-2",
+			OccurredAt:             time.Date(2024, time.January, 3, 0, 0, 0, 0, time.UTC),
+			DisposedQuantity:       mustReportDecimal(t, "1"),
+			AllocatedBasis:         mustReportDecimal(t, "18"),
+			NetLiquidationProceeds: mustReportDecimal(t, "22"),
+			GainOrLoss:             mustReportDecimal(t, "4"),
+			ActivityCurrency:       "USD",
+			CalculationCurrency:    "USD",
+			Matches: []BasisMatch{{
+				AcquisitionSourceID: "buy-2",
+				MatchedQuantity:     mustReportDecimal(t, "1"),
+				MatchedBasis:        mustReportDecimal(t, "18"),
+				MatchedProceeds:     reportMatchedProceeds,
+				MatchedGainOrLoss:   reportMatchedGainOrLoss,
+			}},
+		}},
+	}}
+	var request, requestErr = NewReportRequest(2024, CostBasisMethodFIFO, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
+	if requestErr != nil {
+		t.Fatalf("new report request: %v", requestErr)
+	}
+	var report, reportErr = NewCapitalGainsReport(request, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC), "USD", nil, mustReportDecimal(t, "0"), nil, reportSections)
+	if reportErr != nil {
+		t.Fatalf("new capital gains report: %v", reportErr)
+	}
+
+	*reportUnitPrice = mustReportDecimal(t, "201")
+	*reportGrossValue = mustReportDecimal(t, "202")
+	*reportFeeAmount = mustReportDecimal(t, "203")
+	*reportMatchedProceeds = mustReportDecimal(t, "204")
+	*reportMatchedGainOrLoss = mustReportDecimal(t, "205")
+	reportSections[0].ActivityRows[0].SourceID = "mutated"
+	reportSections[0].LiquidationSummaries[0].Matches[0].AcquisitionSourceID = "mutated"
+	assertOptionalDecimalString(t, report.DetailSections[0].ActivityRows[0].UnitPrice, "21")
+	assertOptionalDecimalString(t, report.DetailSections[0].ActivityRows[0].GrossValue, "22")
+	assertOptionalDecimalString(t, report.DetailSections[0].ActivityRows[0].FeeAmount, "3")
+	assertOptionalDecimalString(t, report.DetailSections[0].LiquidationSummaries[0].Matches[0].MatchedProceeds, "22")
+	assertOptionalDecimalString(t, report.DetailSections[0].LiquidationSummaries[0].Matches[0].MatchedGainOrLoss, "4")
+	if report.DetailSections[0].ActivityRows[0].SourceID != "sell-2" {
+		t.Fatalf("expected report detail activity rows to be independent, got %#v", report.DetailSections[0].ActivityRows[0])
+	}
+	if report.DetailSections[0].LiquidationSummaries[0].Matches[0].AcquisitionSourceID != "buy-2" {
+		t.Fatalf("expected report liquidation summaries to be independent, got %#v", report.DetailSections[0].LiquidationSummaries[0].Matches[0])
+	}
+}
+
 // TestReferenceAndDetailValidationGuardrails verifies remaining report-model
 // validation branches for reference, detail, activity, and liquidation rows.
 // Authored by: OpenCode
@@ -540,9 +674,6 @@ func TestReportConstructorsAndValidationHelpersCoverRemainingBranches(t *testing
 		t.Fatalf("new asset detail section with basis matches: %v", sectionErr)
 	}
 	section.LiquidationSummaries[0].Matches[0].AcquisitionSourceID = "mutated"
-	if section.ActivityRows != nil {
-		// no-op; constructor defensive-copy check happens on liquidation summaries.
-	}
 	if section.LiquidationSummaries[0].Matches[0].AcquisitionSourceID != "mutated" {
 		t.Fatalf("expected local section mutation to succeed for copied value")
 	}
@@ -689,4 +820,18 @@ func decimalPointer(t *testing.T, raw string) *apd.Decimal {
 
 	var value = mustReportDecimal(t, raw)
 	return &value
+}
+
+// assertOptionalDecimalString verifies one optional decimal's canonical value.
+// Authored by: OpenCode
+func assertOptionalDecimalString(t *testing.T, value *apd.Decimal, expected string) {
+	t.Helper()
+
+	var actual, err = decimalsupport.CanonicalStringPointer(value)
+	if err != nil {
+		t.Fatalf("canonical optional decimal string: %v", err)
+	}
+	if actual != expected {
+		t.Fatalf("expected optional decimal %q, got %q", expected, actual)
+	}
 }
