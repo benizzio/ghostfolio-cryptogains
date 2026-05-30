@@ -253,6 +253,20 @@ func requestAutomaticOpen(
 		true,
 		strings.TrimSpace(err.Error()),
 	)
+	if updateErr != nil {
+		return reportmodel.ReportOutputFile{}, pointerToReportOutcome(
+			reportFailureOutcome(
+				request,
+				ReportFailureReportFileWriteFailed,
+				fmt.Sprintf(
+					"Could not finalize the saved report result for %q: %s. The saved file may still exist at %q.",
+					outputFile.Filename,
+					strings.TrimSpace(updateErr.Error()),
+					outputFile.Path,
+				),
+			),
+		)
+	}
 
 	return updatedOutputFile, pointerToReportOutcome(
 		ReportOutcome{
