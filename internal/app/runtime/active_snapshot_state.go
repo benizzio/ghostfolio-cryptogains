@@ -9,6 +9,7 @@ import (
 	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
+	"github.com/cockroachdb/apd/v3"
 )
 
 // activeReadableSnapshot stores the current run's successfully unlocked local
@@ -113,5 +114,36 @@ func (s *activeSnapshotState) CheckServerReplacement(config configmodel.AppSetup
 func cloneProtectedActivityCache(cache syncmodel.ProtectedActivityCache) syncmodel.ProtectedActivityCache {
 	cache.AvailableReportYears = append([]int(nil), cache.AvailableReportYears...)
 	cache.Activities = append([]syncmodel.ActivityRecord(nil), cache.Activities...)
+	for index := range cache.Activities {
+		cache.Activities[index] = cloneActivityRecord(cache.Activities[index])
+	}
 	return cache
+}
+
+// cloneActivityRecord copies pointer-backed activity fields for read access.
+// Authored by: OpenCode
+func cloneActivityRecord(record syncmodel.ActivityRecord) syncmodel.ActivityRecord {
+	record.OrderUnitPrice = cloneDecimal(record.OrderUnitPrice)
+	record.OrderGrossValue = cloneDecimal(record.OrderGrossValue)
+	record.OrderFeeAmount = cloneDecimal(record.OrderFeeAmount)
+	record.AssetProfileUnitPrice = cloneDecimal(record.AssetProfileUnitPrice)
+	record.AssetProfileFeeAmount = cloneDecimal(record.AssetProfileFeeAmount)
+	record.BaseGrossValue = cloneDecimal(record.BaseGrossValue)
+	record.BaseFeeAmount = cloneDecimal(record.BaseFeeAmount)
+	if record.SourceScope != nil {
+		var scope = *record.SourceScope
+		record.SourceScope = &scope
+	}
+	return record
+}
+
+// cloneDecimal copies an optional decimal value.
+// Authored by: OpenCode
+func cloneDecimal(value *apd.Decimal) *apd.Decimal {
+	if value == nil {
+		return nil
+	}
+	var clone apd.Decimal
+	clone.Set(value)
+	return &clone
 }

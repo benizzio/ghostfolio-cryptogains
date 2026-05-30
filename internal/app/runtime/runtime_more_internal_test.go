@@ -950,7 +950,19 @@ func TestSnapshotLifecycleAndWrapperNilBranches(t *testing.T) {
 			ActivityCount:        2,
 			AvailableReportYears: []int{2024, 2025},
 			Activities: []syncmodel.ActivityRecord{
-				{SourceID: "buy-1", AssetIdentityKey: "asset-1", RawHash: "buy-1"},
+				{
+					SourceID:              "buy-1",
+					AssetIdentityKey:      "asset-1",
+					OrderUnitPrice:        apd.New(10, 0),
+					OrderGrossValue:       apd.New(20, 0),
+					OrderFeeAmount:        apd.New(1, 0),
+					AssetProfileUnitPrice: apd.New(11, 0),
+					AssetProfileFeeAmount: apd.New(2, 0),
+					BaseGrossValue:        apd.New(21, 0),
+					BaseFeeAmount:         apd.New(3, 0),
+					SourceScope:           &syncmodel.SourceScope{ID: "scope-1", Name: "Scope One", Kind: syncmodel.SourceScopeKindAccount},
+					RawHash:               "buy-1",
+				},
 			},
 		},
 	}
@@ -969,9 +981,26 @@ func TestSnapshotLifecycleAndWrapperNilBranches(t *testing.T) {
 	}
 	cache.AvailableReportYears[0] = 1900
 	cache.Activities[0].SourceID = "mutated"
+	cache.Activities[0].OrderUnitPrice.Set(apd.New(100, 0))
+	cache.Activities[0].OrderGrossValue.Set(apd.New(200, 0))
+	cache.Activities[0].OrderFeeAmount.Set(apd.New(10, 0))
+	cache.Activities[0].AssetProfileUnitPrice.Set(apd.New(110, 0))
+	cache.Activities[0].AssetProfileFeeAmount.Set(apd.New(20, 0))
+	cache.Activities[0].BaseGrossValue.Set(apd.New(210, 0))
+	cache.Activities[0].BaseFeeAmount.Set(apd.New(30, 0))
+	cache.Activities[0].SourceScope.ID = "mutated-scope"
 	var copiedCache, copiedOK = lifecycle.ReadableProtectedActivityCache()
 	if !copiedOK || copiedCache.AvailableReportYears[0] != 2024 || copiedCache.Activities[0].SourceID != "buy-1" {
 		t.Fatalf("expected readable protected cache slices to be copied, got ok=%v cache=%#v", copiedOK, copiedCache)
+	}
+	if copiedCache.Activities[0].OrderUnitPrice.String() != "10" || copiedCache.Activities[0].OrderGrossValue.String() != "20" || copiedCache.Activities[0].OrderFeeAmount.String() != "1" {
+		t.Fatalf("expected order decimal pointers to be copied, got %#v", copiedCache.Activities[0])
+	}
+	if copiedCache.Activities[0].AssetProfileUnitPrice.String() != "11" || copiedCache.Activities[0].AssetProfileFeeAmount.String() != "2" || copiedCache.Activities[0].BaseGrossValue.String() != "21" || copiedCache.Activities[0].BaseFeeAmount.String() != "3" {
+		t.Fatalf("expected asset-profile and base decimal pointers to be copied, got %#v", copiedCache.Activities[0])
+	}
+	if copiedCache.Activities[0].SourceScope == nil || copiedCache.Activities[0].SourceScope.ID != "scope-1" {
+		t.Fatalf("expected source scope pointer to be copied, got %#v", copiedCache.Activities[0].SourceScope)
 	}
 
 	var nilLifecycle *snapshotLifecycle
