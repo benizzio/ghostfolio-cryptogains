@@ -9,8 +9,6 @@ import (
 	"github.com/cockroachdb/apd/v3"
 )
 
-const activityAmountResolutionScale int32 = 16
-
 // resolvedActivityAmounts stores the transient current-slice money view derived
 // from one normalized activity record during validation.
 // Authored by: OpenCode
@@ -265,5 +263,5 @@ func divideActivityAmountRoundHalfUp(dividend apd.Decimal, divisor apd.Decimal) 
 		return apd.Decimal{}, fmt.Errorf("derive activity amount from gross value and quantity: non-zero divisor is required")
 	}
 
-	return supportmath.DivideFiniteRoundHalfUp(dividend, divisor, activityAmountResolutionScale)
+	return supportmath.DivideFiniteRoundHalfUp(dividend, divisor, supportmath.InternalCalculationScale)
 }

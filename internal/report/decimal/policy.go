@@ -10,8 +10,6 @@ import (
 	"github.com/cockroachdb/apd/v3"
 )
 
-const reportCalculationScale int32 = 16
-
 // DivideRoundHalfUp divides one finite decimal by another using the shared
 // 16-decimal internal report-calculation precision.
 // Authored by: OpenCode
@@ -26,7 +24,7 @@ func DivideRoundHalfUp(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, 
 		return apd.Decimal{}, fmt.Errorf("report division requires a non-zero divisor")
 	}
 
-	return supportmath.DivideFiniteRoundHalfUp(dividend, divisor, reportCalculationScale)
+	return supportmath.DivideFiniteRoundHalfUp(dividend, divisor, supportmath.InternalCalculationScale)
 }
 
 // RequireFinite rejects non-finite decimal inputs before report-local

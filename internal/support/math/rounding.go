@@ -11,6 +11,11 @@ import (
 	"github.com/cockroachdb/apd/v3"
 )
 
+// InternalCalculationScale is the shared fixed scale for internal financial
+// divisions that use round-half-up handling before report rendering.
+// Authored by: OpenCode
+const InternalCalculationScale int32 = 16
+
 // RequireFinite rejects non-finite decimal values before shared arithmetic or
 // comparison helpers are used.
 //
@@ -47,7 +52,7 @@ func RequireFinite(value apd.Decimal, label string) error {
 //	if err != nil {
 //		panic(err)
 //	}
-//	quotient, err := math.DivideFiniteRoundHalfUp(dividend, divisor, 16)
+//	quotient, err := math.DivideFiniteRoundHalfUp(dividend, divisor, math.InternalCalculationScale)
 //	if err != nil {
 //		panic(err)
 //	}

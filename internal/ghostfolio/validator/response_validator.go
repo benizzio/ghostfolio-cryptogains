@@ -276,8 +276,6 @@ func requireDerivableGrossValue(entry dto.ActivityPageEntry) error {
 	return nil
 }
 
-const validatorUnitPriceScale int32 = 16
-
 // deriveRoundedUnitPrice accepts finite same-tier division inputs that may need
 // 16-decimal round-half-up handling later in reporting.
 // Authored by: OpenCode
@@ -292,7 +290,7 @@ func deriveRoundedUnitPrice(grossValue apd.Decimal, quantity apd.Decimal) (apd.D
 		return apd.Decimal{}, fmt.Errorf("unit-price derivation requires a non-zero quantity")
 	}
 
-	return supportmath.DivideFiniteRoundHalfUp(grossValue, quantity, validatorUnitPriceScale)
+	return supportmath.DivideFiniteRoundHalfUp(grossValue, quantity, supportmath.InternalCalculationScale)
 }
 
 // selectGrossValue applies the shared DTO gross-value fallback rule for
