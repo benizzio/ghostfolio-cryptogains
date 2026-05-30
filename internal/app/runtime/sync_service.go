@@ -734,8 +734,12 @@ func (s *syncService) UnlockSelectedServerSnapshot(
 		return result
 	}
 
-	result.UnlockState = SyncReportsUnlockStateRejectedToken
-	result.FailureReason = syncFailureReasonFromBoundary(syncFailureCategory(err))
+	var failureReason = syncFailureReasonFromBoundary(syncFailureCategory(err))
+	result.UnlockState = ""
+	if failureReason == SyncFailureRejectedToken {
+		result.UnlockState = SyncReportsUnlockStateRejectedToken
+	}
+	result.FailureReason = failureReason
 	return result
 }
 

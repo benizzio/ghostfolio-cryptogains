@@ -1233,7 +1233,7 @@ func TestSyncReportsProtectedDataAvailabilityHelpers(t *testing.T) {
 	config = runtimeSetupConfigFixture(t, timeoutServer.URL, true)
 	service = requireSyncService(t, NewSyncService(ghostfolioclient.New(timeoutServer.Client()), time.Second, t.TempDir(), true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), runtimeSnapshotStore{}))
 	result = service.UnlockSelectedServerSnapshot(context.Background(), config, "token")
-	if result.UnlockState != SyncReportsUnlockStateRejectedToken || result.FailureReason != SyncFailureUnsuccessfulServerResponse {
+	if result.UnlockState != "" || result.FailureReason != SyncFailureUnsuccessfulServerResponse {
 		t.Fatalf("expected non-rejected auth failure to map through boundary failure reason, got %#v", result)
 	}
 }
