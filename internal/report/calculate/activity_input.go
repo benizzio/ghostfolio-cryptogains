@@ -1,3 +1,6 @@
+// Package calculate defines yearly gains-and-losses report calculation
+// services built on normalized protected activity history.
+// Authored by: OpenCode
 package calculate
 
 import (
