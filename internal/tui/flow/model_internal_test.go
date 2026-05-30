@@ -247,10 +247,11 @@ func TestUpdateHandlesWindowResizeAndQuit(t *testing.T) {
 	if _, ok := runCmdFlow(cmd).(tea.QuitMsg); !ok {
 		t.Fatalf("expected quit command")
 	}
-	if updated.(*Model).sync.TokenInput.Value() != "" {
+	model = assertUpdatedModel(t, updated)
+	if model.sync.TokenInput.Value() != "" {
 		t.Fatalf("expected token input reset")
 	}
-	if updated.(*Model).syncReports.RuntimeToken != "" {
+	if model.syncReports.RuntimeToken != "" {
 		t.Fatalf("expected quit to clear sync and reports runtime token")
 	}
 }
@@ -936,9 +937,6 @@ func TestUpdateReportCoversSelectionBusyAndResultBranches(t *testing.T) {
 	if model.active != reportBusyScreenKey || !model.report.Busy {
 		t.Fatalf("expected report generation busy state, got active=%s report=%#v", model.active, model.report)
 	}
-	if !reportService.called {
-		_ = 0
-	}
 	var reportBatch = runCmdFlow(cmd)
 	var batch, ok = reportBatch.(tea.BatchMsg)
 	if !ok {
@@ -954,6 +952,9 @@ func TestUpdateReportCoversSelectionBusyAndResultBranches(t *testing.T) {
 	}
 	if model.active != reportResultScreenKey {
 		t.Fatalf("expected report result screen, got %s", model.active)
+	}
+	if !reportService.called {
+		t.Fatalf("expected report service Generate to be called")
 	}
 	if reportService.request.Request.Year != 2025 || reportService.request.Request.CostBasisMethod != reportmodel.CostBasisMethodLIFO {
 		t.Fatalf("expected report service request to use selected year and method, got %#v", reportService.request.Request)
