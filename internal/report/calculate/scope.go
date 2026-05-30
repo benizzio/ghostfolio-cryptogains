@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
-	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
 
 // applicableScopeKind identifies the calculator-local scope partition used by
@@ -98,7 +97,7 @@ func shouldBroadenAssetScope(group assetInputGroup) bool {
 		if input.SourceScope == nil {
 			return true
 		}
-		if input.SourceScope.Reliability != syncmodel.ScopeReliabilityReliable {
+		if input.SourceScope.Reliability != reportmodel.ScopeReliabilityReliable {
 			return true
 		}
 
@@ -141,7 +140,7 @@ func resolveReliableApplicableScope(assetIdentityKey string, input reportmodel.A
 	if input.SourceScope == nil {
 		return applicableScope{}, fmt.Errorf("source scope is required")
 	}
-	if input.SourceScope.Reliability != syncmodel.ScopeReliabilityReliable {
+	if input.SourceScope.Reliability != reportmodel.ScopeReliabilityReliable {
 		return applicableScope{}, fmt.Errorf("source scope reliability %q does not support narrowing", input.SourceScope.Reliability)
 	}
 
@@ -166,11 +165,11 @@ func resolveReliableApplicableScope(assetIdentityKey string, input reportmodel.A
 // supportedApplicableScopeKind maps the preserved sync scope kind into the
 // calculator-local applicable-scope kind.
 // Authored by: OpenCode
-func supportedApplicableScopeKind(kind syncmodel.SourceScopeKind) (applicableScopeKind, bool) {
+func supportedApplicableScopeKind(kind reportmodel.SourceScopeKind) (applicableScopeKind, bool) {
 	switch kind {
-	case syncmodel.SourceScopeKindAccount:
+	case reportmodel.SourceScopeKindAccount:
 		return applicableScopeKindAccount, true
-	case syncmodel.SourceScopeKindWallet:
+	case reportmodel.SourceScopeKindWallet:
 		return applicableScopeKindWallet, true
 	default:
 		return "", false

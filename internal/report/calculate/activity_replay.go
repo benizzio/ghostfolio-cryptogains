@@ -10,7 +10,6 @@ import (
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
-	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -85,9 +84,9 @@ func replayAssetInput(basisState assetBasisState, scopedInput scopedActivityInpu
 func applyBasisInput(basisState assetBasisState, scopedInput scopedActivityInput, deterministicOrder int) (basisApplicationResult, error) {
 	var input = scopedInput.Input
 	switch input.ActivityType {
-	case syncmodel.ActivityTypeBuy:
+	case reportmodel.ActivityTypeBuy:
 		return applyAcquisition(basisState, scopedInput, deterministicOrder)
-	case syncmodel.ActivityTypeSell:
+	case reportmodel.ActivityTypeSell:
 		if input.IsZeroPricedHoldingReduction {
 			return applyZeroPricedHoldingReduction(basisState, scopedInput)
 		}

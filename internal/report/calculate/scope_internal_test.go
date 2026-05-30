@@ -10,7 +10,6 @@ import (
 	"time"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
-	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -29,30 +28,30 @@ func TestResolveScopedAssetInputsNarrowsReliableAssetTimelineEvenWhenCacheIsPart
 				SourceID:         "avax-buy-alpha-2023-001",
 				OccurredAt:       time.Date(2023, time.June, 10, 0, 0, 0, 0, time.UTC),
 				SourceYear:       2023,
-				ActivityType:     syncmodel.ActivityTypeBuy,
+				ActivityType:     reportmodel.ActivityTypeBuy,
 				AssetIdentityKey: "asset-avax-001",
 				DisplayLabel:     "AVAX",
 				Quantity:         *apd.New(1, 0),
-				SourceScope: &syncmodel.SourceScope{
+				SourceScope: &reportmodel.SourceScope{
 					ID:          "wallet-avax-alpha",
 					Name:        "AVAX Alpha Wallet",
-					Kind:        syncmodel.SourceScopeKindWallet,
-					Reliability: syncmodel.ScopeReliabilityReliable,
+					Kind:        reportmodel.SourceScopeKindWallet,
+					Reliability: reportmodel.ScopeReliabilityReliable,
 				},
 			},
 			{
 				SourceID:         "avax-sell-alpha-2024-001",
 				OccurredAt:       time.Date(2024, time.August, 15, 0, 0, 0, 0, time.UTC),
 				SourceYear:       2024,
-				ActivityType:     syncmodel.ActivityTypeSell,
+				ActivityType:     reportmodel.ActivityTypeSell,
 				AssetIdentityKey: "asset-avax-001",
 				DisplayLabel:     "AVAX",
 				Quantity:         *apd.New(1, 0),
-				SourceScope: &syncmodel.SourceScope{
+				SourceScope: &reportmodel.SourceScope{
 					ID:          "wallet-avax-alpha",
 					Name:        "AVAX Alpha Wallet",
-					Kind:        syncmodel.SourceScopeKindWallet,
-					Reliability: syncmodel.ScopeReliabilityReliable,
+					Kind:        reportmodel.SourceScopeKindWallet,
+					Reliability: reportmodel.ScopeReliabilityReliable,
 				},
 			},
 		},
@@ -92,28 +91,28 @@ func TestResolveScopedAssetInputsBroadensContradictoryTimeline(t *testing.T) {
 				SourceID:         "btc-buy-2023-001",
 				OccurredAt:       time.Date(2023, time.January, 1, 0, 0, 0, 0, time.UTC),
 				SourceYear:       2023,
-				ActivityType:     syncmodel.ActivityTypeBuy,
+				ActivityType:     reportmodel.ActivityTypeBuy,
 				AssetIdentityKey: "asset-btc-001",
 				DisplayLabel:     "BTC",
 				Quantity:         *apd.New(1, 0),
-				SourceScope: &syncmodel.SourceScope{
+				SourceScope: &reportmodel.SourceScope{
 					ID:          "scope-1",
-					Kind:        syncmodel.SourceScopeKindWallet,
-					Reliability: syncmodel.ScopeReliabilityReliable,
+					Kind:        reportmodel.SourceScopeKindWallet,
+					Reliability: reportmodel.ScopeReliabilityReliable,
 				},
 			},
 			{
 				SourceID:         "btc-buy-2023-002",
 				OccurredAt:       time.Date(2023, time.February, 1, 0, 0, 0, 0, time.UTC),
 				SourceYear:       2023,
-				ActivityType:     syncmodel.ActivityTypeBuy,
+				ActivityType:     reportmodel.ActivityTypeBuy,
 				AssetIdentityKey: "asset-btc-001",
 				DisplayLabel:     "BTC",
 				Quantity:         *apd.New(1, 0),
-				SourceScope: &syncmodel.SourceScope{
+				SourceScope: &reportmodel.SourceScope{
 					ID:          "scope-1",
-					Kind:        syncmodel.SourceScopeKindAccount,
-					Reliability: syncmodel.ScopeReliabilityReliable,
+					Kind:        reportmodel.SourceScopeKindAccount,
+					Reliability: reportmodel.ScopeReliabilityReliable,
 				},
 			},
 		},
@@ -142,30 +141,30 @@ func TestResolveScopedAssetInputsBroadensContradictoryTimeline(t *testing.T) {
 func TestScopeHelperBranches(t *testing.T) {
 	t.Parallel()
 
-	if !shouldBroadenAssetScope(assetInputGroup{Inputs: []reportmodel.ActivityCalculationInput{{SourceScope: &syncmodel.SourceScope{ID: "scope-a", Kind: syncmodel.SourceScopeKindWallet, Reliability: syncmodel.ScopeReliabilityPartial}}}}) {
+	if !shouldBroadenAssetScope(assetInputGroup{Inputs: []reportmodel.ActivityCalculationInput{{SourceScope: &reportmodel.SourceScope{ID: "scope-a", Kind: reportmodel.SourceScopeKindWallet, Reliability: reportmodel.ScopeReliabilityPartial}}}}) {
 		t.Fatalf("expected unreliable scope to broaden asset scope")
 	}
-	if !shouldBroadenAssetScope(assetInputGroup{Inputs: []reportmodel.ActivityCalculationInput{{SourceScope: &syncmodel.SourceScope{ID: " ", Kind: syncmodel.SourceScopeKindWallet, Reliability: syncmodel.ScopeReliabilityReliable}}}}) {
+	if !shouldBroadenAssetScope(assetInputGroup{Inputs: []reportmodel.ActivityCalculationInput{{SourceScope: &reportmodel.SourceScope{ID: " ", Kind: reportmodel.SourceScopeKindWallet, Reliability: reportmodel.ScopeReliabilityReliable}}}}) {
 		t.Fatalf("expected blank scope ID to broaden asset scope")
 	}
-	if !shouldBroadenAssetScope(assetInputGroup{Inputs: []reportmodel.ActivityCalculationInput{{SourceScope: &syncmodel.SourceScope{ID: "scope-a", Kind: syncmodel.SourceScopeKind("portfolio"), Reliability: syncmodel.ScopeReliabilityReliable}}}}) {
+	if !shouldBroadenAssetScope(assetInputGroup{Inputs: []reportmodel.ActivityCalculationInput{{SourceScope: &reportmodel.SourceScope{ID: "scope-a", Kind: reportmodel.SourceScopeKind("portfolio"), Reliability: reportmodel.ScopeReliabilityReliable}}}}) {
 		t.Fatalf("expected unsupported scope kind to broaden asset scope")
 	}
 
 	if _, err := resolveReliableApplicableScope("asset-btc", reportmodel.ActivityCalculationInput{}); err == nil || !strings.Contains(err.Error(), "source scope is required") {
 		t.Fatalf("expected missing source scope to fail, got %v", err)
 	}
-	if _, err := resolveReliableApplicableScope("asset-btc", reportmodel.ActivityCalculationInput{SourceScope: &syncmodel.SourceScope{ID: "scope-a", Kind: syncmodel.SourceScopeKindWallet, Reliability: syncmodel.ScopeReliabilityPartial}}); err == nil || !strings.Contains(err.Error(), "does not support narrowing") {
+	if _, err := resolveReliableApplicableScope("asset-btc", reportmodel.ActivityCalculationInput{SourceScope: &reportmodel.SourceScope{ID: "scope-a", Kind: reportmodel.SourceScopeKindWallet, Reliability: reportmodel.ScopeReliabilityPartial}}); err == nil || !strings.Contains(err.Error(), "does not support narrowing") {
 		t.Fatalf("expected unreliable source scope to fail, got %v", err)
 	}
-	if _, err := resolveReliableApplicableScope("asset-btc", reportmodel.ActivityCalculationInput{SourceScope: &syncmodel.SourceScope{ID: "scope-a", Kind: syncmodel.SourceScopeKind("portfolio"), Reliability: syncmodel.ScopeReliabilityReliable}}); err == nil || !strings.Contains(err.Error(), "does not support narrowing") {
+	if _, err := resolveReliableApplicableScope("asset-btc", reportmodel.ActivityCalculationInput{SourceScope: &reportmodel.SourceScope{ID: "scope-a", Kind: reportmodel.SourceScopeKind("portfolio"), Reliability: reportmodel.ScopeReliabilityReliable}}); err == nil || !strings.Contains(err.Error(), "does not support narrowing") {
 		t.Fatalf("expected unsupported source scope kind to fail, got %v", err)
 	}
-	if _, err := resolveReliableApplicableScope("asset-btc", reportmodel.ActivityCalculationInput{SourceScope: &syncmodel.SourceScope{ID: " ", Kind: syncmodel.SourceScopeKindWallet, Reliability: syncmodel.ScopeReliabilityReliable}}); err == nil || !strings.Contains(err.Error(), "scope ID is required") {
+	if _, err := resolveReliableApplicableScope("asset-btc", reportmodel.ActivityCalculationInput{SourceScope: &reportmodel.SourceScope{ID: " ", Kind: reportmodel.SourceScopeKindWallet, Reliability: reportmodel.ScopeReliabilityReliable}}); err == nil || !strings.Contains(err.Error(), "scope ID is required") {
 		t.Fatalf("expected blank reliable scope ID to fail, got %v", err)
 	}
 
-	if kind, ok := supportedApplicableScopeKind(syncmodel.SourceScopeKind("portfolio")); ok || kind != "" {
+	if kind, ok := supportedApplicableScopeKind(reportmodel.SourceScopeKind("portfolio")); ok || kind != "" {
 		t.Fatalf("expected unsupported scope kind lookup to fail, got kind=%q ok=%t", kind, ok)
 	}
 }
@@ -190,14 +189,14 @@ func TestResolveScopedAssetInputsWrapsReliableScopeFailures(t *testing.T) {
 			SourceID:         "btc-buy-1",
 			OccurredAt:       time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
 			SourceYear:       2024,
-			ActivityType:     syncmodel.ActivityTypeBuy,
+			ActivityType:     reportmodel.ActivityTypeBuy,
 			AssetIdentityKey: "asset-btc-001",
 			DisplayLabel:     "BTC",
 			Quantity:         *apd.New(1, 0),
-			SourceScope: &syncmodel.SourceScope{
+			SourceScope: &reportmodel.SourceScope{
 				ID:          "scope-a",
-				Kind:        syncmodel.SourceScopeKindWallet,
-				Reliability: syncmodel.ScopeReliabilityReliable,
+				Kind:        reportmodel.SourceScopeKindWallet,
+				Reliability: reportmodel.ScopeReliabilityReliable,
 			},
 		}},
 	})

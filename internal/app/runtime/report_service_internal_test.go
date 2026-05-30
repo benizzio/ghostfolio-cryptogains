@@ -329,7 +329,13 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 			snapshots:         reportSnapshotLifecycleWithCache(syncmodel.ProtectedActivityCache{ActivityCount: 1, AvailableReportYears: []int{2025}, Activities: []syncmodel.ActivityRecord{offendingRecord}}),
 			diagnosticReports: newDiagnosticReportService(t.TempDir()),
 			calculate: func(reportmodel.ReportRequest, syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
-				return reportmodel.CapitalGainsReport{}, reportmodel.NewCalculationError(reportmodel.CalculationErrorKindActivityInput, "incomplete context", offendingRecord.SourceID, offendingRecord.AssetSymbol, nil).WithPersistedActivityRecord(&offendingRecord)
+				return reportmodel.CapitalGainsReport{}, runtimeDiagnosticCarrierError{
+					context: syncmodel.DiagnosticContext{
+						FailureDetail:           "incomplete context (asset \"BTC\", source \"report-failure-buy-1\")",
+						FailureCauseChain:       []string{"incomplete context (asset \"BTC\", source \"report-failure-buy-1\")"},
+						OffendingActivityRecord: &offendingRecord,
+					},
+				}
 			},
 		}
 
@@ -354,7 +360,13 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 			allowDevHTTP:      true,
 			diagnosticReports: newDiagnosticReportService(baseDir),
 			calculate: func(reportmodel.ReportRequest, syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
-				return reportmodel.CapitalGainsReport{}, reportmodel.NewCalculationError(reportmodel.CalculationErrorKindActivityInput, "incomplete context", offendingRecord.SourceID, offendingRecord.AssetSymbol, nil).WithPersistedActivityRecord(&offendingRecord)
+				return reportmodel.CapitalGainsReport{}, runtimeDiagnosticCarrierError{
+					context: syncmodel.DiagnosticContext{
+						FailureDetail:           "incomplete context (asset \"BTC\", source \"report-failure-buy-1\")",
+						FailureCauseChain:       []string{"incomplete context (asset \"BTC\", source \"report-failure-buy-1\")"},
+						OffendingActivityRecord: &offendingRecord,
+					},
+				}
 			},
 		}
 

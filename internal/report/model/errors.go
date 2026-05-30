@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
-	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
 
 // CalculationErrorKind identifies one report-calculation failure branch that
@@ -54,7 +53,6 @@ type CalculationError struct {
 	message      string
 	sourceID     string
 	displayLabel string
-	record       *syncmodel.ActivityRecord
 	cause        error
 	causeChain   []string
 }
@@ -93,18 +91,6 @@ func NewCalculationError(kind CalculationErrorKind, message string, sourceID str
 		cause:        cause,
 		causeChain:   calculationErrorCauseChain(detail, cause),
 	}
-}
-
-// WithPersistedActivityRecord attaches the original persisted activity record to
-// one calculation error for downstream diagnostics.
-// Authored by: OpenCode
-func (e *CalculationError) WithPersistedActivityRecord(record *syncmodel.ActivityRecord) *CalculationError {
-	if e == nil || record == nil {
-		return e
-	}
-
-	e.record = record
-	return e
 }
 
 // Error returns the non-secret user-visible calculation failure detail.
@@ -170,19 +156,26 @@ func (e *CalculationError) DisplayLabel() string {
 	return e.displayLabel
 }
 
-// DiagnosticReportContext returns the source-faithful persisted-record context
-// used by report-failure diagnostics.
+// DiagnosticFailureDetail returns the source-faithful failure detail used by
+// report-failure diagnostics.
 // Authored by: OpenCode
-func (e *CalculationError) DiagnosticReportContext() syncmodel.DiagnosticContext {
+func (e *CalculationError) DiagnosticFailureDetail() string {
 	if e == nil {
-		return syncmodel.DiagnosticContext{}
+		return ""
 	}
 
-	return syncmodel.DiagnosticContext{
-		FailureDetail:           e.Error(),
-		FailureCauseChain:       slices.Clone(calculationErrorCauseChain(e.Error(), e.cause)),
-		OffendingActivityRecord: e.record,
+	return e.Error()
+}
+
+// DiagnosticFailureCauseChain returns the ordered non-secret cause chain used
+// by report-failure diagnostics.
+// Authored by: OpenCode
+func (e *CalculationError) DiagnosticFailureCauseChain() []string {
+	if e == nil {
+		return nil
 	}
+
+	return slices.Clone(calculationErrorCauseChain(e.Error(), e.cause))
 }
 
 // calculationErrorCauseChain builds one deterministic outer-to-inner wrapped

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
-	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -44,21 +43,19 @@ func TestCalculationErrorHandlesFallbacks(t *testing.T) {
 		t.Fatalf("unexpected calculation error display label: %q", err.DisplayLabel())
 	}
 
-	var persistedRecord = &syncmodel.ActivityRecord{SourceID: "source-1", AssetSymbol: "BTC"}
-	err = err.WithPersistedActivityRecord(persistedRecord)
-	var diagnosticContext = err.DiagnosticReportContext()
-	if diagnosticContext.FailureDetail == "" || diagnosticContext.OffendingActivityRecord != persistedRecord {
-		t.Fatalf("expected calculation error to expose report diagnostic context, got %#v", diagnosticContext)
+	if err.DiagnosticFailureDetail() != err.Error() {
+		t.Fatalf("expected calculation error to expose report diagnostic detail, got %q", err.DiagnosticFailureDetail())
 	}
-	if len(diagnosticContext.FailureCauseChain) != 2 || diagnosticContext.FailureCauseChain[0] != err.Error() || diagnosticContext.FailureCauseChain[1] != "root cause" {
-		t.Fatalf("expected wrapped calculation cause chain, got %#v", diagnosticContext)
+	var diagnosticCauseChain = err.DiagnosticFailureCauseChain()
+	if len(diagnosticCauseChain) != 2 || diagnosticCauseChain[0] != err.Error() || diagnosticCauseChain[1] != "root cause" {
+		t.Fatalf("expected wrapped calculation cause chain, got %#v", diagnosticCauseChain)
 	}
 
 	err = NewCalculationError(CalculationErrorKindInvalidRequest, "", "", "", nil)
 	if err.Error() != "unsupported report calculation" {
 		t.Fatalf("expected default calculation error message, got %q", err.Error())
 	}
-	if got := err.DiagnosticReportContext().FailureCauseChain; len(got) != 1 || got[0] != "unsupported report calculation" {
+	if got := err.DiagnosticFailureCauseChain(); len(got) != 1 || got[0] != "unsupported report calculation" {
 		t.Fatalf("expected default calculation error cause chain, got %#v", got)
 	}
 
@@ -69,26 +66,29 @@ func TestCalculationErrorHandlesFallbacks(t *testing.T) {
 		"ETH",
 		fmt.Errorf("lower token abc123 layer: %w", errors.New("Bearer jwt-secret")),
 	)
-	diagnosticContext = err.DiagnosticReportContext()
-	if len(diagnosticContext.FailureCauseChain) != 3 {
-		t.Fatalf("expected redacted wrapped cause chain, got %#v", diagnosticContext)
+	diagnosticCauseChain = err.DiagnosticFailureCauseChain()
+	if len(diagnosticCauseChain) != 3 {
+		t.Fatalf("expected redacted wrapped cause chain, got %#v", diagnosticCauseChain)
 	}
-	if diagnosticContext.FailureCauseChain[0] != err.Error() {
-		t.Fatalf("expected actionable outer failure first, got %#v", diagnosticContext.FailureCauseChain)
+	if diagnosticCauseChain[0] != err.Error() {
+		t.Fatalf("expected actionable outer failure first, got %#v", diagnosticCauseChain)
 	}
-	if !strings.Contains(diagnosticContext.FailureCauseChain[1], "token [REDACTED]") || diagnosticContext.FailureCauseChain[2] != "Bearer [REDACTED]" {
-		t.Fatalf("expected nested causes to be redacted, got %#v", diagnosticContext.FailureCauseChain)
+	if !strings.Contains(diagnosticCauseChain[1], "token [REDACTED]") || diagnosticCauseChain[2] != "Bearer [REDACTED]" {
+		t.Fatalf("expected nested causes to be redacted, got %#v", diagnosticCauseChain)
 	}
-	if strings.Contains(strings.Join(diagnosticContext.FailureCauseChain, " "), "abc123") || strings.Contains(strings.Join(diagnosticContext.FailureCauseChain, " "), "jwt-secret") {
-		t.Fatalf("expected secret-bearing wrapped causes to be redacted, got %#v", diagnosticContext.FailureCauseChain)
+	if strings.Contains(strings.Join(diagnosticCauseChain, " "), "abc123") || strings.Contains(strings.Join(diagnosticCauseChain, " "), "jwt-secret") {
+		t.Fatalf("expected secret-bearing wrapped causes to be redacted, got %#v", diagnosticCauseChain)
 	}
 
 	var nilError *CalculationError
 	if nilError.Error() != "" {
 		t.Fatalf("expected nil calculation error string to be empty")
 	}
-	if got := nilError.DiagnosticReportContext(); got.FailureStage != "" || got.FailureDetail != "" || len(got.FailureCauseChain) != 0 || len(got.Records) != 0 || got.OffendingActivityRecord != nil {
-		t.Fatalf("expected nil calculation error diagnostic context to be empty, got %#v", got)
+	if got := nilError.DiagnosticFailureDetail(); got != "" {
+		t.Fatalf("expected nil calculation error diagnostic detail to be empty, got %q", got)
+	}
+	if got := nilError.DiagnosticFailureCauseChain(); len(got) != 0 {
+		t.Fatalf("expected nil calculation error diagnostic cause chain to be empty, got %#v", got)
 	}
 	if nilError.Unwrap() != nil {
 		t.Fatalf("expected nil calculation error unwrap to be nil")
@@ -217,7 +217,7 @@ func TestNewCapitalGainsReportValidatesNestedContent(t *testing.T) {
 			ActivityRows: []AssetActivityRow{{
 				SourceID:            "sell-1",
 				OccurredAt:          time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
-				ActivityType:        syncmodel.ActivityTypeSell,
+				ActivityType:        ActivityTypeSell,
 				Quantity:            mustReportDecimal(t, "1"),
 				GrossValue:          decimalPointer(t, "12"),
 				FeeAmount:           decimalPointer(t, "0"),
@@ -296,7 +296,7 @@ func TestReferenceAndDetailValidationGuardrails(t *testing.T) {
 		[]AssetActivityRow{{
 			SourceID:         "sell-1",
 			OccurredAt:       time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
-			ActivityType:     syncmodel.ActivityType("swap"),
+			ActivityType:     ActivityType("swap"),
 			Quantity:         mustReportDecimal(t, "1"),
 			BasisAfterRow:    mustReportDecimal(t, "0"),
 			QuantityAfterRow: mustReportDecimal(t, "0"),
@@ -333,7 +333,7 @@ func TestReferenceAndDetailValidationGuardrails(t *testing.T) {
 	var validRow = AssetActivityRow{
 		SourceID:         "buy-1",
 		OccurredAt:       time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC),
-		ActivityType:     syncmodel.ActivityTypeBuy,
+		ActivityType:     ActivityTypeBuy,
 		Quantity:         mustReportDecimal(t, "1"),
 		BasisAfterRow:    mustReportDecimal(t, "1"),
 		QuantityAfterRow: mustReportDecimal(t, "1"),
@@ -477,13 +477,13 @@ func TestReportConstructorsAndValidationHelpersCoverRemainingBranches(t *testing
 		t.Fatalf("expected negative closing basis to fail, got %v", err)
 	}
 
-	if err = (AssetActivityRow{SourceID: "sell-1", OccurredAt: time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC), ActivityType: syncmodel.ActivityTypeSell, Quantity: mustReportDecimal(t, "1"), BasisAfterRow: mustReportDecimal(t, "0"), QuantityAfterRow: mustReportDecimal(t, "0"), LiquidationCalculation: &LiquidationCalculation{}}).Validate(); err == nil || !strings.Contains(err.Error(), "asset activity row liquidation calculation") {
+	if err = (AssetActivityRow{SourceID: "sell-1", OccurredAt: time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC), ActivityType: ActivityTypeSell, Quantity: mustReportDecimal(t, "1"), BasisAfterRow: mustReportDecimal(t, "0"), QuantityAfterRow: mustReportDecimal(t, "0"), LiquidationCalculation: &LiquidationCalculation{}}).Validate(); err == nil || !strings.Contains(err.Error(), "asset activity row liquidation calculation") {
 		t.Fatalf("expected nested liquidation validation to fail, got %v", err)
 	}
-	if err = (AssetActivityRow{SourceID: "sell-1", OccurredAt: time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC), ActivityType: syncmodel.ActivityTypeSell, Quantity: mustReportDecimal(t, "1"), BasisAfterRow: mustReportDecimal(t, "-1"), QuantityAfterRow: mustReportDecimal(t, "0")}).Validate(); err == nil || !strings.Contains(err.Error(), "basis after row") {
+	if err = (AssetActivityRow{SourceID: "sell-1", OccurredAt: time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC), ActivityType: ActivityTypeSell, Quantity: mustReportDecimal(t, "1"), BasisAfterRow: mustReportDecimal(t, "-1"), QuantityAfterRow: mustReportDecimal(t, "0")}).Validate(); err == nil || !strings.Contains(err.Error(), "basis after row") {
 		t.Fatalf("expected negative basis-after-row to fail, got %v", err)
 	}
-	if err = (AssetActivityRow{SourceID: "sell-1", OccurredAt: time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC), ActivityType: syncmodel.ActivityTypeSell, Quantity: mustReportDecimal(t, "1"), BasisAfterRow: mustReportDecimal(t, "0"), QuantityAfterRow: mustReportDecimal(t, "-1")}).Validate(); err == nil || !strings.Contains(err.Error(), "quantity after row") {
+	if err = (AssetActivityRow{SourceID: "sell-1", OccurredAt: time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC), ActivityType: ActivityTypeSell, Quantity: mustReportDecimal(t, "1"), BasisAfterRow: mustReportDecimal(t, "0"), QuantityAfterRow: mustReportDecimal(t, "-1")}).Validate(); err == nil || !strings.Contains(err.Error(), "quantity after row") {
 		t.Fatalf("expected negative quantity-after-row to fail, got %v", err)
 	}
 
@@ -570,10 +570,10 @@ func TestReportConstructorsAndValidationHelpersCoverRemainingBranches(t *testing
 	if err = (AssetActivityRow{SourceID: "row-1"}).Validate(); err == nil || !strings.Contains(err.Error(), "occurred-at timestamp is required") {
 		t.Fatalf("expected blank activity row timestamp to fail, got %v", err)
 	}
-	if err = (AssetActivityRow{SourceID: "row-1", OccurredAt: time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC), ActivityType: syncmodel.ActivityTypeBuy}).Validate(); err == nil || !strings.Contains(err.Error(), "quantity") {
+	if err = (AssetActivityRow{SourceID: "row-1", OccurredAt: time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC), ActivityType: ActivityTypeBuy}).Validate(); err == nil || !strings.Contains(err.Error(), "quantity") {
 		t.Fatalf("expected missing positive activity quantity to fail, got %v", err)
 	}
-	if err = (AssetActivityRow{SourceID: "row-1", OccurredAt: time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC), ActivityType: syncmodel.ActivityTypeBuy, Quantity: mustReportDecimal(t, "1"), FeeAmount: &reportInvalidDecimal, BasisAfterRow: mustReportDecimal(t, "0"), QuantityAfterRow: mustReportDecimal(t, "0")}).Validate(); err == nil || !strings.Contains(err.Error(), "fee amount") {
+	if err = (AssetActivityRow{SourceID: "row-1", OccurredAt: time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC), ActivityType: ActivityTypeBuy, Quantity: mustReportDecimal(t, "1"), FeeAmount: &reportInvalidDecimal, BasisAfterRow: mustReportDecimal(t, "0"), QuantityAfterRow: mustReportDecimal(t, "0")}).Validate(); err == nil || !strings.Contains(err.Error(), "fee amount") {
 		t.Fatalf("expected invalid activity fee amount to fail, got %v", err)
 	}
 

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
-	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -119,7 +118,7 @@ type AssetDetailSection struct {
 type AssetActivityRow struct {
 	SourceID                    string
 	OccurredAt                  time.Time
-	ActivityType                syncmodel.ActivityType
+	ActivityType                ActivityType
 	Quantity                    apd.Decimal
 	UnitPrice                   *apd.Decimal
 	GrossValue                  *apd.Decimal
@@ -757,9 +756,9 @@ func validateReportDocumentType(documentType ReportDocumentType) error {
 
 // validateActivityType rejects unsupported activity-row activity types.
 // Authored by: OpenCode
-func validateActivityType(activityType syncmodel.ActivityType) error {
+func validateActivityType(activityType ActivityType) error {
 	switch activityType {
-	case syncmodel.ActivityTypeBuy, syncmodel.ActivityTypeSell:
+	case ActivityTypeBuy, ActivityTypeSell:
 		return nil
 	default:
 		return fmt.Errorf("unsupported activity type %q", activityType)

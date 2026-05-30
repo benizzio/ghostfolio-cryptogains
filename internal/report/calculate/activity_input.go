@@ -42,16 +42,15 @@ func SelectActivityCalculationInput(record syncmodel.ActivityRecord) (reportmode
 	}
 
 	var input = reportmodel.ActivityCalculationInput{
-		SourceID:                strings.TrimSpace(record.SourceID),
-		OccurredAt:              occurredAt,
-		SourceYear:              occurredAt.Year(),
-		ActivityType:            record.ActivityType,
-		PersistedActivityRecord: &record,
-		AssetIdentityKey:        strings.TrimSpace(record.AssetIdentityKey),
-		DisplayLabel:            activityDisplayLabel(record),
-		Quantity:                record.Quantity,
-		SourceScope:             record.SourceScope,
-		Comment:                 strings.TrimSpace(record.Comment),
+		SourceID:         strings.TrimSpace(record.SourceID),
+		OccurredAt:       occurredAt,
+		SourceYear:       occurredAt.Year(),
+		ActivityType:     reportActivityType(record.ActivityType),
+		AssetIdentityKey: strings.TrimSpace(record.AssetIdentityKey),
+		DisplayLabel:     activityDisplayLabel(record),
+		Quantity:         record.Quantity,
+		SourceScope:      reportSourceScope(record.SourceScope),
+		Comment:          strings.TrimSpace(record.Comment),
 	}
 
 	var zeroPricedValues zeroPricedHoldingReductionValues
@@ -85,6 +84,29 @@ func SelectActivityCalculationInput(record syncmodel.ActivityRecord) (reportmode
 	input.SelectedCurrencyCode = tierInput.SelectedCurrencyCode
 
 	return input, nil
+}
+
+// reportActivityType maps the normalized synced activity type into the report
+// model's owned activity type value.
+// Authored by: OpenCode
+func reportActivityType(activityType syncmodel.ActivityType) reportmodel.ActivityType {
+	return reportmodel.ActivityType(activityType)
+}
+
+// reportSourceScope maps normalized synced source scope into the report model's
+// owned source scope value.
+// Authored by: OpenCode
+func reportSourceScope(scope *syncmodel.SourceScope) *reportmodel.SourceScope {
+	if scope == nil {
+		return nil
+	}
+
+	return &reportmodel.SourceScope{
+		ID:          scope.ID,
+		Name:        scope.Name,
+		Kind:        reportmodel.SourceScopeKind(scope.Kind),
+		Reliability: reportmodel.ScopeReliability(scope.Reliability),
+	}
 }
 
 // activityMoneyTier stores one candidate activity currency context before it is
