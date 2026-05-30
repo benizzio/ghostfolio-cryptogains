@@ -25,22 +25,22 @@ const InternalCalculationScale int32 = 16
 //	if err != nil {
 //		panic(err)
 //	}
-//	err = math.RequireFinite(value, "report dividend")
+//	err = math.RequireFinite(value)
 //	if err != nil {
 //		panic(err)
 //	}
 //
 // Authored by: OpenCode
-func RequireFinite(value apd.Decimal, label string) error {
+func RequireFinite(value apd.Decimal) error {
 	if _, err := decimalsupport.CanonicalString(value); err != nil {
-		return fmt.Errorf("%s: %w", label, err)
+		return fmt.Errorf("decimal value must be finite: %w", err)
 	}
 
 	return nil
 }
 
 // DivideFiniteRoundHalfUp divides one finite decimal by another and rounds the
-// quotient half up to the requested fixed scale.
+// quotient half up to the shared internal fixed scale.
 //
 // Example:
 //
@@ -52,7 +52,7 @@ func RequireFinite(value apd.Decimal, label string) error {
 //	if err != nil {
 //		panic(err)
 //	}
-//	quotient, err := math.DivideFiniteRoundHalfUp(dividend, divisor, math.InternalCalculationScale)
+//	quotient, err := math.DivideFiniteRoundHalfUp(dividend, divisor)
 //	if err != nil {
 //		panic(err)
 //	}
@@ -61,22 +61,19 @@ func RequireFinite(value apd.Decimal, label string) error {
 // Callers that need package-specific validation messages should validate their
 // operands before calling this helper.
 // Authored by: OpenCode
-func DivideFiniteRoundHalfUp(dividend apd.Decimal, divisor apd.Decimal, scale int32) (apd.Decimal, error) {
-	if err := RequireFinite(dividend, "division dividend"); err != nil {
-		return apd.Decimal{}, err
+func DivideFiniteRoundHalfUp(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, error) {
+	if err := RequireFinite(dividend); err != nil {
+		return apd.Decimal{}, fmt.Errorf("division dividend is invalid: %w", err)
 	}
-	if err := RequireFinite(divisor, "division divisor"); err != nil {
-		return apd.Decimal{}, err
-	}
-	if scale < 0 {
-		return apd.Decimal{}, fmt.Errorf("division scale must not be negative")
+	if err := RequireFinite(divisor); err != nil {
+		return apd.Decimal{}, fmt.Errorf("division divisor is invalid: %w", err)
 	}
 	if divisor.Sign() == 0 {
 		return apd.Decimal{}, fmt.Errorf("division requires a non-zero divisor")
 	}
 
-	var scaledQuotient = scaledRoundedQuotient(dividend, divisor, scale)
-	return scaledCoefficientDecimal(scaledQuotient, scale), nil
+	var scaledQuotient = scaledRoundedQuotient(dividend, divisor, InternalCalculationScale)
+	return scaledCoefficientDecimal(scaledQuotient, InternalCalculationScale), nil
 }
 
 // scaledRoundedQuotient computes one fixed-scale quotient rounded half up.

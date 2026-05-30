@@ -15,7 +15,7 @@ import (
 func TestRoundHalfUpDivisionAndFiniteValidation(t *testing.T) {
 	t.Parallel()
 
-	var exact, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "5"), mustMathDecimal(t, "4"), 16)
+	var exact, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "5"), mustMathDecimal(t, "4"))
 	if err != nil {
 		t.Fatalf("divide exact decimals: %v", err)
 	}
@@ -24,7 +24,7 @@ func TestRoundHalfUpDivisionAndFiniteValidation(t *testing.T) {
 	}
 
 	var repeating apd.Decimal
-	repeating, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "1"), mustMathDecimal(t, "3"), 16)
+	repeating, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "1"), mustMathDecimal(t, "3"))
 	if err != nil {
 		t.Fatalf("divide repeating decimals: %v", err)
 	}
@@ -33,7 +33,7 @@ func TestRoundHalfUpDivisionAndFiniteValidation(t *testing.T) {
 	}
 
 	var halfUp apd.Decimal
-	halfUp, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "1"), mustMathDecimal(t, "6"), 16)
+	halfUp, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "1"), mustMathDecimal(t, "6"))
 	if err != nil {
 		t.Fatalf("divide half-up decimals: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestRoundHalfUpDivisionAndFiniteValidation(t *testing.T) {
 	}
 
 	var negative apd.Decimal
-	negative, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "-1"), mustMathDecimal(t, "3"), 16)
+	negative, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "-1"), mustMathDecimal(t, "3"))
 	if err != nil {
 		t.Fatalf("divide negative decimals: %v", err)
 	}
@@ -50,25 +50,22 @@ func TestRoundHalfUpDivisionAndFiniteValidation(t *testing.T) {
 		t.Fatalf("unexpected negative quotient: %q err=%v", got, canonicalErr)
 	}
 
-	if err = RequireFinite(mustMathDecimal(t, "10"), "test decimal"); err != nil {
+	if err = RequireFinite(mustMathDecimal(t, "10")); err != nil {
 		t.Fatalf("require finite decimal: %v", err)
 	}
 
 	var invalid apd.Decimal
 	invalid.Form = apd.Infinite
-	if _, err = DivideFiniteRoundHalfUp(invalid, mustMathDecimal(t, "1"), 16); err == nil || !strings.Contains(err.Error(), "division dividend") {
+	if _, err = DivideFiniteRoundHalfUp(invalid, mustMathDecimal(t, "1")); err == nil || !strings.Contains(err.Error(), "division dividend") {
 		t.Fatalf("expected invalid dividend to fail, got %v", err)
 	}
-	if _, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "1"), invalid, 16); err == nil || !strings.Contains(err.Error(), "division divisor") {
+	if _, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "1"), invalid); err == nil || !strings.Contains(err.Error(), "division divisor") {
 		t.Fatalf("expected invalid divisor to fail, got %v", err)
 	}
-	if _, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "1"), apd.Decimal{}, 16); err == nil || !strings.Contains(err.Error(), "non-zero divisor") {
+	if _, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "1"), apd.Decimal{}); err == nil || !strings.Contains(err.Error(), "non-zero divisor") {
 		t.Fatalf("expected zero divisor to fail, got %v", err)
 	}
-	if _, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "1"), mustMathDecimal(t, "1"), -1); err == nil || !strings.Contains(err.Error(), "scale") {
-		t.Fatalf("expected negative scale to fail, got %v", err)
-	}
-	if err = RequireFinite(invalid, "invalid decimal"); err == nil || !strings.Contains(err.Error(), "invalid decimal") {
+	if err = RequireFinite(invalid); err == nil || !strings.Contains(err.Error(), "finite") {
 		t.Fatalf("expected invalid finite check to fail, got %v", err)
 	}
 
@@ -90,9 +87,6 @@ func TestDecimalOpsAndAllocationHelpers(t *testing.T) {
 	var sum, err = ApplyBinaryOperation(
 		mustMathDecimal(t, "2"),
 		mustMathDecimal(t, "3"),
-		"left decimal",
-		"right decimal",
-		"add decimals",
 		func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
 			return apd.BaseContext.Add(result, left, right)
 		},
@@ -105,7 +99,7 @@ func TestDecimalOpsAndAllocationHelpers(t *testing.T) {
 	}
 
 	var difference apd.Decimal
-	difference, err = Subtract(mustMathDecimal(t, "5"), mustMathDecimal(t, "3"), "left decimal", "right decimal", "subtract decimals")
+	difference, err = Subtract(mustMathDecimal(t, "5"), mustMathDecimal(t, "3"))
 	if err != nil {
 		t.Fatalf("subtract decimals: %v", err)
 	}
@@ -114,7 +108,7 @@ func TestDecimalOpsAndAllocationHelpers(t *testing.T) {
 	}
 
 	var product apd.Decimal
-	product, err = Multiply(mustMathDecimal(t, "1.25"), mustMathDecimal(t, "4"), "left decimal", "right decimal", "multiply decimals")
+	product, err = Multiply(mustMathDecimal(t, "1.25"), mustMathDecimal(t, "4"))
 	if err != nil {
 		t.Fatalf("multiply decimals: %v", err)
 	}
@@ -123,13 +117,13 @@ func TestDecimalOpsAndAllocationHelpers(t *testing.T) {
 	}
 
 	var comparison int
-	comparison, err = Compare(mustMathDecimal(t, "2"), mustMathDecimal(t, "10"), "left decimal", "right decimal")
+	comparison, err = Compare(mustMathDecimal(t, "2"), mustMathDecimal(t, "10"))
 	if err != nil || comparison >= 0 {
 		t.Fatalf("expected 2 to compare before 10, got %d err=%v", comparison, err)
 	}
 
 	var isZero bool
-	isZero, err = IsZero(mustMathDecimal(t, "0.000"), "test decimal")
+	isZero, err = IsZero(mustMathDecimal(t, "0.000"))
 	if err != nil || !isZero {
 		t.Fatalf("expected canonical zero to compare as zero, got %t err=%v", isZero, err)
 	}
@@ -157,18 +151,12 @@ func TestDecimalOpsAndAllocationHelpers(t *testing.T) {
 		mustMathDecimal(t, "1"),
 		mustMathDecimal(t, "3"),
 		mustMathDecimal(t, "1"),
-		"total basis",
-		"total quantity",
-		"matched quantity",
-		"allocate basis proportionally",
 		func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-			return ApplyBinaryOperation(left, right, "left decimal", "right decimal", "multiply decimals", func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
+			return ApplyBinaryOperation(left, right, func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
 				return apd.BaseContext.Mul(result, left, right)
 			})
 		},
-		func(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, error) {
-			return DivideFiniteRoundHalfUp(dividend, divisor, 16)
-		},
+		DivideFiniteRoundHalfUp,
 	)
 	if err != nil {
 		t.Fatalf("allocate proportional amount: %v", err)
@@ -181,10 +169,6 @@ func TestDecimalOpsAndAllocationHelpers(t *testing.T) {
 		mustMathDecimal(t, "10"),
 		mustMathDecimal(t, "2"),
 		mustMathDecimal(t, "2"),
-		"total basis",
-		"total quantity",
-		"matched quantity",
-		"allocate basis proportionally",
 		func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) { return apd.Decimal{}, nil },
 		func(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, error) { return apd.Decimal{}, nil },
 	)
@@ -197,24 +181,24 @@ func TestDecimalOpsAndAllocationHelpers(t *testing.T) {
 
 	var invalid apd.Decimal
 	invalid.Form = apd.NaNSignaling
-	if _, err = ApplyBinaryOperation(invalid, mustMathDecimal(t, "1"), "left decimal", "right decimal", "add decimals", func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
+	if _, err = ApplyBinaryOperation(invalid, mustMathDecimal(t, "1"), func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
 		return apd.BaseContext.Add(result, left, right)
-	}); err == nil || !strings.Contains(err.Error(), "left decimal") {
+	}); err == nil || !strings.Contains(err.Error(), "left decimal operand") {
 		t.Fatalf("expected invalid left operand to fail, got %v", err)
 	}
-	if _, err = Compare(mustMathDecimal(t, "1"), invalid, "left decimal", "right decimal"); err == nil || !strings.Contains(err.Error(), "right decimal") {
+	if _, err = Compare(mustMathDecimal(t, "1"), invalid); err == nil || !strings.Contains(err.Error(), "right decimal operand") {
 		t.Fatalf("expected invalid right comparison operand to fail, got %v", err)
 	}
-	if _, err = IsZero(invalid, "test decimal"); err == nil || !strings.Contains(err.Error(), "test decimal") {
+	if _, err = IsZero(invalid); err == nil || !strings.Contains(err.Error(), "decimal operand") {
 		t.Fatalf("expected invalid zero operand to fail, got %v", err)
 	}
-	if _, err = Add(invalid, mustMathDecimal(t, "1"), "left decimal", "right decimal", "add decimals"); err == nil || !strings.Contains(err.Error(), "left decimal") {
+	if _, err = Add(invalid, mustMathDecimal(t, "1")); err == nil || !strings.Contains(err.Error(), "left decimal operand") {
 		t.Fatalf("expected invalid add operand to fail, got %v", err)
 	}
-	if _, err = Subtract(mustMathDecimal(t, "1"), invalid, "left decimal", "right decimal", "subtract decimals"); err == nil || !strings.Contains(err.Error(), "right decimal") {
+	if _, err = Subtract(mustMathDecimal(t, "1"), invalid); err == nil || !strings.Contains(err.Error(), "right decimal operand") {
 		t.Fatalf("expected invalid subtract operand to fail, got %v", err)
 	}
-	if _, err = Multiply(mustMathDecimal(t, "1"), invalid, "left decimal", "right decimal", "multiply decimals"); err == nil || !strings.Contains(err.Error(), "right decimal") {
+	if _, err = Multiply(mustMathDecimal(t, "1"), invalid); err == nil || !strings.Contains(err.Error(), "right decimal operand") {
 		t.Fatalf("expected invalid multiply operand to fail, got %v", err)
 	}
 	if err = RequirePositive(mustMathDecimal(t, "0"), "positive decimal"); err == nil || !strings.Contains(err.Error(), "must be greater than zero") {
@@ -223,55 +207,55 @@ func TestDecimalOpsAndAllocationHelpers(t *testing.T) {
 	if err = RequireNonNegative(mustMathDecimal(t, "-1"), "non-negative decimal"); err == nil || !strings.Contains(err.Error(), "must not be negative") {
 		t.Fatalf("expected negative decimal to fail, got %v", err)
 	}
-	if _, err = ApplyBinaryOperation(mustMathDecimal(t, "1"), mustMathDecimal(t, "1"), "left decimal", "right decimal", "add decimals", nil); err == nil || !strings.Contains(err.Error(), "operation is required") {
+	if _, err = ApplyBinaryOperation(mustMathDecimal(t, "1"), mustMathDecimal(t, "1"), nil); err == nil || !strings.Contains(err.Error(), "operation is required") {
 		t.Fatalf("expected missing operation to fail, got %v", err)
 	}
-	if _, err = ApplyBinaryOperation(mustMathDecimal(t, "1"), mustMathDecimal(t, "1"), "left decimal", "right decimal", "add decimals", func(*apd.Decimal, *apd.Decimal, *apd.Decimal) (apd.Condition, error) {
+	if _, err = ApplyBinaryOperation(mustMathDecimal(t, "1"), mustMathDecimal(t, "1"), func(*apd.Decimal, *apd.Decimal, *apd.Decimal) (apd.Condition, error) {
 		return 0, errors.New("add boom")
-	}); err == nil || !strings.Contains(err.Error(), "add decimals") {
+	}); err == nil || !strings.Contains(err.Error(), "decimal operation failed") {
 		t.Fatalf("expected wrapped operation failure, got %v", err)
 	}
-	if _, err = AllocateProportional(mustMathDecimal(t, "1"), mustMathDecimal(t, "2"), mustMathDecimal(t, "3"), "total basis", "total quantity", "matched quantity", "allocate basis proportionally", nil, nil); err == nil || !strings.Contains(err.Error(), "multiplication helper") {
+	if _, err = AllocateProportional(mustMathDecimal(t, "1"), mustMathDecimal(t, "2"), mustMathDecimal(t, "3"), nil, nil); err == nil || !strings.Contains(err.Error(), "multiplication helper") {
 		t.Fatalf("expected missing multiply helper to fail, got %v", err)
 	}
-	if _, err = AllocateProportional(mustMathDecimal(t, "1"), mustMathDecimal(t, "2"), mustMathDecimal(t, "1"), "total basis", "total quantity", "matched quantity", "allocate basis proportionally", func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+	if _, err = AllocateProportional(mustMathDecimal(t, "1"), mustMathDecimal(t, "2"), mustMathDecimal(t, "1"), func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
 		return left, nil
 	}, nil); err == nil || !strings.Contains(err.Error(), "division helper") {
 		t.Fatalf("expected missing divide helper to fail, got %v", err)
 	}
-	if _, err = AllocateProportional(mustMathDecimal(t, "-1"), mustMathDecimal(t, "2"), mustMathDecimal(t, "1"), "total basis", "total quantity", "matched quantity", "allocate basis proportionally", func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+	if _, err = AllocateProportional(mustMathDecimal(t, "-1"), mustMathDecimal(t, "2"), mustMathDecimal(t, "1"), func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
 		return left, nil
 	}, func(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, error) {
 		return dividend, nil
-	}); err == nil || !strings.Contains(err.Error(), "total basis") {
+	}); err == nil || !strings.Contains(err.Error(), "total amount") {
 		t.Fatalf("expected negative total amount to fail, got %v", err)
 	}
-	if _, err = AllocateProportional(mustMathDecimal(t, "1"), mustMathDecimal(t, "0"), mustMathDecimal(t, "1"), "total basis", "total quantity", "matched quantity", "allocate basis proportionally", func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+	if _, err = AllocateProportional(mustMathDecimal(t, "1"), mustMathDecimal(t, "0"), mustMathDecimal(t, "1"), func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
 		return left, nil
 	}, func(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, error) {
 		return dividend, nil
 	}); err == nil || !strings.Contains(err.Error(), "total quantity") {
 		t.Fatalf("expected non-positive total quantity to fail, got %v", err)
 	}
-	if _, err = AllocateProportional(mustMathDecimal(t, "1"), mustMathDecimal(t, "2"), mustMathDecimal(t, "0"), "total basis", "total quantity", "matched quantity", "allocate basis proportionally", func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+	if _, err = AllocateProportional(mustMathDecimal(t, "1"), mustMathDecimal(t, "2"), mustMathDecimal(t, "0"), func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
 		return left, nil
 	}, func(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, error) {
 		return dividend, nil
-	}); err == nil || !strings.Contains(err.Error(), "matched quantity") {
+	}); err == nil || !strings.Contains(err.Error(), "portion quantity") {
 		t.Fatalf("expected non-positive matched quantity to fail, got %v", err)
 	}
-	if _, err = AllocateProportional(mustMathDecimal(t, "1"), mustMathDecimal(t, "2"), mustMathDecimal(t, "1"), "total basis", "total quantity", "matched quantity", "allocate basis proportionally", func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+	if _, err = AllocateProportional(mustMathDecimal(t, "1"), mustMathDecimal(t, "2"), mustMathDecimal(t, "1"), func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
 		return apd.Decimal{}, errors.New("multiply boom")
 	}, func(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, error) {
 		return dividend, nil
 	}); err == nil || !strings.Contains(err.Error(), "multiply boom") {
 		t.Fatalf("expected multiply failure to propagate, got %v", err)
 	}
-	if _, err = AllocateProportional(mustMathDecimal(t, "1"), mustMathDecimal(t, "2"), mustMathDecimal(t, "1"), "total basis", "total quantity", "matched quantity", "allocate basis proportionally", func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+	if _, err = AllocateProportional(mustMathDecimal(t, "1"), mustMathDecimal(t, "2"), mustMathDecimal(t, "1"), func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
 		return left, nil
 	}, func(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, error) {
 		return apd.Decimal{}, errors.New("divide boom")
-	}); err == nil || !strings.Contains(err.Error(), "allocate basis proportionally") {
+	}); err == nil || !strings.Contains(err.Error(), "allocate proportional amount") {
 		t.Fatalf("expected wrapped divide failure, got %v", err)
 	}
 }

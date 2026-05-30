@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	reportdecimal "github.com/benizzio/ghostfolio-cryptogains/internal/report/decimal"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
@@ -209,9 +208,9 @@ func allPresentDecimalsAreZero(values []*apd.Decimal) (bool, error) {
 			continue
 		}
 
-		var isZero, err = supportmath.IsZero(*value, "report decimal")
+		var isZero, err = supportmath.IsZero(*value)
 		if err != nil {
-			return false, err
+			return false, fmt.Errorf("report decimal is invalid: %w", err)
 		}
 		if !isZero {
 			return false, nil
@@ -240,7 +239,7 @@ func firstExplicitZeroValue(values ...*apd.Decimal) *apd.Decimal {
 // precondition before tier selection.
 // Authored by: OpenCode
 func requirePositivePricedQuantity(record syncmodel.ActivityRecord) error {
-	var comparison, err = supportmath.Compare(record.Quantity, apd.Decimal{}, "left report decimal", "right report decimal")
+	var comparison, err = supportmath.Compare(record.Quantity, apd.Decimal{})
 	if err != nil {
 		return fmt.Errorf("activity %q quantity is invalid: %w", strings.TrimSpace(record.SourceID), err)
 	}
@@ -332,7 +331,7 @@ func selectTierGrossValue(record syncmodel.ActivityRecord, tier activityMoneyTie
 		return nil, nil
 	}
 
-	var derivedGrossValue, err = supportmath.Multiply(record.Quantity, *tier.unitPrice, "left report decimal", "right report decimal", "multiply report decimals")
+	var derivedGrossValue, err = supportmath.Multiply(record.Quantity, *tier.unitPrice)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"activity %q %s gross value cannot be derived from quantity and unit price: %w",
@@ -358,7 +357,7 @@ func selectTierUnitPrice(record syncmodel.ActivityRecord, tier activityMoneyTier
 
 	var derivedUnitPrice apd.Decimal
 	var err error
-	derivedUnitPrice, err = reportdecimal.DivideRoundHalfUp(*grossValue, record.Quantity)
+	derivedUnitPrice, err = supportmath.DivideFiniteRoundHalfUp(*grossValue, record.Quantity)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"activity %q %s unit price cannot be derived from gross value and quantity: %w",
@@ -436,7 +435,7 @@ func informedGrossValue(unitPrice *apd.Decimal, currency string, quantity apd.De
 		return nil
 	}
 
-	var grossValue, err = supportmath.Multiply(quantity, *unitPrice, "left report decimal", "right report decimal", "multiply report decimals")
+	var grossValue, err = supportmath.Multiply(quantity, *unitPrice)
 	if err != nil {
 		return nil
 	}

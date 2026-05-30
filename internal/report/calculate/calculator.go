@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	reportbasis "github.com/benizzio/ghostfolio-cryptogains/internal/report/basis"
-	reportdecimal "github.com/benizzio/ghostfolio-cryptogains/internal/report/decimal"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
@@ -27,7 +26,9 @@ var (
 	resolveScopedInputsFunc   = resolveScopedAssetInputs
 	replayAssetInputFunc      = replayAssetInput
 	lotStateTotalOpenQuantity = func(state *reportbasis.LotMethodState) (apd.Decimal, error) { return state.TotalOpenQuantity() }
-	reportDivideRoundHalfUp   = reportdecimal.DivideRoundHalfUp
+	reportDivideRoundHalfUp   = func(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, error) {
+		return supportmath.DivideFiniteRoundHalfUp(dividend, divisor)
+	}
 )
 
 // Calculate replays the protected synced activity cache through one selected
@@ -93,7 +94,7 @@ func Calculate(request reportmodel.ReportRequest, cache syncmodel.ProtectedActiv
 		summaryEntries = append(summaryEntries, assetResult.SummaryEntry)
 		detailSections = append(detailSections, assetResult.DetailSection)
 
-		yearlyNetTotal, err = supportmath.Add(yearlyNetTotal, assetResult.YearlyNet, "left calculation decimal", "right calculation decimal", "add calculation decimals")
+		yearlyNetTotal, err = supportmath.Add(yearlyNetTotal, assetResult.YearlyNet)
 		if err != nil {
 			return reportmodel.CapitalGainsReport{}, reportmodel.NewCalculationError(
 				reportmodel.CalculationErrorKindBasisAllocation,

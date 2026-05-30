@@ -114,7 +114,7 @@ func applyAcquisition(basisState assetBasisState, scopedInput scopedActivityInpu
 		)
 	}
 
-	var acquisitionBasis, err = supportmath.Add(*input.GrossValue, *input.FeeAmount, "left calculation decimal", "right calculation decimal", "add calculation decimals")
+	var acquisitionBasis, err = supportmath.Add(*input.GrossValue, *input.FeeAmount)
 	if err != nil {
 		return basisApplicationResult{}, newInputCalculationError(
 			reportmodel.CalculationErrorKindBasisAllocation,
@@ -176,7 +176,7 @@ func applyPricedLiquidation(basisState assetBasisState, scopedInput scopedActivi
 		)
 	}
 
-	var netProceeds, err = supportmath.Subtract(*input.GrossValue, *input.FeeAmount, "left calculation decimal", "right calculation decimal", "subtract calculation decimals")
+	var netProceeds, err = supportmath.Subtract(*input.GrossValue, *input.FeeAmount)
 	if err != nil {
 		return basisApplicationResult{}, newInputCalculationError(
 			reportmodel.CalculationErrorKindBasisAllocation,
@@ -198,7 +198,7 @@ func applyPricedLiquidation(basisState assetBasisState, scopedInput scopedActivi
 	}
 
 	var gainOrLoss apd.Decimal
-	gainOrLoss, err = supportmath.Subtract(netProceeds, disposal.AllocatedBasis, "left calculation decimal", "right calculation decimal", "subtract calculation decimals")
+	gainOrLoss, err = supportmath.Subtract(netProceeds, disposal.AllocatedBasis)
 	if err != nil {
 		return basisApplicationResult{}, newInputCalculationError(
 			reportmodel.CalculationErrorKindBasisAllocation,
@@ -235,14 +235,14 @@ func buildPricedLiquidationMatches(matches []reportmodel.BasisMatch, disposedQua
 	if len(matches) == 0 {
 		return nil, nil
 	}
-	if err := supportmath.RequireFinite(disposedQuantity, "disposed quantity"); err != nil {
-		return nil, err
+	if err := supportmath.RequireFinite(disposedQuantity); err != nil {
+		return nil, fmt.Errorf("disposed quantity is invalid: %w", err)
 	}
 	if disposedQuantity.Sign() <= 0 {
 		return nil, fmt.Errorf("disposed quantity must be greater than zero")
 	}
-	if err := supportmath.RequireFinite(netProceeds, "net proceeds"); err != nil {
-		return nil, err
+	if err := supportmath.RequireFinite(netProceeds); err != nil {
+		return nil, fmt.Errorf("net proceeds is invalid: %w", err)
 	}
 
 	var proceedsPerUnit, err = reportDivideRoundHalfUp(netProceeds, disposedQuantity)
@@ -254,12 +254,12 @@ func buildPricedLiquidationMatches(matches []reportmodel.BasisMatch, disposedQua
 	for _, match := range matches {
 		var matchCopy = match
 		var matchedProceeds apd.Decimal
-		matchedProceeds, err = supportmath.Multiply(proceedsPerUnit, match.MatchedQuantity, "left report decimal", "right report decimal", "multiply report decimals")
+		matchedProceeds, err = supportmath.Multiply(proceedsPerUnit, match.MatchedQuantity)
 		if err != nil {
 			return nil, fmt.Errorf("calculate matched proceeds for acquisition %q: %w", strings.TrimSpace(match.AcquisitionSourceID), err)
 		}
 		var matchedGainOrLoss apd.Decimal
-		matchedGainOrLoss, err = supportmath.Subtract(matchedProceeds, match.MatchedBasis, "left calculation decimal", "right calculation decimal", "subtract calculation decimals")
+		matchedGainOrLoss, err = supportmath.Subtract(matchedProceeds, match.MatchedBasis)
 		if err != nil {
 			return nil, fmt.Errorf("calculate matched gain or loss for acquisition %q: %w", strings.TrimSpace(match.AcquisitionSourceID), err)
 		}

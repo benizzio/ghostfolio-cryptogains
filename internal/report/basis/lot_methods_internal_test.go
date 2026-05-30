@@ -88,7 +88,7 @@ func TestLotMethodFallbackAndNilPaths(t *testing.T) {
 	}
 
 	_, err = exactProportionalBasis(decimalFromInt(10), decimalFromInt(2), decimalFromInt(3))
-	if err == nil || !strings.Contains(err.Error(), "matched quantity exceeds total quantity") {
+	if err == nil || !strings.Contains(err.Error(), "portion quantity exceeds total quantity") {
 		t.Fatalf("expected oversized proportional match to fail, got %v", err)
 	}
 }
@@ -158,16 +158,16 @@ func TestLotMethodValidationAndHelperPaths(t *testing.T) {
 	if _, err = exactProportionalBasis(decimalFromInt(1), invalid, decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "total quantity") {
 		t.Fatalf("expected invalid total quantity to fail, got %v", err)
 	}
-	if _, err = exactProportionalBasis(decimalFromInt(1), decimalFromInt(1), invalid); err == nil || !strings.Contains(err.Error(), "matched quantity") {
+	if _, err = exactProportionalBasis(decimalFromInt(1), decimalFromInt(1), invalid); err == nil || !strings.Contains(err.Error(), "portion quantity") {
 		t.Fatalf("expected invalid matched quantity to fail, got %v", err)
 	}
-	if _, err = supportmath.Add(decimalFromInt(1), invalid, "left decimal", "right decimal", "add decimals"); err == nil || !strings.Contains(err.Error(), "right decimal") {
+	if _, err = supportmath.Add(decimalFromInt(1), invalid); err == nil || !strings.Contains(err.Error(), "right decimal operand") {
 		t.Fatalf("expected invalid add decimal to fail, got %v", err)
 	}
-	if _, err = supportmath.Subtract(decimalFromInt(1), invalid, "left decimal", "right decimal", "subtract decimals"); err == nil || !strings.Contains(err.Error(), "right decimal") {
+	if _, err = supportmath.Subtract(decimalFromInt(1), invalid); err == nil || !strings.Contains(err.Error(), "right decimal operand") {
 		t.Fatalf("expected invalid subtract decimal to fail, got %v", err)
 	}
-	if _, err = supportmath.Multiply(decimalFromInt(1), invalid, "left decimal", "right decimal", "multiply decimals"); err == nil || !strings.Contains(err.Error(), "right decimal") {
+	if _, err = supportmath.Multiply(decimalFromInt(1), invalid); err == nil || !strings.Contains(err.Error(), "right decimal operand") {
 		t.Fatalf("expected invalid multiply decimal to fail, got %v", err)
 	}
 	if err = supportmath.RequireNonNegative(invalid, "non-negative"); err == nil || !strings.Contains(err.Error(), "non-negative") {

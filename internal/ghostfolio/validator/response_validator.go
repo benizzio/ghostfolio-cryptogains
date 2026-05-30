@@ -280,17 +280,17 @@ func requireDerivableGrossValue(entry dto.ActivityPageEntry) error {
 // 16-decimal round-half-up handling later in reporting.
 // Authored by: OpenCode
 func deriveRoundedUnitPrice(grossValue apd.Decimal, quantity apd.Decimal) (apd.Decimal, error) {
-	if err := supportmath.RequireFinite(grossValue, "gross value for unit-price derivation"); err != nil {
+	if err := supportmath.RequireFinite(grossValue); err != nil {
 		return apd.Decimal{}, fmt.Errorf("prepare gross value for unit-price derivation: %w", err)
 	}
-	if err := supportmath.RequireFinite(quantity, "quantity for unit-price derivation"); err != nil {
+	if err := supportmath.RequireFinite(quantity); err != nil {
 		return apd.Decimal{}, fmt.Errorf("prepare quantity for unit-price derivation: %w", err)
 	}
 	if quantity.Sign() == 0 {
 		return apd.Decimal{}, fmt.Errorf("unit-price derivation requires a non-zero quantity")
 	}
 
-	return supportmath.DivideFiniteRoundHalfUp(grossValue, quantity, supportmath.InternalCalculationScale)
+	return supportmath.DivideFiniteRoundHalfUp(grossValue, quantity)
 }
 
 // selectGrossValue applies the shared DTO gross-value fallback rule for

@@ -11,16 +11,9 @@ import (
 //
 // Example:
 //
-//	sum, err := math.ApplyBinaryOperation(
-//		left,
-//		right,
-//		"left calculation decimal",
-//		"right calculation decimal",
-//		"add calculation decimals",
-//		func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
-//			return apd.BaseContext.Add(result, left, right)
-//		},
-//	)
+//	sum, err := math.ApplyBinaryOperation(left, right, func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
+//		return apd.BaseContext.Add(result, left, right)
+//	})
 //	if err != nil {
 //		panic(err)
 //	}
@@ -30,24 +23,21 @@ import (
 func ApplyBinaryOperation(
 	left apd.Decimal,
 	right apd.Decimal,
-	leftLabel string,
-	rightLabel string,
-	errorPrefix string,
 	operation func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error),
 ) (apd.Decimal, error) {
 	if operation == nil {
 		return apd.Decimal{}, fmt.Errorf("decimal operation is required")
 	}
-	if err := RequireFinite(left, leftLabel); err != nil {
-		return apd.Decimal{}, err
+	if err := RequireFinite(left); err != nil {
+		return apd.Decimal{}, fmt.Errorf("left decimal operand is invalid: %w", err)
 	}
-	if err := RequireFinite(right, rightLabel); err != nil {
-		return apd.Decimal{}, err
+	if err := RequireFinite(right); err != nil {
+		return apd.Decimal{}, fmt.Errorf("right decimal operand is invalid: %w", err)
 	}
 
 	var result apd.Decimal
 	if _, err := operation(&result, &left, &right); err != nil {
-		return apd.Decimal{}, fmt.Errorf("%s: %w", errorPrefix, err)
+		return apd.Decimal{}, fmt.Errorf("decimal operation failed: %w", err)
 	}
 
 	return result, nil
@@ -57,15 +47,15 @@ func ApplyBinaryOperation(
 //
 // Example:
 //
-//	sum, err := math.Add(left, right, "left calculation decimal", "right calculation decimal", "add calculation decimals")
+//	sum, err := math.Add(left, right)
 //	if err != nil {
 //		panic(err)
 //	}
 //	_ = sum
 //
 // Authored by: OpenCode
-func Add(left apd.Decimal, right apd.Decimal, leftLabel string, rightLabel string, errorPrefix string) (apd.Decimal, error) {
-	return ApplyBinaryOperation(left, right, leftLabel, rightLabel, errorPrefix, func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
+func Add(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+	return ApplyBinaryOperation(left, right, func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
 		return apd.BaseContext.Add(result, left, right)
 	})
 }
@@ -75,15 +65,15 @@ func Add(left apd.Decimal, right apd.Decimal, leftLabel string, rightLabel strin
 //
 // Example:
 //
-//	difference, err := math.Subtract(left, right, "left calculation decimal", "right calculation decimal", "subtract calculation decimals")
+//	difference, err := math.Subtract(left, right)
 //	if err != nil {
 //		panic(err)
 //	}
 //	_ = difference
 //
 // Authored by: OpenCode
-func Subtract(left apd.Decimal, right apd.Decimal, leftLabel string, rightLabel string, errorPrefix string) (apd.Decimal, error) {
-	return ApplyBinaryOperation(left, right, leftLabel, rightLabel, errorPrefix, func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
+func Subtract(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+	return ApplyBinaryOperation(left, right, func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
 		return apd.BaseContext.Sub(result, left, right)
 	})
 }
@@ -93,15 +83,15 @@ func Subtract(left apd.Decimal, right apd.Decimal, leftLabel string, rightLabel 
 //
 // Example:
 //
-//	product, err := math.Multiply(left, right, "left report decimal", "right report decimal", "multiply report decimals")
+//	product, err := math.Multiply(left, right)
 //	if err != nil {
 //		panic(err)
 //	}
 //	_ = product
 //
 // Authored by: OpenCode
-func Multiply(left apd.Decimal, right apd.Decimal, leftLabel string, rightLabel string, errorPrefix string) (apd.Decimal, error) {
-	return ApplyBinaryOperation(left, right, leftLabel, rightLabel, errorPrefix, func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
+func Multiply(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
+	return ApplyBinaryOperation(left, right, func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
 		return apd.BaseContext.Mul(result, left, right)
 	})
 }
@@ -110,19 +100,19 @@ func Multiply(left apd.Decimal, right apd.Decimal, leftLabel string, rightLabel 
 //
 // Example:
 //
-//	comparison, err := math.Compare(left, right, "left report decimal", "right report decimal")
+//	comparison, err := math.Compare(left, right)
 //	if err != nil {
 //		panic(err)
 //	}
 //	_ = comparison
 //
 // Authored by: OpenCode
-func Compare(left apd.Decimal, right apd.Decimal, leftLabel string, rightLabel string) (int, error) {
-	if err := RequireFinite(left, leftLabel); err != nil {
-		return 0, err
+func Compare(left apd.Decimal, right apd.Decimal) (int, error) {
+	if err := RequireFinite(left); err != nil {
+		return 0, fmt.Errorf("left decimal operand is invalid: %w", err)
 	}
-	if err := RequireFinite(right, rightLabel); err != nil {
-		return 0, err
+	if err := RequireFinite(right); err != nil {
+		return 0, fmt.Errorf("right decimal operand is invalid: %w", err)
 	}
 
 	return left.Cmp(&right), nil
@@ -133,16 +123,16 @@ func Compare(left apd.Decimal, right apd.Decimal, leftLabel string, rightLabel s
 //
 // Example:
 //
-//	isZero, err := math.IsZero(value, "report decimal")
+//	isZero, err := math.IsZero(value)
 //	if err != nil {
 //		panic(err)
 //	}
 //	_ = isZero
 //
 // Authored by: OpenCode
-func IsZero(value apd.Decimal, label string) (bool, error) {
-	if err := RequireFinite(value, label); err != nil {
-		return false, err
+func IsZero(value apd.Decimal) (bool, error) {
+	if err := RequireFinite(value); err != nil {
+		return false, fmt.Errorf("decimal operand is invalid: %w", err)
 	}
 
 	return value.Cmp(&apd.Decimal{}) == 0, nil
@@ -159,8 +149,8 @@ func IsZero(value apd.Decimal, label string) (bool, error) {
 //
 // Authored by: OpenCode
 func RequirePositive(value apd.Decimal, label string) error {
-	if err := RequireFinite(value, label); err != nil {
-		return err
+	if err := RequireFinite(value); err != nil {
+		return fmt.Errorf("%s is invalid: %w", label, err)
 	}
 	if value.Sign() <= 0 {
 		return fmt.Errorf("%s must be greater than zero", label)
@@ -180,8 +170,8 @@ func RequirePositive(value apd.Decimal, label string) error {
 //
 // Authored by: OpenCode
 func RequireNonNegative(value apd.Decimal, label string) error {
-	if err := RequireFinite(value, label); err != nil {
-		return err
+	if err := RequireFinite(value); err != nil {
+		return fmt.Errorf("%s is invalid: %w", label, err)
 	}
 	if value.Sign() < 0 {
 		return fmt.Errorf("%s must not be negative", label)
@@ -239,10 +229,6 @@ func Clone(value apd.Decimal) apd.Decimal {
 //		totalBasis,
 //		totalQuantity,
 //		matchedQuantity,
-//		"total basis",
-//		"total quantity",
-//		"matched quantity",
-//		"allocate basis proportionally",
 //		multiply,
 //		divide,
 //	)
@@ -256,10 +242,6 @@ func AllocateProportional(
 	totalAmount apd.Decimal,
 	totalQuantity apd.Decimal,
 	portionQuantity apd.Decimal,
-	totalAmountLabel string,
-	totalQuantityLabel string,
-	portionQuantityLabel string,
-	errorPrefix string,
 	multiply func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error),
 	divide func(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, error),
 ) (apd.Decimal, error) {
@@ -269,26 +251,26 @@ func AllocateProportional(
 	if divide == nil {
 		return apd.Decimal{}, fmt.Errorf("decimal division helper is required")
 	}
-	if err := RequireFinite(totalAmount, totalAmountLabel); err != nil {
-		return apd.Decimal{}, err
+	if err := RequireFinite(totalAmount); err != nil {
+		return apd.Decimal{}, fmt.Errorf("total amount is invalid: %w", err)
 	}
 	if totalAmount.Sign() < 0 {
-		return apd.Decimal{}, fmt.Errorf("%s must not be negative", totalAmountLabel)
+		return apd.Decimal{}, fmt.Errorf("total amount must not be negative")
 	}
-	if err := RequireFinite(totalQuantity, totalQuantityLabel); err != nil {
-		return apd.Decimal{}, err
+	if err := RequireFinite(totalQuantity); err != nil {
+		return apd.Decimal{}, fmt.Errorf("total quantity is invalid: %w", err)
 	}
 	if totalQuantity.Sign() <= 0 {
-		return apd.Decimal{}, fmt.Errorf("%s must be greater than zero", totalQuantityLabel)
+		return apd.Decimal{}, fmt.Errorf("total quantity must be greater than zero")
 	}
-	if err := RequireFinite(portionQuantity, portionQuantityLabel); err != nil {
-		return apd.Decimal{}, err
+	if err := RequireFinite(portionQuantity); err != nil {
+		return apd.Decimal{}, fmt.Errorf("portion quantity is invalid: %w", err)
 	}
 	if portionQuantity.Sign() <= 0 {
-		return apd.Decimal{}, fmt.Errorf("%s must be greater than zero", portionQuantityLabel)
+		return apd.Decimal{}, fmt.Errorf("portion quantity must be greater than zero")
 	}
 	if portionQuantity.Cmp(&totalQuantity) > 0 {
-		return apd.Decimal{}, fmt.Errorf("%s exceeds %s", portionQuantityLabel, totalQuantityLabel)
+		return apd.Decimal{}, fmt.Errorf("portion quantity exceeds total quantity")
 	}
 	if portionQuantity.Cmp(&totalQuantity) == 0 {
 		return Clone(totalAmount), nil
@@ -302,7 +284,7 @@ func AllocateProportional(
 	var quotient apd.Decimal
 	quotient, err = divide(numerator, totalQuantity)
 	if err != nil {
-		return apd.Decimal{}, fmt.Errorf("%s: %w", errorPrefix, err)
+		return apd.Decimal{}, fmt.Errorf("allocate proportional amount: %w", err)
 	}
 
 	return quotient, nil

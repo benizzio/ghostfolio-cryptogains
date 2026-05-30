@@ -194,10 +194,10 @@ func TestAverageCostStateRejectsSharedMathFailures(t *testing.T) {
 	var invalid apd.Decimal
 	invalid.Form = apd.Infinite
 
-	if _, err := supportmath.Add(invalid, decimalFromInt(1), "left decimal", "right decimal", "add decimals"); err == nil || !strings.Contains(err.Error(), "left decimal") {
+	if _, err := supportmath.Add(invalid, decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "left decimal operand") {
 		t.Fatalf("expected shared add helper to reject invalid left decimal, got %v", err)
 	}
-	if _, err := supportmath.Subtract(decimalFromInt(1), invalid, "left decimal", "right decimal", "subtract decimals"); err == nil || !strings.Contains(err.Error(), "right decimal") {
+	if _, err := supportmath.Subtract(decimalFromInt(1), invalid); err == nil || !strings.Contains(err.Error(), "right decimal operand") {
 		t.Fatalf("expected shared subtract helper to reject invalid right decimal, got %v", err)
 	}
 	if err := supportmath.RequirePositive(decimalFromInt(0), "average cost disposal quantity"); err == nil || !strings.Contains(err.Error(), "must be greater than zero") {

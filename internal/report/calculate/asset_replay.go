@@ -86,7 +86,7 @@ func applyReplayResult(state *assetReplayState, input reportmodel.ActivityCalcul
 		state.liquidationSummaries = append(state.liquidationSummaries, *replayResult.liquidationSummary)
 	}
 
-	var nextYearlyNet, err = supportmath.Add(state.yearlyNet, replayResult.yearlyNetDelta, "left calculation decimal", "right calculation decimal", "add calculation decimals")
+	var nextYearlyNet, err = supportmath.Add(state.yearlyNet, replayResult.yearlyNetDelta)
 	if err != nil {
 		return newInputCalculationError(
 			reportmodel.CalculationErrorKindBasisAllocation,

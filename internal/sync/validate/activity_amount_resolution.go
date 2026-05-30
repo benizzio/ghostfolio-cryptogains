@@ -240,9 +240,6 @@ func multiplyActivityAmount(left apd.Decimal, right apd.Decimal) (apd.Decimal, e
 	return supportmath.ApplyBinaryOperation(
 		left,
 		right,
-		"left activity amount",
-		"right activity amount",
-		"derive activity amount from quantity and unit price",
 		func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
 			return apd.BaseContext.Mul(result, left, right)
 		},
@@ -253,15 +250,15 @@ func multiplyActivityAmount(left apd.Decimal, right apd.Decimal) (apd.Decimal, e
 // 16-decimal round-half-up policy for repeating divisions.
 // Authored by: OpenCode
 func divideActivityAmountRoundHalfUp(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, error) {
-	if err := supportmath.RequireFinite(dividend, "derive activity amount from gross value and quantity"); err != nil {
-		return apd.Decimal{}, err
+	if err := supportmath.RequireFinite(dividend); err != nil {
+		return apd.Decimal{}, fmt.Errorf("derive activity amount from gross value and quantity: dividend is invalid: %w", err)
 	}
-	if err := supportmath.RequireFinite(divisor, "derive activity amount from gross value and quantity"); err != nil {
-		return apd.Decimal{}, err
+	if err := supportmath.RequireFinite(divisor); err != nil {
+		return apd.Decimal{}, fmt.Errorf("derive activity amount from gross value and quantity: divisor is invalid: %w", err)
 	}
 	if divisor.Sign() == 0 {
 		return apd.Decimal{}, fmt.Errorf("derive activity amount from gross value and quantity: non-zero divisor is required")
 	}
 
-	return supportmath.DivideFiniteRoundHalfUp(dividend, divisor, supportmath.InternalCalculationScale)
+	return supportmath.DivideFiniteRoundHalfUp(dividend, divisor)
 }

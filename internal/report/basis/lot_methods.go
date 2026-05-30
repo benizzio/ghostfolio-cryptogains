@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	reportdecimal "github.com/benizzio/ghostfolio-cryptogains/internal/report/decimal"
 	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	"github.com/cockroachdb/apd/v3"
 )
@@ -71,13 +70,13 @@ type LotMethodState struct {
 // Authored by: OpenCode
 var (
 	lotAddDecimal = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-		return supportmath.Add(left, right, "left decimal", "right decimal", "add decimals")
+		return supportmath.Add(left, right)
 	}
 	lotSubtractDecimal = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-		return supportmath.Subtract(left, right, "left decimal", "right decimal", "subtract decimals")
+		return supportmath.Subtract(left, right)
 	}
 	lotMultiplyDecimal = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-		return supportmath.Multiply(left, right, "left decimal", "right decimal", "multiply decimals")
+		return supportmath.Multiply(left, right)
 	}
 )
 
@@ -265,7 +264,7 @@ func (state *LotMethodState) TotalOpenQuantity() (apd.Decimal, error) {
 	var total = supportmath.Zero()
 
 	for _, lot := range state.OpenLots() {
-		var nextTotal, err = supportmath.Add(total, lot.RemainingQuantity, "left decimal", "right decimal", "add decimals")
+		var nextTotal, err = supportmath.Add(total, lot.RemainingQuantity)
 		if err != nil {
 			return apd.Decimal{}, err
 		}
@@ -281,7 +280,7 @@ func (state *LotMethodState) TotalOpenBasis() (apd.Decimal, error) {
 	var total = supportmath.Zero()
 
 	for _, lot := range state.OpenLots() {
-		var nextTotal, err = supportmath.Add(total, lot.RemainingBasis, "left decimal", "right decimal", "add decimals")
+		var nextTotal, err = supportmath.Add(total, lot.RemainingBasis)
 		if err != nil {
 			return apd.Decimal{}, err
 		}
@@ -374,7 +373,7 @@ func compareUnitCostsCrossMultiply(left LotAcquisition, right LotAcquisition) (i
 		return 0, err
 	}
 
-	return supportmath.Compare(leftCross, rightCross, "left lot unit-cost cross product", "right lot unit-cost cross product")
+	return supportmath.Compare(leftCross, rightCross)
 }
 
 // validateLotMethod rejects unsupported lot-selection methods.
@@ -411,17 +410,20 @@ func validateLotAcquisition(acquisition LotAcquisition) error {
 // internal report-calculation precision when the proportional division repeats.
 // Authored by: OpenCode
 func exactProportionalBasis(totalBasis apd.Decimal, totalQuantity apd.Decimal, matchedQuantity apd.Decimal) (apd.Decimal, error) {
-	return supportmath.AllocateProportional(
+	var allocated, err = supportmath.AllocateProportional(
 		totalBasis,
 		totalQuantity,
 		matchedQuantity,
-		"total basis",
-		"total quantity",
-		"matched quantity",
-		"allocate basis proportionally",
 		lotMultiplyDecimal,
-		reportdecimal.DivideRoundHalfUp,
+		func(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, error) {
+			return supportmath.DivideFiniteRoundHalfUp(dividend, divisor)
+		},
 	)
+	if err != nil {
+		return apd.Decimal{}, fmt.Errorf("allocate basis proportionally: %w", err)
+	}
+
+	return allocated, nil
 }
 
 // cloneLotAcquisition returns a defensive copy of one lot acquisition.

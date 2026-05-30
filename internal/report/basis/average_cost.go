@@ -6,7 +6,6 @@ package basis
 import (
 	"fmt"
 
-	reportdecimal "github.com/benizzio/ghostfolio-cryptogains/internal/report/decimal"
 	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	"github.com/cockroachdb/apd/v3"
 )
@@ -62,12 +61,12 @@ func (state *AverageCostState) AddAcquisition(quantity apd.Decimal, basis apd.De
 		return err
 	}
 
-	var nextQuantity, err = supportmath.Add(state.quantity, quantity, "left decimal", "right decimal", "add decimals")
+	var nextQuantity, err = supportmath.Add(state.quantity, quantity)
 	if err != nil {
 		return err
 	}
 	var nextBasis apd.Decimal
-	nextBasis, err = supportmath.Add(state.basis, basis, "left decimal", "right decimal", "add decimals")
+	nextBasis, err = supportmath.Add(state.basis, basis)
 	if err != nil {
 		return err
 	}
@@ -195,7 +194,7 @@ func (state *AverageCostState) AverageUnitCost() (apd.Decimal, error) {
 		return supportmath.Zero(), nil
 	}
 
-	var average, err = reportdecimal.DivideRoundHalfUp(state.basis, state.quantity)
+	var average, err = supportmath.DivideFiniteRoundHalfUp(state.basis, state.quantity)
 	if err != nil {
 		return apd.Decimal{}, fmt.Errorf("calculate average unit cost: %w", err)
 	}

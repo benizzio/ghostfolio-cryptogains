@@ -808,5 +808,9 @@ func validateNonNegativeDecimal(value apd.Decimal, label string) error {
 // validateFiniteDecimal verifies one finite exact decimal value.
 // Authored by: OpenCode
 func validateFiniteDecimal(value apd.Decimal, label string) error {
-	return supportmath.RequireFinite(value, label)
+	if err := supportmath.RequireFinite(value); err != nil {
+		return fmt.Errorf("%s is invalid: %w", label, err)
+	}
+
+	return nil
 }

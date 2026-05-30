@@ -65,7 +65,7 @@ var (
 	scopeLocalLotTotalOpenBasis    = func(state *LotMethodState) (apd.Decimal, error) { return state.TotalOpenBasis() }
 	scopeLocalLotTotalOpenQuantity = func(state *LotMethodState) (apd.Decimal, error) { return state.TotalOpenQuantity() }
 	scopeLocalSubtractDecimal      = func(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-		return supportmath.Subtract(left, right, "left decimal", "right decimal", "subtract decimals")
+		return supportmath.Subtract(left, right)
 	}
 )
 
@@ -187,7 +187,7 @@ func (state *ScopeLocalHybridState) TotalOpenQuantity() (apd.Decimal, error) {
 				return apd.Decimal{}, err
 			}
 		}
-		total, err = supportmath.Add(total, scopeQuantity, "left decimal", "right decimal", "add decimals")
+		total, err = supportmath.Add(total, scopeQuantity)
 		if err != nil {
 			return apd.Decimal{}, err
 		}
@@ -215,7 +215,7 @@ func (state *ScopeLocalHybridState) TotalOpenBasis() (apd.Decimal, error) {
 				return apd.Decimal{}, err
 			}
 		}
-		total, err = supportmath.Add(total, scopeBasis, "left decimal", "right decimal", "add decimals")
+		total, err = supportmath.Add(total, scopeBasis)
 		if err != nil {
 			return apd.Decimal{}, err
 		}
