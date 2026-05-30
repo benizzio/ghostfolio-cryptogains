@@ -42,6 +42,14 @@ func NewAverageCostState() *AverageCostState {
 
 // AddAcquisition adds one exact acquisition quantity and basis to the moving
 // pool.
+//
+// Example:
+//
+//	state := basis.NewAverageCostState()
+//	if err := state.AddAcquisition(*apd.New(2, 0), *apd.New(10, 0)); err != nil {
+//		panic(err)
+//	}
+//
 // Authored by: OpenCode
 func (state *AverageCostState) AddAcquisition(quantity apd.Decimal, basis apd.Decimal) error {
 	if state == nil {
@@ -71,6 +79,17 @@ func (state *AverageCostState) AddAcquisition(quantity apd.Decimal, basis apd.De
 
 // Dispose removes one quantity from the moving pool using the shared internal
 // report-calculation precision for proportional allocation when needed.
+//
+// Example:
+//
+//	state := basis.NewAverageCostState()
+//	_ = state.AddAcquisition(*apd.New(4, 0), *apd.New(20, 0))
+//	result, err := state.Dispose(*apd.New(1, 0))
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = result.AllocatedBasis
+//
 // Authored by: OpenCode
 func (state *AverageCostState) Dispose(quantity apd.Decimal) (AverageCostDisposalResult, error) {
 	if state == nil {
@@ -119,6 +138,14 @@ func (state *AverageCostState) Dispose(quantity apd.Decimal) (AverageCostDisposa
 }
 
 // Quantity returns the current open pool quantity.
+//
+// Example:
+//
+//	state := basis.NewAverageCostState()
+//	_ = state.AddAcquisition(*apd.New(2, 0), *apd.New(10, 0))
+//	openQuantity := state.Quantity()
+//	_ = openQuantity
+//
 // Authored by: OpenCode
 func (state *AverageCostState) Quantity() apd.Decimal {
 	if state == nil {
@@ -129,6 +156,14 @@ func (state *AverageCostState) Quantity() apd.Decimal {
 }
 
 // Basis returns the current open pool basis.
+//
+// Example:
+//
+//	state := basis.NewAverageCostState()
+//	_ = state.AddAcquisition(*apd.New(2, 0), *apd.New(10, 0))
+//	openBasis := state.Basis()
+//	_ = openBasis
+//
 // Authored by: OpenCode
 func (state *AverageCostState) Basis() apd.Decimal {
 	if state == nil {
@@ -140,6 +175,17 @@ func (state *AverageCostState) Basis() apd.Decimal {
 
 // AverageUnitCost returns the current moving average unit cost using the shared
 // internal report-calculation precision when division does not terminate.
+//
+// Example:
+//
+//	state := basis.NewAverageCostState()
+//	_ = state.AddAcquisition(*apd.New(4, 0), *apd.New(20, 0))
+//	averageUnitCost, err := state.AverageUnitCost()
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = averageUnitCost
+//
 // Authored by: OpenCode
 func (state *AverageCostState) AverageUnitCost() (apd.Decimal, error) {
 	if state == nil {
@@ -158,6 +204,14 @@ func (state *AverageCostState) AverageUnitCost() (apd.Decimal, error) {
 }
 
 // IsEmpty reports whether the moving pool has reset to zero quantity.
+//
+// Example:
+//
+//	state := basis.NewAverageCostState()
+//	if !state.IsEmpty() {
+//		panic("expected a new average-cost state to be empty")
+//	}
+//
 // Authored by: OpenCode
 func (state *AverageCostState) IsEmpty() bool {
 	if state == nil {
