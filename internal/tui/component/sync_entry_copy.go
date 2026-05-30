@@ -29,9 +29,9 @@ const (
 //	copy := component.DefaultSyncEntryCopy(true)
 //	_, _ = copy.IntroText, copy.IdleStatusText
 //
-// When `useContextToken` is true, the returned copy omits the intro text and
-// keeps only the in-context start prompt. Otherwise it returns the standalone
-// token-entry guidance used by the regular sync screen.
+// When `useContextToken` is true, the returned copy explains in-context token
+// reuse and keeps the in-context start prompt. Otherwise it returns the
+// standalone token-entry guidance used by the regular sync screen.
 //
 // Authored by: OpenCode
 func DefaultSyncEntryCopy(useContextToken bool) SyncEntryCopy {

@@ -54,12 +54,12 @@ type SyncEntryScreenParams struct {
 //
 // Authored by: OpenCode
 func SyncEntryScreenView(params SyncEntryScreenParams) string {
-	var copy = component.DefaultSyncEntryCopy(params.UseContextToken)
+	var entryCopy = component.DefaultSyncEntryCopy(params.UseContextToken)
 	if params.IntroText == "" {
-		params.IntroText = copy.IntroText
+		params.IntroText = entryCopy.IntroText
 	}
 	if params.IdleStatusText == "" {
-		params.IdleStatusText = copy.IdleStatusText
+		params.IdleStatusText = entryCopy.IdleStatusText
 	}
 	var bodyParts []string
 	if strings.TrimSpace(params.IntroText) != "" {
