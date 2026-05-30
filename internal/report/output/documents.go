@@ -43,6 +43,15 @@ func ResolveDocumentsDirectory() (string, error) {
 // to be verified without depending on the host operating system.
 // Authored by: OpenCode
 func ResolveDocumentsDirectoryForOS(goos string) (string, error) {
+	switch goos {
+	case "linux", "darwin", "windows":
+	default:
+		return "", wrapFailure(
+			FailureCategoryDocumentsDirectoryUnavailable,
+			fmt.Errorf("documents directory resolution is unsupported on %q", goos),
+		)
+	}
+
 	var homeDir, err = resolveHomeDirectory(goos)
 	if err != nil {
 		return "", wrapFailure(FailureCategoryDocumentsDirectoryUnavailable, err)
@@ -62,12 +71,12 @@ func ResolveDocumentsDirectoryForOS(goos string) (string, error) {
 		return filepath.Join(homeDir, "Documents"), nil
 	case "windows":
 		return filepath.Join(homeDir, "Documents"), nil
-	default:
-		return "", wrapFailure(
-			FailureCategoryDocumentsDirectoryUnavailable,
-			fmt.Errorf("documents directory resolution is unsupported on %q", goos),
-		)
 	}
+
+	return "", wrapFailure(
+		FailureCategoryDocumentsDirectoryUnavailable,
+		fmt.Errorf("documents directory resolution is unsupported on %q", goos),
+	)
 }
 
 // resolveLinuxDocumentsDirectory resolves the XDG Documents directory when the

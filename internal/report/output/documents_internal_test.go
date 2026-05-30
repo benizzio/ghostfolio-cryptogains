@@ -219,9 +219,19 @@ func TestResolveHomeDirectoryFallbacks(t *testing.T) {
 // guardrail for unsupported operating systems.
 // Authored by: OpenCode
 func TestResolveDocumentsDirectoryForOSUnsupported(t *testing.T) {
+	var previousUserHomeDirectory = userHomeDirectory
+	t.Cleanup(func() {
+		userHomeDirectory = previousUserHomeDirectory
+	})
+
+	userHomeDirectory = func() (string, error) { return "", errors.New("home boom") }
+
 	_, err := ResolveDocumentsDirectoryForOS("plan9")
 	if err == nil || !strings.Contains(err.Error(), `unsupported on "plan9"`) {
 		t.Fatalf("expected unsupported-platform error, got %v", err)
+	}
+	if strings.Contains(err.Error(), "home boom") {
+		t.Fatalf("expected unsupported platform to be reported before home-directory failure, got %v", err)
 	}
 }
 
