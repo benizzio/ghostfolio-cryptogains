@@ -91,13 +91,13 @@ func TestAverageCostStateNilAndResetPaths(t *testing.T) {
 func TestAverageCostStateValidationPaths(t *testing.T) {
 	var state = NewAverageCostState()
 
-	if err := state.AddAcquisition(decimalFromInt(0), decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "average cost acquisition quantity must be greater than zero") {
+	if err := state.AddAcquisition(decimalFromInt(0), decimalFromInt(1)); err == nil || !strings.Contains(err.Error(), "average cost acquisition quantity") || !strings.Contains(err.Error(), "decimal operand must be greater than zero") {
 		t.Fatalf("expected zero-quantity acquisition to fail, got %v", err)
 	}
-	if err := state.AddAcquisition(decimalFromInt(1), decimalFromInt(-1)); err == nil || !strings.Contains(err.Error(), "average cost acquisition basis must not be negative") {
+	if err := state.AddAcquisition(decimalFromInt(1), decimalFromInt(-1)); err == nil || !strings.Contains(err.Error(), "average cost acquisition basis") || !strings.Contains(err.Error(), "decimal operand must not be negative") {
 		t.Fatalf("expected negative-basis acquisition to fail, got %v", err)
 	}
-	if _, err := state.Dispose(decimalFromInt(0)); err == nil || !strings.Contains(err.Error(), "average cost disposal quantity must be greater than zero") {
+	if _, err := state.Dispose(decimalFromInt(0)); err == nil || !strings.Contains(err.Error(), "average cost disposal quantity") || !strings.Contains(err.Error(), "decimal operand must be greater than zero") {
 		t.Fatalf("expected zero-quantity disposal to fail, got %v", err)
 	}
 }
@@ -200,10 +200,10 @@ func TestAverageCostStateRejectsSharedMathFailures(t *testing.T) {
 	if _, err := supportmath.Subtract(decimalFromInt(1), invalid); err == nil || !strings.Contains(err.Error(), "right decimal operand") {
 		t.Fatalf("expected shared subtract helper to reject invalid right decimal, got %v", err)
 	}
-	if err := supportmath.RequirePositive(decimalFromInt(0), "average cost disposal quantity"); err == nil || !strings.Contains(err.Error(), "must be greater than zero") {
+	if err := supportmath.RequirePositive(decimalFromInt(0)); err == nil || !strings.Contains(err.Error(), "decimal operand must be greater than zero") {
 		t.Fatalf("expected shared positive guard to reject zero quantity, got %v", err)
 	}
-	if err := supportmath.RequireNonNegative(decimalFromInt(-1), "average cost acquisition basis"); err == nil || !strings.Contains(err.Error(), "must not be negative") {
+	if err := supportmath.RequireNonNegative(decimalFromInt(-1)); err == nil || !strings.Contains(err.Error(), "decimal operand must not be negative") {
 		t.Fatalf("expected shared non-negative guard to reject negative basis, got %v", err)
 	}
 }

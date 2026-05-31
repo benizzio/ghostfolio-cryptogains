@@ -139,10 +139,10 @@ func TestDecimalOpsAndAllocationHelpers(t *testing.T) {
 		t.Fatalf("expected zero helper to return zero")
 	}
 
-	if err = RequirePositive(mustMathDecimal(t, "1"), "positive decimal"); err != nil {
+	if err = RequirePositive(mustMathDecimal(t, "1")); err != nil {
 		t.Fatalf("require positive decimal: %v", err)
 	}
-	if err = RequireNonNegative(mustMathDecimal(t, "0"), "non-negative decimal"); err != nil {
+	if err = RequireNonNegative(mustMathDecimal(t, "0")); err != nil {
 		t.Fatalf("require non-negative decimal: %v", err)
 	}
 
@@ -201,10 +201,10 @@ func TestDecimalOpsAndAllocationHelpers(t *testing.T) {
 	if _, err = Multiply(mustMathDecimal(t, "1"), invalid); err == nil || !strings.Contains(err.Error(), "right decimal operand") {
 		t.Fatalf("expected invalid multiply operand to fail, got %v", err)
 	}
-	if err = RequirePositive(mustMathDecimal(t, "0"), "positive decimal"); err == nil || !strings.Contains(err.Error(), "must be greater than zero") {
+	if err = RequirePositive(mustMathDecimal(t, "0")); err == nil || !strings.Contains(err.Error(), "decimal operand must be greater than zero") {
 		t.Fatalf("expected non-positive decimal to fail, got %v", err)
 	}
-	if err = RequireNonNegative(mustMathDecimal(t, "-1"), "non-negative decimal"); err == nil || !strings.Contains(err.Error(), "must not be negative") {
+	if err = RequireNonNegative(mustMathDecimal(t, "-1")); err == nil || !strings.Contains(err.Error(), "decimal operand must not be negative") {
 		t.Fatalf("expected negative decimal to fail, got %v", err)
 	}
 	if _, err = ApplyBinaryOperation(mustMathDecimal(t, "1"), mustMathDecimal(t, "1"), nil); err == nil || !strings.Contains(err.Error(), "operation is required") {

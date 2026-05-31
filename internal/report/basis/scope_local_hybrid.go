@@ -129,8 +129,8 @@ func (state *ScopeLocalHybridState) Dispose(scopeKey string, quantity apd.Decima
 	if strings.TrimSpace(scopeKey) == "" {
 		return ScopeLocalHybridDisposalResult{}, fmt.Errorf("scope-local hybrid disposal scope key is required")
 	}
-	if err := supportmath.RequirePositive(quantity, "scope-local hybrid disposal quantity"); err != nil {
-		return ScopeLocalHybridDisposalResult{}, err
+	if err := supportmath.RequirePositive(quantity); err != nil {
+		return ScopeLocalHybridDisposalResult{}, fmt.Errorf("scope-local hybrid disposal quantity: %w", err)
 	}
 
 	var normalizedScopeKey = strings.TrimSpace(scopeKey)

@@ -54,11 +54,11 @@ func (state *AverageCostState) AddAcquisition(quantity apd.Decimal, basis apd.De
 	if state == nil {
 		return fmt.Errorf("average cost state is required")
 	}
-	if err := supportmath.RequirePositive(quantity, "average cost acquisition quantity"); err != nil {
-		return err
+	if err := supportmath.RequirePositive(quantity); err != nil {
+		return fmt.Errorf("average cost acquisition quantity: %w", err)
 	}
-	if err := supportmath.RequireNonNegative(basis, "average cost acquisition basis"); err != nil {
-		return err
+	if err := supportmath.RequireNonNegative(basis); err != nil {
+		return fmt.Errorf("average cost acquisition basis: %w", err)
 	}
 
 	var nextQuantity, err = supportmath.Add(state.quantity, quantity)
@@ -94,8 +94,8 @@ func (state *AverageCostState) Dispose(quantity apd.Decimal) (AverageCostDisposa
 	if state == nil {
 		return AverageCostDisposalResult{}, fmt.Errorf("average cost state is required")
 	}
-	if err := supportmath.RequirePositive(quantity, "average cost disposal quantity"); err != nil {
-		return AverageCostDisposalResult{}, err
+	if err := supportmath.RequirePositive(quantity); err != nil {
+		return AverageCostDisposalResult{}, fmt.Errorf("average cost disposal quantity: %w", err)
 	}
 	if state.quantity.Sign() == 0 {
 		return AverageCostDisposalResult{}, fmt.Errorf("average cost disposal quantity exceeds open pool quantity")

@@ -68,13 +68,21 @@ func validateOptionalDecimal(value *apd.Decimal, label string) error {
 // validatePositiveDecimal verifies one positive exact decimal value.
 // Authored by: OpenCode
 func validatePositiveDecimal(value apd.Decimal, label string) error {
-	return supportmath.RequirePositive(value, label)
+	if err := supportmath.RequirePositive(value); err != nil {
+		return fmt.Errorf("%s: %w", label, err)
+	}
+
+	return nil
 }
 
 // validateNonNegativeDecimal verifies one non-negative exact decimal value.
 // Authored by: OpenCode
 func validateNonNegativeDecimal(value apd.Decimal, label string) error {
-	return supportmath.RequireNonNegative(value, label)
+	if err := supportmath.RequireNonNegative(value); err != nil {
+		return fmt.Errorf("%s: %w", label, err)
+	}
+
+	return nil
 }
 
 // validateFiniteDecimal verifies one finite exact decimal value.

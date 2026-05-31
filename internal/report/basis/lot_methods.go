@@ -125,8 +125,8 @@ func (state *LotMethodState) Dispose(quantity apd.Decimal) (LotDisposalResult, e
 	if state == nil {
 		return LotDisposalResult{}, fmt.Errorf("lot method state is required")
 	}
-	if err := supportmath.RequirePositive(quantity, "disposal quantity"); err != nil {
-		return LotDisposalResult{}, err
+	if err := supportmath.RequirePositive(quantity); err != nil {
+		return LotDisposalResult{}, fmt.Errorf("disposal quantity: %w", err)
 	}
 
 	var remainingQuantity = supportmath.Clone(quantity)
@@ -396,11 +396,11 @@ func validateLotAcquisition(acquisition LotAcquisition) error {
 	if acquisition.AcquiredAt.IsZero() {
 		return fmt.Errorf("lot acquisition time is required")
 	}
-	if err := supportmath.RequirePositive(acquisition.RemainingQuantity, "lot acquisition remaining quantity"); err != nil {
-		return err
+	if err := supportmath.RequirePositive(acquisition.RemainingQuantity); err != nil {
+		return fmt.Errorf("lot acquisition remaining quantity: %w", err)
 	}
-	if err := supportmath.RequireNonNegative(acquisition.RemainingBasis, "lot acquisition remaining basis"); err != nil {
-		return err
+	if err := supportmath.RequireNonNegative(acquisition.RemainingBasis); err != nil {
+		return fmt.Errorf("lot acquisition remaining basis: %w", err)
 	}
 
 	return nil

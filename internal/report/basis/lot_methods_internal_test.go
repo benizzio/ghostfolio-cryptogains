@@ -112,13 +112,13 @@ func TestLotMethodValidationAndHelperPaths(t *testing.T) {
 
 	acquisition = validLotAcquisition()
 	acquisition.RemainingQuantity = decimalFromInt(0)
-	if err := validateLotAcquisition(acquisition); err == nil || !strings.Contains(err.Error(), "remaining quantity must be greater than zero") {
+	if err := validateLotAcquisition(acquisition); err == nil || !strings.Contains(err.Error(), "remaining quantity") || !strings.Contains(err.Error(), "decimal operand must be greater than zero") {
 		t.Fatalf("expected zero remaining quantity to fail, got %v", err)
 	}
 
 	acquisition = validLotAcquisition()
 	acquisition.RemainingBasis = decimalFromInt(-1)
-	if err := validateLotAcquisition(acquisition); err == nil || !strings.Contains(err.Error(), "remaining basis must not be negative") {
+	if err := validateLotAcquisition(acquisition); err == nil || !strings.Contains(err.Error(), "remaining basis") || !strings.Contains(err.Error(), "decimal operand must not be negative") {
 		t.Fatalf("expected negative remaining basis to fail, got %v", err)
 	}
 
@@ -170,7 +170,7 @@ func TestLotMethodValidationAndHelperPaths(t *testing.T) {
 	if _, err = supportmath.Multiply(decimalFromInt(1), invalid); err == nil || !strings.Contains(err.Error(), "right decimal operand") {
 		t.Fatalf("expected invalid multiply decimal to fail, got %v", err)
 	}
-	if err = supportmath.RequireNonNegative(invalid, "non-negative"); err == nil || !strings.Contains(err.Error(), "non-negative") {
+	if err = supportmath.RequireNonNegative(invalid); err == nil || !strings.Contains(err.Error(), "decimal operand") {
 		t.Fatalf("expected non-finite non-negative decimal to fail, got %v", err)
 	}
 }

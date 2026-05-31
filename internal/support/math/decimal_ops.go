@@ -142,18 +142,18 @@ func IsZero(value apd.Decimal) (bool, error) {
 //
 // Example:
 //
-//	err := math.RequirePositive(quantity, "disposal quantity")
+//	err := math.RequirePositive(quantity)
 //	if err != nil {
 //		panic(err)
 //	}
 //
 // Authored by: OpenCode
-func RequirePositive(value apd.Decimal, label string) error {
+func RequirePositive(value apd.Decimal) error {
 	if err := RequireFinite(value); err != nil {
-		return fmt.Errorf("%s is invalid: %w", label, err)
+		return fmt.Errorf("decimal operand is invalid: %w", err)
 	}
 	if value.Sign() <= 0 {
-		return fmt.Errorf("%s must be greater than zero", label)
+		return fmt.Errorf("decimal operand must be greater than zero")
 	}
 
 	return nil
@@ -163,18 +163,18 @@ func RequirePositive(value apd.Decimal, label string) error {
 //
 // Example:
 //
-//	err := math.RequireNonNegative(basis, "remaining basis")
+//	err := math.RequireNonNegative(basis)
 //	if err != nil {
 //		panic(err)
 //	}
 //
 // Authored by: OpenCode
-func RequireNonNegative(value apd.Decimal, label string) error {
+func RequireNonNegative(value apd.Decimal) error {
 	if err := RequireFinite(value); err != nil {
-		return fmt.Errorf("%s is invalid: %w", label, err)
+		return fmt.Errorf("decimal operand is invalid: %w", err)
 	}
 	if value.Sign() < 0 {
-		return fmt.Errorf("%s must not be negative", label)
+		return fmt.Errorf("decimal operand must not be negative")
 	}
 
 	return nil
