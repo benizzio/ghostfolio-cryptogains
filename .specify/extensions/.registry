@@ -48,26 +48,6 @@
       "registered_skills": [],
       "installed_at": "2026-05-26T18:29:23.776328+00:00"
     },
-    "data-model-diagram": {
-      "version": "0.2.1",
-      "source": "local",
-      "manifest_hash": "sha256:1ed36a2681b0bbc092477a49c2ae1b140f5271a04360e456b2fb0aed0db6b7e3",
-      "enabled": true,
-      "priority": 5,
-      "registered_commands": {
-        "agy": [
-          "speckit.data-model-diagram.generate"
-        ],
-        "codex": [
-          "speckit.data-model-diagram.generate"
-        ],
-        "opencode": [
-          "speckit.data-model-diagram.generate"
-        ]
-      },
-      "registered_skills": [],
-      "installed_at": "2026-05-31T18:56:03.004580+00:00"
-    },
     "coding-standards-drift-control": {
       "version": "0.3.1",
       "source": "local",
@@ -113,6 +93,26 @@
       },
       "registered_skills": [],
       "installed_at": "2026-05-31T18:56:17.604701+00:00"
+    },
+    "data-model-diagram": {
+      "version": "0.2.2",
+      "source": "local",
+      "manifest_hash": "sha256:6a58f22cc2e035136fb3cf6a993739fab941ad446250810f9ec8763c72e42c4e",
+      "enabled": true,
+      "priority": 5,
+      "registered_commands": {
+        "agy": [
+          "speckit.data-model-diagram.generate"
+        ],
+        "codex": [
+          "speckit.data-model-diagram.generate"
+        ],
+        "opencode": [
+          "speckit.data-model-diagram.generate"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-05-31T20:38:40.586229+00:00"
     }
   }
 }
