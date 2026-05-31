@@ -5,8 +5,6 @@ description: Append Spec Kit remediation tasks to tasks.md from the drift report
 
 <!-- Extension: coding-standards-drift-control -->
 <!-- Config: .specify/extensions/coding-standards-drift-control/ -->
-<!-- Extension: coding-standards-drift-control -->
-<!-- Config: .specify/extensions/coding-standards-drift-control/ -->
 # Generate Coding Standards Drift Remediation Plan
 
 Append a drift remediation phase to the active feature `tasks.md` from the current coding-standards drift report.
