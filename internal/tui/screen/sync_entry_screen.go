@@ -19,18 +19,24 @@ import (
 //
 // Authored by: OpenCode
 type SyncEntryScreenParams struct {
-	Theme               component.Theme
-	Width               int
-	Height              int
-	MenuItems           []component.MenuItem
-	SelectedIndex       int
-	TokenInput          string
-	ValidationMessage   string
-	HelpText            string
-	Busy                bool
-	BusyText            string
-	SpinnerFrame        string
-	ProtectedDataExists bool
+	Theme                   component.Theme
+	Width                   int
+	Height                  int
+	ScreenTitle             string
+	ScreenSubtitle          string
+	IntroText               string
+	IdleStatusText          string
+	UseContextToken         bool
+	ShowProtectedDataStatus bool
+	MenuItems               []component.MenuItem
+	SelectedIndex           int
+	TokenInput              string
+	ValidationMessage       string
+	HelpText                string
+	Busy                    bool
+	BusyText                string
+	SpinnerFrame            string
+	ProtectedDataExists     bool
 }
 
 // SyncEntryScreenView renders the sync-data entry screen.
@@ -40,17 +46,30 @@ type SyncEntryScreenParams struct {
 //	view := screen.SyncEntryScreenView(params)
 //	_ = view
 //
-// `SyncEntryScreenView` renders the token-entry workflow for `Sync Data`.
-// It shows the runtime-only security-token field, the primary action menu when
-// idle, or the progress indicator when sync and protected storage are running.
+// `SyncEntryScreenView` renders the `Sync Data` workflow. It shows the
+// runtime-only security-token field for standalone sync entry, or a token-free
+// context explanation when an unlocked `Sync and Reports` context reuses the
+// in-memory token. The renderer switches between the idle entry view and the
+// busy progress view without mutating workflow state.
 //
 // Authored by: OpenCode
 func SyncEntryScreenView(params SyncEntryScreenParams) string {
-	var bodyParts = []string{
-		"The application will authenticate, retrieve activity history, validate it, and store it securely for future use only.",
-		fmt.Sprintf("Protected Data Loaded For This Run: %s", syncProtectedDataStatusLabel(params.ProtectedDataExists)),
-		params.Theme.InputLabel.Render("Ghostfolio Security Token"),
-		params.TokenInput,
+	var entryCopy = component.DefaultSyncEntryCopy(params.UseContextToken)
+	if params.IntroText == "" {
+		params.IntroText = entryCopy.IntroText
+	}
+	if params.IdleStatusText == "" {
+		params.IdleStatusText = entryCopy.IdleStatusText
+	}
+	var bodyParts []string
+	if strings.TrimSpace(params.IntroText) != "" {
+		bodyParts = append(bodyParts, params.IntroText)
+	}
+	if params.ShowProtectedDataStatus {
+		bodyParts = append(bodyParts, fmt.Sprintf("Protected Data Loaded For This Run: %s", syncProtectedDataStatusLabel(params.ProtectedDataExists)))
+	}
+	if !params.UseContextToken {
+		bodyParts = append(bodyParts, params.Theme.InputLabel.Render("Ghostfolio Security Token"), params.TokenInput)
 	}
 
 	if params.Busy {
@@ -59,17 +78,23 @@ func SyncEntryScreenView(params SyncEntryScreenParams) string {
 		bodyParts = append(bodyParts, component.RenderMenu(params.Theme, params.MenuItems, params.SelectedIndex))
 	}
 
-	var status = "Enter the Ghostfolio security token only when starting Sync Data."
+	var status = params.IdleStatusText
 	if params.ValidationMessage != "" {
 		status = params.ValidationMessage
+	}
+	if params.ScreenTitle == "" {
+		params.ScreenTitle = "Sync Data"
+	}
+	if params.ScreenSubtitle == "" {
+		params.ScreenSubtitle = "Retrieve, validate, and securely store supported activity history."
 	}
 
 	return component.RenderScreen(
 		params.Theme,
 		params.Width,
 		params.Height,
-		"Sync Data",
-		"Retrieve, validate, and securely store supported activity history.",
+		params.ScreenTitle,
+		params.ScreenSubtitle,
 		strings.Join(bodyParts, "\n\n"),
 		status,
 		params.HelpText,

@@ -17,3 +17,4 @@ dist/coverage/
 node_modules/
 vendor/
 coverage/
+.npm/

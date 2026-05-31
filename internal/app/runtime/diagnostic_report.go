@@ -5,12 +5,15 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
 
@@ -34,16 +37,19 @@ const (
 // written for eligible synced-data failures.
 // Authored by: OpenCode
 type diagnosticReportDocument struct {
-	SchemaVersion           int                              `json:"schema_version"`
-	GeneratedAt             time.Time                        `json:"generated_at"`
-	FailureReason           SyncFailureReason                `json:"failure_reason"`
-	ServerOrigin            string                           `json:"server_origin"`
-	ExplicitDevelopmentMode bool                             `json:"explicit_development_mode"`
-	FinancialValuesRedacted bool                             `json:"financial_values_redacted"`
-	Attempt                 diagnosticAttemptDocument        `json:"attempt"`
-	FailureStage            syncmodel.DiagnosticFailureStage `json:"failure_stage,omitempty"`
-	FailureDetail           string                           `json:"failure_detail,omitempty"`
-	Records                 []syncmodel.DiagnosticRecord     `json:"records,omitempty"`
+	SchemaVersion           int                                 `json:"schema_version"`
+	GeneratedAt             time.Time                           `json:"generated_at"`
+	FailureReason           SyncFailureReason                   `json:"failure_reason,omitempty"`
+	FailureCategory         ReportFailureReason                 `json:"failure_category,omitempty"`
+	ServerOrigin            string                              `json:"server_origin"`
+	ExplicitDevelopmentMode bool                                `json:"explicit_development_mode"`
+	FinancialValuesRedacted bool                                `json:"financial_values_redacted"`
+	Attempt                 diagnosticAttemptDocument           `json:"attempt"`
+	FailureStage            syncmodel.DiagnosticFailureStage    `json:"failure_stage,omitempty"`
+	FailureDetail           string                              `json:"failure_detail,omitempty"`
+	FailureCauseChain       []string                            `json:"failure_cause_chain,omitempty"`
+	Records                 []syncmodel.DiagnosticRecord        `json:"records,omitempty"`
+	OffendingActivityRecord *syncmodel.DiagnosticActivityRecord `json:"offending_activity_record,omitempty"`
 }
 
 // diagnosticAttemptDocument stores the structured attempt lifecycle context
@@ -68,7 +74,9 @@ func writeDiagnosticReport(
 		return "", err
 	}
 	if request.FailureReason == SyncFailureNone {
-		return "", fmt.Errorf("diagnostic report requires a failure reason")
+		if request.FailureCategory == ReportFailureNone {
+			return "", fmt.Errorf("diagnostic report requires a failure reason or category")
+		}
 	}
 	if request.ServerOrigin == "" {
 		return "", fmt.Errorf("diagnostic report requires a server origin")
@@ -106,6 +114,7 @@ func buildDiagnosticReportDocument(
 	generatedAt time.Time,
 ) diagnosticReportDocument {
 	var context = request.Context
+	context = redactDiagnosticCauseChainContext(context)
 	if request.RedactFinancialValues {
 		context = redactDiagnosticContext(context)
 	}
@@ -114,6 +123,7 @@ func buildDiagnosticReportDocument(
 		SchemaVersion:           diagnosticReportVersion,
 		GeneratedAt:             generatedAt,
 		FailureReason:           request.FailureReason,
+		FailureCategory:         request.FailureCategory,
 		ServerOrigin:            request.ServerOrigin,
 		ExplicitDevelopmentMode: request.ExplicitDevelopmentMode,
 		FinancialValuesRedacted: request.RedactFinancialValues,
@@ -124,9 +134,11 @@ func buildDiagnosticReportDocument(
 			CompletedAt:             request.Attempt.CompletedAt,
 			ServerMismatchConfirmed: request.Attempt.ServerMismatchConfirmed,
 		},
-		FailureStage:  context.FailureStage,
-		FailureDetail: context.FailureDetail,
-		Records:       context.Records,
+		FailureStage:            context.FailureStage,
+		FailureDetail:           context.FailureDetail,
+		FailureCauseChain:       slices.Clone(context.FailureCauseChain),
+		Records:                 context.Records,
+		OffendingActivityRecord: diagnosticOffendingActivityRecord(context, request.RedactFinancialValues),
 	}
 }
 
@@ -134,6 +146,8 @@ func buildDiagnosticReportDocument(
 // context for non-development diagnostic reports.
 // Authored by: OpenCode
 func redactDiagnosticContext(context syncmodel.DiagnosticContext) syncmodel.DiagnosticContext {
+	context = redactDiagnosticCauseChainContext(context)
+
 	var records = make([]syncmodel.DiagnosticRecord, 0, len(context.Records))
 	for _, record := range context.Records {
 		record.Quantity = ""
@@ -149,6 +163,33 @@ func redactDiagnosticContext(context syncmodel.DiagnosticContext) syncmodel.Diag
 
 	context.Records = records
 	return context
+}
+
+// redactDiagnosticCauseChainContext scrubs obvious secret-shaped fragments from
+// the shared diagnostics detail and wrapped-cause chain regardless of runtime
+// mode.
+// Authored by: OpenCode
+func redactDiagnosticCauseChainContext(context syncmodel.DiagnosticContext) syncmodel.DiagnosticContext {
+	context.FailureDetail = redact.ErrorText(errors.New(context.FailureDetail))
+	context.FailureCauseChain = redactDiagnosticCauseChain(context.FailureCauseChain)
+	return context
+}
+
+// diagnosticOffendingActivityRecord converts one optional offending activity
+// record from runtime context into the persisted document shape.
+// Authored by: OpenCode
+func diagnosticOffendingActivityRecord(context syncmodel.DiagnosticContext, redactFinancialValues bool) *syncmodel.DiagnosticActivityRecord {
+	if context.OffendingActivityRecord == nil {
+		return nil
+	}
+
+	var record = syncmodel.DiagnosticActivityRecordFromActivityRecord(*context.OffendingActivityRecord)
+	if redactFinancialValues {
+		redactedRecord := record.RedactFinancialValues()
+		return &redactedRecord
+	}
+
+	return &record
 }
 
 // resolveBaseConfigDir returns the configured application-data root used for

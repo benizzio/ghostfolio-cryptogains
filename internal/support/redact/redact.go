@@ -3,9 +3,21 @@
 // Authored by: OpenCode
 package redact
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 const replacement = "[REDACTED]"
+
+var obviousSecretPatterns = []struct {
+	pattern     *regexp.Regexp
+	replacement string
+}{
+	{pattern: regexp.MustCompile(`(?i)\b(token|jwt|payload)\s*[:=]\s*[^\s]+`), replacement: `$1=[REDACTED]`},
+	{pattern: regexp.MustCompile(`(?i)\b(token|jwt|payload)\s+[^\s]+`), replacement: `$1 [REDACTED]`},
+	{pattern: regexp.MustCompile(`(?i)\bBearer\s+[^\s]+`), replacement: `Bearer [REDACTED]`},
+}
 
 // Text removes known secret values from text that may be shown to users or
 // written into diagnostics.
@@ -24,6 +36,9 @@ func Text(input string, secrets ...string) string {
 		}
 		redacted = strings.ReplaceAll(redacted, secret, replacement)
 	}
+	for _, secretPattern := range obviousSecretPatterns {
+		redacted = secretPattern.pattern.ReplaceAllString(redacted, secretPattern.replacement)
+	}
 	return redacted
 }
 
@@ -40,18 +55,4 @@ func ErrorText(err error, secrets ...string) string {
 		return ""
 	}
 	return Text(err.Error(), secrets...)
-}
-
-// Mask returns a fixed redaction marker for secret input fields.
-//
-// Example:
-//
-//	_ = redact.Mask("abc123")
-//
-// Authored by: OpenCode
-func Mask(secret string) string {
-	if secret == "" {
-		return ""
-	}
-	return replacement
 }

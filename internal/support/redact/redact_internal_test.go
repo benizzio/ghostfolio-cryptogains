@@ -16,14 +16,6 @@ func TestTextSkipsEmptySecrets(t *testing.T) {
 	}
 }
 
-func TestMaskEmptySecretReturnsEmptyString(t *testing.T) {
-	t.Parallel()
-
-	if got := Mask(""); got != "" {
-		t.Fatalf("unexpected mask result: %q", got)
-	}
-}
-
 func TestTextAndErrorTextRedactSecrets(t *testing.T) {
 	t.Parallel()
 
@@ -38,9 +30,5 @@ func TestTextAndErrorTextRedactSecrets(t *testing.T) {
 	got = ErrorText(nil, "abc")
 	if got != "" {
 		t.Fatalf("expected empty error text, got %q", got)
-	}
-	got = Mask("abc")
-	if got != "[REDACTED]" {
-		t.Fatalf("unexpected mask result: %q", got)
 	}
 }

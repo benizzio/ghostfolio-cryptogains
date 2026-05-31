@@ -1,6 +1,6 @@
 # ghostfolio-cryptogains
 
-Terminal UI for the current Ghostfolio full-history sync slice. The application keeps bootstrap setup in `setup.json`, retrieves supported Ghostfolio activity history on demand, normalizes and validates it, and stores successful results only in token-locked local snapshots. Report generation and cached-data browsing remain out of scope.
+Terminal UI for syncing supported Ghostfolio activity history into token-locked local snapshots and generating yearly Markdown capital gains and losses reports from the unlocked synced dataset. The application keeps bootstrap setup in `setup.json`, stores synced activity history only in protected snapshots, writes successful report output only to the current user's Documents folder, and keeps no in-application report history.
 
 ## Running
 
@@ -21,12 +21,12 @@ Supported runtime flags:
 ```bash
 make test
 make coverage
-GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1 go test ./tests/integration -run TestSyncPerformanceFlowLargeHistoryFixture -count=1 -v
+GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1 go test ./tests/integration -run TestReportPerformanceFlowLargeHistoryFixture -count=1 -v
 ```
 
 `make coverage` writes `dist/coverage/coverage.out` and `dist/coverage/coverage.xml` using the maintained coverage gate configuration in `.cov.json`.
 The coverage run instruments project-owned packages from `cmd/` and `internal/` so execution driven by contract and integration tests counts toward the repository coverage gate.
-The explicit performance command runs the deterministic `SC-006` verification path for a 10,000-activity protected snapshot refresh.
+The explicit performance command runs the deterministic `SC-007` verification path for one 10,000-activity yearly report generation from protected synced data, including request validation, calculation, Markdown rendering, final save, and opener invocation.
 
 ## Local Storage
 
@@ -59,11 +59,19 @@ Diagnostic report directory:
 - macOS: `~/Library/Application Support/ghostfolio-cryptogains/diagnostics/`
 - Windows: `%AppData%\ghostfolio-cryptogains\diagnostics\`
 
+Report output directory:
+
+- Linux: configured XDG Documents directory when available, otherwise `~/Documents/`
+- macOS: `~/Documents/`
+- Windows: `%USERPROFILE%\Documents\`
+
 Protection notes:
 
 - Unix-like platforms create the config directory with `0700` permissions and the setup file with `0600` permissions where the platform exposes those permission bits.
 - Windows uses the current user's application-data directory and does not rely on Unix permission bits.
 - Protected snapshots use token-derived encryption and store normalized activity history, not the Ghostfolio token or JWT.
+- Report generation reads only the unlocked protected snapshot. It does not persist report content, report paths, or report history back into `setup.json`, snapshots, or diagnostics.
+- Successful report output is one cleartext Markdown file in the user's Documents folder. The application keeps report content in memory until that final save succeeds.
 - Eligible synced-data failures can write structured local diagnostic reports. Outside explicit development mode those reports redact financial-value fields.
 - The application does not persist the Ghostfolio security token, Ghostfolio JWT, or raw unprotected Ghostfolio payloads in this slice.
 
@@ -77,6 +85,7 @@ Delete the bootstrap setup file to force the next launch back to first-run setup
 
 - Delete the `snapshots/` directory under the same application root to remove protected synced activity history.
 - Delete the `diagnostics/` directory under the same application root to remove local synced-data diagnostic reports.
+- Delete generated `ghostfolio-capital-gains-*.md` files from the user's Documents folder to remove cleartext report output.
 - If `setup.json` is removed after startup, the current run keeps its in-memory server selection until the application exits.
 
 ## Development Mode
@@ -94,10 +103,17 @@ Current behavior:
 
 - the application opens in a full-screen Bubble Tea interface
 - first-run setup lets the user choose Ghostfolio Cloud or a canonical custom origin
-- the main menu exposes only `Sync Data`
-- `Sync Data` prompts for the Ghostfolio security token only when that workflow starts
+- the main menu exposes `Sync and Reports`
+- entering `Sync and Reports` prompts once for the Ghostfolio security token and unlocks the active sync-and-report context
+- the unlocked context always shows `Sync Data` and `Generate Capital Gains Report`
 - sync calls `POST /api/v1/auth/anonymous` and then pages `GET /api/v1/activities?skip=<n>&take=<n>&sortColumn=date&sortDirection=asc` until the full reported history is retrieved
 - successful sync normalizes and validates supported `BUY` and `SELL` activity history and stores it as a protected local snapshot for future use
+- unlocked synced data shows last successful sync metadata and available report years without forcing a new sync
+- report generation uses the unlocked protected snapshot as input, not a fresh Ghostfolio API call
+- report generation supports FIFO, LIFO, HIFO, Average Cost Basis, and Scope-Local Exact Unit Matching, otherwise Scope-Local Average Cost with Oldest-Acquired Deemed-Disposal Order
+- successful report generation writes one timestamped Markdown file to Documents, requests one OS default-app open, and shows the saved path with user file-removal guidance
+- automatic-open failure leaves the saved report file in place and reports the warning without treating the save as failed
+- leaving the result screen or the unlocked context clears transient in-memory report state so the application keeps no report history or reopen list
 - same-token refresh replaces the existing selected-server snapshot only after the new protected write succeeds atomically
 - a different valid token creates a separate isolated protected snapshot for the same server
 - an active readable snapshot can trigger server-replacement confirmation before a new sync starts
@@ -114,10 +130,15 @@ Supported failure categories:
 - `unsupported stored-data version`
 - `incompatible new sync data`
 - `server replacement cancelled`
+- `no synced data available`
+- `no reportable years available`
+- `unsupported report calculation`
+- `documents folder unavailable`
+- `report file write failed`
+- `automatic open failed after save`
 
 Not in scope yet:
 
-- capital-gains calculations
-- report generation
-- report preview
-- cached-data browsing
+- report preview before save
+- report history or reopen catalog
+- cached-data browsing beyond the unlocked readiness summary

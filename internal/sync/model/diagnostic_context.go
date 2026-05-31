@@ -3,11 +3,6 @@
 // Authored by: OpenCode
 package model
 
-import (
-	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
-	"github.com/cockroachdb/apd/v3"
-)
-
 // DiagnosticFailureStage identifies the sync stage that produced diagnostic
 // troubleshooting context.
 // Authored by: OpenCode
@@ -30,41 +25,15 @@ const (
 	DiagnosticFailureStageProtectedPersistence DiagnosticFailureStage = "protected_persistence"
 )
 
-// DiagnosticRecord stores source-faithful offending-record context allowed in
-// synced-data diagnostic reports.
-// Authored by: OpenCode
-type DiagnosticRecord struct {
-	SourceID               string `json:"source_id,omitempty"`
-	OccurredAt             string `json:"occurred_at,omitempty"`
-	ActivityType           string `json:"activity_type,omitempty"`
-	AssetSymbol            string `json:"asset_symbol,omitempty"`
-	AssetName              string `json:"asset_name,omitempty"`
-	OrderCurrency          string `json:"order_currency,omitempty"`
-	AssetProfileCurrency   string `json:"asset_profile_currency,omitempty"`
-	BaseCurrency           string `json:"base_currency,omitempty"`
-	Quantity               string `json:"quantity,omitempty"`
-	OrderUnitPrice         string `json:"order_unit_price,omitempty"`
-	OrderGrossValue        string `json:"order_gross_value,omitempty"`
-	OrderFeeAmount         string `json:"order_fee_amount,omitempty"`
-	AssetProfileUnitPrice  string `json:"asset_profile_unit_price,omitempty"`
-	AssetProfileFeeAmount  string `json:"asset_profile_fee_amount,omitempty"`
-	BaseGrossValue         string `json:"base_gross_value,omitempty"`
-	BaseFeeAmount          string `json:"base_fee_amount,omitempty"`
-	Comment                string `json:"comment,omitempty"`
-	DataSource             string `json:"data_source,omitempty"`
-	SourceScopeID          string `json:"source_scope_id,omitempty"`
-	SourceScopeName        string `json:"source_scope_name,omitempty"`
-	SourceScopeKind        string `json:"source_scope_kind,omitempty"`
-	SourceScopeReliability string `json:"source_scope_reliability,omitempty"`
-}
-
 // DiagnosticContext stores the structured troubleshooting context attached to a
 // synced-data failure.
 // Authored by: OpenCode
 type DiagnosticContext struct {
-	FailureStage  DiagnosticFailureStage `json:"failure_stage,omitempty"`
-	FailureDetail string                 `json:"failure_detail,omitempty"`
-	Records       []DiagnosticRecord     `json:"records,omitempty"`
+	FailureStage            DiagnosticFailureStage `json:"failure_stage,omitempty"`
+	FailureDetail           string                 `json:"failure_detail,omitempty"`
+	FailureCauseChain       []string               `json:"failure_cause_chain,omitempty"`
+	Records                 []DiagnosticRecord     `json:"records,omitempty"`
+	OffendingActivityRecord *ActivityRecord        `json:"-"`
 }
 
 // DiagnosticContextCarrier exposes structured troubleshooting context from
@@ -72,86 +41,4 @@ type DiagnosticContext struct {
 // Authored by: OpenCode
 type DiagnosticContextCarrier interface {
 	DiagnosticContext() DiagnosticContext
-}
-
-// DiagnosticRecordFromActivityRecord converts one normalized activity record
-// into the structured record context used by diagnostic reports.
-//
-// Example:
-//
-//	record := model.DiagnosticRecordFromActivityRecord(activity)
-//	_ = record.SourceID
-//
-// Authored by: OpenCode
-func DiagnosticRecordFromActivityRecord(record ActivityRecord) DiagnosticRecord {
-	var orderUnitPrice = canonicalDiagnosticDecimalPointer(record.OrderUnitPrice)
-	var orderGrossValue = canonicalDiagnosticDecimalPointer(record.OrderGrossValue)
-	var orderFeeAmount = canonicalDiagnosticDecimalPointer(record.OrderFeeAmount)
-	var assetProfileUnitPrice = canonicalDiagnosticDecimalPointer(record.AssetProfileUnitPrice)
-	var assetProfileFeeAmount = canonicalDiagnosticDecimalPointer(record.AssetProfileFeeAmount)
-	var baseGrossValue = canonicalDiagnosticDecimalPointer(record.BaseGrossValue)
-	var baseFeeAmount = canonicalDiagnosticDecimalPointer(record.BaseFeeAmount)
-	var sourceScopeID string
-	var sourceScopeName string
-	var sourceScopeKind string
-	var sourceScopeReliability string
-	if record.SourceScope != nil {
-		sourceScopeID = record.SourceScope.ID
-		sourceScopeName = record.SourceScope.Name
-		sourceScopeKind = string(record.SourceScope.Kind)
-		sourceScopeReliability = string(record.SourceScope.Reliability)
-	}
-
-	return DiagnosticRecord{
-		SourceID:               record.SourceID,
-		OccurredAt:             record.OccurredAt,
-		ActivityType:           string(record.ActivityType),
-		AssetSymbol:            record.AssetSymbol,
-		AssetName:              record.AssetName,
-		OrderCurrency:          record.OrderCurrency,
-		AssetProfileCurrency:   record.AssetProfileCurrency,
-		BaseCurrency:           record.BaseCurrency,
-		Quantity:               canonicalDiagnosticDecimal(record.Quantity),
-		OrderUnitPrice:         orderUnitPrice,
-		OrderGrossValue:        orderGrossValue,
-		OrderFeeAmount:         orderFeeAmount,
-		AssetProfileUnitPrice:  assetProfileUnitPrice,
-		AssetProfileFeeAmount:  assetProfileFeeAmount,
-		BaseGrossValue:         baseGrossValue,
-		BaseFeeAmount:          baseFeeAmount,
-		Comment:                record.Comment,
-		DataSource:             record.DataSource,
-		SourceScopeID:          sourceScopeID,
-		SourceScopeName:        sourceScopeName,
-		SourceScopeKind:        sourceScopeKind,
-		SourceScopeReliability: sourceScopeReliability,
-	}
-}
-
-// canonicalDiagnosticDecimal returns a stable decimal string for diagnostic
-// context.
-// Authored by: OpenCode
-func canonicalDiagnosticDecimal(value apd.Decimal) string {
-	var canonical, err = decimalsupport.CanonicalString(value)
-	if err == nil {
-		return canonical
-	}
-
-	return value.String()
-}
-
-// canonicalDiagnosticDecimalPointer returns a stable optional decimal string
-// for diagnostic context.
-// Authored by: OpenCode
-func canonicalDiagnosticDecimalPointer(value *apd.Decimal) string {
-	if value == nil {
-		return ""
-	}
-
-	var canonical, err = decimalsupport.CanonicalStringPointer(value)
-	if err == nil {
-		return canonical
-	}
-
-	return value.String()
 }

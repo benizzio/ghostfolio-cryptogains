@@ -3,8 +3,10 @@ package screen
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
+	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/component"
 )
 
@@ -48,20 +50,25 @@ func TestMainMenuScreenViewCoversRenderPath(t *testing.T) {
 	t.Parallel()
 
 	var content = MainMenuScreenView(MainMenuScreenParams{
-		Theme:               component.DefaultTheme(),
-		Width:               80,
-		Height:              24,
-		MenuItems:           []component.MenuItem{{Label: "Sync Data", Enabled: true}},
-		SelectedIndex:       0,
-		ServerOrigin:        "https://ghostfol.io",
-		ProtectedDataExists: true,
-		HelpText:            "help",
+		Theme:         component.DefaultTheme(),
+		Width:         80,
+		Height:        24,
+		MenuItems:     []component.MenuItem{{Label: "Sync and Reports", Enabled: true}},
+		SelectedIndex: 0,
+		ServerOrigin:  "https://ghostfol.io",
+		HelpText:      "help",
 	})
 	if content == "" {
 		t.Fatalf("expected rendered content")
 	}
 	if !strings.Contains(content, "ghostfolio-cryptogains") || !strings.Contains(content, "[Ghostfolio]") {
 		t.Fatalf("expected persistent application identity header, got %q", content)
+	}
+	if !strings.Contains(content, "Sync and Reports") {
+		t.Fatalf("expected Sync and Reports menu label, got %q", content)
+	}
+	if strings.Contains(content, "Protected Data:") || strings.Contains(content, "Last Successful Sync") || strings.Contains(content, "Available Report Years") {
+		t.Fatalf("expected no protected metadata on the main menu before unlock, got %q", content)
 	}
 }
 
@@ -90,13 +97,18 @@ func TestSyncEntryScreenViewCoversIdleBranch(t *testing.T) {
 	t.Parallel()
 
 	var content = SyncEntryScreenView(SyncEntryScreenParams{
-		Theme:         component.DefaultTheme(),
-		Width:         80,
-		Height:        24,
-		MenuItems:     []component.MenuItem{{Label: "Start Sync", Enabled: true}, {Label: "Back", Enabled: true}},
-		SelectedIndex: 0,
-		TokenInput:    "***",
-		HelpText:      "help",
+		Theme:                   component.DefaultTheme(),
+		Width:                   80,
+		Height:                  24,
+		ScreenTitle:             "Sync Data",
+		ScreenSubtitle:          "Retrieve, validate, and securely store supported activity history.",
+		IntroText:               "The application will authenticate, retrieve activity history, validate it, and store it securely for future use only.",
+		IdleStatusText:          "Enter the Ghostfolio security token only when starting Sync Data.",
+		ShowProtectedDataStatus: true,
+		MenuItems:               []component.MenuItem{{Label: "Start Sync", Enabled: true}, {Label: "Back", Enabled: true}},
+		SelectedIndex:           0,
+		TokenInput:              "***",
+		HelpText:                "help",
 	})
 	if content == "" {
 		t.Fatalf("expected rendered content")
@@ -113,6 +125,8 @@ func TestSyncEntryScreenViewUsesValidationMessageOverride(t *testing.T) {
 		Theme:             component.DefaultTheme(),
 		Width:             80,
 		Height:            24,
+		IntroText:         "The application will authenticate, retrieve activity history, validate it, and store it securely for future use only.",
+		IdleStatusText:    "Enter the Ghostfolio security token only when starting Sync Data.",
 		TokenInput:        "***",
 		ValidationMessage: "validation failed",
 		HelpText:          "help",
@@ -122,6 +136,42 @@ func TestSyncEntryScreenViewUsesValidationMessageOverride(t *testing.T) {
 	}
 	if !strings.Contains(content, "ghostfolio-cryptogains") || !strings.Contains(content, "[Ghostfolio]") {
 		t.Fatalf("expected persistent application identity header, got %q", content)
+	}
+}
+
+func TestSyncEntryScreenViewCoversContextTokenBranch(t *testing.T) {
+	t.Parallel()
+
+	var content = SyncEntryScreenView(SyncEntryScreenParams{
+		Theme:                   component.DefaultTheme(),
+		Width:                   80,
+		Height:                  24,
+		ScreenTitle:             "Sync Data",
+		ScreenSubtitle:          "Retrieve, validate, and securely store supported activity history.",
+		UseContextToken:         true,
+		ShowProtectedDataStatus: true,
+		MenuItems:               []component.MenuItem{{Label: "Start Sync", Enabled: true}, {Label: "Back", Enabled: true}},
+		SelectedIndex:           0,
+		HelpText:                "help",
+		ProtectedDataExists:     true,
+	})
+	if content == "" {
+		t.Fatalf("expected rendered content")
+	}
+	if strings.Contains(content, "Ghostfolio Security Token") {
+		t.Fatalf("expected context-token sync screen to hide token label, got %q", content)
+	}
+	if strings.Contains(content, "existing Sync and Reports context token") {
+		t.Fatalf("expected context-token screen to omit redundant intro text, got %q", content)
+	}
+	if !strings.Contains(content, "reuses the active Sync and Reports token") || !strings.Contains(content, "does not show token") || !strings.Contains(content, "input again") {
+		t.Fatalf("expected context-token screen to explain token reuse, got %q", content)
+	}
+	if !strings.Contains(content, "Start Sync to obtain current available activity data on the Ghostfolio") || !strings.Contains(content, "server.") {
+		t.Fatalf("expected context-token status text, got %q", content)
+	}
+	if !strings.Contains(content, "Protected Data Loaded For This Run: yes") {
+		t.Fatalf("expected protected-data status branch to stay visible, got %q", content)
 	}
 }
 
@@ -136,9 +186,6 @@ func TestSyncProtectedDataStatusLabelCoversBothBranches(t *testing.T) {
 	}
 	if got := syncProtectedDataStatusLabel(false); got != "no" {
 		t.Fatalf("expected no label, got %q", got)
-	}
-	if got := protectedDataStatusLabel(false); got != "none loaded for this run" {
-		t.Fatalf("expected no protected-data label, got %q", got)
 	}
 }
 
@@ -202,6 +249,69 @@ func TestSyncResultScreenViewCoversDiagnosticBranches(t *testing.T) {
 	}
 }
 
+func TestReportScreenViewsCoverSelectionBusyAndResultBranches(t *testing.T) {
+	t.Parallel()
+
+	var selection = ReportSelectionScreenView(ReportSelectionScreenParams{
+		Theme:             component.DefaultTheme(),
+		Width:             80,
+		Height:            24,
+		AvailableYears:    []int{2024, 2025},
+		SelectedYearIndex: 0,
+		MethodItems:       []component.MenuItem{{Label: "FIFO", Enabled: true}, {Label: "LIFO", Enabled: true}, {Label: "HIFO", Enabled: true}, {Label: "Average Cost Basis", Enabled: true}, {Label: "Scope-Local Exact Unit Matching, otherwise Scope-Local Average Cost with Oldest-Acquired Deemed-Disposal Order", Enabled: true}},
+		SelectedMethod:    0,
+		MethodExplanation: reportmodel.CostBasisMethodFIFO.Explanation(),
+		MenuItems:         []component.MenuItem{{Label: "Generate Report", Enabled: true}, {Label: "Back", Enabled: true}},
+		SelectedAction:    0,
+		HelpText:          "help",
+	})
+	if !strings.Contains(selection, "Generate Capital Gains Report") || !strings.Contains(selection, "2024") || !strings.Contains(selection, "FIFO") || !strings.Contains(selection, reportmodel.CostBasisMethodFIFO.Explanation()) || !strings.Contains(selection, "Generate Report") {
+		t.Fatalf("expected report selection content, got %q", selection)
+	}
+
+	var busy = ReportBusyScreenView(ReportBusyScreenParams{
+		Theme:        component.DefaultTheme(),
+		Width:        80,
+		Height:       24,
+		SelectedYear: 2024,
+		MethodLabel:  "FIFO",
+		BusyText:     "Generating capital gains report...",
+		SpinnerFrame: "*",
+		HelpText:     "help",
+	})
+	if !strings.Contains(busy, "Generating capital gains report") || !strings.Contains(busy, "Selected Year: 2024") || !strings.Contains(busy, "Cost Basis Method: FIFO") {
+		t.Fatalf("expected report busy content, got %q", busy)
+	}
+
+	request, err := reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("new report request: %v", err)
+	}
+	outputFile, err := reportmodel.NewReportOutputFile("/tmp/Documents", "ghostfolio-capital-gains-2024-fifo.md", "/tmp/report.md", time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC), true, "")
+	if err != nil {
+		t.Fatalf("new report output file: %v", err)
+	}
+
+	var result = ReportResultScreenView(ReportResultScreenParams{
+		Theme:         component.DefaultTheme(),
+		Width:         80,
+		Height:        24,
+		MethodLabel:   "FIFO",
+		MenuItems:     []component.MenuItem{{Label: "Back To Sync and Reports", Enabled: true}, {Label: "Generate Another Report", Enabled: true}},
+		SelectedIndex: 0,
+		HelpText:      "help",
+		Outcome: runtime.ReportOutcome{
+			Success:    true,
+			Message:    "Saved the report to \"/tmp/report.md\" and requested automatic opening.",
+			Request:    request,
+			OutputFile: outputFile,
+		},
+	})
+	if !strings.Contains(result, "Saved Markdown Path: /tmp/report.md") || !strings.Contains(result, "Back To Sync and Reports") || !strings.Contains(result, "Generate Another Report") {
+		t.Fatalf("expected report result content, got %q", result)
+	}
+}
+
 // TestSyncFollowUpTextCoversRemainingFailureBranches verifies the
 // explicit follow-up guidance branches that are not covered by the render tests.
 // Authored by: OpenCode
@@ -254,7 +364,7 @@ func TestSyncResultScreenViewCoversSuccessBranch(t *testing.T) {
 	if !strings.Contains(content, "Activity data was stored securely for future use.") {
 		t.Fatalf("expected success summary text, got %q", content)
 	}
-	if !strings.Contains(content, "No report-generation") || !strings.Contains(content, "cached-data browsing workflow") || !strings.Contains(content, "in this slice.") {
+	if !strings.Contains(content, "Return to Sync and Reports") || !strings.Contains(content, "generate a capital gains report") || !strings.Contains(content, "newly stored protected data") {
 		t.Fatalf("expected success follow-up text, got %q", content)
 	}
 	if !strings.Contains(content, "ghostfolio-cryptogains") || !strings.Contains(content, "[Ghostfolio]") {
@@ -294,5 +404,81 @@ func TestSyncResultScreenViewCoversIncompatibleContractBranch(t *testing.T) {
 	}
 	if !strings.Contains(content, "ghostfolio-cryptogains") || !strings.Contains(content, "[Ghostfolio]") {
 		t.Fatalf("expected persistent application identity header, got %q", content)
+	}
+}
+
+// TestReportScreenHelperBranches verifies report-result warning and failure
+// render variants plus direct helper fallbacks.
+// Authored by: OpenCode
+func TestReportScreenHelperBranches(t *testing.T) {
+	t.Parallel()
+
+	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("new report request: %v", err)
+	}
+	var outputFile, outputErr = reportmodel.NewReportOutputFile("/tmp/Documents", "ghostfolio-capital-gains-2024-fifo.md", "/tmp/report.md", time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC), true, "open boom")
+	if outputErr != nil {
+		t.Fatalf("new report output file: %v", outputErr)
+	}
+
+	var warning = ReportResultScreenView(ReportResultScreenParams{
+		Theme:         component.DefaultTheme(),
+		Width:         80,
+		Height:        24,
+		MethodLabel:   "FIFO",
+		MenuItems:     []component.MenuItem{{Label: "Back To Sync and Reports", Enabled: true}},
+		SelectedIndex: 0,
+		HelpText:      "help",
+		Outcome: runtime.ReportOutcome{
+			Success:       true,
+			FailureReason: runtime.ReportFailureAutomaticOpenFailedAfterSave,
+			Message:       "Saved the report to \"/tmp/report.md\", but automatic opening failed.",
+			Request:       request,
+			OutputFile:    outputFile,
+		},
+	})
+	if !strings.Contains(warning, "Success With Warning: automatic open failed after save") {
+		t.Fatalf("expected report warning status, got %q", warning)
+	}
+
+	var failure = ReportResultScreenView(ReportResultScreenParams{
+		Theme:         component.DefaultTheme(),
+		Width:         80,
+		Height:        24,
+		MethodLabel:   "FIFO",
+		MenuItems:     []component.MenuItem{{Label: "Back To Sync and Reports", Enabled: true}},
+		SelectedIndex: 0,
+		HelpText:      "help",
+		Outcome: runtime.ReportOutcome{
+			Success:       false,
+			FailureReason: runtime.ReportFailureUnsupportedReportCalculation,
+			Message:       "Could not generate the report.",
+			Diagnostic: runtime.DiagnosticReportState{
+				Eligible:          true,
+				GenerationMessage: "Diagnostic report generated successfully.",
+				Path:              "/tmp/report.diagnostic.json",
+			},
+			Request: request,
+		},
+	})
+	if !strings.Contains(failure, "Failure Category: unsupported report calculation") {
+		t.Fatalf("expected report failure status, got %q", failure)
+	}
+	if !strings.Contains(failure, "Diagnostic report generated successfully.") || !strings.Contains(failure, "Diagnostic Report Path: /tmp/report.diagnostic.json") {
+		t.Fatalf("expected report failure diagnostics disclosure, got %q", failure)
+	}
+
+	if got := reportMethodExplanation("   "); !strings.Contains(got, reportmodel.CostBasisMethod("").Explanation()) {
+		t.Fatalf("expected empty explanation to fall back, got %q", got)
+	}
+	if got := reportResultSummary(runtime.ReportOutcome{Success: true, Message: "saved without path"}); got != "saved without path" {
+		t.Fatalf("expected success without path to return plain message, got %q", got)
+	}
+	if got := reportResultSummary(runtime.ReportOutcome{Success: false, Message: "failure detail"}); got != "failure detail" {
+		t.Fatalf("expected failure summary to return failure message, got %q", got)
+	}
+	if got := reportResultSummary(runtime.ReportOutcome{Success: false, Message: "failure detail", Diagnostic: runtime.DiagnosticReportState{Eligible: true}}); !strings.Contains(got, "Generate Diagnostic Report is available") {
+		t.Fatalf("expected eligible report failure summary to disclose diagnostics prompt, got %q", got)
 	}
 }

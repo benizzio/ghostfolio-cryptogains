@@ -27,19 +27,27 @@ func TestServerReplacementFlowCancelKeepsReadableSnapshotUnchanged(t *testing.T)
 	t.Parallel()
 
 	baseDir := t.TempDir()
-	firstServer := newGhostfolioStorageServer(t, []storagePageFixture{{Count: 1, ActivitiesJSON: `[{"id":"activity-old","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`}})
+	firstServer := newGhostfolioStorageServer(t, []storagePageFixture{{Count: 1, ActivitiesJSON: `[{"id":"activity-old","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"id":"asset-btc-replace-001","symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`}})
 	service := runtime.NewSyncService(ghostfolioclient.New(firstServer.Client()), time.Second, baseDir, true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), snapshotstore.NewEncryptedStore(baseDir, nil))
 	firstConfig := mustCustomSetupConfig(t, firstServer.URL)
 	if outcome := service.Run(context.Background(), runtime.SyncRequest{Config: firstConfig, SecurityToken: "token-one"}); !outcome.Success {
 		t.Fatalf("expected initial sync success, got %#v", outcome)
 	}
 
-	secondServer := newGhostfolioStorageServer(t, []storagePageFixture{{Count: 1, ActivitiesJSON: `[{"id":"activity-new","date":"2025-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"ETH","name":"Ether","currency":"USD"}}]`}})
+	secondServer := newGhostfolioStorageServer(t, []storagePageFixture{{Count: 1, ActivitiesJSON: `[{"id":"activity-new","date":"2025-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"id":"asset-eth-replace-001","symbol":"ETH","name":"Ether","currency":"USD"}}]`}})
 	secondConfig := mustCustomSetupConfig(t, secondServer.URL)
 	model := flow.NewModel(newFlowDependencies(t, bootstrap.StartupState{ActiveConfig: &secondConfig}, true, service))
 	model = openSyncEntry(t, model)
 	model = typeToken(t, model, "token-one")
 	model = blurTokenInputFromSyncEntry(t, model)
+	updated, unlockCmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	_ = testutil.RunCmd(unlockCmd)
+	model = assertFlowModel(t, updated)
+	if model.ActiveScreen() != "sync_reports_menu" {
+		t.Fatalf("expected unlock to route to sync and reports menu, got %s", model.ActiveScreen())
+	}
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = assertFlowModel(t, updated)
 
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	_ = testutil.RunCmd(cmd)
@@ -52,12 +60,15 @@ func TestServerReplacementFlowCancelKeepsReadableSnapshotUnchanged(t *testing.T)
 	model = assertFlowModel(t, updated)
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = assertFlowModel(t, updated)
-	if model.ActiveScreen() != "sync_result" {
-		t.Fatalf("expected cancel to route to sync result, got %s", model.ActiveScreen())
+	if model.ActiveScreen() != "sync_reports_menu" {
+		t.Fatalf("expected cancel to return to sync and reports menu, got %s", model.ActiveScreen())
 	}
 	content := model.View().Content
-	if !strings.Contains(content, "server replacement cancelled") {
-		t.Fatalf("expected cancellation outcome, got %q", content)
+	if !strings.Contains(content, "Sync Data") || !strings.Contains(content, "Generate Capital Gains Report") {
+		t.Fatalf("expected unlocked context after cancellation, got %q", content)
+	}
+	if strings.Contains(content, "server replacement cancelled") {
+		t.Fatalf("expected cancellation to avoid standalone sync result messaging, got %q", content)
 	}
 }
 
@@ -65,14 +76,14 @@ func TestServerReplacementFlowConfirmSuccessReplacesSnapshot(t *testing.T) {
 	t.Parallel()
 
 	baseDir := t.TempDir()
-	firstServer := newGhostfolioStorageServer(t, []storagePageFixture{{Count: 1, ActivitiesJSON: `[{"id":"activity-old","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`}})
+	firstServer := newGhostfolioStorageServer(t, []storagePageFixture{{Count: 1, ActivitiesJSON: `[{"id":"activity-old","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"id":"asset-btc-replace-001","symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`}})
 	sharedStore := snapshotstore.NewEncryptedStore(baseDir, nil)
 	service := runtime.NewSyncService(ghostfolioclient.New(firstServer.Client()), time.Second, baseDir, true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), sharedStore)
 	if outcome := service.Run(context.Background(), runtime.SyncRequest{Config: mustCustomSetupConfig(t, firstServer.URL), SecurityToken: "token-one"}); !outcome.Success {
 		t.Fatalf("expected initial sync success, got %#v", outcome)
 	}
 
-	secondServer := newGhostfolioStorageServer(t, []storagePageFixture{{Count: 1, ActivitiesJSON: `[{"id":"activity-new","date":"2025-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"ETH","name":"Ether","currency":"USD"}}]`}})
+	secondServer := newGhostfolioStorageServer(t, []storagePageFixture{{Count: 1, ActivitiesJSON: `[{"id":"activity-new","date":"2025-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"id":"asset-eth-replace-001","symbol":"ETH","name":"Ether","currency":"USD"}}]`}})
 	secondConfig := mustCustomSetupConfig(t, secondServer.URL)
 	replacementService := runtime.NewSyncService(ghostfolioclient.New(secondServer.Client()), time.Second, baseDir, true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), sharedStore)
 	if outcome := replacementService.Run(context.Background(), runtime.SyncRequest{Config: mustCustomSetupConfig(t, firstServer.URL), SecurityToken: "token-one"}); !outcome.Success {
@@ -83,6 +94,14 @@ func TestServerReplacementFlowConfirmSuccessReplacesSnapshot(t *testing.T) {
 	model = openSyncEntry(t, model)
 	model = typeToken(t, model, "token-one")
 	model = blurTokenInputFromSyncEntry(t, model)
+	updated, unlockCmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	_ = testutil.RunCmd(unlockCmd)
+	model = assertFlowModel(t, updated)
+	if model.ActiveScreen() != "sync_reports_menu" {
+		t.Fatalf("expected unlock to route to sync and reports menu, got %s", model.ActiveScreen())
+	}
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = assertFlowModel(t, updated)
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	_ = testutil.RunCmd(cmd)
 	model = assertFlowModel(t, updated)
@@ -92,8 +111,8 @@ func TestServerReplacementFlowConfirmSuccessReplacesSnapshot(t *testing.T) {
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = assertFlowModel(t, updated)
 	model = applySyncBatch(t, model, cmd)
-	if model.ActiveScreen() != "sync_result" {
-		t.Fatalf("expected result screen after confirmed replacement, got %s", model.ActiveScreen())
+	if model.ActiveScreen() != "sync_reports_menu" {
+		t.Fatalf("expected confirmed replacement to return to sync and reports menu, got %s", model.ActiveScreen())
 	}
 
 	inspector := snapshotstore.NewEncryptedStore(baseDir, nil)
@@ -123,7 +142,7 @@ func TestServerReplacementFlowFailedReplacementRetainsPreviousSnapshot(t *testin
 	t.Parallel()
 
 	baseDir := t.TempDir()
-	firstServer := newGhostfolioStorageServer(t, []storagePageFixture{{Count: 1, ActivitiesJSON: `[{"id":"activity-old","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`}})
+	firstServer := newGhostfolioStorageServer(t, []storagePageFixture{{Count: 1, ActivitiesJSON: `[{"id":"activity-old","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"id":"asset-btc-replace-001","symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`}})
 	baseStore := snapshotstore.NewEncryptedStore(baseDir, nil)
 	service := runtime.NewSyncService(ghostfolioclient.New(firstServer.Client()), time.Second, baseDir, true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), baseStore)
 	firstConfig := mustCustomSetupConfig(t, firstServer.URL)
@@ -147,7 +166,7 @@ func TestServerReplacementFlowFailedReplacementRetainsPreviousSnapshot(t *testin
 		case "/api/v1/user":
 			_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":"USD"}}`))
 		case "/api/v1/activities":
-			_, _ = writer.Write([]byte(`{"activities":[{"id":"bad-sell","date":"2025-01-01T10:00:00Z","type":"SELL","quantity":10,"valueInBaseCurrency":1000,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}],"count":1}`))
+			_, _ = writer.Write([]byte(`{"activities":[{"id":"bad-sell","date":"2025-01-01T10:00:00Z","type":"SELL","quantity":10,"valueInBaseCurrency":1000,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"id":"asset-btc-replace-001","symbol":"BTC","name":"Bitcoin","currency":"USD"}}],"count":1}`))
 		default:
 			writer.WriteHeader(http.StatusNotFound)
 		}

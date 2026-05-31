@@ -14,6 +14,9 @@ import (
 	"github.com/cockroachdb/apd/v3"
 )
 
+// activityMoneyContext preserves each supported monetary tier exactly as mapped
+// from one Ghostfolio activity entry before later validation chooses one tier.
+// Authored by: OpenCode
 type activityMoneyContext struct {
 	orderCurrency         string
 	assetProfileCurrency  string
@@ -193,6 +196,7 @@ func MapActivity(entry dto.ActivityPageEntry, baseCurrency string, decimalServic
 		SourceID:              sourceID,
 		OccurredAt:            occurredAt,
 		ActivityType:          syncmodel.ActivityType(strings.ToUpper(strings.TrimSpace(entry.Type))),
+		AssetIdentityKey:      strings.TrimSpace(entry.SymbolProfile.ID),
 		AssetSymbol:           strings.TrimSpace(entry.SymbolProfile.Symbol),
 		AssetName:             strings.TrimSpace(entry.SymbolProfile.Name),
 		Quantity:              quantity,

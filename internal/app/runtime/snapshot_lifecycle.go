@@ -71,6 +71,17 @@ func (s *snapshotLifecycle) ProtectedDataState() ProtectedDataState {
 	return s.state.ProtectedDataState()
 }
 
+// ReadableProtectedActivityCache returns the currently unlocked protected
+// activity cache for this run.
+// Authored by: OpenCode
+func (s *snapshotLifecycle) ReadableProtectedActivityCache() (syncmodel.ProtectedActivityCache, bool) {
+	if s == nil {
+		return syncmodel.ProtectedActivityCache{}, false
+	}
+
+	return s.state.ReadableProtectedActivityCache()
+}
+
 // CheckServerReplacement compares the selected server against the active readable snapshot.
 // Authored by: OpenCode
 func (s *snapshotLifecycle) CheckServerReplacement(config configmodel.AppSetupConfig) ServerReplacementCheck {
@@ -126,6 +137,39 @@ func (s *snapshotLifecycle) DiscoverAndUnlock(
 	}
 
 	return snapshotUnlockResult{}, nil
+}
+
+// UnlockSelectedServerSnapshot tries to unlock one selected-server protected
+// snapshot for the active Sync and Reports context and returns the readable
+// summary that the TUI may expose after token entry.
+// Authored by: OpenCode
+func (s *snapshotLifecycle) UnlockSelectedServerSnapshot(
+	ctx context.Context,
+	serverOrigin string,
+	securityToken string,
+) SyncReportsContextResult {
+	var result = SyncReportsContextResult{ReportUnavailableReason: ReportFailureNoSyncedDataAvailable}
+	if s == nil {
+		return result
+	}
+
+	unlockedSnapshot, err := s.DiscoverAndUnlock(ctx, serverOrigin, securityToken)
+	if err != nil {
+		if errors.Is(err, snapshotstore.ErrUnsupportedStoredDataVersion) {
+			result.ReportUnavailableReason = ReportFailureUnsupportedStoredDataVersion
+		}
+		return result
+	}
+	if !unlockedSnapshot.Unlocked {
+		result.UnlockState = SyncReportsUnlockStateAuthenticatedNewContext
+		return result
+	}
+
+	s.state.Set(unlockedSnapshot.Candidate, unlockedSnapshot.Payload)
+	result.UnlockState = SyncReportsUnlockStateSnapshotUnlocked
+	result.ProtectedData = s.state.ProtectedDataState()
+	result.ReportUnavailableReason = syncReportsUnavailableReasonFromProtectedData(result.ProtectedData)
+	return result
 }
 
 // Persist builds the next protected payload, writes it atomically, and updates

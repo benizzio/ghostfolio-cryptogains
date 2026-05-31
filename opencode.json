@@ -4,5 +4,8 @@
     "paths": [
       ".agents/skills"
     ]
+  },
+  "watcher": {
+    "ignore": ["dist/**/*"]
   }
 }

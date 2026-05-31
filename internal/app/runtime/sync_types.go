@@ -50,17 +50,8 @@ const (
 type AttemptStatus string
 
 const (
-	// AttemptStatusIdle indicates that no sync attempt is currently running.
-	AttemptStatusIdle AttemptStatus = "idle"
-
-	// AttemptStatusStarted indicates that a sync attempt has started.
-	AttemptStatusStarted AttemptStatus = "started"
-
 	// AttemptStatusDiscoveringSnapshot indicates that local snapshot discovery is in flight.
 	AttemptStatusDiscoveringSnapshot AttemptStatus = "discovering_snapshot"
-
-	// AttemptStatusUnlockingSnapshot indicates that a selected-server snapshot unlock attempt is in flight.
-	AttemptStatusUnlockingSnapshot AttemptStatus = "unlocking_snapshot"
 
 	// AttemptStatusAuthenticating indicates that anonymous auth is in flight.
 	AttemptStatusAuthenticating AttemptStatus = "authenticating"
@@ -119,11 +110,23 @@ type SyncOutcome struct {
 	Diagnostic    DiagnosticReportState
 }
 
+// ProtectedDataState summarizes whether readable protected data is active in
+// memory for this run and which report-related metadata is available from it.
+// Authored by: OpenCode
+type ProtectedDataState struct {
+	HasReadableSnapshot  bool
+	ServerOrigin         string
+	ActivityCount        int
+	LastSuccessfulSyncAt time.Time
+	AvailableReportYears []int
+}
+
 // DiagnosticReportRequest stores the structured data needed to write one local
-// synced-data diagnostic report.
+// synced-data or report-failure diagnostic report.
 // Authored by: OpenCode
 type DiagnosticReportRequest struct {
 	FailureReason           SyncFailureReason
+	FailureCategory         ReportFailureReason
 	ServerOrigin            string
 	Attempt                 SyncAttempt
 	Context                 syncmodel.DiagnosticContext
@@ -135,7 +138,8 @@ type DiagnosticReportRequest struct {
 // available for the current failure outcome and where it was written.
 // Authored by: OpenCode
 type DiagnosticReportState struct {
-	Eligible bool
-	Path     string
-	Request  DiagnosticReportRequest
+	Eligible          bool
+	Path              string
+	GenerationMessage string
+	Request           DiagnosticReportRequest
 }

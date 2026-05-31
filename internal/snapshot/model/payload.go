@@ -14,7 +14,10 @@ const (
 	PayloadSchemaVersion = 1
 
 	// ActivityModelVersion is the supported normalized protected-activity model version.
-	ActivityModelVersion = 3
+	// Version 4 already persists AssetIdentityKey in the protected payload, so the
+	// corrected upstream `SymbolProfile.id` mapping does not require a new on-disk
+	// model version.
+	ActivityModelVersion = 4
 )
 
 // Payload stores the encrypted protected snapshot document.
@@ -35,11 +38,6 @@ type StoredDataVersion struct {
 	WrittenByAppVersion   string `json:"written_by_app_version"`
 }
 
-// PayloadVersions preserves the earlier placeholder name while the protected
-// payload model aligns to stored-data version terminology.
-// Authored by: OpenCode
-type PayloadVersions = StoredDataVersion
-
 // SetupProfile stores the selected Ghostfolio server context inside the
 // encrypted payload.
 // Authored by: OpenCode
@@ -50,11 +48,6 @@ type SetupProfile struct {
 	LastValidatedAt   time.Time `json:"last_validated_at"`
 	SourceAPIBasePath string    `json:"source_api_base_path"`
 }
-
-// ProtectedSetupProfile preserves the earlier placeholder name while the
-// protected payload model aligns to setup-profile terminology.
-// Authored by: OpenCode
-type ProtectedSetupProfile = SetupProfile
 
 // RegisteredLocalUser stores the local protected-context identity without
 // persisting the Ghostfolio token.

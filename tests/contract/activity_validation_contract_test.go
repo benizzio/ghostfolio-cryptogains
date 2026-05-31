@@ -276,15 +276,16 @@ func activityValidationContractRecord(
 	}
 
 	record := syncmodel.ActivityRecord{
-		SourceID:        sourceID,
-		OccurredAt:      occurredAt,
-		ActivityType:    activityType,
-		AssetSymbol:     assetSymbol,
-		OrderCurrency:   "USD",
-		BaseCurrency:    "USD",
-		Quantity:        parsedQuantity,
-		OrderUnitPrice:  &parsedUnitPrice,
-		OrderGrossValue: &parsedGrossValue,
+		SourceID:         sourceID,
+		OccurredAt:       occurredAt,
+		ActivityType:     activityType,
+		AssetIdentityKey: "asset-" + assetSymbol + "-contract-001",
+		AssetSymbol:      assetSymbol,
+		OrderCurrency:    "USD",
+		BaseCurrency:     "USD",
+		Quantity:         parsedQuantity,
+		OrderUnitPrice:   &parsedUnitPrice,
+		OrderGrossValue:  &parsedGrossValue,
 	}
 	if mutate != nil {
 		mutate(&record)
