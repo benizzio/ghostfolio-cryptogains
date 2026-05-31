@@ -8,6 +8,14 @@ import (
 	"time"
 )
 
+// ReportRequest stores the user-selected inputs for one report-generation run.
+// Authored by: OpenCode
+type ReportRequest struct {
+	Year            int
+	CostBasisMethod CostBasisMethod
+	RequestedAt     time.Time
+}
+
 // NewReportRequest creates one validated report-generation request.
 //
 // Example:

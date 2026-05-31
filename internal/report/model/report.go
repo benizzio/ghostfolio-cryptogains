@@ -33,14 +33,6 @@ const (
 	ReferenceSectionStatusReferenceOnly ReferenceSectionStatus = "reference only"
 )
 
-// ReportRequest stores the user-selected inputs for one report-generation run.
-// Authored by: OpenCode
-type ReportRequest struct {
-	Year            int
-	CostBasisMethod CostBasisMethod
-	RequestedAt     time.Time
-}
-
 // CapitalGainsReport stores the fully calculated yearly report before Markdown
 // rendering.
 // Authored by: OpenCode
@@ -55,28 +47,6 @@ type CapitalGainsReport struct {
 	DetailSections            []AssetDetailSection
 }
 
-// ReportDocument stores the rendered report content before the final save.
-// Authored by: OpenCode
-type ReportDocument struct {
-	DocumentType    ReportDocumentType
-	Content         string
-	Year            int
-	CostBasisMethod CostBasisMethod
-	GeneratedAt     time.Time
-}
-
-// ReportOutputFile stores the final cleartext report file details returned to
-// the runtime workflow.
-// Authored by: OpenCode
-type ReportOutputFile struct {
-	DocumentsDirectory string
-	Filename           string
-	Path               string
-	SavedAt            time.Time
-	OpenRequested      bool
-	OpenError          string
-}
-
 // AssetSummaryEntry stores one row in the summary section of the report.
 // Authored by: OpenCode
 type AssetSummaryEntry struct {
@@ -84,15 +54,6 @@ type AssetSummaryEntry struct {
 	DisplayLabel              string
 	NetGainOrLoss             apd.Decimal
 	ReportCalculationCurrency string
-}
-
-// ReferenceLiquidationEntry stores one row in the report reference section.
-// Authored by: OpenCode
-type ReferenceLiquidationEntry struct {
-	AssetIdentityKey                   string
-	DisplayLabel                       string
-	FullLiquidationCountThroughYearEnd int
-	MainSectionStatus                  ReferenceSectionStatus
 }
 
 // AssetDetailSection stores one per-asset detail section in the calculated
@@ -108,47 +69,4 @@ type AssetDetailSection struct {
 	CalculationCurrency  string
 	ActivityRows         []AssetActivityRow
 	LiquidationSummaries []LiquidationCalculation
-}
-
-// AssetActivityRow stores one in-year activity row for an included asset.
-// Authored by: OpenCode
-type AssetActivityRow struct {
-	SourceID                    string
-	OccurredAt                  time.Time
-	ActivityType                ActivityType
-	Quantity                    apd.Decimal
-	UnitPrice                   *apd.Decimal
-	GrossValue                  *apd.Decimal
-	FeeAmount                   *apd.Decimal
-	ActivityCurrency            string
-	BasisAfterRow               apd.Decimal
-	CalculationCurrency         string
-	QuantityAfterRow            apd.Decimal
-	HoldingReductionExplanation string
-	LiquidationCalculation      *LiquidationCalculation
-}
-
-// BasisMatch stores one acquisition fragment consumed by one liquidation.
-// Authored by: OpenCode
-type BasisMatch struct {
-	AcquisitionSourceID string
-	MatchedQuantity     apd.Decimal
-	MatchedBasis        apd.Decimal
-	MatchedProceeds     *apd.Decimal
-	MatchedGainOrLoss   *apd.Decimal
-}
-
-// LiquidationCalculation stores one priced liquidation calculation rendered in
-// an asset detail section.
-// Authored by: OpenCode
-type LiquidationCalculation struct {
-	SourceID               string
-	OccurredAt             time.Time
-	DisposedQuantity       apd.Decimal
-	AllocatedBasis         apd.Decimal
-	NetLiquidationProceeds apd.Decimal
-	GainOrLoss             apd.Decimal
-	ActivityCurrency       string
-	CalculationCurrency    string
-	Matches                []BasisMatch
 }

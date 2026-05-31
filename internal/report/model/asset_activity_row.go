@@ -6,7 +6,28 @@ package model
 import (
 	"fmt"
 	"strings"
+	"time"
+
+	"github.com/cockroachdb/apd/v3"
 )
+
+// AssetActivityRow stores one in-year activity row for an included asset.
+// Authored by: OpenCode
+type AssetActivityRow struct {
+	SourceID                    string
+	OccurredAt                  time.Time
+	ActivityType                ActivityType
+	Quantity                    apd.Decimal
+	UnitPrice                   *apd.Decimal
+	GrossValue                  *apd.Decimal
+	FeeAmount                   *apd.Decimal
+	ActivityCurrency            string
+	BasisAfterRow               apd.Decimal
+	CalculationCurrency         string
+	QuantityAfterRow            apd.Decimal
+	HoldingReductionExplanation string
+	LiquidationCalculation      *LiquidationCalculation
+}
 
 // Validate verifies one in-year asset activity row.
 // Authored by: OpenCode

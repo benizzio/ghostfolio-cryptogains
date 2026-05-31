@@ -9,6 +9,16 @@ import (
 	"time"
 )
 
+// ReportDocument stores the rendered report content before the final save.
+// Authored by: OpenCode
+type ReportDocument struct {
+	DocumentType    ReportDocumentType
+	Content         string
+	Year            int
+	CostBasisMethod CostBasisMethod
+	GeneratedAt     time.Time
+}
+
 // NewReportDocument creates one validated rendered report document.
 //
 // Example:

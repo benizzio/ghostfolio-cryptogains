@@ -8,6 +8,15 @@ import (
 	"strings"
 )
 
+// ReferenceLiquidationEntry stores one row in the report reference section.
+// Authored by: OpenCode
+type ReferenceLiquidationEntry struct {
+	AssetIdentityKey                   string
+	DisplayLabel                       string
+	FullLiquidationCountThroughYearEnd int
+	MainSectionStatus                  ReferenceSectionStatus
+}
+
 // NewReferenceLiquidationEntry creates one validated reference-section row.
 //
 // Example:

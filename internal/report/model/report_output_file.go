@@ -9,6 +9,18 @@ import (
 	"time"
 )
 
+// ReportOutputFile stores the final cleartext report file details returned to
+// the runtime workflow.
+// Authored by: OpenCode
+type ReportOutputFile struct {
+	DocumentsDirectory string
+	Filename           string
+	Path               string
+	SavedAt            time.Time
+	OpenRequested      bool
+	OpenError          string
+}
+
 // NewReportOutputFile creates one validated report save outcome.
 //
 // Example:

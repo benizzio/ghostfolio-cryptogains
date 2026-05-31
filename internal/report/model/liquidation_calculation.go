@@ -6,7 +6,35 @@ package model
 import (
 	"fmt"
 	"strings"
+	"time"
+
+	"github.com/cockroachdb/apd/v3"
 )
+
+// BasisMatch stores one acquisition fragment consumed by one liquidation.
+// Authored by: OpenCode
+type BasisMatch struct {
+	AcquisitionSourceID string
+	MatchedQuantity     apd.Decimal
+	MatchedBasis        apd.Decimal
+	MatchedProceeds     *apd.Decimal
+	MatchedGainOrLoss   *apd.Decimal
+}
+
+// LiquidationCalculation stores one priced liquidation calculation rendered in
+// an asset detail section.
+// Authored by: OpenCode
+type LiquidationCalculation struct {
+	SourceID               string
+	OccurredAt             time.Time
+	DisposedQuantity       apd.Decimal
+	AllocatedBasis         apd.Decimal
+	NetLiquidationProceeds apd.Decimal
+	GainOrLoss             apd.Decimal
+	ActivityCurrency       string
+	CalculationCurrency    string
+	Matches                []BasisMatch
+}
 
 // Validate verifies one matched acquisition fragment used by a liquidation.
 // Authored by: OpenCode
