@@ -1,6 +1,7 @@
 # Implementation Plan: [FEATURE]
 
 **Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
+
 **Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/plan-template.md` for the execution workflow.
@@ -17,44 +18,29 @@
   the iteration process.
 -->
 
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, local-only files or database with protection appropriate to the persisted data sensitivity, or N/A]  
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
+**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]
+
+**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]
+
+**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
+
+**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]
+
 **Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
-**Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app or NEEDS CLARIFICATION]  
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
+
+**Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app or NEEDS CLARIFICATION]
+
+**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]
+
+**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]
+
 **Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
 
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-- [ ] Security: no Ghostfolio token persistence or output, justified local-only
-      persistence, documented protection appropriate to the sensitivity of any
-      persisted data, token-derived encryption and OWASP Cryptographic Storage
-      Cheat Sheet alignment for any persisted financial or person-linked data,
-      and most recent published OWASP Top 10 review scope are defined.
-- [ ] Precision: all financial calculations use fixed-point decimals or integer
-      minor units, never floating point in domain logic; every
-      currency-denominated value remains tied to an explicit currency; stored
-      and intermediate values preserve their original currency unless a
-      documented feature requirement defines the conversion boundary,
-      exchange-rate source, and rounding rules.
-- [ ] Testing: integration-first automated tests, mocked or stubbed outside
-      services, unit tests only for justified complex units or integration
-      gaps, overlapping unit tests are avoided, and 100% coverage for
-      project-owned code is planned through coverage instrumentation that counts
-      black-box contract and integration execution.
-- [ ] Dependencies: every new third-party library is justified against a core
-      implementation and includes research on maintenance, community acceptance,
-      security posture, release freshness, and recent activity.
-- [ ] External APIs: each integration is necessary, and the latest supported API
-      version, authentication model, failure modes, and security implications are
-      documented.
-- [ ] Architecture: the design keeps clear domain boundaries, descriptive names,
-      cohesive modules, and minimal duplication.
+[Gates determined based on constitution file]
 
 ## Project Structure
 

@@ -1,9 +1,9 @@
 installed:
 - bugfix
-- coding-standards-drift-analysis
+- coding-standards-drift-control
 - data-model-diagram
 - git
-- test-coverage-drift-analysis
+- test-coverage-drift-control
 settings:
   auto_execute_hooks: true
 hooks:
@@ -104,19 +104,19 @@ hooks:
     description: Auto-commit after spec clarification
     condition: null
   after_plan:
-  - extension: data-model-diagram
-    command: speckit.data-model-diagram.generate
-    enabled: true
-    optional: false
-    prompt: Execute speckit.data-model-diagram.generate?
-    description: Generate a Mermaid ER diagram from the active feature data model
-    condition: null
   - extension: git
     command: speckit.git.commit
     enabled: true
     optional: true
     prompt: Commit plan changes?
     description: Auto-commit after implementation planning
+    condition: null
+  - extension: data-model-diagram
+    command: speckit.data-model-diagram.generate
+    enabled: true
+    optional: true
+    prompt: Generate a Mermaid ER diagram after planning?
+    description: Generate a Mermaid ER diagram from the active feature data model
     condition: null
   after_tasks:
   - extension: git
@@ -127,22 +127,6 @@ hooks:
     description: Auto-commit after task generation
     condition: null
   after_implement:
-  - extension: coding-standards-drift-analysis
-    command: speckit.coding-standards-drift-analysis.report
-    enabled: true
-    optional: true
-    prompt: Run coding-standards drift analysis after implementation?
-    description: Generate or refresh the coding-standards drift report for the active
-      feature
-    condition: null
-  - extension: test-coverage-drift-analysis
-    command: speckit.test-coverage-drift-analysis.report
-    enabled: true
-    optional: true
-    prompt: Run test-coverage drift analysis after implementation?
-    description: Generate or refresh the test-coverage drift report for the active
-      feature
-    condition: null
   - extension: git
     command: speckit.git.commit
     enabled: true
@@ -156,6 +140,22 @@ hooks:
     optional: true
     prompt: Run bugfix consistency check after implementation?
     description: Verify spec artifact consistency after implementation completes
+    condition: null
+  - extension: coding-standards-drift-control
+    command: speckit.coding-standards-drift-control.report
+    enabled: true
+    optional: true
+    prompt: Run Coding Standards Drift Control after implementation?
+    description: Generate or refresh the coding-standards drift report for the active
+      feature
+    condition: null
+  - extension: test-coverage-drift-control
+    command: speckit.test-coverage-drift-control.report
+    enabled: true
+    optional: true
+    prompt: Run test coverage drift control after implementation?
+    description: Generate or refresh the test coverage drift report for the active
+      feature
     condition: null
   after_checklist:
   - extension: git

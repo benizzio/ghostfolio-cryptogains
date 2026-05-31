@@ -6,13 +6,10 @@ description: "Task list template for feature implementation"
 # Tasks: [FEATURE NAME]
 
 **Input**: Design documents from `/specs/[###-feature-name]/`
+
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: Tests are MANDATORY. Every feature MUST include automated tests that
-maintain 100% coverage for project-owned code. Prefer integration tests with
-mocked or stubbed outside services. Add unit tests only when complexity or an
-integration-only coverage gap justifies isolated verification. Remove
-substantially overlapping unit tests once integration coverage replaces them.
+**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -29,21 +26,21 @@ substantially overlapping unit tests once integration coverage replaces them.
 - **Mobile**: `api/src/`, `ios/src/` or `android/src/`
 - Paths shown below assume single project - adjust based on plan.md structure
 
-<!-- 
+<!--
   ============================================================================
   IMPORTANT: The tasks below are SAMPLE TASKS for illustration purposes only.
-  
+
   The /speckit.tasks command MUST replace these with actual tasks based on:
   - User stories from spec.md (with their priorities P1, P2, P3...)
   - Feature requirements from plan.md
   - Entities from data-model.md
   - Endpoints from contracts/
-  
+
   Tasks MUST be organized by user story so each story can be:
   - Implemented independently
   - Tested independently
   - Delivered as an MVP increment
-  
+
   DO NOT keep these sample tasks in the generated tasks.md file.
   ============================================================================
 -->
@@ -54,7 +51,7 @@ substantially overlapping unit tests once integration coverage replaces them.
 
 - [ ] T001 Create project structure per implementation plan
 - [ ] T002 Initialize [language] project with [framework] dependencies
-- [ ] T003 [P] Configure linting, formatting, and 100% coverage gates
+- [ ] T003 [P] Configure linting and formatting tools
 
 ---
 
@@ -66,15 +63,12 @@ substantially overlapping unit tests once integration coverage replaces them.
 
 Examples of foundational tasks (adjust based on your project):
 
-- [ ] T004 Setup secure configuration and secret handling framework
-- [ ] T005 [P] Record dependency and external API research in
-      specs/[###-feature-name]/research.md
+- [ ] T004 Setup database schema and migrations framework
+- [ ] T005 [P] Implement authentication/authorization framework
 - [ ] T006 [P] Setup API routing and middleware structure
-- [ ] T007 Create base models/entities and currency-aware financial precision
-      primitives that all stories depend on
-- [ ] T008 Configure error handling and security logging infrastructure
-- [ ] T009 Setup justified local-only persistence and protection approach, using token-derived encryption when persisted data includes financial or person-linked information
-- [ ] T010 Setup environment configuration management
+- [ ] T007 Create base models/entities that all stories depend on
+- [ ] T008 Configure error handling and logging infrastructure
+- [ ] T009 Setup environment configuration management
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -86,11 +80,9 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 1 (MANDATORY) ⚠️
+### Tests for User Story 1 (OPTIONAL - only if tests requested) ⚠️
 
-> **NOTE: Write these tests FIRST, ensure they FAIL before implementation.**
-> Prefer integration tests. Add unit tests only when complexity is justified in
-> `plan.md`.
+> **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
 - [ ] T010 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
 - [ ] T011 [P] [US1] Integration test for [user journey] in tests/integration/test_[name].py
@@ -114,10 +106,7 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 2 (MANDATORY) ⚠️
-
-> **NOTE: Prefer integration tests. Add unit tests only when complexity is
-> justified in `plan.md`.**
+### Tests for User Story 2 (OPTIONAL - only if tests requested) ⚠️
 
 - [ ] T018 [P] [US2] Contract test for [endpoint] in tests/contract/test_[name].py
 - [ ] T019 [P] [US2] Integration test for [user journey] in tests/integration/test_[name].py
@@ -139,10 +128,7 @@ Examples of foundational tasks (adjust based on your project):
 
 **Independent Test**: [How to verify this story works on its own]
 
-### Tests for User Story 3 (MANDATORY) ⚠️
-
-> **NOTE: Prefer integration tests. Add unit tests only when complexity is
-> justified in `plan.md`.**
+### Tests for User Story 3 (OPTIONAL - only if tests requested) ⚠️
 
 - [ ] T024 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
 - [ ] T025 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py
@@ -168,11 +154,8 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX [P] Documentation updates in docs/
 - [ ] TXXX Code cleanup and refactoring
 - [ ] TXXX Performance optimization across all stories
-- [ ] TXXX [P] Additional unit tests for justified complex logic in language default location
-- [ ] TXXX [P] Verify financial tests cover amount-plus-currency pairing,
-      original-currency preservation, and any documented conversion boundary
-- [ ] TXXX [P] Verify 100% coverage for project-owned code
-- [ ] TXXX Most recent published OWASP Top 10 review and, when persisted data includes financial or person-linked information, OWASP Cryptographic Storage Cheat Sheet review and security hardening
+- [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
+- [ ] TXXX Security hardening
 - [ ] TXXX Run quickstart.md validation
 
 ---
@@ -196,7 +179,7 @@ Examples of foundational tasks (adjust based on your project):
 
 ### Within Each User Story
 
-- Mandatory tests MUST be written and FAIL before implementation
+- Tests (if included) MUST be written and FAIL before implementation
 - Models before services
 - Services before endpoints
 - Core implementation before integration

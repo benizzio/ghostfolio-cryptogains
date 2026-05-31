@@ -19,20 +19,6 @@
       "registered_skills": [],
       "installed_at": "2026-05-01T18:52:14.638134+00:00"
     },
-    "data-model-diagram": {
-      "version": "0.1.0",
-      "source": "local",
-      "manifest_hash": "sha256:1e3225136ffc533278aa894275c770a74089e413842e89c3250a6515891bd2e0",
-      "enabled": true,
-      "priority": 5,
-      "registered_commands": {
-        "opencode": [
-          "speckit.data-model-diagram.generate"
-        ]
-      },
-      "registered_skills": [],
-      "installed_at": "2026-05-02T13:04:18.867868+00:00"
-    },
     "bugfix": {
       "version": "1.1.0",
       "source": "local",
@@ -61,6 +47,72 @@
       },
       "registered_skills": [],
       "installed_at": "2026-05-26T18:29:23.776328+00:00"
+    },
+    "coding-standards-drift-control": {
+      "version": "0.3.1",
+      "source": "local",
+      "manifest_hash": "sha256:0011e340d2ccf60f62a93fe05f4c183f0d9ae8d415ad64cedc7ade62d863ab57",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "agy": [
+          "speckit.coding-standards-drift-control.report",
+          "speckit.coding-standards-drift-control.remediation-plan"
+        ],
+        "codex": [
+          "speckit.coding-standards-drift-control.report",
+          "speckit.coding-standards-drift-control.remediation-plan"
+        ],
+        "opencode": [
+          "speckit.coding-standards-drift-control.report",
+          "speckit.coding-standards-drift-control.remediation-plan"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-05-31T18:56:11.919512+00:00"
+    },
+    "test-coverage-drift-control": {
+      "version": "0.2.1",
+      "source": "local",
+      "manifest_hash": "sha256:86dfa5b9c795797dc7c783d5d12a49cfb1b601bd7e21137181c51a1e3befbf95",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "agy": [
+          "speckit.test-coverage-drift-control.report",
+          "speckit.test-coverage-drift-control.remediation-plan"
+        ],
+        "codex": [
+          "speckit.test-coverage-drift-control.report",
+          "speckit.test-coverage-drift-control.remediation-plan"
+        ],
+        "opencode": [
+          "speckit.test-coverage-drift-control.report",
+          "speckit.test-coverage-drift-control.remediation-plan"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-05-31T18:56:17.604701+00:00"
+    },
+    "data-model-diagram": {
+      "version": "0.2.2",
+      "source": "local",
+      "manifest_hash": "sha256:6a58f22cc2e035136fb3cf6a993739fab941ad446250810f9ec8763c72e42c4e",
+      "enabled": true,
+      "priority": 5,
+      "registered_commands": {
+        "agy": [
+          "speckit.data-model-diagram.generate"
+        ],
+        "codex": [
+          "speckit.data-model-diagram.generate"
+        ],
+        "opencode": [
+          "speckit.data-model-diagram.generate"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-05-31T20:38:40.586229+00:00"
     }
   }
 }

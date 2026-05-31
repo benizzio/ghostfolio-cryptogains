@@ -1,8 +1,11 @@
 # Feature Specification: [FEATURE NAME]
 
-**Feature Branch**: `[###-feature-name]`  
-**Created**: [DATE]  
-**Status**: Draft  
+**Feature Branch**: `[###-feature-name]`
+
+**Created**: [DATE]
+
+**Status**: Draft
+
 **Input**: User description: "$ARGUMENTS"
 
 ## User Scenarios & Testing *(mandatory)*
@@ -11,7 +14,7 @@
   IMPORTANT: User stories should be PRIORITIZED as user journeys ordered by importance.
   Each user story/journey must be INDEPENDENTLY TESTABLE - meaning if you implement just ONE of them,
   you should still have a viable MVP (Minimum Viable Product) that delivers value.
-  
+
   Assign priorities (P1, P2, P3, etc.) to each story, where P1 is the most critical.
   Think of each story as a standalone slice of functionality that can be:
   - Developed independently
@@ -77,10 +80,6 @@
 
 ## Requirements *(mandatory)*
 
-Each feature specification MUST capture security, persistence, financial
-precision and currency-handling, testing, dependency, and external integration
-impacts when the feature touches those areas.
-
 <!--
   ACTION REQUIRED: The content in this section represents placeholders.
   Fill them out with the right functional requirements.
@@ -89,36 +88,15 @@ impacts when the feature touches those areas.
 ### Functional Requirements
 
 - **FR-001**: System MUST [specific capability, e.g., "allow users to create accounts"]
-- **FR-002**: System MUST [specific capability, e.g., "validate email addresses"]  
+- **FR-002**: System MUST [specific capability, e.g., "validate email addresses"]
 - **FR-003**: Users MUST be able to [key interaction, e.g., "reset their password"]
-- **FR-004**: System MUST [data requirement, e.g., "persist local configuration with documented justification and protection appropriate to its sensitivity"]
+- **FR-004**: System MUST [data requirement, e.g., "persist user preferences"]
 - **FR-005**: System MUST [behavior, e.g., "log all security events"]
 
 *Example of marking unclear requirements:*
 
 - **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
 - **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
-
-### Security, Precision, and Integration Constraints
-
-- **SEC-001**: [Describe how secrets are supplied, kept in memory only, and kept
-  out of logs, output, and persisted artifacts]
-- **SEC-002**: [State whether any data is persisted. If yes, justify it and keep
-  it local only. For persisted data that contains financial information or can
-  be connected to a specific person or user, describe token-derived encryption
-  aligned with the OWASP Cryptographic Storage Cheat Sheet. For less-sensitive
-  bootstrap or machine-local configuration, describe the proportionate local
-  protection approach instead]
-- **FIN-001**: [Define the numeric representation, scale, currency identity, and
-  rounding rules for every financial value involved. Require stored and
-  intermediate values to preserve the original source currency and amount unless
-  a later documented feature explicitly requires conversion, and if it does,
-  define the exchange-rate source and conversion boundary]
-- **QUAL-001**: [Describe the automated integration tests, mocked or stubbed
-  outside services, how overlapping unit tests will be avoided, and how 100%
-  coverage will be enforced across project-owned packages]
-- **INT-001**: [List any new dependencies or external APIs and the research or
-  justification required before implementation]
 
 ### Key Entities *(include if feature involves data)*
 
