@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -70,6 +71,14 @@ type runtimeDiagnosticCarrierError struct {
 	context syncmodel.DiagnosticContext
 }
 
+// runtimeWrappedError exposes controllable wrapped-error text and cause values
+// for helper branch coverage.
+// Authored by: OpenCode
+type runtimeWrappedError struct {
+	message string
+	cause   error
+}
+
 // runtimeNormalizerFunc adapts one test function to the runtime normalization
 // contract.
 // Authored by: OpenCode
@@ -109,6 +118,24 @@ func (e runtimeDiagnosticCarrierError) Error() string {
 // Authored by: OpenCode
 func (e runtimeDiagnosticCarrierError) DiagnosticContext() syncmodel.DiagnosticContext {
 	return e.context
+}
+
+// DiagnosticReportContext returns the injected report-failure troubleshooting context.
+// Authored by: OpenCode
+func (e runtimeDiagnosticCarrierError) DiagnosticReportContext() syncmodel.DiagnosticContext {
+	return e.context
+}
+
+// Error returns the injected wrapped-error message.
+// Authored by: OpenCode
+func (e runtimeWrappedError) Error() string {
+	return e.message
+}
+
+// Unwrap returns the injected wrapped cause.
+// Authored by: OpenCode
+func (e runtimeWrappedError) Unwrap() error {
+	return e.cause
 }
 
 // TestWriteDiagnosticReportCoversBranches verifies structured diagnostic-report
@@ -214,6 +241,10 @@ func TestBuildDiagnosticReportDocumentPreservesCurrencyContextWhileRedactingFina
 	request.Context = syncmodel.DiagnosticContext{
 		FailureStage:  syncmodel.DiagnosticFailureStageValidation,
 		FailureDetail: `activity "buy-1" unit price currency context is uninformed across order, asset-profile, and base tiers`,
+		FailureCauseChain: []string{
+			`activity "buy-1" unit price currency context is uninformed across order, asset-profile, and base tiers`,
+			`lower token abc123 layer`,
+		},
 		Records: []syncmodel.DiagnosticRecord{{
 			SourceID:              "buy-1",
 			OrderCurrency:         "CHF",
@@ -237,6 +268,9 @@ func TestBuildDiagnosticReportDocumentPreservesCurrencyContextWhileRedactingFina
 	if len(redacted.Records) != 1 {
 		t.Fatalf("expected one redacted diagnostic record, got %#v", redacted)
 	}
+	if len(redacted.FailureCauseChain) != 2 || redacted.FailureCauseChain[0] != `activity "buy-1" unit price currency context is uninformed across order, asset-profile, and base tiers` || !strings.Contains(redacted.FailureCauseChain[1], "token [REDACTED]") {
+		t.Fatalf("expected redacted cause chain to be preserved, got %#v", redacted.FailureCauseChain)
+	}
 	redactedRecord := redacted.Records[0]
 	if redactedRecord.OrderCurrency != "CHF" || redactedRecord.AssetProfileCurrency != "EUR" || redactedRecord.BaseCurrency != "USD" {
 		t.Fatalf("expected currency context to remain visible after redaction, got %#v", redactedRecord)
@@ -250,6 +284,76 @@ func TestBuildDiagnosticReportDocumentPreservesCurrencyContextWhileRedactingFina
 	unredactedRecord := unredacted.Records[0]
 	if unredactedRecord.OrderUnitPrice != "90" || unredactedRecord.OrderGrossValue != "90" || unredactedRecord.OrderFeeAmount != "1.5" || unredactedRecord.AssetProfileUnitPrice != "95" || unredactedRecord.AssetProfileFeeAmount != "1.6" || unredactedRecord.BaseGrossValue != "100" || unredactedRecord.BaseFeeAmount != "1.7" {
 		t.Fatalf("expected explicit-development-mode diagnostics to retain source financial values, got %#v", unredactedRecord)
+	}
+	if len(unredacted.FailureCauseChain) != 2 || unredacted.FailureCauseChain[1] != `lower token [REDACTED] layer` {
+		t.Fatalf("expected unredacted cause chain to be preserved, got %#v", unredacted.FailureCauseChain)
+	}
+}
+
+// TestBuildDiagnosticReportDocumentSupportsReportFailureDiagnostics verifies the
+// shared writer payload for report-failure diagnostics.
+// Authored by: OpenCode
+func TestBuildDiagnosticReportDocumentSupportsReportFailureDiagnostics(t *testing.T) {
+	t.Parallel()
+
+	var quantity, _, err = decimalsupport.ParseString("1")
+	if err != nil {
+		t.Fatalf("parse quantity: %v", err)
+	}
+
+	var request = DiagnosticReportRequest{
+		FailureCategory:         ReportFailureUnsupportedReportCalculation,
+		ServerOrigin:            "https://ghostfol.io",
+		Attempt:                 SyncAttempt{AttemptID: "attempt-report-1", Status: AttemptStatusFailed, StartedAt: time.Unix(10, 0).UTC(), CompletedAt: time.Unix(11, 0).UTC()},
+		ExplicitDevelopmentMode: true,
+		Context: syncmodel.DiagnosticContext{
+			FailureDetail:     "incomplete context",
+			FailureCauseChain: []string{"incomplete context", "tier detail", "Bearer secret-token"},
+			OffendingActivityRecord: &syncmodel.ActivityRecord{
+				SourceID:         "doge-buy-2025-incomplete-001",
+				OccurredAt:       "2025-02-01T10:00:00Z",
+				ActivityType:     syncmodel.ActivityTypeBuy,
+				AssetIdentityKey: "asset-doge-001",
+				AssetSymbol:      "DOGE",
+				Quantity:         quantity,
+				RawHash:          "doge-buy-2025-incomplete-001",
+			},
+		},
+	}
+
+	var document = buildDiagnosticReportDocument(request, time.Unix(12, 0).UTC())
+	if document.FailureCategory != ReportFailureUnsupportedReportCalculation || document.FailureReason != SyncFailureNone {
+		t.Fatalf("expected report-failure category without sync failure reason, got %#v", document)
+	}
+	if document.OffendingActivityRecord == nil || document.OffendingActivityRecord.AssetIdentityKey == nil || *document.OffendingActivityRecord.AssetIdentityKey != "asset-doge-001" {
+		t.Fatalf("expected offending activity record to be preserved, got %#v", document)
+	}
+
+	raw, err := json.Marshal(document)
+	if err != nil {
+		t.Fatalf("marshal report-failure diagnostic document: %v", err)
+	}
+	text := string(raw)
+	if !strings.Contains(text, `"failure_category":"unsupported report calculation"`) {
+		t.Fatalf("expected report failure category in JSON, got %q", text)
+	}
+	if !strings.Contains(text, `"failure_cause_chain":["incomplete context","tier detail","Bearer [REDACTED]"]`) {
+		t.Fatalf("expected failure cause chain in JSON, got %q", text)
+	}
+	if !strings.Contains(text, `"offending_activity_record"`) || !strings.Contains(text, `"order_currency":null`) || !strings.Contains(text, `"source_scope":null`) {
+		t.Fatalf("expected explicit nulls in offending activity record JSON, got %q", text)
+	}
+	if strings.Contains(text, `"selected_currency_context"`) || strings.Contains(text, `"activity_currency"`) {
+		t.Fatalf("expected no derived report fields in JSON, got %q", text)
+	}
+
+	request.RedactFinancialValues = true
+	document = buildDiagnosticReportDocument(request, time.Unix(12, 0).UTC())
+	if document.OffendingActivityRecord == nil || document.OffendingActivityRecord.Quantity != nil {
+		t.Fatalf("expected production redaction to clear offending record financial values, got %#v", document.OffendingActivityRecord)
+	}
+	if len(document.FailureCauseChain) != 3 || document.FailureCauseChain[2] != "Bearer [REDACTED]" {
+		t.Fatalf("expected production redaction to scrub wrapped-cause secrets, got %#v", document.FailureCauseChain)
 	}
 }
 
@@ -322,21 +426,27 @@ func TestNewSyncServiceAndHelperFunctionsCoverBranches(t *testing.T) {
 	}
 
 	contextFromNil := diagnosticContextFromError(nil, syncmodel.DiagnosticFailureStageValidation, "token")
-	if contextFromNil.FailureStage != syncmodel.DiagnosticFailureStageValidation || contextFromNil.FailureDetail != "" {
+	if contextFromNil.FailureStage != syncmodel.DiagnosticFailureStageValidation || contextFromNil.FailureDetail != "" || len(contextFromNil.FailureCauseChain) != 0 {
 		t.Fatalf("expected default diagnostic context for nil error, got %#v", contextFromNil)
 	}
 
-	contextFromPlain := diagnosticContextFromError(errors.New("token boom"), syncmodel.DiagnosticFailureStageValidation, "token")
+	contextFromPlain := diagnosticContextFromError(fmt.Errorf("outer token boom: %w", errors.New("Bearer jwt-token")), syncmodel.DiagnosticFailureStageValidation, "token")
 	if strings.Contains(contextFromPlain.FailureDetail, "token") {
 		t.Fatalf("expected secret to be redacted from plain error, got %#v", contextFromPlain)
 	}
+	if len(contextFromPlain.FailureCauseChain) != 2 || strings.Contains(strings.Join(contextFromPlain.FailureCauseChain, " "), "jwt-token") {
+		t.Fatalf("expected plain wrapped cause chain to be redacted, got %#v", contextFromPlain)
+	}
 
-	contextFromCarrier := diagnosticContextFromError(runtimeDiagnosticCarrierError{context: syncmodel.DiagnosticContext{FailureDetail: "token detail"}}, syncmodel.DiagnosticFailureStageNormalization, "token")
+	contextFromCarrier := diagnosticContextFromError(runtimeDiagnosticCarrierError{context: syncmodel.DiagnosticContext{FailureDetail: "token detail", FailureCauseChain: []string{"token detail", "Bearer jwt-token"}}}, syncmodel.DiagnosticFailureStageNormalization, "token")
 	if contextFromCarrier.FailureStage != syncmodel.DiagnosticFailureStageNormalization {
 		t.Fatalf("expected default stage to be applied, got %#v", contextFromCarrier)
 	}
 	if strings.Contains(contextFromCarrier.FailureDetail, "token") {
 		t.Fatalf("expected carrier detail to be redacted, got %#v", contextFromCarrier)
+	}
+	if len(contextFromCarrier.FailureCauseChain) != 2 || strings.Contains(strings.Join(contextFromCarrier.FailureCauseChain, " "), "jwt-token") {
+		t.Fatalf("expected carrier cause chain to be redacted, got %#v", contextFromCarrier)
 	}
 
 	carrierWithStage := diagnosticContextFromError(runtimeDiagnosticCarrierError{context: syncmodel.DiagnosticContext{FailureStage: syncmodel.DiagnosticFailureStageMapping, FailureDetail: "mapped"}}, syncmodel.DiagnosticFailureStageNormalization)
@@ -391,6 +501,58 @@ func TestNewSyncServiceAndHelperFunctionsCoverBranches(t *testing.T) {
 	}
 	if len(id) != 8 {
 		t.Fatalf("expected hex identifier, got %q", id)
+	}
+}
+
+// TestDiagnosticHelperFunctionsCoverRemainingBranches verifies direct helper
+// branches for wrapped-cause extraction, duplicate suppression, redaction, and
+// nil-safe unwrap behavior.
+// Authored by: OpenCode
+func TestDiagnosticHelperFunctionsCoverRemainingBranches(t *testing.T) {
+	t.Parallel()
+
+	var carrierFallback = diagnosticContextFromError(runtimeDiagnosticCarrierError{context: syncmodel.DiagnosticContext{}}, syncmodel.DiagnosticFailureStageNormalization)
+	if carrierFallback.FailureStage != syncmodel.DiagnosticFailureStageNormalization || carrierFallback.FailureDetail != "carrier boom" {
+		t.Fatalf("expected carrier fallback detail and stage, got %#v", carrierFallback)
+	}
+	if len(carrierFallback.FailureCauseChain) != 1 || carrierFallback.FailureCauseChain[0] != "carrier boom" {
+		t.Fatalf("expected carrier fallback cause chain, got %#v", carrierFallback.FailureCauseChain)
+	}
+
+	if detail := diagnosticFailureDetail(errors.New("plain detail")); detail != "plain detail" {
+		t.Fatalf("expected plain detail without unwrap suffix trimming, got %q", detail)
+	}
+	if detail := diagnosticFailureDetail(runtimeWrappedError{message: "outer detail", cause: errors.New(" ")}); detail != "outer detail" {
+		t.Fatalf("expected blank wrapped cause detail to be ignored, got %q", detail)
+	}
+
+	if chain := diagnosticCauseChainFromError(runtimeWrappedError{message: " ", cause: errors.New("inner detail")}); len(chain) != 1 || chain[0] != "inner detail" {
+		t.Fatalf("expected blank outer detail to fall back to wrapped cause, got %#v", chain)
+	}
+	if chain := diagnosticCauseChainFromError(runtimeWrappedError{message: "outer detail", cause: errors.New(" ")}); len(chain) != 1 || chain[0] != "outer detail" {
+		t.Fatalf("expected blank wrapped cause entries to be skipped, got %#v", chain)
+	}
+	if chain := diagnosticCauseChainFromError(runtimeWrappedError{message: "same detail", cause: errors.New("same detail")}); len(chain) != 1 || chain[0] != "same detail" {
+		t.Fatalf("expected duplicate wrapped cause entries to be suppressed, got %#v", chain)
+	}
+
+	if chain := redactDiagnosticCauseChain(nil); chain != nil {
+		t.Fatalf("expected nil input chain to stay nil, got %#v", chain)
+	}
+	var redactedChain = redactDiagnosticCauseChain([]string{" ", "token abc123", "token abc123", "Bearer jwt-secret", "Bearer jwt-secret"}, "abc123")
+	if len(redactedChain) != 2 || redactedChain[0] != "token [REDACTED]" || redactedChain[1] != "Bearer [REDACTED]" {
+		t.Fatalf("expected blank entries skipped, secrets redacted, and duplicates collapsed, got %#v", redactedChain)
+	}
+
+	if unwrapSingleError(nil) != nil {
+		t.Fatalf("expected nil unwrap input to return nil")
+	}
+	if unwrapSingleError(errors.New("plain detail")) != nil {
+		t.Fatalf("expected non-wrapped error to return nil from unwrap helper")
+	}
+	var cause = errors.New("inner detail")
+	if unwrapped := unwrapSingleError(runtimeWrappedError{message: "outer detail", cause: cause}); !errors.Is(unwrapped, cause) {
+		t.Fatalf("expected wrapped cause from unwrap helper, got %v", unwrapped)
 	}
 }
 
@@ -612,7 +774,7 @@ func TestRunCoversMappingNormalizationAndValidationFailures(t *testing.T) {
 			case "/api/v1/user":
 				_, _ = writer.Write([]byte(`{"settings":{"baseCurrency":"USD"}}`))
 			case "/api/v1/activities":
-				_, _ = writer.Write([]byte(`{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"symbol":"BTC","name":"Bitcoin"},"quantity":1,"unitPriceInAssetProfileCurrency":1,"value":1,"feeInBaseCurrency":0}],"count":1}`))
+				_, _ = writer.Write([]byte(`{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"id":"asset-btc-runtime-001","symbol":"BTC","name":"Bitcoin"},"quantity":1,"unitPriceInAssetProfileCurrency":1,"value":1,"feeInBaseCurrency":0}],"count":1}`))
 			default:
 				writer.WriteHeader(http.StatusNotFound)
 			}
@@ -628,7 +790,7 @@ func TestRunCoversMappingNormalizationAndValidationFailures(t *testing.T) {
 	})
 
 	t.Run("normalization failure", func(t *testing.T) {
-		service, config := runtimeServiceWithHistoryServer(t, runtimeSnapshotStore{}, true, `{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"symbol":"BTC","name":"Bitcoin"},"quantity":1,"unitPriceInAssetProfileCurrency":1,"value":1,"feeInBaseCurrency":0},{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"symbol":"BTC","name":"Bitcoin"},"quantity":2,"unitPriceInAssetProfileCurrency":1,"value":2,"feeInBaseCurrency":0}],"count":2}`)
+		service, config := runtimeServiceWithHistoryServer(t, runtimeSnapshotStore{}, true, `{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"id":"asset-btc-runtime-001","symbol":"BTC","name":"Bitcoin"},"quantity":1,"unitPriceInAssetProfileCurrency":1,"value":1,"feeInBaseCurrency":0},{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"id":"asset-btc-runtime-001","symbol":"BTC","name":"Bitcoin"},"quantity":2,"unitPriceInAssetProfileCurrency":1,"value":2,"feeInBaseCurrency":0}],"count":2}`)
 		outcome := service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
 		if outcome.FailureReason != SyncFailureUnsupportedActivityHistory || !outcome.Diagnostic.Eligible {
 			t.Fatalf("expected unsupported-history normalization failure, got %#v", outcome)
@@ -636,7 +798,7 @@ func TestRunCoversMappingNormalizationAndValidationFailures(t *testing.T) {
 	})
 
 	t.Run("validation failure", func(t *testing.T) {
-		service, config := runtimeServiceWithHistoryServer(t, runtimeSnapshotStore{}, true, `{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"symbol":"BTC","name":"Bitcoin"},"quantity":1,"unitPriceInAssetProfileCurrency":0,"value":1,"feeInBaseCurrency":0}],"count":1}`)
+		service, config := runtimeServiceWithHistoryServer(t, runtimeSnapshotStore{}, true, `{"activities":[{"id":"activity-1","date":"2024-01-01T10:00:00Z","type":"BUY","SymbolProfile":{"id":"asset-btc-runtime-001","symbol":"BTC","name":"Bitcoin"},"quantity":1,"unitPriceInAssetProfileCurrency":0,"value":1,"feeInBaseCurrency":0}],"count":1}`)
 		outcome := service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
 		if outcome.FailureReason != SyncFailureUnsupportedActivityHistory || !outcome.Diagnostic.Eligible {
 			t.Fatalf("expected unsupported-history validation failure, got %#v", outcome)
@@ -764,22 +926,89 @@ func TestSnapshotLifecycleAndWrapperNilBranches(t *testing.T) {
 
 	var nilActiveState *activeSnapshotState
 	nilActiveState.Set(snapshotstore.Candidate{SnapshotID: "ignored"}, snapshotmodel.Payload{})
-	if state := nilActiveState.ProtectedDataState(); state != (ProtectedDataState{}) {
+	if state := nilActiveState.ProtectedDataState(); state.HasReadableSnapshot || state.ServerOrigin != "" || state.ActivityCount != 0 || !state.LastSuccessfulSyncAt.IsZero() || len(state.AvailableReportYears) != 0 {
 		t.Fatalf("expected nil active snapshot state to report zero value, got %#v", state)
+	}
+	if cache, ok := nilActiveState.ReadableProtectedActivityCache(); ok || cache.ActivityCount != 0 || !cache.SyncedAt.IsZero() || len(cache.AvailableReportYears) != 0 || len(cache.Activities) != 0 {
+		t.Fatalf("expected nil active snapshot state to expose no readable cache, got ok=%v cache=%#v", ok, cache)
+	}
+
+	var emptyActiveState = newActiveSnapshotState()
+	if cache, ok := emptyActiveState.ReadableProtectedActivityCache(); ok || cache.ActivityCount != 0 || !cache.SyncedAt.IsZero() || len(cache.AvailableReportYears) != 0 || len(cache.Activities) != 0 {
+		t.Fatalf("expected present-but-empty active snapshot state to expose no readable cache, got ok=%v cache=%#v", ok, cache)
 	}
 
 	lifecycle := newSnapshotLifecycle(runtimeSnapshotStore{}, nil, protectedPayloadBuilder{})
 	if lifecycle == nil || lifecycle.state == nil {
 		t.Fatalf("expected new snapshot lifecycle to create default state, got %#v", lifecycle)
 	}
-	lifecycle.SetActiveSnapshot(snapshotstore.Candidate{SnapshotID: "active"}, snapshotmodel.Payload{SetupProfile: snapshotmodel.SetupProfile{ServerOrigin: "https://ghostfol.io"}})
-	if state := lifecycle.ProtectedDataState(); !state.HasReadableSnapshot || state.ServerOrigin != "https://ghostfol.io" {
+	var activePayload = snapshotmodel.Payload{
+		RegisteredLocalUser: snapshotmodel.RegisteredLocalUser{LastSuccessfulSyncAt: time.Unix(11, 0).UTC()},
+		SetupProfile:        snapshotmodel.SetupProfile{ServerOrigin: "https://ghostfol.io"},
+		ProtectedActivityCache: syncmodel.ProtectedActivityCache{
+			SyncedAt:             time.Unix(10, 0).UTC(),
+			ActivityCount:        2,
+			AvailableReportYears: []int{2024, 2025},
+			Activities: []syncmodel.ActivityRecord{
+				{
+					SourceID:              "buy-1",
+					AssetIdentityKey:      "asset-1",
+					OrderUnitPrice:        apd.New(10, 0),
+					OrderGrossValue:       apd.New(20, 0),
+					OrderFeeAmount:        apd.New(1, 0),
+					AssetProfileUnitPrice: apd.New(11, 0),
+					AssetProfileFeeAmount: apd.New(2, 0),
+					BaseGrossValue:        apd.New(21, 0),
+					BaseFeeAmount:         apd.New(3, 0),
+					SourceScope:           &syncmodel.SourceScope{ID: "scope-1", Name: "Scope One", Kind: syncmodel.SourceScopeKindAccount},
+					RawHash:               "buy-1",
+				},
+			},
+		},
+	}
+	lifecycle.SetActiveSnapshot(snapshotstore.Candidate{SnapshotID: "active"}, activePayload)
+	if state := lifecycle.ProtectedDataState(); !state.HasReadableSnapshot || state.ServerOrigin != "https://ghostfol.io" || state.ActivityCount != 2 || !state.LastSuccessfulSyncAt.Equal(time.Unix(10, 0).UTC()) || len(state.AvailableReportYears) != 2 || state.AvailableReportYears[0] != 2024 || state.AvailableReportYears[1] != 2025 {
 		t.Fatalf("expected non-nil snapshot lifecycle state, got %#v", state)
+	}
+	state := lifecycle.ProtectedDataState()
+	state.AvailableReportYears[0] = 1900
+	if copiedState := lifecycle.ProtectedDataState(); copiedState.AvailableReportYears[0] != 2024 {
+		t.Fatalf("expected protected data summary report years to be copied, got %#v", copiedState)
+	}
+	cache, ok := lifecycle.ReadableProtectedActivityCache()
+	if !ok || cache.ActivityCount != 2 || !cache.SyncedAt.Equal(time.Unix(10, 0).UTC()) || len(cache.AvailableReportYears) != 2 || len(cache.Activities) != 1 {
+		t.Fatalf("expected readable protected cache from snapshot lifecycle, got ok=%v cache=%#v", ok, cache)
+	}
+	cache.AvailableReportYears[0] = 1900
+	cache.Activities[0].SourceID = "mutated"
+	cache.Activities[0].OrderUnitPrice.Set(apd.New(100, 0))
+	cache.Activities[0].OrderGrossValue.Set(apd.New(200, 0))
+	cache.Activities[0].OrderFeeAmount.Set(apd.New(10, 0))
+	cache.Activities[0].AssetProfileUnitPrice.Set(apd.New(110, 0))
+	cache.Activities[0].AssetProfileFeeAmount.Set(apd.New(20, 0))
+	cache.Activities[0].BaseGrossValue.Set(apd.New(210, 0))
+	cache.Activities[0].BaseFeeAmount.Set(apd.New(30, 0))
+	cache.Activities[0].SourceScope.ID = "mutated-scope"
+	var copiedCache, copiedOK = lifecycle.ReadableProtectedActivityCache()
+	if !copiedOK || copiedCache.AvailableReportYears[0] != 2024 || copiedCache.Activities[0].SourceID != "buy-1" {
+		t.Fatalf("expected readable protected cache slices to be copied, got ok=%v cache=%#v", copiedOK, copiedCache)
+	}
+	if copiedCache.Activities[0].OrderUnitPrice.String() != "10" || copiedCache.Activities[0].OrderGrossValue.String() != "20" || copiedCache.Activities[0].OrderFeeAmount.String() != "1" {
+		t.Fatalf("expected order decimal pointers to be copied, got %#v", copiedCache.Activities[0])
+	}
+	if copiedCache.Activities[0].AssetProfileUnitPrice.String() != "11" || copiedCache.Activities[0].AssetProfileFeeAmount.String() != "2" || copiedCache.Activities[0].BaseGrossValue.String() != "21" || copiedCache.Activities[0].BaseFeeAmount.String() != "3" {
+		t.Fatalf("expected asset-profile and base decimal pointers to be copied, got %#v", copiedCache.Activities[0])
+	}
+	if copiedCache.Activities[0].SourceScope == nil || copiedCache.Activities[0].SourceScope.ID != "scope-1" {
+		t.Fatalf("expected source scope pointer to be copied, got %#v", copiedCache.Activities[0].SourceScope)
 	}
 
 	var nilLifecycle *snapshotLifecycle
-	if state := nilLifecycle.ProtectedDataState(); state != (ProtectedDataState{}) {
+	if state := nilLifecycle.ProtectedDataState(); state.HasReadableSnapshot || state.ServerOrigin != "" || state.ActivityCount != 0 || !state.LastSuccessfulSyncAt.IsZero() || len(state.AvailableReportYears) != 0 {
 		t.Fatalf("expected nil snapshot lifecycle to report zero protected data state, got %#v", state)
+	}
+	if cache, ok := nilLifecycle.ReadableProtectedActivityCache(); ok || cache.ActivityCount != 0 || !cache.SyncedAt.IsZero() || len(cache.AvailableReportYears) != 0 || len(cache.Activities) != 0 {
+		t.Fatalf("expected nil snapshot lifecycle to expose no readable cache, got ok=%v cache=%#v", ok, cache)
 	}
 	if check := nilLifecycle.CheckServerReplacement(runtimeSetupConfigFixture(t, "https://ghostfol.io", true)); check != (ServerReplacementCheck{}) {
 		t.Fatalf("expected nil snapshot lifecycle to report no replacement requirement, got %#v", check)
@@ -807,6 +1036,27 @@ func TestSnapshotLifecycleAndWrapperNilBranches(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "build protected payload local user id") {
 		t.Fatalf("expected payload build failure from random identifier error, got %v", err)
 	}
+
+	var nilUnlockLifecycle *snapshotLifecycle
+	var nilUnlockResult = nilUnlockLifecycle.UnlockSelectedServerSnapshot(context.Background(), "https://ghostfol.io", "token")
+	if nilUnlockResult.ReportUnavailableReason != ReportFailureNoSyncedDataAvailable || nilUnlockResult.ProtectedData.HasReadableSnapshot || nilUnlockResult.ProtectedData.ServerOrigin != "" || nilUnlockResult.ProtectedData.ActivityCount != 0 || !nilUnlockResult.ProtectedData.LastSuccessfulSyncAt.IsZero() || len(nilUnlockResult.ProtectedData.AvailableReportYears) != 0 || nilUnlockResult.UnlockState != "" {
+		t.Fatalf("expected nil unlock lifecycle to report no synced data, got %#v", nilUnlockResult)
+	}
+
+	var unsupportedStore = runtimeSnapshotStore{
+		candidates: []snapshotstore.Candidate{runtimeSnapshotCandidateFixture("https://ghostfol.io", "snapshot-1")},
+		read: func(context.Context, snapshotstore.ReadRequest) (snapshotmodel.Payload, error) {
+			return snapshotmodel.Payload{}, snapshotstore.ErrUnsupportedStoredDataVersion
+		},
+	}
+	var unsupportedLifecycle = newSnapshotLifecycle(unsupportedStore, newActiveSnapshotState(), protectedPayloadBuilder{})
+	var unsupportedUnlockResult = unsupportedLifecycle.UnlockSelectedServerSnapshot(context.Background(), "https://ghostfol.io", "token")
+	if unsupportedUnlockResult.ReportUnavailableReason != ReportFailureUnsupportedStoredDataVersion {
+		t.Fatalf("expected unsupported stored-data version result, got %#v", unsupportedUnlockResult)
+	}
+	if unsupportedUnlockResult.UnlockState != "" {
+		t.Fatalf("expected unsupported stored-data version unlock to avoid exposing a context state, got %#v", unsupportedUnlockResult)
+	}
 }
 
 // TestSyncServiceUserFetchAndSnapshotWrapperBranches verifies the remaining
@@ -819,8 +1069,15 @@ func TestSyncServiceUserFetchAndSnapshotWrapperBranches(t *testing.T) {
 		config := runtimeSetupConfigFixture(t, "https://ghostfol.io", true)
 		service := &syncService{}
 		lifecycle := newSnapshotLifecycle(runtimeSnapshotStore{}, newActiveSnapshotState(), protectedPayloadBuilder{})
-		lifecycle.SetActiveSnapshot(snapshotstore.Candidate{SnapshotID: "active"}, snapshotmodel.Payload{SetupProfile: snapshotmodel.SetupProfile{ServerOrigin: "https://ghostfol.io"}})
-		if state := service.ProtectedDataState(); state != (ProtectedDataState{}) {
+		lifecycle.SetActiveSnapshot(snapshotstore.Candidate{SnapshotID: "active"}, snapshotmodel.Payload{
+			SetupProfile: snapshotmodel.SetupProfile{ServerOrigin: "https://ghostfol.io"},
+			ProtectedActivityCache: syncmodel.ProtectedActivityCache{
+				SyncedAt:             time.Unix(12, 0).UTC(),
+				ActivityCount:        3,
+				AvailableReportYears: []int{2024},
+			},
+		})
+		if state := service.ProtectedDataState(); state.HasReadableSnapshot || state.ServerOrigin != "" || state.ActivityCount != 0 || !state.LastSuccessfulSyncAt.IsZero() || len(state.AvailableReportYears) != 0 {
 			t.Fatalf("expected zero protected data state when snapshots are absent, got %#v", state)
 		}
 		if check := service.CheckServerReplacement(config); check != (ServerReplacementCheck{}) {
@@ -834,7 +1091,7 @@ func TestSyncServiceUserFetchAndSnapshotWrapperBranches(t *testing.T) {
 		}
 
 		service.snapshots = lifecycle
-		if state := service.ProtectedDataState(); !state.HasReadableSnapshot || state.ServerOrigin != "https://ghostfol.io" {
+		if state := service.ProtectedDataState(); !state.HasReadableSnapshot || state.ServerOrigin != "https://ghostfol.io" || state.ActivityCount != 3 || !state.LastSuccessfulSyncAt.Equal(time.Unix(12, 0).UTC()) || len(state.AvailableReportYears) != 1 || state.AvailableReportYears[0] != 2024 {
 			t.Fatalf("expected sync-service wrapper to delegate protected data state, got %#v", state)
 		}
 	})
@@ -880,6 +1137,105 @@ func TestSyncServiceUserFetchAndSnapshotWrapperBranches(t *testing.T) {
 			t.Fatalf("expected user-response contract failure, got %#v", outcome)
 		}
 	})
+}
+
+// TestSyncReportsProtectedDataAvailabilityHelpers verifies direct report
+// availability mapping and selected-server unlock delegation branches.
+// Authored by: OpenCode
+func TestSyncReportsProtectedDataAvailabilityHelpers(t *testing.T) {
+	t.Parallel()
+
+	if reason := syncReportsUnavailableReasonFromProtectedData(ProtectedDataState{}); reason != ReportFailureNoSyncedDataAvailable {
+		t.Fatalf("expected missing readable snapshot to report no synced data, got %q", reason)
+	}
+	if reason := syncReportsUnavailableReasonFromProtectedData(ProtectedDataState{HasReadableSnapshot: true}); reason != ReportFailureNoReportableYearsAvailable {
+		t.Fatalf("expected readable snapshot without years to report no reportable years, got %q", reason)
+	}
+	if reason := syncReportsUnavailableReasonFromProtectedData(ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}); reason != ReportFailureNone {
+		t.Fatalf("expected readable snapshot with years to report availability, got %q", reason)
+	}
+
+	var lifecycle = newSnapshotLifecycle(runtimeSnapshotStore{
+		candidates: []snapshotstore.Candidate{runtimeSnapshotCandidateFixture("https://ghostfol.io", "snapshot-1")},
+		read: func(context.Context, snapshotstore.ReadRequest) (snapshotmodel.Payload, error) {
+			return snapshotmodel.Payload{
+				SetupProfile: snapshotmodel.SetupProfile{ServerOrigin: "https://ghostfol.io"},
+				ProtectedActivityCache: syncmodel.ProtectedActivityCache{
+					AvailableReportYears: []int{2024},
+					ActivityCount:        1,
+				},
+			}, nil
+		},
+	}, newActiveSnapshotState(), protectedPayloadBuilder{})
+	var service = &syncService{snapshots: lifecycle}
+	var config = runtimeSetupConfigFixture(t, "https://ghostfol.io", true)
+	var result = service.UnlockSelectedServerSnapshot(context.Background(), config, "token")
+	if !result.ProtectedData.HasReadableSnapshot || result.ReportUnavailableReason != ReportFailureNone || result.UnlockState != SyncReportsUnlockStateSnapshotUnlocked {
+		t.Fatalf("expected sync-service unlock delegation to expose readable report data, got %#v", result)
+	}
+
+	var nilSnapshotService = &syncService{}
+	result = nilSnapshotService.UnlockSelectedServerSnapshot(context.Background(), config, "token")
+	if result.ReportUnavailableReason != ReportFailureNoSyncedDataAvailable {
+		t.Fatalf("expected nil snapshot lifecycle unlock to report no synced data, got %#v", result)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/api/v1/auth/anonymous":
+			_, _ = writer.Write([]byte(`{"authToken":"jwt"}`))
+		default:
+			writer.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	config = runtimeSetupConfigFixture(t, server.URL, true)
+	service = requireSyncService(t, NewSyncService(ghostfolioclient.New(server.Client()), time.Second, t.TempDir(), true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), runtimeSnapshotStore{}))
+	result = service.UnlockSelectedServerSnapshot(context.Background(), config, "token")
+	if result.UnlockState != SyncReportsUnlockStateAuthenticatedNewContext || result.FailureReason != SyncFailureNone || result.ProtectedData.HasReadableSnapshot {
+		t.Fatalf("expected snapshot miss with successful auth to open a new isolated context, got %#v", result)
+	}
+
+	rejectedServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/api/v1/auth/anonymous":
+			writer.WriteHeader(http.StatusForbidden)
+		default:
+			writer.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer rejectedServer.Close()
+	config = runtimeSetupConfigFixture(t, rejectedServer.URL, true)
+	service = requireSyncService(t, NewSyncService(ghostfolioclient.New(rejectedServer.Client()), time.Second, t.TempDir(), true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), runtimeSnapshotStore{}))
+	result = service.UnlockSelectedServerSnapshot(context.Background(), config, "token")
+	if result.UnlockState != SyncReportsUnlockStateRejectedToken || result.FailureReason != SyncFailureRejectedToken {
+		t.Fatalf("expected snapshot miss with rejected auth to stay rejected, got %#v", result)
+	}
+
+	service = &syncService{snapshots: newSnapshotLifecycle(runtimeSnapshotStore{}, newActiveSnapshotState(), protectedPayloadBuilder{})}
+	result = service.UnlockSelectedServerSnapshot(context.Background(), config, "token")
+	if result.UnlockState != SyncReportsUnlockStateRejectedToken || result.FailureReason != SyncFailureRejectedToken {
+		t.Fatalf("expected missing runtime client to reject unlock retry, got %#v", result)
+	}
+
+	timeoutServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/api/v1/auth/anonymous":
+			writer.WriteHeader(http.StatusGatewayTimeout)
+		default:
+			writer.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer timeoutServer.Close()
+	config = runtimeSetupConfigFixture(t, timeoutServer.URL, true)
+	service = requireSyncService(t, NewSyncService(ghostfolioclient.New(timeoutServer.Client()), time.Second, t.TempDir(), true, decimalsupport.NewService(), syncnormalize.NewNormalizer(), syncvalidate.NewValidator(), runtimeSnapshotStore{}))
+	result = service.UnlockSelectedServerSnapshot(context.Background(), config, "token")
+	if result.UnlockState != "" || result.FailureReason != SyncFailureUnsuccessfulServerResponse {
+		t.Fatalf("expected non-rejected auth failure to map through boundary failure reason, got %#v", result)
+	}
 }
 
 // runtimeDiagnosticRequestFixture returns one structured diagnostic-report
@@ -951,6 +1307,7 @@ func runtimeCurrencyMismatchRecordFixture(t *testing.T) syncmodel.ActivityRecord
 		SourceID:              "buy-1",
 		OccurredAt:            "2024-01-01T10:00:00Z",
 		ActivityType:          syncmodel.ActivityTypeBuy,
+		AssetIdentityKey:      "asset-btc-runtime-currency-mismatch-001",
 		AssetSymbol:           "BTC",
 		AssetName:             "Bitcoin",
 		OrderCurrency:         "",

@@ -32,7 +32,7 @@ func TestSyncDiagnosticReportFlowPromptsInProductionAndWritesOnExplicitChoice(t 
 	baseDir := t.TempDir()
 	server := newGhostfolioStorageTLSServer(t, []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
+		ActivitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"id":"asset-btc-diagnostic-001","symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
 	}})
 	config, err := configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, server.URL, false, time.Now())
 	if err != nil {
@@ -56,6 +56,9 @@ func TestSyncDiagnosticReportFlowPromptsInProductionAndWritesOnExplicitChoice(t 
 	model, cmd := startSyncAttempt(t, model)
 	model = applySyncBatch(t, model, cmd)
 
+	if model.ActiveScreen() != "sync_reports_menu" {
+		t.Fatalf("expected sync and reports menu after context sync failure, got %s", model.ActiveScreen())
+	}
 	content := model.View().Content
 	if !strings.Contains(content, "Generate Diagnostic Report") {
 		t.Fatalf("expected production diagnostic-report prompt, got %q", content)
@@ -92,8 +95,11 @@ func TestSyncDiagnosticReportFlowPromptsInProductionAndWritesOnExplicitChoice(t 
 	if len(records) == 0 {
 		t.Fatalf("expected production diagnostic report records")
 	}
-	if records[0].Quantity == "1" || records[0].AssetProfileUnitPrice == "100" || records[0].BaseGrossValue == "100" {
+	if records[0].Quantity != nil || records[0].AssetProfileUnitPrice != nil || records[0].BaseGrossValue != nil {
 		t.Fatalf("expected production report to redact financial values, got %q", reportText)
+	}
+	if records[0].OrderCurrency != nil {
+		t.Fatalf("expected absent source currency to serialize as explicit null, got %q", reportText)
 	}
 }
 
@@ -103,7 +109,7 @@ func TestSyncDiagnosticReportFlowGeneratesAutomaticallyInExplicitDevelopmentMode
 	baseDir := t.TempDir()
 	server := newGhostfolioStorageServer(t, []storagePageFixture{{
 		Count:          1,
-		ActivitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
+		ActivitiesJSON: `[{"id":"unsupported-1","date":"2024-01-02T10:00:00Z","type":"TRANSFER","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"id":"asset-btc-diagnostic-001","symbol":"BTC","name":"Bitcoin","currency":"USD"}}]`,
 	}})
 	config, err := configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, server.URL, true, time.Now())
 	if err != nil {
@@ -127,6 +133,9 @@ func TestSyncDiagnosticReportFlowGeneratesAutomaticallyInExplicitDevelopmentMode
 	model, cmd := startSyncAttempt(t, model)
 	model = applySyncBatch(t, model, cmd)
 
+	if model.ActiveScreen() != "sync_reports_menu" {
+		t.Fatalf("expected sync and reports menu after context sync failure, got %s", model.ActiveScreen())
+	}
 	content := model.View().Content
 	if strings.Contains(content, "Generate Diagnostic Report") {
 		t.Fatalf("expected explicit development mode to skip the prompt, got %q", content)
@@ -151,7 +160,7 @@ func TestSyncDiagnosticReportFlowGeneratesAutomaticallyInExplicitDevelopmentMode
 	if len(records) == 0 {
 		t.Fatalf("expected development diagnostic report records")
 	}
-	if records[0].Quantity != "1" || records[0].AssetProfileUnitPrice != "100" || records[0].BaseGrossValue != "100" {
+	if records[0].Quantity == nil || *records[0].Quantity != "1" || records[0].AssetProfileUnitPrice == nil || *records[0].AssetProfileUnitPrice != "100" || records[0].BaseGrossValue == nil || *records[0].BaseGrossValue != "100" {
 		t.Fatalf("expected development report to retain source financial context, got %q", reportText)
 	}
 }
@@ -220,6 +229,9 @@ func mustDiagnosticFiles(t *testing.T, baseDir string) []string {
 
 	entries, err := os.ReadDir(filepath.Join(baseDir, "ghostfolio-cryptogains", "diagnostics"))
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		t.Fatalf("read diagnostics directory: %v", err)
 	}
 
@@ -231,11 +243,12 @@ func mustDiagnosticFiles(t *testing.T, baseDir string) []string {
 }
 
 type diagnosticReportRecord struct {
-	Quantity              string `json:"quantity"`
-	OrderUnitPrice        string `json:"order_unit_price"`
-	OrderGrossValue       string `json:"order_gross_value"`
-	AssetProfileUnitPrice string `json:"asset_profile_unit_price"`
-	BaseGrossValue        string `json:"base_gross_value"`
+	Quantity              *string `json:"quantity"`
+	OrderUnitPrice        *string `json:"order_unit_price"`
+	OrderGrossValue       *string `json:"order_gross_value"`
+	AssetProfileUnitPrice *string `json:"asset_profile_unit_price"`
+	BaseGrossValue        *string `json:"base_gross_value"`
+	OrderCurrency         *string `json:"order_currency"`
 }
 
 type diagnosticReportPayload struct {

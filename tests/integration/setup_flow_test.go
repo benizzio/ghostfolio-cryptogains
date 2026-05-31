@@ -42,6 +42,10 @@ func (integrationSyncService) ProtectedDataState() runtime.ProtectedDataState {
 	return runtime.ProtectedDataState{}
 }
 
+func (integrationSyncService) UnlockSelectedServerSnapshot(context.Context, configmodel.AppSetupConfig, string) runtime.SyncReportsContextResult {
+	return runtime.SyncReportsContextResult{UnlockState: runtime.SyncReportsUnlockStateAuthenticatedNewContext, ReportUnavailableReason: runtime.ReportFailureNoSyncedDataAvailable}
+}
+
 func (integrationSyncService) CheckServerReplacement(configmodel.AppSetupConfig) runtime.ServerReplacementCheck {
 	return runtime.ServerReplacementCheck{}
 }
@@ -167,7 +171,7 @@ func TestSetupFileRemovalAfterStartupDoesNotBreakCurrentRun(t *testing.T) {
 	_ = testutil.RunCmd(cmd)
 	model = assertFlowModel(t, updated)
 
-	if model.ActiveScreen() != "sync" {
+	if model.ActiveScreen() != "sync_reports_unlock" {
 		t.Fatalf("expected current run to keep working after setup file removal")
 	}
 }

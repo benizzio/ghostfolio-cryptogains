@@ -79,7 +79,7 @@ func SyncResultScreenView(params SyncResultScreenParams) string {
 // Authored by: OpenCode
 func syncSummaryText(outcome runtime.SyncOutcome) string {
 	if outcome.Success {
-		return "Activity data was stored securely for future use."
+		return component.ProtectedDataStoredMessage
 	}
 	return "Sync and secure storage did not succeed."
 }
@@ -89,17 +89,17 @@ func syncSummaryText(outcome runtime.SyncOutcome) string {
 // Authored by: OpenCode
 func syncFollowUpText(outcome runtime.SyncOutcome, busy bool) string {
 	if outcome.Success {
-		return "No report-generation, report-preview, or cached-data browsing workflow is available in this slice."
+		return "Return to Sync and Reports to generate a capital gains report from the newly stored protected data."
 	}
 	if busy {
-		return "Generating a local synced-data diagnostic report for this failure."
+		return component.SyncDiagnosticGeneratingMessage
 	}
 
 	if outcome.Diagnostic.Path != "" {
-		return fmt.Sprintf("A synced-data diagnostic report was generated at %s.", outcome.Diagnostic.Path)
+		return component.SyncDiagnosticReportGeneratedMessage(outcome.Diagnostic.Path)
 	}
 	if outcome.Diagnostic.Eligible {
-		return "You can generate a synced-data diagnostic report for this failure from this screen."
+		return component.SyncDiagnosticAvailableFromScreenMessage
 	}
 
 	switch outcome.FailureReason {
@@ -127,7 +127,7 @@ func resultStatusText(outcome runtime.SyncOutcome, statusMessage string) string 
 		return statusMessage
 	}
 	if outcome.Diagnostic.Path != "" {
-		return "Results are transient and are not shown again after restart."
+		return component.ResultsTransientStatusText
 	}
-	return "Results are transient and are not shown again after restart."
+	return component.ResultsTransientStatusText
 }

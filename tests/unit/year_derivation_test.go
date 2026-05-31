@@ -31,8 +31,8 @@ func TestYearDerivationUsesSourceTimestampOffset(t *testing.T) {
 	}
 
 	cache, err := syncnormalize.NewNormalizer().Normalize([]syncmodel.ActivityRecord{
-		{SourceID: "activity-1", OccurredAt: "2024-12-31T23:30:00-02:00", ActivityType: syncmodel.ActivityTypeBuy, AssetSymbol: "BTC", OrderCurrency: "USD", BaseCurrency: "USD", Quantity: quantity, OrderUnitPrice: &unitPrice, OrderGrossValue: &grossValue},
-		{SourceID: "activity-2", OccurredAt: "2025-01-01T00:15:00+02:00", ActivityType: syncmodel.ActivityTypeBuy, AssetSymbol: "BTC", OrderCurrency: "USD", BaseCurrency: "USD", Quantity: quantity, OrderUnitPrice: &unitPrice, OrderGrossValue: &grossValue},
+		{SourceID: "activity-1", OccurredAt: "2024-12-31T23:30:00-02:00", ActivityType: syncmodel.ActivityTypeBuy, AssetIdentityKey: "asset-btc-year-001", AssetSymbol: "BTC", OrderCurrency: "USD", BaseCurrency: "USD", Quantity: quantity, OrderUnitPrice: &unitPrice, OrderGrossValue: &grossValue},
+		{SourceID: "activity-2", OccurredAt: "2025-01-01T00:15:00+02:00", ActivityType: syncmodel.ActivityTypeBuy, AssetIdentityKey: "asset-btc-year-001", AssetSymbol: "BTC", OrderCurrency: "USD", BaseCurrency: "USD", Quantity: quantity, OrderUnitPrice: &unitPrice, OrderGrossValue: &grossValue},
 	})
 	if err != nil {
 		t.Fatalf("normalize: %v", err)

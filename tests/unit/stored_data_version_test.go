@@ -46,7 +46,7 @@ func TestValidatePayloadCompatibilityRejectsUnsupportedPayloadAndActivityVersion
 			},
 		},
 		{
-			name: "previous activity model",
+			name: "previous activity model without asset identity key",
 			mutate: func(version snapshotmodel.StoredDataVersion) snapshotmodel.StoredDataVersion {
 				version.ActivityModelVersion--
 				return version
@@ -67,6 +67,10 @@ func TestValidatePayloadCompatibilityRejectsUnsupportedPayloadAndActivityVersion
 	}
 }
 
+// TestSupportsStoredDataVersionAcceptsCurrentVersions verifies the corrected
+// `SymbolProfile.id` mapping does not require a new protected activity-model
+// version because the persisted `AssetIdentityKey` payload shape is unchanged.
+// Authored by: OpenCode
 func TestSupportsStoredDataVersionAcceptsCurrentVersions(t *testing.T) {
 	t.Parallel()
 

@@ -11,6 +11,7 @@ import (
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/dto"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -246,10 +247,10 @@ func requireDerivableUnitPrice(entry dto.ActivityPageEntry) error {
 	}
 	grossValue, _, err := decimalsupport.ParseNumber(selectGrossValue(entry))
 	if err != nil {
-		return fmt.Errorf("activity basis input must support exact unit-price derivation: %w", err)
+		return fmt.Errorf("activity basis input must support unit-price derivation: %w", err)
 	}
-	if _, _, err := decimalsupport.DivideExact(grossValue, quantity); err != nil {
-		return fmt.Errorf("activity basis input must support exact unit-price derivation: %w", err)
+	if _, err := deriveRoundedUnitPrice(grossValue, quantity); err != nil {
+		return fmt.Errorf("activity basis input must support unit-price derivation: %w", err)
 	}
 
 	return nil
@@ -273,6 +274,23 @@ func requireDerivableGrossValue(entry dto.ActivityPageEntry) error {
 	}
 
 	return nil
+}
+
+// deriveRoundedUnitPrice accepts finite same-tier division inputs that may need
+// 16-decimal round-half-up handling later in reporting.
+// Authored by: OpenCode
+func deriveRoundedUnitPrice(grossValue apd.Decimal, quantity apd.Decimal) (apd.Decimal, error) {
+	if err := supportmath.RequireFinite(grossValue); err != nil {
+		return apd.Decimal{}, fmt.Errorf("prepare gross value for unit-price derivation: %w", err)
+	}
+	if err := supportmath.RequireFinite(quantity); err != nil {
+		return apd.Decimal{}, fmt.Errorf("prepare quantity for unit-price derivation: %w", err)
+	}
+	if quantity.Sign() == 0 {
+		return apd.Decimal{}, fmt.Errorf("unit-price derivation requires a non-zero quantity")
+	}
+
+	return supportmath.DivideFiniteRoundHalfUp(grossValue, quantity)
 }
 
 // selectGrossValue applies the shared DTO gross-value fallback rule for

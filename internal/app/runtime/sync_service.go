@@ -32,13 +32,6 @@ type SyncRequest struct {
 	ConfirmServerReplacement bool
 }
 
-// ProtectedDataState summarizes whether readable protected data is active in memory for this run.
-// Authored by: OpenCode
-type ProtectedDataState struct {
-	HasReadableSnapshot bool
-	ServerOrigin        string
-}
-
 // ServerReplacementCheck reports whether the selected server would replace the active readable snapshot.
 // Authored by: OpenCode
 type ServerReplacementCheck struct {
@@ -66,6 +59,11 @@ type SyncService interface {
 	// ProtectedDataState reports whether a readable protected snapshot is active for this run.
 	// Authored by: OpenCode
 	ProtectedDataState() ProtectedDataState
+
+	// UnlockSelectedServerSnapshot tries to unlock one selected-server protected
+	// snapshot for the active Sync and Reports context without forcing a new sync.
+	// Authored by: OpenCode
+	UnlockSelectedServerSnapshot(context.Context, configmodel.AppSetupConfig, string) SyncReportsContextResult
 
 	// CheckServerReplacement compares the selected setup server with the active readable snapshot.
 	// Authored by: OpenCode
@@ -106,6 +104,31 @@ func NewSyncService(
 	validatorService syncvalidate.Validator,
 	snapshots snapshotstore.Store,
 ) SyncService {
+	return newSyncService(
+		client,
+		requestTimeout,
+		baseConfigDir,
+		allowDevHTTP,
+		decimalService,
+		normalizer,
+		validatorService,
+		newSnapshotLifecycle(snapshots, newActiveSnapshotState(), protectedPayloadBuilder{}),
+	)
+}
+
+// newSyncService creates the runtime sync service around one shared snapshot
+// lifecycle.
+// Authored by: OpenCode
+func newSyncService(
+	client *ghostfolioclient.Client,
+	requestTimeout time.Duration,
+	baseConfigDir string,
+	allowDevHTTP bool,
+	decimalService decimalsupport.Service,
+	normalizer syncnormalize.Normalizer,
+	validatorService syncvalidate.Validator,
+	snapshots *snapshotLifecycle,
+) SyncService {
 	if client == nil {
 		client = ghostfolioclient.New(nil)
 	}
@@ -126,7 +149,7 @@ func NewSyncService(
 		decimalService:    decimalService,
 		normalizer:        normalizer,
 		validator:         validatorService,
-		snapshots:         newSnapshotLifecycle(snapshots, newActiveSnapshotState(), protectedPayloadBuilder{}),
+		snapshots:         snapshots,
 		diagnosticReports: newDiagnosticReportService(baseConfigDir),
 	}
 }
@@ -184,7 +207,13 @@ func (s *syncService) Run(ctx context.Context, request SyncRequest) SyncOutcome 
 		return finalizeContractFailure(&session, &attempt, err)
 	}
 
-	cache, outcome, ok := s.buildProtectedActivityCache(timedContext, historyResponse, request.SecurityToken, &session, &attempt)
+	cache, outcome, ok := s.buildProtectedActivityCache(
+		timedContext,
+		historyResponse,
+		request.SecurityToken,
+		&session,
+		&attempt,
+	)
 	if !ok {
 		return outcome
 	}
@@ -202,12 +231,14 @@ func (s *syncService) Run(ctx context.Context, request SyncRequest) SyncOutcome 
 	}
 
 	attempt.Status = AttemptStatusPersisting
-	err = s.snapshots.Persist(timedContext, snapshotPersistRequest{
-		Config:        request.Config,
-		SecurityToken: request.SecurityToken,
-		Cache:         cache,
-		Existing:      unlockedSnapshot,
-	})
+	err = s.snapshots.Persist(
+		timedContext, snapshotPersistRequest{
+			Config:        request.Config,
+			SecurityToken: request.SecurityToken,
+			Cache:         cache,
+			Existing:      unlockedSnapshot,
+		},
+	)
 	if err != nil {
 		return s.finalizePersistenceFailure(timedContext, &session, &attempt, err, request.SecurityToken)
 	}
@@ -248,10 +279,12 @@ func (s *syncService) prepareSyncAttempt(
 	attempt *SyncAttempt,
 ) (snapshotUnlockResult, SyncOutcome, bool) {
 	if s.snapshots == nil {
-		return snapshotUnlockResult{}, s.finalizeSyncFailure(ctx, session, attempt, SyncFailureIncompatibleNewSyncData, syncmodel.DiagnosticContext{
-			FailureStage:  syncmodel.DiagnosticFailureStageProtectedPersistence,
-			FailureDetail: "protected snapshot store is unavailable",
-		}), false
+		return snapshotUnlockResult{}, s.finalizeSyncFailure(
+			ctx, session, attempt, SyncFailureIncompatibleNewSyncData, syncmodel.DiagnosticContext{
+				FailureStage:  syncmodel.DiagnosticFailureStageProtectedPersistence,
+				FailureDetail: "protected snapshot store is unavailable",
+			},
+		), false
 	}
 
 	var outcome, ok = s.confirmServerReplacement(ctx, request, session, attempt)
@@ -282,7 +315,13 @@ func (s *syncService) confirmServerReplacement(
 	}
 	if !request.ConfirmServerReplacement {
 		attempt.Status = AttemptStatusAborted
-		return s.finalizeSyncFailure(ctx, session, attempt, SyncFailureServerReplacementCancelled, syncmodel.DiagnosticContext{}), false
+		return s.finalizeSyncFailure(
+			ctx,
+			session,
+			attempt,
+			SyncFailureServerReplacementCancelled,
+			syncmodel.DiagnosticContext{},
+		), false
 	}
 
 	attempt.ServerMismatchConfirmed = true
@@ -303,10 +342,12 @@ func (s *syncService) finalizeUnlockFailure(
 		reason = SyncFailureUnsupportedStoredDataVersion
 	}
 
-	return s.finalizeSyncFailure(ctx, session, attempt, reason, syncmodel.DiagnosticContext{
-		FailureStage:  syncmodel.DiagnosticFailureStageStoredDataCompatibility,
-		FailureDetail: redact.ErrorText(err, securityToken),
-	})
+	return s.finalizeSyncFailure(
+		ctx, session, attempt, reason, syncmodel.DiagnosticContext{
+			FailureStage:  syncmodel.DiagnosticFailureStageStoredDataCompatibility,
+			FailureDetail: redact.ErrorText(err, securityToken),
+		},
+	)
 }
 
 // buildProtectedActivityCache maps, normalizes, and returns the protected activity cache for one retrieved history.
@@ -320,7 +361,11 @@ func (s *syncService) buildProtectedActivityCache(
 ) (syncmodel.ProtectedActivityCache, SyncOutcome, bool) {
 	attempt.Status = AttemptStatusNormalizing
 
-	records, err := ghostfoliomapper.MapActivities(historyResponse.Activities, session.UserBaseCurrency, s.decimalService)
+	records, err := ghostfoliomapper.MapActivities(
+		historyResponse.Activities,
+		session.UserBaseCurrency,
+		s.decimalService,
+	)
 	if err != nil {
 		return syncmodel.ProtectedActivityCache{}, s.finalizeSyncFailure(
 			ctx,
@@ -359,10 +404,12 @@ func (s *syncService) finalizePersistenceFailure(
 		reason = SyncFailureUnsupportedStoredDataVersion
 	}
 
-	return s.finalizeSyncFailure(ctx, session, attempt, reason, syncmodel.DiagnosticContext{
-		FailureStage:  syncmodel.DiagnosticFailureStageProtectedPersistence,
-		FailureDetail: redact.ErrorText(err, securityToken),
-	})
+	return s.finalizeSyncFailure(
+		ctx, session, attempt, reason, syncmodel.DiagnosticContext{
+			FailureStage:  syncmodel.DiagnosticFailureStageProtectedPersistence,
+			FailureDetail: redact.ErrorText(err, securityToken),
+		},
+	)
 }
 
 // GenerateDiagnosticReport writes one local synced-data diagnostic report for an eligible failure.
@@ -490,12 +537,13 @@ func diagnosticContextFromError(
 	defaultStage syncmodel.DiagnosticFailureStage,
 	secrets ...string,
 ) syncmodel.DiagnosticContext {
-	var context = syncmodel.DiagnosticContext{
-		FailureStage:  defaultStage,
-		FailureDetail: redact.ErrorText(err, secrets...),
+	var diagnosticContext = syncmodel.DiagnosticContext{
+		FailureStage:      defaultStage,
+		FailureDetail:     diagnosticFailureDetail(err, secrets...),
+		FailureCauseChain: diagnosticCauseChainFromError(err, secrets...),
 	}
 	if err == nil {
-		return context
+		return diagnosticContext
 	}
 
 	var carrier interface {
@@ -505,15 +553,115 @@ func diagnosticContextFromError(
 		DiagnosticContext() syncmodel.DiagnosticContext
 	}); ok {
 		carrier = typed
-		context = carrier.DiagnosticContext()
-		if context.FailureStage == "" {
-			context.FailureStage = defaultStage
+		diagnosticContext = carrier.DiagnosticContext()
+		if diagnosticContext.FailureStage == "" {
+			diagnosticContext.FailureStage = defaultStage
 		}
-		context.FailureDetail = redact.Text(context.FailureDetail, secrets...)
-		return context
+		diagnosticContext.FailureDetail = redact.Text(diagnosticContext.FailureDetail, secrets...)
+		diagnosticContext.FailureCauseChain = redactDiagnosticCauseChain(
+			diagnosticContext.FailureCauseChain,
+			secrets...,
+		)
+		if diagnosticContext.FailureDetail == "" {
+			diagnosticContext.FailureDetail = diagnosticFailureDetail(err, secrets...)
+		}
+		if len(diagnosticContext.FailureCauseChain) == 0 {
+			diagnosticContext.FailureCauseChain = diagnosticCauseChainFromError(err, secrets...)
+		}
+		return diagnosticContext
 	}
 
-	return context
+	return diagnosticContext
+}
+
+// diagnosticFailureDetail keeps the actionable outer failure detail separate
+// from any wrapped lower-level cause text.
+// Authored by: OpenCode
+func diagnosticFailureDetail(err error, secrets ...string) string {
+	if err == nil {
+		return ""
+	}
+
+	var detail = strings.TrimSpace(redact.ErrorText(err, secrets...))
+	var cause = unwrapSingleError(err)
+	if cause == nil {
+		return detail
+	}
+
+	var causeDetail = strings.TrimSpace(redact.ErrorText(cause, secrets...))
+	if causeDetail == "" {
+		return detail
+	}
+
+	var suffix = ": " + causeDetail
+	if strings.HasSuffix(detail, suffix) {
+		return strings.TrimSpace(strings.TrimSuffix(detail, suffix))
+	}
+
+	return detail
+}
+
+// diagnosticCauseChainFromError extracts one deterministic outer-to-inner cause
+// chain from a wrapped error while keeping obvious secrets redacted.
+// Authored by: OpenCode
+func diagnosticCauseChainFromError(err error, secrets ...string) []string {
+	if err == nil {
+		return nil
+	}
+
+	var chain []string
+	var outerDetail = diagnosticFailureDetail(err, secrets...)
+	if outerDetail != "" {
+		chain = append(chain, outerDetail)
+	}
+
+	for current := unwrapSingleError(err); current != nil; current = unwrapSingleError(current) {
+		var detail = strings.TrimSpace(redact.ErrorText(current, secrets...))
+		if detail == "" {
+			continue
+		}
+		if len(chain) > 0 && chain[len(chain)-1] == detail {
+			continue
+		}
+		chain = append(chain, detail)
+	}
+
+	return chain
+}
+
+// redactDiagnosticCauseChain redacts secrets from one precomputed cause chain.
+// Authored by: OpenCode
+func redactDiagnosticCauseChain(entries []string, secrets ...string) []string {
+	if len(entries) == 0 {
+		return nil
+	}
+
+	var chain = make([]string, 0, len(entries))
+	for _, entry := range entries {
+		var detail = strings.TrimSpace(redact.Text(entry, secrets...))
+		if detail == "" {
+			continue
+		}
+		if len(chain) > 0 && chain[len(chain)-1] == detail {
+			continue
+		}
+		chain = append(chain, detail)
+	}
+
+	return chain
+}
+
+// unwrapSingleError follows one wrapped-error edge when available.
+// Authored by: OpenCode
+func unwrapSingleError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var unwrapper interface{ Unwrap() error }
+	if errors.As(err, &unwrapper) {
+		return unwrapper.Unwrap()
+	}
+	return nil
 }
 
 // clearSessionSecrets removes transient secret material from the active session.
@@ -524,6 +672,19 @@ func clearSessionSecrets(session *GhostfolioSession) {
 	session.UserBaseCurrency = ""
 }
 
+// syncReportsUnavailableReasonFromProtectedData derives the current report
+// availability gate from the readable selected-server protected-data summary.
+// Authored by: OpenCode
+func syncReportsUnavailableReasonFromProtectedData(state ProtectedDataState) ReportFailureReason {
+	if !state.HasReadableSnapshot {
+		return ReportFailureNoSyncedDataAvailable
+	}
+	if len(state.AvailableReportYears) == 0 {
+		return ReportFailureNoReportableYearsAvailable
+	}
+	return ReportFailureNone
+}
+
 // ProtectedDataState reports whether a readable protected snapshot is active for this run.
 // Authored by: OpenCode
 func (s *syncService) ProtectedDataState() ProtectedDataState {
@@ -532,6 +693,62 @@ func (s *syncService) ProtectedDataState() ProtectedDataState {
 	}
 
 	return s.snapshots.ProtectedDataState()
+}
+
+// UnlockSelectedServerSnapshot tries to unlock one selected-server protected
+// snapshot for the active Sync and Reports context without forcing a new sync.
+// Authored by: OpenCode
+func (s *syncService) UnlockSelectedServerSnapshot(
+	ctx context.Context,
+	config configmodel.AppSetupConfig,
+	securityToken string,
+) SyncReportsContextResult {
+	if s.snapshots == nil {
+		return SyncReportsContextResult{ReportUnavailableReason: ReportFailureNoSyncedDataAvailable}
+	}
+
+	var result = s.snapshots.UnlockSelectedServerSnapshot(ctx, config.ServerOrigin, securityToken)
+	if result.UnlockState == SyncReportsUnlockStateSnapshotUnlocked || result.ReportUnavailableReason == ReportFailureUnsupportedStoredDataVersion {
+		return result
+	}
+
+	if s.client == nil {
+		result.UnlockState = SyncReportsUnlockStateRejectedToken
+		result.FailureReason = SyncFailureRejectedToken
+		return result
+	}
+
+	var timedContext, cancel = context.WithTimeout(ctx, s.requestTimeout)
+	defer cancel()
+
+	_, err := s.client.Authenticate(timedContext, config.ServerOrigin, securityToken)
+	if err == nil {
+		result.UnlockState = SyncReportsUnlockStateAuthenticatedNewContext
+		result.FailureReason = SyncFailureNone
+		return result
+	}
+
+	if requestFailure, ok := errors.AsType[*ghostfolioclient.RequestFailure](err); ok && requestFailure.Category == ghostfolioclient.FailureRejectedToken {
+		result.UnlockState = SyncReportsUnlockStateRejectedToken
+		result.FailureReason = SyncFailureRejectedToken
+		return result
+	}
+
+	var failureReason = syncFailureReasonFromBoundary(syncFailureCategory(err))
+	result.UnlockState = ""
+	result.FailureReason = failureReason
+	return result
+}
+
+// syncFailureCategory extracts the Ghostfolio boundary category for one runtime
+// unlock authentication failure.
+// Authored by: OpenCode
+func syncFailureCategory(err error) ghostfolioclient.FailureCategory {
+	if requestFailure, ok := errors.AsType[*ghostfolioclient.RequestFailure](err); ok {
+		return requestFailure.Category
+	}
+
+	return ghostfolioclient.FailureConnectivityProblem
 }
 
 // CheckServerReplacement compares the selected server against the active readable snapshot.

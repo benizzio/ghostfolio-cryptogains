@@ -214,15 +214,16 @@ func unitActivityRecord(
 	}
 
 	record := syncmodel.ActivityRecord{
-		SourceID:        sourceID,
-		OccurredAt:      occurredAt,
-		ActivityType:    activityType,
-		AssetSymbol:     assetSymbol,
-		OrderCurrency:   "USD",
-		BaseCurrency:    "USD",
-		Quantity:        parsedQuantity,
-		OrderUnitPrice:  &parsedUnitPrice,
-		OrderGrossValue: &parsedGrossValue,
+		SourceID:         sourceID,
+		OccurredAt:       occurredAt,
+		ActivityType:     activityType,
+		AssetIdentityKey: "asset-btc-unit-001",
+		AssetSymbol:      assetSymbol,
+		OrderCurrency:    "USD",
+		BaseCurrency:     "USD",
+		Quantity:         parsedQuantity,
+		OrderUnitPrice:   &parsedUnitPrice,
+		OrderGrossValue:  &parsedGrossValue,
 	}
 	if mutate != nil {
 		mutate(&record)

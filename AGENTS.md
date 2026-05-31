@@ -1,6 +1,6 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
-shell commands, and other important information, read `specs/003-store-activity-data/plan.md`
+shell commands, and other important information, read `specs/005-generate-gains-report/plan.md`
 <!-- SPECKIT END -->
 
 <!--suppress HtmlUnknownTag -->
@@ -92,8 +92,9 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
 
 - Shared support:
   - `internal/support/decimal/` centralizes exact-decimal parsing and canonical formatting.
+  - `internal/support/math/` centralizes math implementations and calculation code.
   - `internal/support/redact/` centralizes safe error and diagnostic redaction.
-  - Prefer reusing these helpers instead of duplicating formatting or redaction logic in runtime packages.
+  - Prefer reusing these helpers instead of duplicating formatting or redaction logic in runtime packages. General-purpose code should go here
 
 - TUI:
   - `internal/tui/flow/` owns the root Bubble Tea model, screen routing, async command wiring, and workflow state transitions.
@@ -142,6 +143,15 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
   should be made to split it
   - for Go code, use `github.com/uudashr/gocognit` to measure it
   - test code does not need to follow this rule
+- Single Responsibility Principle (SRP) and decomposition SPECIAL instructions:
+  - Go files should also be part of SRP and should contain code related to a single responsibility. Files that are too 
+    long should be evaluated to be decomposed
+    - For Go `struct` that contains methods, the type declaration and its methods and "newX" builder functions should 
+      ALWAYS be in the same file for higher cohesion. To follow SRP, if a file containing multiple types gets too long, 
+      they should be split in a file per type and its methods/function.
+  - the Domain Driven Design concept of "Layered Architecture" should be also considered as part of an SRP analysis.
+    Modules that contain domain or application code should not be mixed with infrastructure, utility, or generalizable 
+    and reusable code
 
 </LiteratureAndIndustryReferences>
 

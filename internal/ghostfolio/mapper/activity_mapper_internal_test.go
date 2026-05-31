@@ -49,6 +49,9 @@ func TestMapActivityHandlesOptionalValuesAndScopeBranches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("map activity: %v", err)
 	}
+	if record.AssetIdentityKey != "asset-btc-001" {
+		t.Fatalf("expected persisted asset identity key, got %#v", record.AssetIdentityKey)
+	}
 	orderGrossValue, err := decimalsupport.CanonicalStringPointer(record.OrderGrossValue)
 	if err != nil {
 		t.Fatalf("canonical order gross value: %v", err)
@@ -104,14 +107,56 @@ func TestMapActivityHandlesOptionalValuesAndScopeBranches(t *testing.T) {
 	}
 
 	entry = validActivityPageEntry()
+	entry.SymbolProfile.ID = ""
+	record, err = MapActivity(entry, "USD", decimalsupport.NewService())
+	if err != nil {
+		t.Fatalf("map activity with missing asset identity key: %v", err)
+	}
+	if record.AssetIdentityKey != "" {
+		t.Fatalf("expected missing SymbolProfile.id not to fall back to display fields, got %#v", record.AssetIdentityKey)
+	}
+
+	entry = validActivityPageEntry()
 	entry.ID = "  activity-2  "
 	entry.Date = "  2024-01-01T10:00:00Z  "
+	entry.SymbolProfile.ID = "  asset-btc-002  "
 	record, err = MapActivity(entry, "USD", decimalsupport.NewService())
 	if err != nil {
 		t.Fatalf("map activity with padded identifiers: %v", err)
 	}
-	if record.SourceID != "activity-2" || record.OccurredAt != "2024-01-01T10:00:00Z" {
+	if record.SourceID != "activity-2" || record.OccurredAt != "2024-01-01T10:00:00Z" || record.AssetIdentityKey != "asset-btc-002" {
 		t.Fatalf("expected stored identity fields to be trimmed, got %#v", record)
+	}
+}
+
+// TestMapActivitiesPreservesAssetIdentityKeyFromDecodedSymbolProfileID verifies
+// JSON decoding and activity mapping preserve the upstream nested
+// `Activity.SymbolProfile.id` value as the stored asset identity key.
+// Authored by: OpenCode
+func TestMapActivitiesPreservesAssetIdentityKeyFromDecodedSymbolProfileID(t *testing.T) {
+	t.Parallel()
+
+	var response dto.ActivityPageResponse
+	var rawResponse = `{"activities":[{"id":"activity-json","date":"2024-01-01T10:00:00Z","type":"BUY","quantity":1,"valueInBaseCurrency":100,"feeInBaseCurrency":0,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"id":"asset-btc-decoded-001","symbol":"BTC","name":"Bitcoin","currency":"USD"}}],"count":1}`
+	if err := json.Unmarshal([]byte(rawResponse), &response); err != nil {
+		t.Fatalf("unmarshal activity page response: %v", err)
+	}
+	if len(response.Activities) != 1 {
+		t.Fatalf("expected one decoded activity, got %d", len(response.Activities))
+	}
+	if response.Activities[0].SymbolProfile.ID != "asset-btc-decoded-001" {
+		t.Fatalf("expected decoded SymbolProfile.id, got %#v", response.Activities[0].SymbolProfile)
+	}
+
+	records, err := MapActivities(response.Activities, "USD", decimalsupport.NewService())
+	if err != nil {
+		t.Fatalf("map decoded activities: %v", err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("expected one mapped record, got %d", len(records))
+	}
+	if records[0].AssetIdentityKey != "asset-btc-decoded-001" {
+		t.Fatalf("expected asset identity key from decoded SymbolProfile.id, got %#v", records[0].AssetIdentityKey)
 	}
 }
 
@@ -298,7 +343,7 @@ func validActivityPageEntry() dto.ActivityPageEntry {
 		FeeInBaseCurrency:               json.Number("0.25"),
 		UnitPriceInAssetProfileCurrency: json.Number("82.3"),
 		Comment:                         "comment",
-		SymbolProfile:                   dto.ActivitySymbolProfile{Symbol: "BTC", Name: "Bitcoin", Currency: "EUR"},
+		SymbolProfile:                   dto.ActivitySymbolProfile{ID: "asset-btc-001", Symbol: "BTC", Name: "Bitcoin", Currency: "EUR"},
 		Account:                         &dto.ActivityAccountScope{ID: "account-1", Name: "Main Account"},
 		DataSource:                      "ghostfolio",
 	}

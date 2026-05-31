@@ -66,10 +66,11 @@ func run() error {
 
 	var program = newProgram(
 		flow.NewModel(flow.Dependencies{
-			Options:      app.Options,
-			Startup:      startupState,
-			SetupService: app.SetupService,
-			SyncService:  app.SyncService,
+			Options:       app.Options,
+			Startup:       startupState,
+			SetupService:  app.SetupService,
+			SyncService:   app.SyncService,
+			ReportService: app.ReportService,
 		}),
 		tea.WithWindowSize(options.InitialWindowWidth, options.InitialWindowHeight),
 	)

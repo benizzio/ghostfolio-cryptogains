@@ -41,6 +41,7 @@ type ActivityPageEntry struct {
 // for normalization.
 // Authored by: OpenCode
 type ActivitySymbolProfile struct {
+	ID       string `json:"id"`
 	Symbol   string `json:"symbol"`
 	Name     string `json:"name"`
 	Currency string `json:"currency"`
