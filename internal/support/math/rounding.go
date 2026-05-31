@@ -4,10 +4,8 @@
 package math
 
 import (
-	"fmt"
 	"math/big"
 
-	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -15,66 +13,6 @@ import (
 // divisions that use round-half-up handling before report rendering.
 // Authored by: OpenCode
 const InternalCalculationScale int32 = 16
-
-// RequireFinite rejects non-finite decimal values before shared arithmetic or
-// comparison helpers are used.
-//
-// Example:
-//
-//	value, _, err := decimalsupport.ParseString("10.5")
-//	if err != nil {
-//		panic(err)
-//	}
-//	err = math.RequireFinite(value)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-// Authored by: OpenCode
-func RequireFinite(value apd.Decimal) error {
-	if _, err := decimalsupport.CanonicalString(value); err != nil {
-		return fmt.Errorf("decimal value must be finite: %w", err)
-	}
-
-	return nil
-}
-
-// DivideFiniteRoundHalfUp divides one finite decimal by another and rounds the
-// quotient half up to the shared internal fixed scale.
-//
-// Example:
-//
-//	dividend, _, err := decimalsupport.ParseString("1")
-//	if err != nil {
-//		panic(err)
-//	}
-//	divisor, _, err := decimalsupport.ParseString("3")
-//	if err != nil {
-//		panic(err)
-//	}
-//	quotient, err := math.DivideFiniteRoundHalfUp(dividend, divisor)
-//	if err != nil {
-//		panic(err)
-//	}
-//	_ = quotient
-//
-// Callers that need package-specific validation messages should validate their
-// operands before calling this helper.
-// Authored by: OpenCode
-func DivideFiniteRoundHalfUp(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, error) {
-	if err := RequireFinite(dividend); err != nil {
-		return apd.Decimal{}, fmt.Errorf("division dividend is invalid: %w", err)
-	}
-	if err := RequireFinite(divisor); err != nil {
-		return apd.Decimal{}, fmt.Errorf("division divisor is invalid: %w", err)
-	}
-	if divisor.Sign() == 0 {
-		return apd.Decimal{}, fmt.Errorf("division requires a non-zero divisor")
-	}
-
-	var scaledQuotient = scaledRoundedQuotient(dividend, divisor, InternalCalculationScale)
-	return scaledCoefficientDecimal(scaledQuotient, InternalCalculationScale), nil
-}
 
 // scaledRoundedQuotient computes one fixed-scale quotient rounded half up.
 // Authored by: OpenCode

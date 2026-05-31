@@ -3,8 +3,30 @@ package math
 import (
 	"fmt"
 
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/cockroachdb/apd/v3"
 )
+
+// addOperation applies exact decimal addition for shared binary operation
+// validation.
+// Authored by: OpenCode
+func addOperation(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
+	return apd.BaseContext.Add(result, left, right)
+}
+
+// subtractOperation applies exact decimal subtraction for shared binary
+// operation validation.
+// Authored by: OpenCode
+func subtractOperation(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
+	return apd.BaseContext.Sub(result, left, right)
+}
+
+// multiplyOperation applies exact decimal multiplication for shared binary
+// operation validation.
+// Authored by: OpenCode
+func multiplyOperation(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
+	return apd.BaseContext.Mul(result, left, right)
+}
 
 // ApplyBinaryOperation validates two finite decimal operands and then applies
 // one injected exact-decimal operation.
@@ -55,9 +77,7 @@ func ApplyBinaryOperation(
 //
 // Authored by: OpenCode
 func Add(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-	return ApplyBinaryOperation(left, right, func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
-		return apd.BaseContext.Add(result, left, right)
-	})
+	return ApplyBinaryOperation(left, right, addOperation)
 }
 
 // Subtract validates two finite decimal operands and returns their exact
@@ -73,9 +93,7 @@ func Add(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
 //
 // Authored by: OpenCode
 func Subtract(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-	return ApplyBinaryOperation(left, right, func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
-		return apd.BaseContext.Sub(result, left, right)
-	})
+	return ApplyBinaryOperation(left, right, subtractOperation)
 }
 
 // Multiply validates two finite decimal operands and returns their exact
@@ -91,9 +109,67 @@ func Subtract(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
 //
 // Authored by: OpenCode
 func Multiply(left apd.Decimal, right apd.Decimal) (apd.Decimal, error) {
-	return ApplyBinaryOperation(left, right, func(result *apd.Decimal, left *apd.Decimal, right *apd.Decimal) (apd.Condition, error) {
-		return apd.BaseContext.Mul(result, left, right)
-	})
+	return ApplyBinaryOperation(left, right, multiplyOperation)
+}
+
+// RequireFinite rejects non-finite decimal values before shared arithmetic or
+// comparison helpers are used.
+//
+// Example:
+//
+//	value, _, err := decimalsupport.ParseString("10.5")
+//	if err != nil {
+//		panic(err)
+//	}
+//	err = math.RequireFinite(value)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+// Authored by: OpenCode
+func RequireFinite(value apd.Decimal) error {
+	if _, err := decimalsupport.CanonicalString(value); err != nil {
+		return fmt.Errorf("decimal value must be finite: %w", err)
+	}
+
+	return nil
+}
+
+// DivideFiniteRoundHalfUp divides one finite decimal by another and rounds the
+// quotient half up to the shared internal fixed scale.
+//
+// Example:
+//
+//	dividend, _, err := decimalsupport.ParseString("1")
+//	if err != nil {
+//		panic(err)
+//	}
+//	divisor, _, err := decimalsupport.ParseString("3")
+//	if err != nil {
+//		panic(err)
+//	}
+//	quotient, err := math.DivideFiniteRoundHalfUp(dividend, divisor)
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = quotient
+//
+// Callers that need package-specific validation messages should validate their
+// operands before calling this helper.
+// Authored by: OpenCode
+func DivideFiniteRoundHalfUp(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, error) {
+	if err := RequireFinite(dividend); err != nil {
+		return apd.Decimal{}, fmt.Errorf("division dividend is invalid: %w", err)
+	}
+	if err := RequireFinite(divisor); err != nil {
+		return apd.Decimal{}, fmt.Errorf("division divisor is invalid: %w", err)
+	}
+	if divisor.Sign() == 0 {
+		return apd.Decimal{}, fmt.Errorf("division requires a non-zero divisor")
+	}
+
+	var scaledQuotient = scaledRoundedQuotient(dividend, divisor, InternalCalculationScale)
+	return scaledCoefficientDecimal(scaledQuotient, InternalCalculationScale), nil
 }
 
 // Compare validates two finite decimal operands and returns their ordering.
