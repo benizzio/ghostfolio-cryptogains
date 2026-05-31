@@ -146,6 +146,8 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
 - Single Responsibility Principle (SRP) and decomposition SPECIAL instructions:
   - Go files should also be part of SRP and should contain code related to a single responsibility. Files that are too 
     long should be evaluated to be decomposed
+    - For Go `struct` that contains methods, the type declaration and its methods should ALWAYS be in the same file for higher cohesion. 
+      To follow SRP, if a file containing multiple types gets too long, they should be split in a file per type and its methods.
   - the Domain Driven Design concept of "Layered Architecture" should be also considered as part of an SRP analysis.
     Modules that contain domain or application code should not be mixed with infrastructure, utility, or generalizable 
     and reusable code
