@@ -5,8 +5,6 @@ description: Generate or refresh test-coverage-drift-report.md for the active fe
 
 <!-- Extension: test-coverage-drift-control -->
 <!-- Config: .specify/extensions/test-coverage-drift-control/ -->
-<!-- Extension: test-coverage-drift-control -->
-<!-- Config: .specify/extensions/test-coverage-drift-control/ -->
 # Generate Test Coverage Drift Report
 
 Review the active feature implementation for divergences from the repository test-coverage baseline and write a structured drift report.

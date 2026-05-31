@@ -7,8 +7,6 @@ metadata:
   source: test-coverage-drift-control:commands/speckit.test-coverage-drift-control.report.md
 ---
 
-<!-- Extension: test-coverage-drift-control -->
-<!-- Config: .specify/extensions/test-coverage-drift-control/ -->
 # Generate Test Coverage Drift Report
 
 Review the active feature implementation for divergences from the repository test-coverage baseline and write a structured drift report.

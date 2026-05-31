@@ -1,7 +1,7 @@
 # Coding Standards Drift Control
 
 Beta Spec Kit extension for reviewing implemented features against the repository coding-standards baseline and appending remediation tasks for drift findings.
-Track and fix code that moves away from technical definitions adding the smallest amout of complexity possible to the Spec Kit artifacts.
+Track and fix code that moves away from technical definitions while adding the smallest amount of complexity possible to the Spec Kit artifacts.
 
 ## Features
 
@@ -25,7 +25,7 @@ Track and fix code that moves away from technical definitions adding the smalles
 ### Release Install
 
 ```bash
-specify extension add coding-standards-drift-control --from https://github.com/benizzio/spec-kit-coding-standards-drift-control/archive/refs/tags/v0.3.0.zip
+specify extension add coding-standards-drift-control --from https://github.com/benizzio/spec-kit-coding-standards-drift-control/archive/refs/tags/v0.3.1.zip
 ```
 
 ### Development Install
@@ -104,13 +104,13 @@ uv tool install specify-cli --force --from git+https://github.com/github/spec-ki
 - Documentation: `README.md`
 - Changelog: `CHANGELOG.md`
 - License: `MIT`
-- Current beta version: `0.3.0`
+- Current beta version: `0.3.1`
 
 ## Catalog Submission Metadata
 
 - Extension ID: `coding-standards-drift-control`
 - Extension Name: `Coding Standards Drift Control`
-- Version: `0.3.0`
+- Version: `0.3.1`
 - Commands: `2`
 - Hooks: `1`
 - Suggested tags: `analysis`, `standards`, `quality`, `maintenance`

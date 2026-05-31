@@ -49,9 +49,9 @@
       "installed_at": "2026-05-26T18:29:23.776328+00:00"
     },
     "data-model-diagram": {
-      "version": "0.2.0",
+      "version": "0.2.1",
       "source": "local",
-      "manifest_hash": "sha256:116fdb968dc800cb05e961caf7bc160e3ca2b40c37cb3be2c8043b7cbeab879d",
+      "manifest_hash": "sha256:1ed36a2681b0bbc092477a49c2ae1b140f5271a04360e456b2fb0aed0db6b7e3",
       "enabled": true,
       "priority": 5,
       "registered_commands": {
@@ -66,12 +66,12 @@
         ]
       },
       "registered_skills": [],
-      "installed_at": "2026-05-26T21:16:46.216656+00:00"
+      "installed_at": "2026-05-31T18:56:03.004580+00:00"
     },
     "coding-standards-drift-control": {
-      "version": "0.3.0",
+      "version": "0.3.1",
       "source": "local",
-      "manifest_hash": "sha256:90f1d653f6c2b16d00654e7ed9f4f7b92ee9a8d813e80d76d422fefe7096da3f",
+      "manifest_hash": "sha256:0011e340d2ccf60f62a93fe05f4c183f0d9ae8d415ad64cedc7ade62d863ab57",
       "enabled": true,
       "priority": 10,
       "registered_commands": {
@@ -89,12 +89,12 @@
         ]
       },
       "registered_skills": [],
-      "installed_at": "2026-05-27T19:52:28.902435+00:00"
+      "installed_at": "2026-05-31T18:56:11.919512+00:00"
     },
     "test-coverage-drift-control": {
-      "version": "0.2.0",
+      "version": "0.2.1",
       "source": "local",
-      "manifest_hash": "sha256:961244c6e8fcfa021fcb5b1339b54cd59d395e3424a01fbedabd94e5301b4153",
+      "manifest_hash": "sha256:86dfa5b9c795797dc7c783d5d12a49cfb1b601bd7e21137181c51a1e3befbf95",
       "enabled": true,
       "priority": 10,
       "registered_commands": {
@@ -112,7 +112,7 @@
         ]
       },
       "registered_skills": [],
-      "installed_at": "2026-05-27T20:52:53.716045+00:00"
+      "installed_at": "2026-05-31T18:56:17.604701+00:00"
     }
   }
 }

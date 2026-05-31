@@ -7,6 +7,9 @@ metadata:
   source: data-model-diagram:commands/speckit.data-model-diagram.generate.md
 ---
 
+<!-- Extension: data-model-diagram -->
+<!-- Config: .specify/extensions/data-model-diagram/ -->
+
 # Generate Data Model Diagram
 
 Generate a Mermaid ER diagram for the active Spec Kit feature directory.

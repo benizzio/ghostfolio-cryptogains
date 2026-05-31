@@ -3,7 +3,7 @@ schema_version: "1.0"
 extension:
   id: test-coverage-drift-control
   name: "Test Coverage Drift Control"
-  version: "0.2.0"
+  version: "0.2.1"
   description: "Generate coverage drift reports and remediation tasks after implementation"
   author: "Igor Benicio de Mesquita"
   repository: "https://github.com/benizzio/spec-kit-test-coverage-drift-control"

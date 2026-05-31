@@ -104,19 +104,19 @@ hooks:
     description: Auto-commit after spec clarification
     condition: null
   after_plan:
-  - extension: data-model-diagram
-    command: speckit.data-model-diagram.generate
-    enabled: true
-    optional: true
-    prompt: Generate a Mermaid ER diagram after planning?
-    description: Generate a Mermaid ER diagram from the active feature data model
-    condition: null
   - extension: git
     command: speckit.git.commit
     enabled: true
     optional: true
     prompt: Commit plan changes?
     description: Auto-commit after implementation planning
+    condition: null
+  - extension: data-model-diagram
+    command: speckit.data-model-diagram.generate
+    enabled: true
+    optional: true
+    prompt: Generate a Mermaid ER diagram after planning?
+    description: Generate a Mermaid ER diagram from the active feature data model
     condition: null
   after_tasks:
   - extension: git
@@ -145,7 +145,7 @@ hooks:
     command: speckit.coding-standards-drift-control.report
     enabled: true
     optional: true
-    prompt: Run coding-standards drift analysis after implementation?
+    prompt: Run Coding Standards Drift Control after implementation?
     description: Generate or refresh the coding-standards drift report for the active
       feature
     condition: null

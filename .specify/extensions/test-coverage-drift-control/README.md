@@ -25,7 +25,7 @@ It helps keep feature-level test coverage aligned with repository policy while a
 ### From a release archive
 
 ```bash
-specify extension add test-coverage-drift-control --from https://github.com/benizzio/spec-kit-test-coverage-drift-control/archive/refs/tags/v0.2.0.zip
+specify extension add test-coverage-drift-control --from https://github.com/benizzio/spec-kit-test-coverage-drift-control/archive/refs/tags/v0.2.1.zip
 ```
 
 ### Development install
@@ -98,14 +98,14 @@ The extension registers an optional `after_implement` hook that runs `speckit.te
 ## Release Process
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.2.1
+git push origin v0.2.1
 ```
 
 Then create the GitHub release and verify install from:
 
 ```text
-https://github.com/benizzio/spec-kit-test-coverage-drift-control/archive/refs/tags/v0.2.0.zip
+https://github.com/benizzio/spec-kit-test-coverage-drift-control/archive/refs/tags/v0.2.1.zip
 ```
 
 ## Support And Contributing

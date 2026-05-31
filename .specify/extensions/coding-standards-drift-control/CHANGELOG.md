@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1
+
+- Fix review feedback from the source extraction PR by correcting README wording
+- Align the optional hook prompt with the drift-control naming
+
 ## 0.3.0
 
 - Rename the extension ID and command namespace from `coding-standards-drift-analysis` to `coding-standards-drift-control`

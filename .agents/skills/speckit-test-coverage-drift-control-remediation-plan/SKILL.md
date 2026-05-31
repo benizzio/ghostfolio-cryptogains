@@ -8,8 +8,6 @@ metadata:
   source: test-coverage-drift-control:commands/speckit.test-coverage-drift-control.remediation-plan.md
 ---
 
-<!-- Extension: test-coverage-drift-control -->
-<!-- Config: .specify/extensions/test-coverage-drift-control/ -->
 # Generate Test Coverage Drift Remediation Plan
 
 Append a coverage drift remediation phase to the active feature `tasks.md` from the current test-coverage drift report.

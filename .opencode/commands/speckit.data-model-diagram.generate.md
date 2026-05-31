@@ -5,6 +5,9 @@ description: Generate data-model-diagram.mmd from data-model.md via agent infere
 
 <!-- Extension: data-model-diagram -->
 <!-- Config: .specify/extensions/data-model-diagram/ -->
+<!-- Extension: data-model-diagram -->
+<!-- Config: .specify/extensions/data-model-diagram/ -->
+
 # Generate Data Model Diagram
 
 Generate a Mermaid ER diagram for the active Spec Kit feature directory.
