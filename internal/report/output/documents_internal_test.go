@@ -124,6 +124,9 @@ func TestResolveDocumentsDirectoryAdditionalBranches(t *testing.T) {
 		}()
 
 		userHomeDirectory = func() (string, error) { return "", errors.New("home boom") }
+		if _, err := ResolveDocumentsDirectoryForOS("linux"); err == nil || !strings.Contains(err.Error(), "resolve user home directory") {
+			t.Fatalf("expected Linux home directory resolution failure, got %v", err)
+		}
 		if _, err := ResolveDocumentsDirectoryForOS("darwin"); err == nil || !strings.Contains(err.Error(), "resolve user home directory") {
 			t.Fatalf("expected home directory resolution failure, got %v", err)
 		}

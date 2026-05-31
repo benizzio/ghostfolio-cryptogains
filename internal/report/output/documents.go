@@ -44,21 +44,11 @@ func ResolveDocumentsDirectory() (string, error) {
 // Authored by: OpenCode
 func ResolveDocumentsDirectoryForOS(goos string) (string, error) {
 	switch goos {
-	case "linux", "darwin", "windows":
-	default:
-		return "", wrapFailure(
-			FailureCategoryDocumentsDirectoryUnavailable,
-			fmt.Errorf("documents directory resolution is unsupported on %q", goos),
-		)
-	}
-
-	var homeDir, err = resolveHomeDirectory(goos)
-	if err != nil {
-		return "", wrapFailure(FailureCategoryDocumentsDirectoryUnavailable, err)
-	}
-
-	switch goos {
 	case "linux":
+		var homeDir, err = resolveHomeDirectory(goos)
+		if err != nil {
+			return "", wrapFailure(FailureCategoryDocumentsDirectoryUnavailable, err)
+		}
 		var documentsDir, configured, resolveErr = resolveLinuxDocumentsDirectory(homeDir)
 		if resolveErr != nil {
 			return "", wrapFailure(FailureCategoryDocumentsDirectoryUnavailable, resolveErr)
@@ -67,16 +57,18 @@ func ResolveDocumentsDirectoryForOS(goos string) (string, error) {
 			return documentsDir, nil
 		}
 		return filepath.Join(homeDir, "Documents"), nil
-	case "darwin":
+	case "darwin", "windows":
+		var homeDir, err = resolveHomeDirectory(goos)
+		if err != nil {
+			return "", wrapFailure(FailureCategoryDocumentsDirectoryUnavailable, err)
+		}
 		return filepath.Join(homeDir, "Documents"), nil
-	case "windows":
-		return filepath.Join(homeDir, "Documents"), nil
+	default:
+		return "", wrapFailure(
+			FailureCategoryDocumentsDirectoryUnavailable,
+			fmt.Errorf("documents directory resolution is unsupported on %q", goos),
+		)
 	}
-
-	return "", wrapFailure(
-		FailureCategoryDocumentsDirectoryUnavailable,
-		fmt.Errorf("documents directory resolution is unsupported on %q", goos),
-	)
 }
 
 // resolveLinuxDocumentsDirectory resolves the XDG Documents directory when the

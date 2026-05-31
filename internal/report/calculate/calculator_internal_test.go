@@ -1332,6 +1332,25 @@ func TestNewAssetBasisStateAndCalculationHelpers(t *testing.T) {
 	if recordCalcErr.SourceID() != "rec-1" || recordCalcErr.DisplayLabel() != "BTC" {
 		t.Fatalf("expected record error references, got %#v", recordCalcErr)
 	}
+	var diagnosticRecordErr, ok = recordErr.(diagnosticCalculationError)
+	if !ok {
+		t.Fatalf("expected diagnostic calculation error, got %T", recordErr)
+	}
+	var stringTarget string
+	if diagnosticRecordErr.As(&stringTarget) {
+		t.Fatalf("expected diagnostic calculation error not to match unrelated target")
+	}
+	var diagnosticErr = diagnosticCalculationError{}
+	if context := diagnosticErr.DiagnosticReportContext(); context.FailureStage != "" || context.FailureDetail != "" || len(context.FailureCauseChain) != 0 || len(context.Records) != 0 || context.OffendingActivityRecord != nil {
+		t.Fatalf("expected empty diagnostic context for nil calculation error, got %#v", context)
+	}
+	if passthrough := withPersistedActivityRecord(nil, &syncmodel.ActivityRecord{SourceID: "rec-2"}); passthrough != nil {
+		t.Fatalf("expected nil calculation error passthrough, got %#v", passthrough)
+	}
+	var orphanCalcErr = reportmodel.NewCalculationError(reportmodel.CalculationErrorKindActivityInput, "orphan", "", "", nil)
+	if passthrough := withPersistedActivityRecord(orphanCalcErr, nil); passthrough != orphanCalcErr {
+		t.Fatalf("expected missing record to preserve calculation error pointer")
+	}
 
 	var inputErr = newInputCalculationError(reportmodel.CalculationErrorKindBasisAllocation, reportmodel.ActivityCalculationInput{
 		SourceID:     " input-1 ",

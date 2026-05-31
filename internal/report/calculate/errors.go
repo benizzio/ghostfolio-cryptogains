@@ -56,7 +56,10 @@ func newInputCalculationError(kind reportmodel.CalculationErrorKind, input repor
 // calculation error for downstream report diagnostics.
 // Authored by: OpenCode
 func withPersistedActivityRecord(err *reportmodel.CalculationError, record *syncmodel.ActivityRecord) error {
-	if err == nil || record == nil {
+	if err == nil {
+		return nil
+	}
+	if record == nil {
 		return err
 	}
 
