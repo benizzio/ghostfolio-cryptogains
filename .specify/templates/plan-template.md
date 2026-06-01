@@ -26,6 +26,9 @@
 
 **Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]
 
+**Empirical Dataset**: [N/A, existing dataset path/format and read-only policy,
+or NEEDS CLARIFICATION]
+
 **Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
 
 **Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app or NEEDS CLARIFICATION]
@@ -40,7 +43,21 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- [ ] Security: Document persistence, token handling, redaction, and relevant
+  OWASP review scope.
+- [ ] Precision: Define numeric representation, scale, currency identity,
+  conversion boundaries, rounding rules, and auditability requirements.
+- [ ] Testing: Define integration coverage, coverage-gate verification, and any
+  justified targeted unit tests.
+- [ ] Empirical financial validation: If the feature changes financial
+  calculations and an `empirical solidified financial tests` suite exists or is
+  introduced, identify the dataset path and format, confirm the `empirical
+  external dataset` remains read-only for standard implementation, and isolate
+  any dataset mutation to a dedicated dataset-maintenance spec.
+- [ ] Dependencies and external integrations: Justify each new dependency,
+  external API, or version change.
+- [ ] Architecture: Keep domain rules separate from IO and infrastructure, and
+  record any justified deviations.
 
 ## Project Structure
 

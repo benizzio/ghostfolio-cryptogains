@@ -21,6 +21,10 @@
   - Tested independently
   - Deployed independently
   - Demonstrated to users independently
+
+  For features that change financial calculations, describe the expected
+  integration coverage and whether any existing `empirical solidified financial
+  tests` apply.
 -->
 
 ### User Story 1 - [Brief Title] (Priority: P1)
@@ -98,6 +102,13 @@
 - **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
 - **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
 
+### Financial Calculation Evidence *(include when feature affects financial calculations)*
+
+- **Numeric Representation**: [Describe required exact-decimal or integer-unit handling, scale, and currency identity]
+- **Conversion And Rounding**: [Describe any authorized conversion boundary, exchange-rate source, and rounding rules, or state that none apply]
+- **Empirical Solidified Financial Tests**: [List applicable existing suite coverage, or state N/A]
+- **Empirical External Dataset Changes**: [State that the dataset remains read-only for this feature, or reference the isolated dataset-maintenance spec that owns the change]
+
 ### Key Entities *(include if feature involves data)*
 
 - **[Entity 1]**: [What it represents, key attributes without implementation]
@@ -129,3 +140,4 @@
 - [Assumption about scope boundaries, e.g., "Mobile support is out of scope for v1"]
 - [Assumption about data/environment, e.g., "Existing authentication system will be reused"]
 - [Dependency on existing system/service, e.g., "Requires access to the existing user profile API"]
+- [For financial-calculation features, whether the empirical external dataset is unchanged for this feature]
