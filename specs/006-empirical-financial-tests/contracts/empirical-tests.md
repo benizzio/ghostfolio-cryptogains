@@ -93,9 +93,13 @@ Comparable output must include at least:
 ## Precision Rules
 
 - Quantity fields compare by exact decimal equality.
-- Financial value fields compare exactly after normalization when possible.
-- Any tolerated financial difference must be documented per field type.
-- Tolerances must be tight and must not hide systematic method differences.
+- Financial value fields compare after normalization under the selected decimal policy.
+- The default selected policy is the project's production 16-decimal round-half-up internal calculation policy.
+- If hledger cannot be configured or normalized to match the default policy for every valid case, empirical tests must set `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` to the hledger-established policy before invoking project calculation.
+- Production behavior must keep the 16-decimal default when `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` is unset.
+- Financial value fields may use documented tight per-field tolerances only for residual hledger/project deviations after decimal-policy alignment.
+- Quantity tolerance is always zero.
+- Financial tolerances must be small enough to catch material drift and systematic method differences.
 - Comparison code must use decimal arithmetic only.
 - Floating-point math is invalid in dataset parsing, normalization, and comparison.
 
@@ -108,6 +112,7 @@ A comparison failure must identify:
 - report year
 - asset identity key
 - field path
+- selected decimal policy
 - expected value
 - actual value
 - difference

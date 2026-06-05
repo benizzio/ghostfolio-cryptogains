@@ -210,6 +210,7 @@ Fields:
 | `command_arguments` | string array | Exact arguments used |
 | `dataset_input_hash` | string | Source dataset hash |
 | `hledger_input_hash` | string | Generated ledger hash |
+| `decimal_policy` | string | Selected decimal policy used by hledger normalization and project comparison |
 | `normalization_version` | string | Project-owned normalizer version |
 | `oracle_output_hash` | string | Hash of normalized output |
 | `generated_at` | timestamp | Fixture generation time when persisted |
@@ -223,6 +224,7 @@ Relationships:
 Validation rules:
 
 - Command arguments are recorded exactly.
+- Decimal policy is recorded exactly and matches the policy used by empirical project calculation.
 - Hashes are present and stable for unchanged inputs.
 - Generation runs only when golden fixture is absent or explicit regeneration is requested.
 
@@ -354,7 +356,8 @@ Fields:
 | `expected_value` | decimal string | Oracle value |
 | `actual_value` | decimal string | Project value |
 | `difference` | decimal string | Absolute or signed difference according to field contract |
-| `tolerance` | decimal string | Allowed tolerance for financial fields, zero for exact fields |
+| `decimal_policy` | string | Selected comparison policy, such as production 16-decimal round-half-up or hledger-aligned empirical policy |
+| `tolerance` | decimal string | Allowed residual difference, zero for quantity fields and documented tightly for financial fields |
 | `passed` | boolean | Whether comparison passed |
 | `diagnostic_context` | string | Non-secret failure context |
 
@@ -364,7 +367,10 @@ Relationships:
 
 Validation rules:
 
-- Quantity tolerance is zero.
-- Financial tolerances are documented per field and must be tight.
-- Failure output identifies dataset case, method, asset, year, field, expected, actual, difference, and tolerance.
+- Quantities compare by exact decimal equality after normalization under `decimal_policy`.
+- Financial values compare after normalization under `decimal_policy` with the documented `tolerance` for residual hledger/project deviations.
+- If hledger cannot align with the production 16-decimal policy, empirical tests select the hledger-aligned policy through the test-scoped environment variable before project calculation runs.
+- Quantity `tolerance` is zero.
+- Financial `tolerance` is documented per field and must be tight enough to catch material drift and systematic method differences.
+- Failure output identifies dataset case, method, asset, year, field, decimal policy, expected, actual, difference, and tolerance.
 - Failure output excludes secrets, raw protected payloads, Markdown, report files, and UI text.

@@ -60,9 +60,15 @@ tools/empiricaloracle/
   "metadata": {
     "hledger_version": "1.52.1",
     "command_arguments": ["-f", "testdata/empirical/hledger/fifo.journal", "print"],
+    "decimal_policy": "scale=16,rounding=half_up",
     "dataset_input_hash": "sha256:...",
     "hledger_input_hash": "sha256:...",
     "normalization_version": "1",
+    "financial_tolerances": {
+      "realized_gain_or_loss": "0.0000000000000001",
+      "allocated_basis": "0.0000000000000001",
+      "closing_basis": "0.0000000000000001"
+    },
     "oracle_output_hash": "sha256:..."
   }
 }
@@ -74,6 +80,8 @@ Every golden fixture must include:
 
 - hledger version
 - exact command arguments
+- selected decimal policy
+- documented financial tolerances
 - dataset input hash
 - generated hledger input hash
 - normalized oracle output hash
@@ -89,8 +97,11 @@ Every golden fixture must include:
 
 - All decimal values are JSON strings.
 - Quantities are canonical decimal strings and compare exactly.
-- Financial values are normalized to the project's 16-decimal round-half-up policy when possible.
-- Any tolerance required for hledger/project precision mismatch must be declared in the empirical test comparison contract, not hidden in the fixture.
+- Financial values are normalized to the selected decimal policy before comparison.
+- The default selected policy is the project's production 16-decimal round-half-up policy.
+- If hledger cannot be configured or normalized to the production policy for every valid case, empirical tests must set `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` before project calculation runs and fixtures must record the hledger-aligned policy used.
+- Residual financial differences after decimal-policy alignment may use documented tight per-field tolerances. Quantity tolerance is always zero.
+- Tolerances must be small enough to catch material drift and systematic method differences.
 - Floating-point JSON numbers are invalid for financial fields.
 
 ## Unsupported Segment Rules

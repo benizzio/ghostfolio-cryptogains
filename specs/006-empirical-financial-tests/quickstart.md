@@ -51,8 +51,9 @@ Expected result:
 - hledger is not invoked while required fixtures are present
 - dataset rows are translated into calculation-layer inputs
 - `calculate.Calculate` runs for every comparable method and year
-- normalized project output matches oracle output within the documented precision contract
-- failures, if any, identify case, method, year, asset, field, expected value, actual value, difference, tolerance, and source IDs
+- normalized project output matches oracle output under the documented decimal-policy and financial-tolerance contract
+- if hledger cannot match the production 16-decimal policy, the empirical command configures `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` to the hledger-established policy before project calculation runs
+- failures, if any, identify case, method, year, asset, field, selected decimal policy, expected value, actual value, difference, tolerance, and source IDs
 
 ## Run Full Repository Verification
 
@@ -129,7 +130,7 @@ go test ./tests/empirical -count=1 -v
 Expected result:
 
 - the failure identifies the exact dataset case
-- the failure identifies method, year, asset, field, expected value, actual value, difference, tolerance, and source IDs
+- the failure identifies method, year, asset, field, selected decimal policy, expected value, actual value, difference, tolerance, and source IDs
 - the failure does not print secrets, raw protected payloads, Markdown report content, TUI text, or Documents paths
 
 ## Read-Only Policy After Completion

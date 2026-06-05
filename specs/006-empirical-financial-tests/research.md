@@ -121,16 +121,18 @@ If a dataset case cannot be represented in hledger without changing its financia
 - Remove unsupported edge cases from the dataset: rejected because the dataset must cover project-supported edge cases.
 - Fail the whole suite on any unsupported case: rejected because some project-specific semantics may legitimately lack a direct hledger representation.
 
-## Decision: Compare Quantities Exactly And Financial Values With Documented Tight Tolerances Only When Needed
+## Decision: Align Decimal Policy First, Then Apply Tight Financial Tolerances
 
-Quantities compare by exact decimal equality after normalization. Financial fields compare exactly after 16-decimal round-half-up normalization when possible. If hledger cannot align exactly for an otherwise valid case, use a documented per-field tolerance in the fixture contract.
+Quantities compare by exact decimal equality after normalization. Financial fields are compared after one selected decimal policy is applied to both hledger oracle output and project calculation output. The oracle first attempts to configure or normalize hledger-derived values to this project's production internal policy: 16 decimal places with round-half-up handling for required non-terminating divisions and proportional allocations. If hledger cannot be configured to match that policy for every otherwise valid empirical case, the implementation must expose a test-scoped external environment variable, expected as `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY`, and empirical tests must set it to the hledger-established decimal policy for those runs. Production behavior keeps the 16-decimal default when the variable is unset. After decimal-policy alignment, calculated financial values may use documented tight per-field tolerances for residual external-oracle deviations; tolerances must be small enough to catch material drift and systematic method differences.
 
-**Rationale**: Quantities should not drift. Financial calculations may involve hledger formatting or precision behavior that does not exactly match the project's internal 16-decimal policy in every valid case, but tolerances must remain explicit and tight enough to detect material drift.
+**Rationale**: Empirical validation should minimize avoidable differences by aligning decimal policy before comparison. hledger may still produce small residual deviations because it is an external accounting engine with its own internal representation and reporting behavior. A documented per-field tolerance prevents immaterial oracle/tooling differences from failing the suite, while the decimal-policy alignment step and tight thresholds keep the comparison sensitive to actual calculation drift.
 
 **Alternatives considered**:
 
-- Use broad global tolerance: rejected because it can hide systematic method differences.
-- Require exact equality for every financial value regardless of hledger precision behavior: rejected because it could reject valid external evidence when precision policies differ by an immaterial unit.
+- Use broad global comparison deltas: rejected because they can hide systematic method differences.
+- Use tolerance without first aligning decimal policy: rejected because avoidable precision mismatches would consume the tolerance budget and weaken drift detection.
+- Require exact equality for every financial value after policy alignment: rejected because small residual external-oracle deviations may still occur and should not fail otherwise valid empirical cases.
+- Require exact equality under the production 16-decimal policy regardless of hledger precision behavior: rejected because it could reject valid external evidence when hledger's established policy cannot be made to match the project's production default.
 - Use floating-point comparisons: rejected by the constitution.
 
 ## Decision: Keep Currency Conversion Permanently Out Of Scope
