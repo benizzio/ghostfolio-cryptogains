@@ -29,6 +29,7 @@ The specification is kept in `spec.md` for repository tooling compatibility, but
 - Q: How should empirical tests handle hledger availability? -> A: hledger must be vendored inside the repository for empirical test use.
 - Q: Should oracle outputs be persisted or generated only during tests? -> A: Persist normalized oracle outputs as golden fixtures.
 - Q: When may empirical tests run hledger generation? -> A: Only when the required golden fixture is absent.
+- Q: Is hledger licensing compatible with repository vendoring? -> A: Yes, only with GPLv3-compliant vendoring that includes source, license notices, and no binary-only artifact.
 
 ## Terms Used In This Spec
 
@@ -131,12 +132,16 @@ Each requirement applies to internal test infrastructure, not to user-facing app
 - **SEC-002**: The empirical external dataset MUST use synthetic assets, synthetic accounts or wallets, synthetic source identifiers, and synthetic timestamps.
 - **SEC-003**: Oracle outputs and empirical test artifacts MUST NOT be written to protected application storage, user Documents folders, or OS-specific application config directories.
 - **SEC-004**: Oracle outputs persisted in the repository MUST be synthetic, reproducible from the dataset and documented oracle command, and reviewable as non-secret golden fixtures.
+- **SEC-005**: Oracle outputs and empirical fixtures MUST NOT embed upstream hledger examples, documentation text, or test fixture content. hledger-generated output is acceptable only when normalized to project-owned synthetic dataset results.
 
 ### Dependency And External Tool Requirements
 
 - **DEP-001**: hledger is a repository-vendored test-time tool for this empirical validation scope. Runtime application code MUST NOT depend on hledger.
-- **DEP-002**: The vendored hledger artifact or source, supported version, version-detection command, license implications, platform support, failure modes, and reproducibility implications MUST be documented before implementation.
-- **DEP-003**: The empirical test command MUST require the repository-vendored hledger tool only when a required golden fixture is absent and generation is needed. In that case, it MUST fail with an actionable setup error when the tool is missing, not executable on the current platform, or reports an unsupported version.
+- **DEP-002**: hledger vendoring MUST comply with hledger's GPL-3.0-or-later license and this repository's GPLv3 license. Binary-only vendoring is prohibited.
+- **DEP-003**: The repository MUST include the vendored hledger source package or complete corresponding source for any vendored executable artifact, plus upstream license text, copyright notices, source version, source URL, and checksum.
+- **DEP-004**: The empirical oracle MUST invoke hledger as a separate test-time command-line tool and MUST NOT link, import, or embed hledger or hledger-lib code into runtime application code.
+- **DEP-005**: The vendored hledger artifact or source, supported version, version-detection command, platform support, license compliance notes, failure modes, and reproducibility implications MUST be documented before implementation.
+- **DEP-006**: The empirical test command MUST require the repository-vendored hledger tool only when a required golden fixture is absent and generation is needed. In that case, it MUST fail with an actionable setup error when the tool is missing, not executable on the current platform, or reports an unsupported version.
 
 ## Dataset Coverage Requirements
 
@@ -179,6 +184,7 @@ The empirical external dataset MUST include at least these categories:
 - Replacing the existing unit, contract, integration, coverage, or performance suites.
 - Markdown report, report document, TUI, filename, or filesystem-output assertions.
 - Copying upstream hledger, Ledger, or Beancount fixtures verbatim into this repository without a license review.
+- Vendoring hledger in binary-only form or without the GPL-3.0-or-later license text and corresponding source.
 
 ## Success Criteria
 
@@ -190,10 +196,12 @@ The empirical external dataset MUST include at least these categories:
 - **SC-004**: Empirical solidified financial integration tests compare project calculation output against oracle output for every supported method and report actionable differences when comparison fails.
 - **SC-005**: Zero-priced holding reduction cases prove quantity and basis are reduced while proceeds, realized gain, and realized loss remain zero or absent according to the normalized comparison contract.
 - **SC-006**: Precision-sensitive cases either match under the 16-decimal internal precision policy or are covered by an explicitly documented test-only precision configuration path.
+- **SC-007**: Vendored hledger materials include GPL-3.0-or-later license notices, corresponding source, version identity, source URL, and checksum, and empirical tests use hledger only as a separate test-time tool.
 
 ## Assumptions
 
 - hledger is the primary external oracle because it directly supports FIFO, LIFO, HIFO, and AVERAGE lot reduction with gain postings.
+- hledger and hledger-lib are published as GPL-3.0-or-later packages, which is compatible with this GPLv3 repository when vendored with license notices and corresponding source.
 - Beancount and Ledger remain useful research references, but they are not the primary oracle for all supported methods.
 - Scope-local hybrid has no exact single upstream equivalent, so the oracle may combine hledger-backed per-scope exact and average-cost evidence with project-owned hybrid lifecycle assertions.
 - Dataset activities are synthetic and can be designed specifically to avoid upstream license inheritance from copied fixture text.
