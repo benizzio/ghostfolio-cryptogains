@@ -28,6 +28,7 @@ The specification is kept in `spec.md` for repository tooling compatibility, but
 - Q: How should empirical comparisons handle decimal equality versus tolerances? -> A: Quantities must compare by exact decimal equality; calculated financial values may use documented tolerances.
 - Q: How should empirical tests handle hledger availability? -> A: hledger must be vendored inside the repository for empirical test use.
 - Q: Should oracle outputs be persisted or generated only during tests? -> A: Persist normalized oracle outputs as golden fixtures.
+- Q: When may empirical tests run hledger generation? -> A: Only when the required golden fixture is absent.
 
 ## Terms Used In This Spec
 
@@ -58,7 +59,7 @@ Create an empirical external dataset that is broad enough to exercise the calcul
 
 Create an empirical calculation oracle that uses hledger to derive expected outcomes from the empirical external dataset.
 
-**Independent Test**: Running the oracle on the dataset produces deterministic normalized golden fixture output whose hash is stable for the same hledger version, oracle code, and dataset input.
+**Independent Test**: Running the oracle on the dataset produces deterministic normalized golden fixture output whose hash is stable for the same hledger version, oracle code, and dataset input. Empirical tests reuse existing golden fixtures and invoke hledger generation only when a required golden fixture is absent.
 
 **Required Outcomes**:
 
@@ -105,13 +106,14 @@ Each requirement applies to internal test infrastructure, not to user-facing app
 - **FR-014**: The empirical calculation oracle MUST include input and output hashes so oracle results are reproducible and drift is visible.
 - **FR-015**: The empirical calculation oracle MUST reject or mark unsupported any dataset case that cannot be represented faithfully in hledger without changing the case's financial meaning.
 - **FR-016**: The empirical calculation oracle MUST persist normalized oracle output as repository golden fixtures used by empirical solidified financial tests.
-- **FR-017**: The empirical solidified financial tests MUST be integration tests and MUST NOT replace existing unit, contract, integration, coverage, or performance verification requirements.
-- **FR-018**: The empirical solidified financial tests MUST be implemented in a completely isolated Go test package dedicated to empirical financial validation. The expected package path is `tests/empirical`, separate from `tests/integration`.
-- **FR-019**: The empirical solidified financial tests MUST run the project calculation layer from translated dataset records, not by parsing generated Markdown reports or generated report documents.
-- **FR-020**: The empirical solidified financial tests MUST compare pure normalized calculation results only and MUST NOT assert Markdown, report document structure, TUI text, saved filenames, output paths, or other report-format boundaries.
-- **FR-021**: The empirical solidified financial tests MUST compare per-year and per-method outputs for realized gain or loss, allocated basis, closing quantity, closing basis, full-liquidation effects where comparable, and method-specific matching evidence where comparable.
-- **FR-022**: The empirical solidified financial tests MUST report comparison failures with enough context to identify the exact dataset row or calculation segment that drifted.
-- **FR-023**: After the dataset is introduced by this dataset-maintenance work, ordinary feature work MUST treat it as read-only and MUST adapt code or project-owned tests around it instead of mutating it.
+- **FR-017**: The empirical solidified financial tests MUST read existing golden fixtures by default and MUST invoke hledger-backed oracle generation only when the required golden fixture is absent.
+- **FR-018**: The empirical solidified financial tests MUST be integration tests and MUST NOT replace existing unit, contract, integration, coverage, or performance verification requirements.
+- **FR-019**: The empirical solidified financial tests MUST be implemented in a completely isolated Go test package dedicated to empirical financial validation. The expected package path is `tests/empirical`, separate from `tests/integration`.
+- **FR-020**: The empirical solidified financial tests MUST run the project calculation layer from translated dataset records, not by parsing generated Markdown reports or generated report documents.
+- **FR-021**: The empirical solidified financial tests MUST compare pure normalized calculation results only and MUST NOT assert Markdown, report document structure, TUI text, saved filenames, output paths, or other report-format boundaries.
+- **FR-022**: The empirical solidified financial tests MUST compare per-year and per-method outputs for realized gain or loss, allocated basis, closing quantity, closing basis, full-liquidation effects where comparable, and method-specific matching evidence where comparable.
+- **FR-023**: The empirical solidified financial tests MUST report comparison failures with enough context to identify the exact dataset row or calculation segment that drifted.
+- **FR-024**: After the dataset is introduced by this dataset-maintenance work, ordinary feature work MUST treat it as read-only and MUST adapt code or project-owned tests around it instead of mutating it.
 
 ### Precision And Tolerance Requirements
 
@@ -134,7 +136,7 @@ Each requirement applies to internal test infrastructure, not to user-facing app
 
 - **DEP-001**: hledger is a repository-vendored test-time tool for this empirical validation scope. Runtime application code MUST NOT depend on hledger.
 - **DEP-002**: The vendored hledger artifact or source, supported version, version-detection command, license implications, platform support, failure modes, and reproducibility implications MUST be documented before implementation.
-- **DEP-003**: The empirical test command MUST fail with an actionable setup error when the repository-vendored hledger tool is missing, not executable on the current platform, or reports an unsupported version.
+- **DEP-003**: The empirical test command MUST require the repository-vendored hledger tool only when a required golden fixture is absent and generation is needed. In that case, it MUST fail with an actionable setup error when the tool is missing, not executable on the current platform, or reports an unsupported version.
 
 ## Dataset Coverage Requirements
 
@@ -184,7 +186,7 @@ The empirical external dataset MUST include at least these categories:
 
 - **SC-001**: Dataset validation confirms at least 150 activities across at least 3 source-calendar years.
 - **SC-002**: Dataset validation confirms coverage tags for every supported project cost-basis method and every required dataset coverage category in this specification.
-- **SC-003**: The oracle produces deterministic normalized golden fixture output for every supported empirical case when run with the documented hledger version and command set.
+- **SC-003**: The oracle produces deterministic normalized golden fixture output for every supported empirical case when run with the documented hledger version and command set, and empirical tests do not run hledger generation while the required golden fixtures are present.
 - **SC-004**: Empirical solidified financial integration tests compare project calculation output against oracle output for every supported method and report actionable differences when comparison fails.
 - **SC-005**: Zero-priced holding reduction cases prove quantity and basis are reduced while proceeds, realized gain, and realized loss remain zero or absent according to the normalized comparison contract.
 - **SC-006**: Precision-sensitive cases either match under the 16-decimal internal precision policy or are covered by an explicitly documented test-only precision configuration path.
