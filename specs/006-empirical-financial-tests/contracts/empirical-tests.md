@@ -74,9 +74,9 @@ The empirical suite must compare every supported project cost-basis method:
 - LIFO
 - HIFO
 - Average Cost Basis
-- Scope-Local Exact Unit Matching otherwise Scope-Local Average Cost with Oldest-Acquired Deemed-Disposal Order
+- Scope-Local Hybrid (`scope_local_hybrid`)
 
-Scope-local hybrid comparisons must distinguish hledger-backed sub-evidence from project-owned composition rules.
+Scope-Local Hybrid (`scope_local_hybrid`) comparisons must distinguish hledger-backed sub-evidence from project-owned composition rules.
 
 ## Required Field Coverage
 
@@ -86,20 +86,32 @@ Comparable output must include at least:
 - allocated basis
 - closing quantity
 - closing basis
-- full-liquidation effects where comparable
-- method-specific lot or pool evidence where comparable
+- full-liquidation effects when the fixture records source IDs, evidence type, and expected values
+- method-specific lot or pool evidence when the fixture records source IDs, evidence type, and expected values
 - zero-priced holding reduction effects
+
+## Comparability Rules
+
+- A field is comparable only when the oracle fixture contains a normalized expected value for the same case, method, year, asset, and source-row segment.
+- A field is not comparable when an unsupported segment covers that field.
+- Unsupported fields must be reported as skipped with the unsupported reason; they must not be counted as matched external-oracle assertions.
+- Scope-Local Hybrid assertions must be labeled `hledger_backed` or `project_composition_rule`.
+- A `project_composition_rule` assertion must include a stable rule ID and the source-row segment it covers.
 
 ## Precision Rules
 
 - Quantity fields compare by exact decimal equality.
 - Financial value fields compare after normalization under the selected decimal policy.
 - The default selected policy is the project's production 16-decimal round-half-up internal calculation policy.
+- Accepted `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` values use the form `scale=<digits>,rounding=half_up`.
+- The required accepted value is `scale=16,rounding=half_up`, matching the production default.
+- Additional hledger-aligned accepted values may be added only when hledger cannot align with the production default, and each added value must be documented with the hledger version and reason.
 - If hledger cannot be configured or normalized to match the default policy for every valid case, empirical tests must set `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` to the hledger-established policy before invoking project calculation.
 - Production behavior must keep the 16-decimal default when `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` is unset.
-- Financial value fields may use documented tight per-field tolerances only for residual hledger/project deviations after decimal-policy alignment.
+- Financial value fields may use documented per-field tolerances only for residual hledger/project deviations after decimal-policy alignment.
 - Quantity tolerance is always zero.
-- Financial tolerances must be small enough to catch material drift and systematic method differences.
+- Non-zero financial tolerances must not exceed one unit at the selected decimal-policy scale. For the production 16-decimal policy, the maximum is `0.0000000000000001`.
+- A non-zero financial tolerance must include a fixture note explaining why exact equality is not achievable for that hledger-derived value.
 - Comparison code must use decimal arithmetic only.
 - Floating-point math is invalid in dataset parsing, normalization, and comparison.
 

@@ -69,6 +69,9 @@ tools/empiricaloracle/
       "allocated_basis": "0.0000000000000001",
       "closing_basis": "0.0000000000000001"
     },
+    "tolerance_notes": {
+      "realized_gain_or_loss": "One-unit residual from hledger output scale after decimal-policy alignment for this fixture"
+    },
     "oracle_output_hash": "sha256:..."
   }
 }
@@ -82,6 +85,7 @@ Every golden fixture must include:
 - exact command arguments
 - selected decimal policy
 - documented financial tolerances
+- tolerance notes for every non-zero financial tolerance
 - dataset input hash
 - generated hledger input hash
 - normalized oracle output hash
@@ -99,10 +103,22 @@ Every golden fixture must include:
 - Quantities are canonical decimal strings and compare exactly.
 - Financial values are normalized to the selected decimal policy before comparison.
 - The default selected policy is the project's production 16-decimal round-half-up policy.
+- Accepted `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` values use the form `scale=<digits>,rounding=half_up`.
+- The required accepted value is `scale=16,rounding=half_up`, matching the production default.
+- Additional hledger-aligned accepted values may be added only when hledger cannot align with the production default, and each added value must be documented with the hledger version and reason.
 - If hledger cannot be configured or normalized to the production policy for every valid case, empirical tests must set `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` before project calculation runs and fixtures must record the hledger-aligned policy used.
-- Residual financial differences after decimal-policy alignment may use documented tight per-field tolerances. Quantity tolerance is always zero.
-- Tolerances must be small enough to catch material drift and systematic method differences.
+- Residual financial differences after decimal-policy alignment may use documented per-field tolerances. Quantity tolerance is always zero.
+- Non-zero financial tolerances must not exceed one unit at the selected decimal-policy scale. For the production 16-decimal policy, the maximum is `0.0000000000000001`.
+- Every non-zero financial tolerance must include a tolerance note explaining why exact equality is not achievable for that hledger-derived value.
 - Floating-point JSON numbers are invalid for financial fields.
+
+## Comparability Rules
+
+- A field is comparable only when the fixture contains a normalized expected value for the same case, method, year, asset, and source-row segment.
+- Full-liquidation effects and method-specific lot or pool evidence are comparable only when the fixture records the evidence source IDs and expected values.
+- Scope-Local Hybrid (`scope_local_hybrid`) assertions must be labeled `hledger_backed` or `project_composition_rule`.
+- A `project_composition_rule` assertion must include a stable rule ID and the source-row segment it covers.
+- Unsupported fields must be reported as skipped with the unsupported reason and must not be counted as matched external-oracle assertions.
 
 ## Unsupported Segment Rules
 
@@ -123,13 +139,13 @@ Rules:
 - `reason` is required.
 - Unsupported segments must not fabricate expected values.
 - Unsupported segments must not be silently omitted from method coverage reporting.
-- Project-owned composition rules may compare scope-local hybrid lifecycle state only when documented by the fixture and test failure output.
+- Project-owned composition rules may compare Scope-Local Hybrid (`scope_local_hybrid`) lifecycle state only when documented by the fixture and test failure output.
 
 ## hledger Invocation Rules
 
 - Empirical tests read golden fixtures by default.
 - hledger generation is allowed only when a required fixture is absent or when an explicit regeneration command is used.
-- The command must be the repository-vendored hledger executable or a wrapper that resolves only that vendored tool.
+- The command must be the repository-vendored hledger executable at `third_party/hledger/bin/<goos>-<goarch>/hledger` or a wrapper that resolves only that vendored tool.
 - The command must not use a developer's default `LEDGER_FILE` or hledger config.
 - The command must pass explicit file arguments.
 - The command must record version output before normalization.
@@ -142,8 +158,10 @@ Rules:
 - GPL-3.0-or-later license text
 - upstream source URL
 - selected hledger version
-- checksum for vendored source or artifact
-- source or complete corresponding source for any executable artifact
+- checksum for vendored source
+- checksum for each supported executable artifact
+- complete corresponding source under `third_party/hledger/source/`
+- supported executable artifacts under `third_party/hledger/bin/<goos>-<goarch>/hledger`
 - platform support notes
 - regeneration instructions
 - statement that runtime application code must not link, import, or execute hledger

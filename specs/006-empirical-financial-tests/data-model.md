@@ -65,7 +65,7 @@ Fields:
 | `unit_price` | decimal string nullable | Optional same-tier value used for derivation evidence |
 | `fee_amount` | decimal string nullable | Explicit fee. `0` is distinct from missing |
 | `currency` | string nullable | Required for priced rows, absent for zero-priced reductions |
-| `source_scope` | `EmpiricalScope` nullable | Scope used by scope-local hybrid cases |
+| `source_scope` | `EmpiricalScope` nullable | Scope used by Scope-Local Hybrid (`scope_local_hybrid`) cases |
 | `zero_priced_reduction_explanation` | string nullable | Required for zero-priced holding reductions |
 | `coverage_tags` | string array | Row-level coverage categories |
 
@@ -181,7 +181,9 @@ Fields:
 | `source_url` | URL | Upstream source URL |
 | `license` | string | GPL-3.0-or-later |
 | `license_path` | path | Vendored license text path |
-| `source_path` | path | Vendored source or corresponding source path |
+| `source_path` | path | Complete corresponding source path under `third_party/hledger/source/` |
+| `executable_paths` | path array | Supported executable artifact paths under `third_party/hledger/bin/<goos>-<goarch>/hledger` |
+| `executable_checksums` | string map | Checksum for each supported executable artifact |
 | `checksum` | string | Checksum for vendored source or artifact |
 | `executable_path` | path nullable | Test-time command path when an executable is available |
 | `platform_support` | string array | Supported local platforms for generation |
@@ -193,7 +195,8 @@ Relationships:
 Validation rules:
 
 - Binary-only vendoring is invalid.
-- License text and corresponding source must be present.
+- License text and complete corresponding source must be present.
+- Each supported executable artifact has a matching checksum.
 - Runtime application code must not import or execute hledger.
 - Missing or unsupported hledger fails fixture generation with an actionable setup error, not normal fixture-backed comparisons.
 
@@ -245,7 +248,7 @@ Fields:
 | `allocated_basis` | decimal string | Expected basis allocated to disposals |
 | `closing_quantity` | decimal string | Expected remaining quantity |
 | `closing_basis` | decimal string | Expected remaining basis |
-| `matches` | `OracleMatchEvidence[]` | Method-specific lot or pool evidence where comparable |
+| `matches` | `OracleMatchEvidence[]` | Method-specific lot or pool evidence when the fixture records source IDs, evidence type, and expected values |
 | `unsupported_segments` | `UnsupportedOracleSegment[]` | Explicit unsupported evidence when needed |
 | `metadata` | `OracleGenerationRun` | Generation metadata and hashes |
 
@@ -276,6 +279,8 @@ Fields:
 | `matched_basis` | decimal string | Basis matched |
 | `matched_proceeds` | decimal string nullable | Proceeds evidence when comparable |
 | `matched_gain_or_loss` | decimal string nullable | Fragment-level result when comparable |
+| `support_label` | enum | `hledger_backed` or `project_composition_rule` |
+| `composition_rule_id` | string nullable | Required for `project_composition_rule` evidence |
 
 Relationships:
 
@@ -286,6 +291,7 @@ Validation rules:
 
 - Quantities sum to represented disposal quantities.
 - Missing hledger evidence is explicit, not inferred silently.
+- Scope-Local Hybrid evidence is labeled as hledger-backed evidence or project-owned composition-rule evidence.
 
 ## UnsupportedOracleSegment
 
@@ -357,7 +363,7 @@ Fields:
 | `actual_value` | decimal string | Project value |
 | `difference` | decimal string | Absolute or signed difference according to field contract |
 | `decimal_policy` | string | Selected comparison policy, such as production 16-decimal round-half-up or hledger-aligned empirical policy |
-| `tolerance` | decimal string | Allowed residual difference, zero for quantity fields and documented tightly for financial fields |
+| `tolerance` | decimal string | Allowed residual difference, zero for quantity fields and at most one unit of selected decimal-policy scale for financial fields |
 | `passed` | boolean | Whether comparison passed |
 | `diagnostic_context` | string | Non-secret failure context |
 
@@ -371,6 +377,7 @@ Validation rules:
 - Financial values compare after normalization under `decimal_policy` with the documented `tolerance` for residual hledger/project deviations.
 - If hledger cannot align with the production 16-decimal policy, empirical tests select the hledger-aligned policy through the test-scoped environment variable before project calculation runs.
 - Quantity `tolerance` is zero.
-- Financial `tolerance` is documented per field and must be tight enough to catch material drift and systematic method differences.
+- Financial `tolerance` is documented per field and must not exceed one unit at the selected decimal-policy scale.
+- A non-zero financial tolerance requires a note explaining why exact equality is not achievable for that hledger-derived value.
 - Failure output identifies dataset case, method, asset, year, field, decimal policy, expected, actual, difference, and tolerance.
 - Failure output excludes secrets, raw protected payloads, Markdown, report files, and UI text.

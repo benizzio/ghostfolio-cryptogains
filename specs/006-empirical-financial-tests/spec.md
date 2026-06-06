@@ -12,7 +12,7 @@
 
 This specification defines the needs for creating and using an `empirical external dataset` to validate the financial calculation layer against expected outcomes produced by an external plain-text-accounting engine.
 
-This work is not a user-facing product feature. It exists to detect calculation drift in FIFO, LIFO, HIFO, Average Cost Basis, and Scope-Local Exact Unit Matching otherwise Scope-Local Average Cost with Oldest-Acquired Deemed-Disposal Order.
+This work is not a user-facing product feature. It exists to detect calculation drift in FIFO, LIFO, HIFO, Average Cost Basis, and Scope-Local Hybrid (`scope_local_hybrid`), defined as scope-local exact-unit matching with scope-local average-cost fallback and oldest-acquired deemed-disposal order.
 
 The specification is kept in `spec.md` for repository tooling compatibility, but it intentionally uses internal validation objectives instead of user stories.
 
@@ -25,11 +25,11 @@ The specification is kept in `spec.md` for repository tooling compatibility, but
 - Q: Where should empirical solidified financial tests live? -> A: In a completely isolated Go test package dedicated to empirical financial validation, not in the existing integration test package.
 - Q: Should empirical solidified financial tests compare generated report formats? -> A: No. They must compare pure normalized calculation results only and must not assert Markdown, report document, or UI formatting.
 - Q: Should empirical solidified financial tests cover currency conversion? -> A: No. They must run entirely with one currency to isolate cost-basis and gains-and-losses calculations. Currency conversion logic must never be added to this empirical suite.
-- Q: How should empirical comparisons handle decimal equality versus precision differences? -> A: Quantities must compare by exact decimal equality after normalization. Calculated financial values must first be normalized under one selected decimal policy; if hledger cannot be configured to match the project's 16-decimal production policy for every valid case, empirical tests must set `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` to make the project calculation layer use hledger's established decimal policy while keeping production default behavior at 16 decimals when the variable is unset. After that alignment, calculated financial values may use documented tight per-field tolerances for residual hledger/project deviations.
+- Q: How should empirical comparisons handle decimal equality versus precision differences? -> A: Quantities must compare by exact decimal equality after normalization. Calculated financial values must first be normalized under one selected decimal policy; if hledger cannot be configured to match the project's 16-decimal production policy for every valid case, empirical tests must set `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` to make the project calculation layer use hledger's established decimal policy while keeping production default behavior at 16 decimals when the variable is unset. After that alignment, calculated financial values may use documented per-field tolerances for residual hledger/project deviations, capped at one unit of the selected decimal-policy scale.
 - Q: How should empirical tests handle hledger availability? -> A: hledger must be vendored inside the repository for empirical test use.
 - Q: Should oracle outputs be persisted or generated only during tests? -> A: Persist normalized oracle outputs as golden fixtures.
 - Q: When may empirical tests run hledger generation? -> A: Only when the required golden fixture is absent.
-- Q: Is hledger licensing compatible with repository vendoring? -> A: Yes, only with GPLv3-compliant vendoring that includes source, license notices, and no binary-only artifact.
+- Q: Is hledger licensing compatible with repository vendoring? -> A: Yes, only with GPLv3-compliant vendoring that includes complete corresponding source, license notices, checksums, and no binary-only vendoring.
 
 ## Terms Used In This Spec
 
@@ -37,6 +37,7 @@ The specification is kept in `spec.md` for repository tooling compatibility, but
 - **Empirical calculation oracle**: A deterministic tool or test helper that uses `hledger` to process the empirical external dataset and emit normalized, assertable expected results.
 - **Empirical solidified financial tests**: Supplemental integration tests that translate the empirical external dataset into this project's calculation inputs, run the project calculation layer, and compare those results with the oracle output.
 - **Oracle output**: The normalized assertable golden fixture generated from hledger results, including gains, losses, cost basis, holdings, and matched-lot evidence where supported.
+- **Scope-Local Hybrid**: The canonical short name for method key `scope_local_hybrid`, defined as scope-local exact-unit matching with scope-local average-cost fallback and oldest-acquired deemed-disposal order.
 - **Zero-priced holding reduction**: An explained activity that reduces quantity and basis under the selected method without proceeds, realized gain, realized loss, or priced-liquidation treatment.
 - **Dataset maintenance spec**: An isolated specification whose explicit purpose includes creating, correcting, or expanding the empirical external dataset. This specification is such a dataset-maintenance spec.
 
@@ -67,7 +68,7 @@ Create an empirical calculation oracle that uses hledger to derive expected outc
 1. The oracle records the hledger version, command arguments, dataset input hash, oracle output hash, and any normalization step used before comparison.
 2. The oracle emits expected realized gains and losses, allocated basis, closing quantity, closing basis, and method-specific lot or pool evidence where hledger provides enough data.
 3. The oracle supports FIFO, LIFO, HIFO, and Average Cost Basis directly through hledger lot-reduction behaviour.
-4. The oracle supports the scope-local hybrid method by using hledger-backed evidence for the scope-local exact-match and scope-local average-cost portions, plus documented project-owned composition rules for the hybrid lifecycle that hledger does not model as one native method.
+4. The oracle supports the Scope-Local Hybrid (`scope_local_hybrid`) method by using hledger-backed evidence for the scope-local exact-match and scope-local average-cost portions, plus documented project-owned composition rules for the hybrid lifecycle that hledger does not model as one native method.
 5. Zero-priced holding reductions are translated to hledger in a way that reduces quantity and basis without creating proceeds, realized gain, or realized loss. The preferred hledger representation is a lotful negative holding movement with no transacted selling price when that produces the required no-gain result. If a dataset case cannot be represented faithfully in hledger syntax, the oracle must mark that case as unsupported for external-oracle comparison instead of silently fabricating expected results.
 
 ### Objective 3 - Add Empirical Solidified Financial Integration Tests
@@ -95,9 +96,9 @@ Each requirement applies to internal test infrastructure, not to user-facing app
 - **FR-002**: The empirical external dataset MUST be stored in a clear, simplified, human-readable format that exposes activity inputs and expected outcome references without hidden transformation logic.
 - **FR-003**: The empirical external dataset MUST contain at least 150 activities.
 - **FR-004**: The empirical external dataset MUST span at least 3 source-calendar years.
-- **FR-005**: The empirical external dataset MUST include activity shapes needed to validate FIFO, LIFO, HIFO, Average Cost Basis, and Scope-Local Exact Unit Matching otherwise Scope-Local Average Cost with Oldest-Acquired Deemed-Disposal Order.
+- **FR-005**: The empirical external dataset MUST include activity shapes needed to validate FIFO, LIFO, HIFO, Average Cost Basis, and Scope-Local Hybrid (`scope_local_hybrid`).
 - **FR-006**: The empirical external dataset MUST include acquisitions, partial liquidations, full liquidations, gains, losses, zero-result liquidations, fees, same-source-calendar-date ordering, pre-year opening positions, in-year activity, after-year ignored activity, full liquidation followed by reacquisition, and assets excluded from selected-year main results.
-- **FR-007**: The empirical external dataset MUST include reliable scoped activity and unreliable or unavailable scoped activity so the scope-local hybrid method can validate narrowing, broadening, fallback activation, fallback carry-forward until zero, same-scope reset after zero, and independent other-scope state.
+- **FR-007**: The empirical external dataset MUST include reliable scoped activity and unreliable or unavailable scoped activity so Scope-Local Hybrid (`scope_local_hybrid`) can validate narrowing, broadening, fallback activation, fallback carry-forward until zero, same-scope reset after zero, and independent other-scope state.
 - **FR-008**: The empirical external dataset MUST include zero-priced holding reductions with explanations. These rows MUST reduce quantity and basis under the selected method and MUST NOT create proceeds, realized gain, realized loss, or priced-liquidation treatment.
 - **FR-009**: The empirical external dataset MUST include cases that require non-terminating division or proportional allocation so shared internal precision behaviour is exercised.
 - **FR-010**: The empirical external dataset MUST include deterministic source IDs and stable ordering fields sufficient to reproduce project calculation order and hledger input order.
@@ -110,11 +111,17 @@ Each requirement applies to internal test infrastructure, not to user-facing app
 - **FR-017**: The empirical solidified financial tests MUST read existing golden fixtures by default and MUST invoke hledger-backed oracle generation only when the required golden fixture is absent.
 - **FR-018**: The empirical solidified financial tests MUST be integration tests and MUST NOT replace existing unit, contract, integration, coverage, or performance verification requirements.
 - **FR-019**: The empirical solidified financial tests MUST be implemented in a completely isolated Go test package dedicated to empirical financial validation. The expected package path is `tests/empirical`, separate from `tests/integration`.
-- **FR-020**: The empirical solidified financial tests MUST run the project calculation layer from translated dataset records, not by parsing generated Markdown reports or generated report documents.
+- **FR-020**: The empirical solidified financial tests MUST run the project calculation layer from translated dataset records.
 - **FR-021**: The empirical solidified financial tests MUST compare pure normalized calculation results only and MUST NOT assert Markdown, report document structure, TUI text, saved filenames, output paths, or other report-format boundaries.
-- **FR-022**: The empirical solidified financial tests MUST compare per-year and per-method outputs for realized gain or loss, allocated basis, closing quantity, closing basis, full-liquidation effects where comparable, and method-specific matching evidence where comparable.
+- **FR-022**: The empirical solidified financial tests MUST compare per-year and per-method outputs for realized gain or loss, allocated basis, closing quantity, closing basis, full-liquidation effects, and method-specific matching evidence when those fields are comparable under the comparability requirements in this specification.
 - **FR-023**: The empirical solidified financial tests MUST report comparison failures with enough context to identify the exact dataset row or calculation segment that drifted.
 - **FR-024**: After the dataset is introduced by this dataset-maintenance work, ordinary feature work MUST treat it as read-only and MUST adapt code or project-owned tests around it instead of mutating it.
+
+### Comparability Requirements
+
+- **CMP-001**: A result field is comparable only when the oracle fixture contains a normalized expected value for the same case, method, year, asset, and source-row segment, and no unsupported segment covers that field.
+- **CMP-002**: Full-liquidation effects and method-specific lot or pool evidence are comparable only when the oracle fixture records the source IDs, evidence type, and expected values used for that assertion.
+- **CMP-003**: Scope-Local Hybrid assertions MUST label each comparison as `hledger_backed` or `project_composition_rule`. A project-owned composition-rule assertion MUST include a stable rule ID and the source-row segment it covers. Assertions without this label are unsupported for external-oracle comparison and MUST be reported as skipped with a reason.
 
 ### Precision Requirements
 
@@ -122,7 +129,7 @@ Each requirement applies to internal test infrastructure, not to user-facing app
 - **FIN-002**: The preferred empirical comparison precision is this project's current shared internal report-calculation precision: 16 decimal places, round half up for required non-terminating divisions and proportional allocations.
 - **FIN-003**: The oracle MUST first attempt to normalize hledger-derived values to the same 16-decimal precision before comparison.
 - **FIN-004**: If hledger cannot be configured or normalized to align with the 16-decimal internal precision for every otherwise valid empirical case, the implementation MUST add a test-scoped environment-variable configuration path for the project internal report-calculation decimal policy. The expected variable is `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY`; empirical tests MUST set it to the hledger-established decimal policy for those runs, production behavior MUST keep the 16-decimal default when the variable is unset, and the accepted variable values MUST be documented before use.
-- **FIN-005**: Quantity fields MUST compare by exact decimal equality after normalization under the selected decimal policy. Calculated financial value fields MUST first compare under the selected decimal policy and MAY use explicitly documented tight per-field tolerances only for residual hledger/project deviations that remain after decimal-policy alignment. Tolerances MUST be small enough to detect material calculation drift and MUST NOT hide systematic method differences.
+- **FIN-005**: Quantity fields MUST compare by exact decimal equality after normalization under the selected decimal policy, and quantity tolerance MUST be `0`. Calculated financial value fields MUST first compare under the selected decimal policy. Non-zero financial tolerances MAY be used only for documented residual hledger/project deviations that remain after decimal-policy alignment, MUST be declared per field in oracle metadata, and MUST NOT exceed one unit at the selected decimal-policy scale (`0.0000000000000001` for the 16-decimal policy). A non-zero tolerance MUST NOT be used for a field unless the fixture documents why exact equality is not achievable for that hledger-derived value.
 - **FIN-006**: Cross-currency conversion remains permanently out of scope for empirical solidified financial tests. The empirical dataset and all empirical test cases MUST use a single currency only, and currency conversion logic MUST NOT be added to this suite.
 - **FIN-007**: If future product calculation work introduces currency conversion, that conversion MUST be covered by separate project-owned tests or a separate dedicated empirical suite. It MUST NOT be folded into the empirical solidified financial tests defined here.
 
@@ -138,10 +145,10 @@ Each requirement applies to internal test infrastructure, not to user-facing app
 
 - **DEP-001**: hledger is a repository-vendored test-time tool for this empirical validation scope. Runtime application code MUST NOT depend on hledger.
 - **DEP-002**: hledger vendoring MUST comply with hledger's GPL-3.0-or-later license and this repository's GPLv3 license. Binary-only vendoring is prohibited.
-- **DEP-003**: The repository MUST include the vendored hledger source package or complete corresponding source for any vendored executable artifact, plus upstream license text, copyright notices, source version, source URL, and checksum.
+- **DEP-003**: The repository MUST include complete corresponding hledger source under `third_party/hledger/source/`, plus upstream license text, copyright notices, source version, source URL, and checksum. Any supported platform executable artifact MUST be committed under `third_party/hledger/bin/<goos>-<goarch>/hledger` with a matching checksum. Empirical tests and oracle generation MUST NOT fetch or build hledger during test execution.
 - **DEP-004**: The empirical oracle MUST invoke hledger as a separate test-time command-line tool and MUST NOT link, import, or embed hledger or hledger-lib code into runtime application code.
-- **DEP-005**: The vendored hledger artifact or source, supported version, version-detection command, platform support, license compliance notes, failure modes, and reproducibility implications MUST be documented before implementation.
-- **DEP-006**: The empirical test command MUST require the repository-vendored hledger tool only when a required golden fixture is absent and generation is needed. In that case, it MUST fail with an actionable setup error when the tool is missing, not executable on the current platform, or reports an unsupported version.
+- **DEP-005**: The vendored hledger executable-and-source model, supported version, version-detection command, platform support, license compliance notes, failure modes, and reproducibility implications MUST be documented before implementation.
+- **DEP-006**: The empirical test command MUST require the repository-vendored hledger executable under `third_party/hledger/bin/<goos>-<goarch>/hledger` only when a required golden fixture is absent and generation is needed. Fixture-backed tests MAY run on platforms without a supported vendored executable. Fixture generation MUST fail with an actionable setup error when the executable is missing, not executable on the current platform, or reports an unsupported version.
 
 ## Dataset Coverage Requirements
 
@@ -193,16 +200,16 @@ The empirical external dataset MUST include at least these categories:
 - **SC-001**: Dataset validation confirms at least 150 activities across at least 3 source-calendar years.
 - **SC-002**: Dataset validation confirms coverage tags for every supported project cost-basis method and every required dataset coverage category in this specification.
 - **SC-003**: The oracle produces deterministic normalized golden fixture output for every supported empirical case when run with the documented hledger version and command set, and empirical tests do not run hledger generation while the required golden fixtures are present.
-- **SC-004**: Empirical solidified financial integration tests compare project calculation output against oracle output for every supported method and report actionable differences when comparison fails.
+- **SC-004**: Empirical solidified financial integration tests compare project calculation output against oracle output for every supported method and every comparable field, and report actionable differences when comparison fails.
 - **SC-005**: Zero-priced holding reduction cases prove quantity and basis are reduced while proceeds, realized gain, and realized loss remain zero or absent according to the normalized comparison contract.
 - **SC-006**: Precision-sensitive cases match exactly under either the 16-decimal production default policy or an explicitly documented empirical-test-only decimal-policy configuration that matches hledger's established policy.
-- **SC-007**: Vendored hledger materials include GPL-3.0-or-later license notices, corresponding source, version identity, source URL, and checksum, and empirical tests use hledger only as a separate test-time tool.
+- **SC-007**: Vendored hledger materials include GPL-3.0-or-later license notices, corresponding source, version identity, source URL, checksums for source and any supported executable artifact, and empirical tests use hledger only as a separate test-time tool.
 
 ## Assumptions
 
 - hledger is the primary external oracle because it directly supports FIFO, LIFO, HIFO, and AVERAGE lot reduction with gain postings.
 - hledger and hledger-lib are published as GPL-3.0-or-later packages, which is compatible with this GPLv3 repository when vendored with license notices and corresponding source.
 - Beancount and Ledger remain useful research references, but they are not the primary oracle for all supported methods.
-- Scope-local hybrid has no exact single upstream equivalent, so the oracle may combine hledger-backed per-scope exact and average-cost evidence with project-owned hybrid lifecycle assertions.
+- Scope-Local Hybrid (`scope_local_hybrid`) has no exact single upstream equivalent, so the oracle may combine hledger-backed per-scope exact and average-cost evidence with project-owned hybrid lifecycle assertions.
 - Dataset activities are synthetic and can be designed specifically to avoid upstream license inheritance from copied fixture text.
 - The empirical suite relies on a repository-vendored hledger tool instead of system hledger installation.

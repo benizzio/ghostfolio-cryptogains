@@ -39,9 +39,9 @@ Use hledger as a separate repository-vendored command-line tool for oracle gener
 
 ## Decision: Vendor GPL-Compliant Source Materials, Not Binary-Only Artifacts
 
-Vendor hledger materials under `third_party/hledger` with GPL-3.0-or-later license text, upstream source URL, selected version, checksum, platform support notes, and source or complete corresponding source for any executable artifact.
+Vendor hledger materials under `third_party/hledger` with GPL-3.0-or-later license text, upstream source URL, selected version, source checksum, platform support notes, complete corresponding source under `third_party/hledger/source/`, and supported executable artifacts under `third_party/hledger/bin/<goos>-<goarch>/hledger` with checksums.
 
-**Rationale**: hledger's README identifies GPLv3-or-later licensing, and the upstream repository includes a GPLv3 license. The repository is GPLv3, so vendoring is compatible only when license and corresponding-source obligations are preserved. The spec explicitly prohibits binary-only vendoring.
+**Rationale**: hledger's README identifies GPLv3-or-later licensing, and the upstream repository includes a GPLv3 license. The repository is GPLv3, so vendoring is compatible only when license and corresponding-source obligations are preserved. The spec explicitly prohibits binary-only vendoring and requires supported executable artifacts to be backed by complete corresponding source.
 
 **Alternatives considered**:
 
@@ -99,14 +99,14 @@ Place empirical solidified financial tests under `tests/empirical` as a complete
 
 ## Decision: Cover Scope-Local Hybrid With hledger-Backed Sub-Evidence Plus Project Composition Rules
 
-For scope-local hybrid, use hledger to validate representable per-scope exact matching and average-cost portions, then apply documented project-owned composition rules for fallback activation, carry-forward until zero, reset after zero, and independent scope state.
+For Scope-Local Hybrid (`scope_local_hybrid`), use hledger to validate representable per-scope exact matching and average-cost portions, then apply documented project-owned composition rules for fallback activation, carry-forward until zero, reset after zero, and independent scope state.
 
 **Rationale**: hledger does not model this project's full hybrid lifecycle as one native method. Using hledger for representable subproblems keeps external evidence where possible while avoiding false claims that hledger directly implements the project's hybrid method.
 
 **Alternatives considered**:
 
 - Treat hledger as a native scope-local-hybrid oracle: rejected because that would be inaccurate.
-- Exclude scope-local hybrid from empirical testing: rejected because the spec requires every supported method.
+- Exclude Scope-Local Hybrid from empirical testing: rejected because the spec requires every supported method.
 - Hand-author all hybrid expected results without hledger evidence: rejected because it weakens the empirical external-oracle objective.
 
 ## Decision: Mark Faithfully Unrepresentable Cases As Unsupported For External Comparison
@@ -123,9 +123,9 @@ If a dataset case cannot be represented in hledger without changing its financia
 
 ## Decision: Align Decimal Policy First, Then Apply Tight Financial Tolerances
 
-Quantities compare by exact decimal equality after normalization. Financial fields are compared after one selected decimal policy is applied to both hledger oracle output and project calculation output. The oracle first attempts to configure or normalize hledger-derived values to this project's production internal policy: 16 decimal places with round-half-up handling for required non-terminating divisions and proportional allocations. If hledger cannot be configured to match that policy for every otherwise valid empirical case, the implementation must expose a test-scoped external environment variable, expected as `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY`, and empirical tests must set it to the hledger-established decimal policy for those runs. Production behavior keeps the 16-decimal default when the variable is unset. After decimal-policy alignment, calculated financial values may use documented tight per-field tolerances for residual external-oracle deviations; tolerances must be small enough to catch material drift and systematic method differences.
+Quantities compare by exact decimal equality after normalization. Financial fields are compared after one selected decimal policy is applied to both hledger oracle output and project calculation output. The oracle first attempts to configure or normalize hledger-derived values to this project's production internal policy: 16 decimal places with round-half-up handling for required non-terminating divisions and proportional allocations. If hledger cannot be configured to match that policy for every otherwise valid empirical case, the implementation must expose a test-scoped external environment variable, expected as `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY`, and empirical tests must set it to the hledger-established decimal policy for those runs. Production behavior keeps the 16-decimal default when the variable is unset. After decimal-policy alignment, calculated financial values may use documented per-field tolerances for residual external-oracle deviations. Quantity tolerance is `0`. Non-zero financial tolerances must be declared per field, must not exceed one unit at the selected decimal-policy scale, and must include a note explaining why exact equality is not achievable for that hledger-derived value.
 
-**Rationale**: Empirical validation should minimize avoidable differences by aligning decimal policy before comparison. hledger may still produce small residual deviations because it is an external accounting engine with its own internal representation and reporting behavior. A documented per-field tolerance prevents immaterial oracle/tooling differences from failing the suite, while the decimal-policy alignment step and tight thresholds keep the comparison sensitive to actual calculation drift.
+**Rationale**: Empirical validation should minimize avoidable differences by aligning decimal policy before comparison. hledger may still produce small residual deviations because it is an external accounting engine with its own internal representation and reporting behavior. A documented per-field tolerance prevents immaterial oracle/tooling differences from failing the suite, while the decimal-policy alignment step and one-unit-at-scale cap keep the comparison sensitive to actual calculation drift.
 
 **Alternatives considered**:
 

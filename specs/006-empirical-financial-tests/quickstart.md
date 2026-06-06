@@ -53,7 +53,10 @@ Expected result:
 - `calculate.Calculate` runs for every comparable method and year
 - normalized project output matches oracle output under the documented decimal-policy and financial-tolerance contract
 - if hledger cannot match the production 16-decimal policy, the empirical command configures `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` to the hledger-established policy before project calculation runs
+- accepted decimal-policy values use the form `scale=<digits>,rounding=half_up`; `scale=16,rounding=half_up` is required and matches the production default
+- quantity tolerance is zero, and any non-zero financial tolerance is capped at one unit of the selected decimal-policy scale
 - failures, if any, identify case, method, year, asset, field, selected decimal policy, expected value, actual value, difference, tolerance, and source IDs
+- fixture-backed empirical tests complete in 30 seconds or less when required golden fixtures are present
 
 ## Run Full Repository Verification
 
@@ -98,7 +101,9 @@ Expected result:
 - upstream source URL is documented
 - selected version is documented
 - checksum is documented
-- source or complete corresponding source is present for any executable artifact
+- complete corresponding source is present under `third_party/hledger/source/`
+- supported executable artifacts are present under `third_party/hledger/bin/<goos>-<goarch>/hledger`
+- checksums are documented for source and every supported executable artifact
 - platform support and failure modes are documented
 - no binary-only vendoring is used
 
@@ -117,7 +122,20 @@ Expected result:
 - artifacts are synthetic and reviewable
 - golden fixtures include hledger version, command arguments, dataset hash, hledger input hash, output hash, and normalization version
 - unsupported hledger segments have explicit reasons
+- comparable fields are identified by case, method, year, asset, source-row segment, expected value, tolerance, and support status
+- Scope-Local Hybrid assertions are labeled as hledger-backed evidence or project-owned composition rules
 - no artifact contains tokens, JWTs, real user data, protected snapshot payloads, generated Markdown reports, TUI text, or output paths
+
+## OWASP Top 10 Review Evidence
+
+Before merge, record the OWASP Top 10 categories reviewed for this empirical test infrastructure and the resulting evidence. The review must cover at least the categories already scoped in `plan.md`: cryptographic failures, identification and authentication failures, insecure design, vulnerable and outdated components, software and data integrity failures, and logging or diagnostic leakage.
+
+Expected result:
+
+- the review confirms the suite does not touch protected storage or token boundaries
+- the review confirms persisted fixtures are synthetic and non-secret
+- the review records hledger vendoring and generated-fixture integrity controls
+- the review records failure-output leakage controls
 
 ## Manual Failure Inspection
 

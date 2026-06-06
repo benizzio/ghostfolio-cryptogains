@@ -24,9 +24,9 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 **Purpose**: Create the repository locations and documentation anchors needed by all empirical validation work.
 
-- [ ] T001 Create empirical directory skeleton at `testdata/empirical/golden/`, `testdata/empirical/hledger/`, `tests/empirical/`, `tests/empirical/fixture/`, `tools/empiricaloracle/`, and `third_party/hledger/`
+- [ ] T001 Create empirical directory skeleton at `testdata/empirical/golden/`, `testdata/empirical/hledger/`, `tests/empirical/`, `tests/empirical/fixture/`, `tools/empiricaloracle/`, `third_party/hledger/bin/`, and `third_party/hledger/source/`
 - [ ] T002 [P] Add empirical artifact operating notes in `testdata/empirical/README.md`
-- [ ] T003 [P] Add hledger vendoring compliance notes in `third_party/hledger/README.md`
+- [ ] T003 [P] Add hledger vendoring compliance notes for complete source, supported executable artifact paths, checksums, platform support, and no binary-only vendoring in `third_party/hledger/README.md`
 - [ ] T004 [P] Add compilable empirical oracle command skeleton in `tools/empiricaloracle/main.go` and `tools/empiricaloracle/doc.go`
 - [ ] T005 [P] Add empirical test package documentation in `tests/empirical/doc.go` and `tests/empirical/fixture/doc.go`
 
@@ -38,7 +38,7 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 **Critical**: No objective phase should begin until this phase is complete.
 
-- [ ] T006 [P] Add decimal policy configuration tests for the default production policy and `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` in `internal/support/math/rounding_internal_test.go`
+- [ ] T006 [P] Add decimal policy configuration tests for the default production policy and documented accepted `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` values in `internal/support/math/rounding_internal_test.go`
 - [ ] T007 Implement decimal policy selection in `internal/support/math/decimal_policy.go` and update `internal/support/math/decimal_ops.go` to keep the 16-decimal round-half-up default when the environment variable is unset
 - [ ] T008 [P] Add shared empirical model tests for dataset, activity, case, oracle, and comparison structs in `tests/empirical/fixture/model_test.go`
 - [ ] T009 Implement shared empirical model structs in `tests/empirical/fixture/model.go`
@@ -68,7 +68,7 @@ description: "Task list for Empirical Solidified Financial Tests"
 - [ ] T017 [US1] Implement the constrained project-owned YAML parser for `testdata/empirical/financial-dataset.yaml` in `tests/empirical/fixture/dataset_parser.go`
 - [ ] T018 [US1] Implement dataset validation rules for counts, years, methods, deterministic ordering, currency, zero-priced reductions, scopes, and synthetic-only content in `tests/empirical/fixture/dataset_validator.go`
 - [ ] T019 [US1] Implement required method and edge-case coverage validation in `tests/empirical/fixture/dataset_coverage.go`
-- [ ] T020 [US1] Populate `testdata/empirical/financial-dataset.yaml` with at least 150 synthetic activities across at least 3 source-calendar years covering FIFO, LIFO, HIFO, average cost, scope-local hybrid, fees, gains, losses, zero-result liquidations, zero-priced reductions, same-date ordering, pre-year positions, in-year activity, after-year ignored activity, full liquidation followed by reacquisition, and assets excluded from selected-year main results
+- [ ] T020 [US1] Populate `testdata/empirical/financial-dataset.yaml` with at least 150 synthetic activities across at least 3 source-calendar years covering FIFO, LIFO, HIFO, average cost, Scope-Local Hybrid (`scope_local_hybrid`), fees, gains, losses, zero-result liquidations, zero-priced reductions, same-date ordering, pre-year positions, in-year activity, after-year ignored activity, full liquidation followed by reacquisition, and assets excluded from selected-year main results
 - [ ] T021 [US1] Update `testdata/empirical/README.md` with the dataset schema fields, stable coverage tag index, synthetic-only policy, and read-only policy after this dataset-maintenance feature completes
 - [ ] T022 [US1] Wire `tests/empirical/dataset_validation_test.go` to load and validate `testdata/empirical/financial-dataset.yaml`
 - [ ] T023 [US1] Run `go test ./tests/empirical -run TestEmpiricalDatasetValidation -count=1 -v` for `tests/empirical/dataset_validation_test.go` and `testdata/empirical/financial-dataset.yaml`
@@ -85,7 +85,7 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 ### Tests for User Story 2
 
-- [ ] T024 [P] [US2] Add hledger vendoring contract tests for license text, source metadata, checksum, source presence, platform support, and runtime prohibition in `tests/empirical/hledger_vendoring_test.go`
+- [ ] T024 [P] [US2] Add hledger vendoring contract tests for license text, source metadata, source checksum, supported executable artifact checksum, source presence, executable path, platform support, and runtime prohibition in `tests/empirical/hledger_vendoring_test.go`
 - [ ] T025 [P] [US2] Add oracle fixture schema tests for metadata, decimal strings, tolerances, hashes, methods, years, matches, and unsupported segments in `tests/empirical/fixture/oracle_output_test.go`
 - [ ] T026 [P] [US2] Add vendored hledger command wrapper tests for version detection, explicit file arguments, missing executable errors, unsupported version errors, and environment isolation in `tools/empiricaloracle/command_test.go`
 - [ ] T027 [P] [US2] Add hledger journal rendering tests for acquisitions, liquidations, fees, zero-priced reductions, same-date ordering, scope evidence, and unsupported cases in `tools/empiricaloracle/journal_test.go`
@@ -93,15 +93,15 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 ### Implementation for User Story 2
 
-- [ ] T029 [US2] Add GPL-compatible hledger license and source metadata in `third_party/hledger/LICENSE` and `third_party/hledger/SOURCE.md`
-- [ ] T030 [US2] Add hledger corresponding source or complete source package under `third_party/hledger/source/`
-- [ ] T031 [US2] Implement vendored hledger discovery, version capture, platform checks, explicit argument handling, and actionable setup errors in `tools/empiricaloracle/command.go`
+- [ ] T029 [US2] Add GPL-compatible hledger license, source metadata, executable metadata, platform support notes, and checksums in `third_party/hledger/LICENSE`, `third_party/hledger/SOURCE.md`, and `third_party/hledger/README.md`
+- [ ] T030 [US2] Add hledger complete corresponding source under `third_party/hledger/source/` and supported executable artifacts under `third_party/hledger/bin/<goos>-<goarch>/hledger`
+- [ ] T031 [US2] Implement vendored hledger discovery from `third_party/hledger/bin/<goos>-<goarch>/hledger`, version capture, platform checks, explicit argument handling, and actionable setup errors in `tools/empiricaloracle/command.go`
 - [ ] T032 [US2] Implement dataset-to-hledger journal rendering in `tools/empiricaloracle/journal.go`
 - [ ] T033 [US2] Implement normalized oracle output JSON generation and stable hashing in `tools/empiricaloracle/oracle_output.go`
 - [ ] T034 [US2] Implement explicit unsupported-segment detection and serialization in `tools/empiricaloracle/unsupported.go`
 - [ ] T035 [US2] Implement CLI generation and explicit regeneration flow in `tools/empiricaloracle/main.go`
 - [ ] T036 [US2] Generate hledger journal fixtures in `testdata/empirical/hledger/` from `testdata/empirical/financial-dataset.yaml`
-- [ ] T037 [US2] Generate normalized golden fixtures for FIFO, LIFO, HIFO, average cost, and scope-local hybrid under `testdata/empirical/golden/`
+- [ ] T037 [US2] Generate normalized golden fixtures for FIFO, LIFO, HIFO, average cost, and Scope-Local Hybrid (`scope_local_hybrid`) under `testdata/empirical/golden/`
 - [ ] T038 [US2] Implement golden fixture loading and validation helpers in `tests/empirical/fixture/oracle_output.go`
 - [ ] T039 [US2] Run `go test ./tools/empiricaloracle ./tests/empirical/fixture -run 'TestHledger|TestOracle|TestJournal' -count=1 -v` for `tools/empiricaloracle` and `tests/empirical/fixture/oracle_output_test.go`
 
@@ -118,8 +118,8 @@ description: "Task list for Empirical Solidified Financial Tests"
 ### Tests for User Story 3
 
 - [ ] T040 [P] [US3] Add dataset-to-project translation tests for `syncmodel.ProtectedActivityCache`, activity ordering, scope reliability, selected currency context, and zero-priced holding reductions in `tests/empirical/fixture/project_translation_test.go`
-- [ ] T041 [P] [US3] Add project calculation output normalization tests for realized gain or loss, allocated basis, closing quantity, closing basis, matches, and reference-only assets in `tests/empirical/fixture/project_output_test.go`
-- [ ] T042 [P] [US3] Add decimal comparator tests for exact quantity equality, financial tolerances, selected decimal policy, difference formatting, and failure context in `tests/empirical/fixture/comparison_test.go`
+- [ ] T041 [P] [US3] Add project calculation output normalization tests for realized gain or loss, allocated basis, closing quantity, closing basis, comparable full-liquidation effects, comparable matches, and reference-only assets in `tests/empirical/fixture/project_output_test.go`
+- [ ] T042 [P] [US3] Add decimal comparator tests for exact quantity equality, capped per-field financial tolerances, selected decimal policy, difference formatting, and failure context in `tests/empirical/fixture/comparison_test.go`
 - [ ] T043 [P] [US3] Add isolation boundary tests that reject Ghostfolio, TUI, snapshot, Markdown, report output writer, OS opener, filename, and Documents-path usage in `tests/empirical/isolation_test.go`
 - [ ] T044 [P] [US3] Add fixture-backed empirical integration test skeleton for all supported methods and comparable cases in `tests/empirical/empirical_calculation_test.go`
 
@@ -130,7 +130,7 @@ description: "Task list for Empirical Solidified Financial Tests"
 - [ ] T047 [US3] Implement `reportmodel.CapitalGainsReport` normalization into project comparison output in `tests/empirical/fixture/project_output.go`
 - [ ] T048 [US3] Implement decimal comparison, per-field tolerance handling, and non-secret failure formatting in `tests/empirical/fixture/comparison.go`
 - [ ] T049 [US3] Implement hledger generation policy guard that skips execution when fixtures exist and permits generation only for missing fixtures in `tests/empirical/fixture/oracle_generation_policy.go`
-- [ ] T050 [US3] Complete the empirical integration flow that validates dataset, loads fixtures, conditionally generates missing fixtures, runs project calculation, normalizes output, and compares every comparable case in `tests/empirical/empirical_calculation_test.go`
+- [ ] T050 [US3] Complete the empirical integration flow that validates dataset, loads fixtures, conditionally generates missing fixtures, runs project calculation, normalizes output, and compares every comparable case while reporting unsupported fields with reasons in `tests/empirical/empirical_calculation_test.go`
 - [ ] T051 [US3] Implement static isolation assertions for forbidden package imports and forbidden output artifacts in `tests/empirical/isolation_test.go`
 - [ ] T052 [US3] Run `go test ./tests/empirical -count=1 -v` for `tests/empirical/empirical_calculation_test.go`
 
@@ -143,13 +143,15 @@ description: "Task list for Empirical Solidified Financial Tests"
 **Purpose**: Finalize documentation, repository verification, formatting, coverage wiring, and fixture review.
 
 - [ ] T053 [P] Update final empirical verification commands and oracle generation command in `specs/006-empirical-financial-tests/quickstart.md`
-- [ ] T054 [P] Update final fixture names, unsupported-case policy, and hledger metadata examples in `specs/006-empirical-financial-tests/contracts/oracle-output.md`
-- [ ] T055 [P] Update accepted decimal-policy values and empirical isolation notes in `specs/006-empirical-financial-tests/contracts/empirical-tests.md`
+- [ ] T054 [P] Update final fixture names, comparability labels, unsupported-case policy, and hledger metadata examples in `specs/006-empirical-financial-tests/contracts/oracle-output.md`
+- [ ] T055 [P] Update empirical isolation notes in `specs/006-empirical-financial-tests/contracts/empirical-tests.md`
 - [ ] T056 Add `./tests/empirical` to the coverage test package list in `Makefile` while keeping `-coverpkg=$(PRODUCTION_PACKAGES)` unchanged
 - [ ] T057 Run `gofmt` on Go files under `internal/support/math/`, `tests/empirical/`, and `tools/empiricaloracle/`
 - [ ] T058 [P] Run synthetic and secret-content fixture review for `testdata/empirical/financial-dataset.yaml`, `testdata/empirical/golden/`, and `testdata/empirical/hledger/`
 - [ ] T059 Run `make test` from the repository root for `Makefile`
 - [ ] T060 Run `make coverage` from the repository root for `Makefile`
+- [ ] T061 [P] Record OWASP Top 10 review evidence for empirical test infrastructure in `specs/006-empirical-financial-tests/quickstart.md`
+- [ ] T062 [P] Verify fixture-backed empirical test runtime target of 30 seconds or less with `go test ./tests/empirical -count=1 -v` and document the observed result in `specs/006-empirical-financial-tests/quickstart.md`
 
 ---
 
@@ -177,7 +179,7 @@ Setup -> Foundational -> US1 Dataset -> US2 Oracle -> US3 Empirical Tests -> Pol
 - T014, T015, and T016 can run in parallel once Phase 2 is complete.
 - T024, T025, T026, T027, and T028 can run in parallel once US1 is complete.
 - T040, T041, T042, T043, and T044 can run in parallel once US2 is complete.
-- T053, T054, T055, and T058 can run in parallel during Polish.
+- T053, T054, T055, T058, T061, and T062 can run in parallel during Polish.
 
 ---
 
