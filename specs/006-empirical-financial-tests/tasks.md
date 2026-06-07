@@ -24,11 +24,11 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 **Purpose**: Create the repository locations and documentation anchors needed by all empirical validation work.
 
-- [ ] T001 Create empirical directory skeleton at `testdata/empirical/golden/`, `testdata/empirical/hledger/`, `tests/empirical/`, `tests/empirical/fixture/`, `tools/empiricaloracle/`, `third_party/hledger/bin/`, and `third_party/hledger/source/`
-- [ ] T002 [P] Add empirical artifact operating notes in `testdata/empirical/README.md`
-- [ ] T003 [P] Add hledger vendoring compliance notes for complete source, supported executable artifact paths, checksums, platform support, and no binary-only vendoring in `third_party/hledger/README.md`
-- [ ] T004 [P] Add compilable empirical oracle command skeleton in `tools/empiricaloracle/main.go` and `tools/empiricaloracle/doc.go`
-- [ ] T005 [P] Add empirical test package documentation in `tests/empirical/doc.go` and `tests/empirical/fixture/doc.go`
+- [X] T001 Create empirical directory skeleton at `testdata/empirical/golden/`, `testdata/empirical/hledger/`, `tests/empirical/`, `tests/empirical/fixture/`, `tools/empiricaloracle/`, `third_party/hledger/bin/`, and `third_party/hledger/source/`
+- [X] T002 [P] Add empirical artifact operating notes in `testdata/empirical/README.md`
+- [X] T003 [P] Add hledger vendoring compliance notes for complete source, supported executable artifact paths, checksums, platform support, and no binary-only vendoring in `third_party/hledger/README.md`
+- [X] T004 [P] Add compilable empirical oracle command skeleton in `tools/empiricaloracle/main.go` and `tools/empiricaloracle/doc.go`
+- [X] T005 [P] Add empirical test package documentation in `tests/empirical/doc.go` and `tests/empirical/fixture/doc.go`
 
 ---
 
@@ -38,14 +38,14 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 **Critical**: No objective phase should begin until this phase is complete.
 
-- [ ] T006 [P] Add decimal policy configuration tests for the default production policy and documented accepted `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` values in `internal/support/math/rounding_internal_test.go`
-- [ ] T007 Implement decimal policy selection in `internal/support/math/decimal_policy.go` and update `internal/support/math/decimal_ops.go` to keep the 16-decimal round-half-up default when the environment variable is unset
-- [ ] T008 [P] Add shared empirical model tests for dataset, activity, case, oracle, and comparison structs in `tests/empirical/fixture/model_test.go`
-- [ ] T009 Implement shared empirical model structs in `tests/empirical/fixture/model.go`
-- [ ] T010 [P] Add decimal string parsing and canonicalization tests in `tests/empirical/fixture/decimal_test.go`
-- [ ] T011 Implement decimal string parsing and canonicalization helpers in `tests/empirical/fixture/decimal.go`
-- [ ] T012 [P] Add synthetic-content scanner tests for token, JWT, bearer, real-name, and copied-fixture patterns in `tests/empirical/fixture/security_test.go`
-- [ ] T013 Implement synthetic-content scanner helpers in `tests/empirical/fixture/security.go`
+- [X] T006 [P] Add decimal policy configuration tests for the default production policy and documented accepted `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` values in `internal/support/math/rounding_internal_test.go`
+- [X] T007 Implement decimal policy selection in `internal/support/math/decimal_policy.go` and update `internal/support/math/decimal_ops.go` to keep the 16-decimal round-half-up default when the environment variable is unset
+- [X] T008 [P] Add shared empirical model tests for dataset, activity, case, oracle, and comparison structs in `tests/empirical/fixture/model_test.go`
+- [X] T009 Implement shared empirical model structs in `tests/empirical/fixture/model.go`
+- [X] T010 [P] Add decimal string parsing and canonicalization tests in `tests/empirical/fixture/decimal_test.go`
+- [X] T011 Implement decimal string parsing and canonicalization helpers in `tests/empirical/fixture/decimal.go`
+- [X] T012 [P] Add synthetic-content scanner tests for token, JWT, bearer, real-name, and copied-fixture patterns in `tests/empirical/fixture/security_test.go`
+- [X] T013 Implement synthetic-content scanner helpers in `tests/empirical/fixture/security.go`
 
 **Checkpoint**: Shared empirical helpers compile, decimal-policy behavior is covered, and objective work can begin.
 
@@ -59,19 +59,19 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 ### Tests for User Story 1
 
-- [ ] T014 [P] [US1] Add dataset parser contract tests for top-level fields, activity fields, case fields, string-only decimals, scopes, and zero-priced reductions in `tests/empirical/fixture/dataset_parser_test.go`
-- [ ] T015 [P] [US1] Add dataset validation contract tests for activity count, year span, supported methods, deterministic source IDs, ordering metadata, single currency, and synthetic-only content in `tests/empirical/dataset_validation_test.go`
-- [ ] T016 [P] [US1] Add required coverage tag tests for every method and edge-case category from `specs/006-empirical-financial-tests/spec.md` in `tests/empirical/fixture/dataset_coverage_test.go`
+- [X] T014 [P] [US1] Add dataset parser contract tests for top-level fields, activity fields, case fields, string-only decimals, scopes, and zero-priced reductions in `tests/empirical/fixture/dataset_parser_test.go`
+- [X] T015 [P] [US1] Add dataset validation contract tests for activity count, year span, supported methods, deterministic source IDs, ordering metadata, single currency, and synthetic-only content in `tests/empirical/dataset_validation_test.go`
+- [X] T016 [P] [US1] Add required coverage tag tests for every method and edge-case category from `specs/006-empirical-financial-tests/spec.md` in `tests/empirical/fixture/dataset_coverage_test.go`
 
 ### Implementation for User Story 1
 
-- [ ] T017 [US1] Implement the constrained project-owned YAML parser for `testdata/empirical/financial-dataset.yaml` in `tests/empirical/fixture/dataset_parser.go`
-- [ ] T018 [US1] Implement dataset validation rules for counts, years, methods, deterministic ordering, currency, zero-priced reductions, scopes, and synthetic-only content in `tests/empirical/fixture/dataset_validator.go`
-- [ ] T019 [US1] Implement required method and edge-case coverage validation in `tests/empirical/fixture/dataset_coverage.go`
-- [ ] T020 [US1] Populate `testdata/empirical/financial-dataset.yaml` with at least 150 synthetic activities across at least 3 source-calendar years covering FIFO, LIFO, HIFO, average cost, Scope-Local Hybrid (`scope_local_hybrid`), fees, gains, losses, zero-result liquidations, zero-priced reductions, same-date ordering, pre-year positions, in-year activity, after-year ignored activity, full liquidation followed by reacquisition, and assets excluded from selected-year main results
-- [ ] T021 [US1] Update `testdata/empirical/README.md` with the dataset schema fields, stable coverage tag index, synthetic-only policy, and read-only policy after this dataset-maintenance feature completes
-- [ ] T022 [US1] Wire `tests/empirical/dataset_validation_test.go` to load and validate `testdata/empirical/financial-dataset.yaml`
-- [ ] T023 [US1] Run `go test ./tests/empirical -run TestEmpiricalDatasetValidation -count=1 -v` for `tests/empirical/dataset_validation_test.go` and `testdata/empirical/financial-dataset.yaml`
+- [X] T017 [US1] Implement the constrained project-owned YAML parser for `testdata/empirical/financial-dataset.yaml` in `tests/empirical/fixture/dataset_parser.go`
+- [X] T018 [US1] Implement dataset validation rules for counts, years, methods, deterministic ordering, currency, zero-priced reductions, scopes, and synthetic-only content in `tests/empirical/fixture/dataset_validator.go`
+- [X] T019 [US1] Implement required method and edge-case coverage validation in `tests/empirical/fixture/dataset_coverage.go`
+- [X] T020 [US1] Populate `testdata/empirical/financial-dataset.yaml` with at least 150 synthetic activities across at least 3 source-calendar years covering FIFO, LIFO, HIFO, average cost, Scope-Local Hybrid (`scope_local_hybrid`), fees, gains, losses, zero-result liquidations, zero-priced reductions, same-date ordering, pre-year positions, in-year activity, after-year ignored activity, full liquidation followed by reacquisition, and assets excluded from selected-year main results
+- [X] T021 [US1] Update `testdata/empirical/README.md` with the dataset schema fields, stable coverage tag index, synthetic-only policy, and read-only policy after this dataset-maintenance feature completes
+- [X] T022 [US1] Wire `tests/empirical/dataset_validation_test.go` to load and validate `testdata/empirical/financial-dataset.yaml`
+- [X] T023 [US1] Run `go test ./tests/empirical -run TestEmpiricalDatasetValidation -count=1 -v` for `tests/empirical/dataset_validation_test.go` and `testdata/empirical/financial-dataset.yaml`
 
 **Checkpoint**: The dataset is independently valid and reviewable without hledger or project calculation output.
 

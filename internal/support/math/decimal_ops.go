@@ -136,7 +136,9 @@ func RequireFinite(value apd.Decimal) error {
 }
 
 // DivideFiniteRoundHalfUp divides one finite decimal by another and rounds the
-// quotient half up to the shared internal fixed scale.
+// quotient half up to the selected internal calculation scale. When
+// GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY is unset, the production
+// 16-decimal round-half-up policy is used.
 //
 // Example:
 //
@@ -168,8 +170,13 @@ func DivideFiniteRoundHalfUp(dividend apd.Decimal, divisor apd.Decimal) (apd.Dec
 		return apd.Decimal{}, fmt.Errorf("division requires a non-zero divisor")
 	}
 
-	var scaledQuotient = scaledRoundedQuotient(dividend, divisor, InternalCalculationScale)
-	return scaledCoefficientDecimal(scaledQuotient, InternalCalculationScale), nil
+	var policy, err = selectedDecimalPolicy()
+	if err != nil {
+		return apd.Decimal{}, fmt.Errorf("select division decimal policy: %w", err)
+	}
+
+	var scaledQuotient = scaledRoundedQuotient(dividend, divisor, policy.scale)
+	return scaledCoefficientDecimal(scaledQuotient, policy.scale), nil
 }
 
 // Compare validates two finite decimal operands and returns their ordering.

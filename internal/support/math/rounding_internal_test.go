@@ -2,12 +2,89 @@ package math
 
 import (
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/cockroachdb/apd/v3"
 )
+
+// TestDecimalPolicyConfiguration verifies the production default policy and the
+// documented accepted decimal-policy environment-variable values.
+// Authored by: OpenCode
+func TestDecimalPolicyConfiguration(t *testing.T) {
+	const expectedPolicy = "scale=16,rounding=half_up"
+
+	if got := defaultDecimalPolicy().canonicalString(); got != expectedPolicy {
+		t.Fatalf("unexpected production default decimal policy: %q", got)
+	}
+
+	t.Run("unset uses production default", func(t *testing.T) {
+		var originalValue, wasSet = os.LookupEnv(reportDecimalPolicyEnvironmentVariable)
+		if err := os.Unsetenv(reportDecimalPolicyEnvironmentVariable); err != nil {
+			t.Fatalf("unset decimal policy environment variable: %v", err)
+		}
+		t.Cleanup(func() {
+			var restoreErr error
+			if wasSet {
+				restoreErr = os.Setenv(reportDecimalPolicyEnvironmentVariable, originalValue)
+			} else {
+				restoreErr = os.Unsetenv(reportDecimalPolicyEnvironmentVariable)
+			}
+			if restoreErr != nil {
+				t.Fatalf("restore decimal policy environment variable: %v", restoreErr)
+			}
+		})
+
+		var policy, err = selectedDecimalPolicy()
+		if err != nil {
+			t.Fatalf("select default decimal policy: %v", err)
+		}
+		if policy.scale != InternalCalculationScale {
+			t.Fatalf("unexpected default decimal policy scale: %d", policy.scale)
+		}
+		if got := policy.canonicalString(); got != expectedPolicy {
+			t.Fatalf("unexpected default decimal policy value: %q", got)
+		}
+
+		var quotient apd.Decimal
+		quotient, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "1"), mustMathDecimal(t, "6"))
+		if err != nil {
+			t.Fatalf("divide decimals with default decimal policy: %v", err)
+		}
+		if got, canonicalErr := decimalsupport.CanonicalString(quotient); canonicalErr != nil || got != "0.1666666666666667" {
+			t.Fatalf("unexpected default-policy quotient: %q err=%v", got, canonicalErr)
+		}
+	})
+
+	for _, acceptedValue := range []string{expectedPolicy} {
+		var acceptedValue = acceptedValue
+		t.Run("accepts "+acceptedValue, func(t *testing.T) {
+			t.Setenv(reportDecimalPolicyEnvironmentVariable, acceptedValue)
+
+			var policy, err = selectedDecimalPolicy()
+			if err != nil {
+				t.Fatalf("select configured decimal policy %q: %v", acceptedValue, err)
+			}
+			if policy.scale != InternalCalculationScale {
+				t.Fatalf("unexpected configured decimal policy scale: %d", policy.scale)
+			}
+			if got := policy.canonicalString(); got != acceptedValue {
+				t.Fatalf("unexpected configured decimal policy value: %q", got)
+			}
+
+			var quotient apd.Decimal
+			quotient, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "1"), mustMathDecimal(t, "3"))
+			if err != nil {
+				t.Fatalf("divide decimals with configured decimal policy: %v", err)
+			}
+			if got, canonicalErr := decimalsupport.CanonicalString(quotient); canonicalErr != nil || got != "0.3333333333333333" {
+				t.Fatalf("unexpected configured-policy quotient: %q err=%v", got, canonicalErr)
+			}
+		})
+	}
+}
 
 // TestRoundHalfUpDivisionAndFiniteValidation verifies the shared fixed-scale
 // division policy and finite-decimal guards.

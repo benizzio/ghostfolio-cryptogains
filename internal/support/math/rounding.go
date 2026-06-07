@@ -9,8 +9,8 @@ import (
 	"github.com/cockroachdb/apd/v3"
 )
 
-// InternalCalculationScale is the shared fixed scale for internal financial
-// divisions that use round-half-up handling before report rendering.
+// InternalCalculationScale is the production default scale for internal
+// financial divisions that use round-half-up handling before report rendering.
 // Authored by: OpenCode
 const InternalCalculationScale int32 = 16
 

@@ -13,6 +13,7 @@ Thumbs.db
 *.tmp
 *.class
 build/
+dist/
 dist/coverage/
 node_modules/
 vendor/
