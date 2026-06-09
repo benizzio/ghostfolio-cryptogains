@@ -85,25 +85,25 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 ### Tests for User Story 2
 
-- [ ] T024 [P] [US2] Add hledger vendoring contract tests for license text, source metadata, source checksum, supported executable artifact checksum, source presence, executable path, platform support, and runtime prohibition in `tests/empirical/hledger_vendoring_test.go`
-- [ ] T025 [P] [US2] Add oracle fixture schema tests for metadata, decimal strings, tolerances, hashes, methods, years, matches, and unsupported segments in `tests/empirical/fixture/oracle_output_test.go`
-- [ ] T026 [P] [US2] Add vendored hledger command wrapper tests for version detection, explicit file arguments, missing executable errors, unsupported version errors, and environment isolation in `tools/empiricaloracle/command_test.go`
-- [ ] T027 [P] [US2] Add hledger journal rendering tests for acquisitions, liquidations, fees, zero-priced reductions, same-date ordering, scope evidence, and unsupported cases in `tools/empiricaloracle/journal_test.go`
-- [ ] T028 [P] [US2] Add oracle normalization and stable hash tests for hledger output, dataset input hash, hledger input hash, oracle output hash, and normalization version in `tools/empiricaloracle/oracle_output_test.go`
+- [X] T024 [P] [US2] Add hledger vendoring contract tests for license text, source metadata, source checksum, supported executable artifact checksum, source presence, executable path, platform support, and runtime prohibition in `tests/empirical/hledger_vendoring_test.go`
+- [X] T025 [P] [US2] Add oracle fixture schema tests for metadata, decimal strings, tolerances, hashes, methods, years, matches, and unsupported segments in `tests/empirical/fixture/oracle_output_test.go`
+- [X] T026 [P] [US2] Add vendored hledger command wrapper tests for version detection, explicit file arguments, missing executable errors, unsupported version errors, and environment isolation in `tools/empiricaloracle/command_test.go`
+- [X] T027 [P] [US2] Add hledger journal rendering tests for acquisitions, liquidations, fees, zero-priced reductions, same-date ordering, scope evidence, and unsupported cases in `tools/empiricaloracle/journal_test.go`
+- [X] T028 [P] [US2] Add oracle normalization and stable hash tests for hledger output, dataset input hash, hledger input hash, oracle output hash, and normalization version in `tools/empiricaloracle/oracle_output_test.go`
 
 ### Implementation for User Story 2
 
-- [ ] T029 [US2] Add GPL-compatible hledger license, source metadata, executable metadata, platform support notes, and checksums in `third_party/hledger/LICENSE`, `third_party/hledger/SOURCE.md`, and `third_party/hledger/README.md`
-- [ ] T030 [US2] Add hledger complete corresponding source under `third_party/hledger/source/` and supported executable artifacts under `third_party/hledger/bin/<goos>-<goarch>/hledger`
-- [ ] T031 [US2] Implement vendored hledger discovery from `third_party/hledger/bin/<goos>-<goarch>/hledger`, version capture, platform checks, explicit argument handling, and actionable setup errors in `tools/empiricaloracle/command.go`
-- [ ] T032 [US2] Implement dataset-to-hledger journal rendering in `tools/empiricaloracle/journal.go`
-- [ ] T033 [US2] Implement normalized oracle output JSON generation and stable hashing in `tools/empiricaloracle/oracle_output.go`
-- [ ] T034 [US2] Implement explicit unsupported-segment detection and serialization in `tools/empiricaloracle/unsupported.go`
-- [ ] T035 [US2] Implement CLI generation and explicit regeneration flow in `tools/empiricaloracle/main.go`
-- [ ] T036 [US2] Generate hledger journal fixtures in `testdata/empirical/hledger/` from `testdata/empirical/financial-dataset.yaml`
-- [ ] T037 [US2] Generate normalized golden fixtures for FIFO, LIFO, HIFO, average cost, and Scope-Local Hybrid (`scope_local_hybrid`) under `testdata/empirical/golden/`
-- [ ] T038 [US2] Implement golden fixture loading and validation helpers in `tests/empirical/fixture/oracle_output.go`
-- [ ] T039 [US2] Run `go test ./tools/empiricaloracle ./tests/empirical/fixture -run 'TestHledger|TestOracle|TestJournal' -count=1 -v` for `tools/empiricaloracle` and `tests/empirical/fixture/oracle_output_test.go`
+- [X] T029 [US2] Add GPL-compatible hledger license, source metadata, executable metadata, platform support notes, and checksums in `third_party/hledger/LICENSE`, `third_party/hledger/SOURCE.md`, and `third_party/hledger/README.md`
+- [X] T030 [US2] Add hledger complete corresponding source under `third_party/hledger/source/` and supported executable artifacts under `third_party/hledger/bin/<goos>-<goarch>/hledger`
+- [X] T031 [US2] Implement vendored hledger discovery from `third_party/hledger/bin/<goos>-<goarch>/hledger`, version capture, platform checks, explicit argument handling, and actionable setup errors in `tools/empiricaloracle/command.go`
+- [X] T032 [US2] Implement dataset-to-hledger journal rendering in `tools/empiricaloracle/journal.go`
+- [X] T033 [US2] Implement normalized oracle output JSON generation and stable hashing in `tools/empiricaloracle/oracle_output.go`
+- [X] T034 [US2] Implement explicit unsupported-segment detection and serialization in `tools/empiricaloracle/unsupported.go`
+- [X] T035 [US2] Implement CLI generation and explicit regeneration flow in `tools/empiricaloracle/main.go`
+- [X] T036 [US2] Generate hledger journal fixtures in `testdata/empirical/hledger/` from `testdata/empirical/financial-dataset.yaml`
+- [X] T037 [US2] Generate normalized golden fixtures for FIFO, LIFO, HIFO, average cost, and Scope-Local Hybrid (`scope_local_hybrid`) under `testdata/empirical/golden/`
+- [X] T038 [US2] Implement golden fixture loading and validation helpers in `tests/empirical/fixture/oracle_output.go`
+- [X] T039 [US2] Run `go test ./tools/empiricaloracle ./tests/empirical/fixture -run 'TestHledger|TestOracle|TestJournal' -count=1 -v` for `tools/empiricaloracle` and `tests/empirical/fixture/oracle_output_test.go`
 
 **Checkpoint**: Oracle fixtures are persisted, reproducible, metadata-complete, and generated only through the documented vendored hledger boundary.
 
@@ -152,6 +152,7 @@ description: "Task list for Empirical Solidified Financial Tests"
 - [ ] T060 Run `make coverage` from the repository root for `Makefile`
 - [ ] T061 [P] Record OWASP Top 10 review evidence for empirical test infrastructure in `specs/006-empirical-financial-tests/quickstart.md`
 - [ ] T062 [P] Verify fixture-backed empirical test runtime target of 30 seconds or less with `go test ./tests/empirical -count=1 -v` and document the observed result in `specs/006-empirical-financial-tests/quickstart.md`
+- [ ] T063 Update `specs/006-empirical-financial-tests/spec.md`, `plan.md`, `research.md`, `quickstart.md`, and `contracts/oracle-output.md` to reflect the actually implemented vendored hledger version and rationale when it differs from the original planning assumption
 
 ---
 

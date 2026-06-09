@@ -1,0 +1,90 @@
+{
+  "fixture_version": "1",
+  "dataset_version": "1",
+  "case_id": "case-zero-priced-gamma-2024",
+  "method": "hifo",
+  "year": 2024,
+  "asset_identity_key": "asset-gamma",
+  "values": {
+    "realized_gain_or_loss": "-4",
+    "allocated_basis": "129",
+    "closing_quantity": "6",
+    "closing_basis": "19.9999999998"
+  },
+  "matches": [
+    {
+      "disposed_source_id": "emp-act-000073",
+      "acquisition_source_id": "emp-act-000072",
+      "matched_quantity": "1",
+      "matched_basis": "25",
+      "matched_proceeds": "27",
+      "matched_gain_or_loss": "2",
+      "support_label": "hledger_backed"
+    },
+    {
+      "disposed_source_id": "emp-act-000075",
+      "acquisition_source_id": "emp-act-000072",
+      "matched_quantity": "1",
+      "matched_basis": "25",
+      "matched_proceeds": "22",
+      "matched_gain_or_loss": "-3",
+      "support_label": "hledger_backed"
+    },
+    {
+      "disposed_source_id": "emp-act-000077",
+      "acquisition_source_id": "emp-act-000071",
+      "matched_quantity": "1",
+      "matched_basis": "23",
+      "matched_proceeds": "23.5",
+      "matched_gain_or_loss": "0.5",
+      "support_label": "hledger_backed"
+    },
+    {
+      "disposed_source_id": "emp-act-000077",
+      "acquisition_source_id": "emp-act-000076",
+      "matched_quantity": "1",
+      "matched_basis": "27",
+      "matched_proceeds": "23.5",
+      "matched_gain_or_loss": "-3.5",
+      "support_label": "hledger_backed"
+    },
+    {
+      "disposed_source_id": "emp-act-000079",
+      "acquisition_source_id": "emp-act-000078",
+      "matched_quantity": "1",
+      "matched_basis": "29",
+      "matched_proceeds": "29",
+      "matched_gain_or_loss": "0",
+      "support_label": "hledger_backed"
+    }
+  ],
+  "unsupported_segments": [],
+  "metadata": {
+    "hledger_version": "1.99.2",
+    "command_arguments": [
+      "-n",
+      "-f",
+      "testdata/empirical/hledger/hifo/case-zero-priced-gamma-2024.journal",
+      "print",
+      "--lots",
+      "--explicit",
+      "-O",
+      "json",
+      "-b",
+      "2024-01-01",
+      "-e",
+      "2025-01-01"
+    ],
+    "dataset_input_hash": "sha256:680845580ca1311d610f4730dd026f683fedb6a0c27b2aefb7cbb26e630114bf",
+    "hledger_input_hash": "sha256:591532d5fbf7c6bed1261c0254b6f06ff1236dd7dafd10e2960c645a6f8d4c0f",
+    "decimal_policy": "scale=16,rounding=half_up",
+    "normalization_version": "1",
+    "financial_tolerances": {
+      "allocated_basis": "0",
+      "closing_basis": "0",
+      "realized_gain_or_loss": "0"
+    },
+    "tolerance_notes": {},
+    "oracle_output_hash": "sha256:5cc9c370a38a798410302a98df009d497f20858aa57f9a35073639bba0d8d01a"
+  }
+}

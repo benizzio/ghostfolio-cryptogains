@@ -1,0 +1,78 @@
+{
+  "fixture_version": "1",
+  "dataset_version": "1",
+  "case_id": "case-scope-local-broadening-gamma-2024",
+  "method": "scope_local_hybrid",
+  "year": 2024,
+  "asset_identity_key": "asset-gamma",
+  "values": {
+    "realized_gain_or_loss": "13.380952381",
+    "allocated_basis": "35.619047619",
+    "closing_quantity": "9",
+    "closing_basis": "150.9999999999"
+  },
+  "matches": [
+    {
+      "disposed_source_id": "emp-act-000073",
+      "acquisition_source_id": "emp-act-000024",
+      "matched_quantity": "1",
+      "matched_basis": "19.619047619",
+      "matched_proceeds": "27",
+      "matched_gain_or_loss": "7.380952381",
+      "support_label": "hledger_backed"
+    },
+    {
+      "disposed_source_id": "emp-act-000075",
+      "acquisition_source_id": "emp-act-000026",
+      "matched_quantity": "1",
+      "matched_basis": "16",
+      "matched_proceeds": "22",
+      "matched_gain_or_loss": "6",
+      "support_label": "hledger_backed"
+    }
+  ],
+  "unsupported_segments": [
+    {
+      "case_id": "case-scope-local-broadening-gamma-2024",
+      "method": "scope_local_hybrid",
+      "activity_source_ids": [
+        "emp-act-000071",
+        "emp-act-000072",
+        "emp-act-000073",
+        "emp-act-000074",
+        "emp-act-000075",
+        "emp-act-000076"
+      ],
+      "reason": "Hybrid broadening and fallback activation remain partly project-owned composition rules",
+      "comparison_policy": "project_composition_only"
+    }
+  ],
+  "metadata": {
+    "hledger_version": "1.99.2",
+    "command_arguments": [
+      "-n",
+      "-f",
+      "testdata/empirical/hledger/scope-local-hybrid/case-scope-local-broadening-gamma-2024.journal",
+      "print",
+      "--lots",
+      "--explicit",
+      "-O",
+      "json",
+      "-b",
+      "2024-01-01",
+      "-e",
+      "2025-01-01"
+    ],
+    "dataset_input_hash": "sha256:680845580ca1311d610f4730dd026f683fedb6a0c27b2aefb7cbb26e630114bf",
+    "hledger_input_hash": "sha256:83d0105e4f0ede4af27aca4aeb9afea54e1a73c9657aa3a11eef56c90d88e066",
+    "decimal_policy": "scale=16,rounding=half_up",
+    "normalization_version": "1",
+    "financial_tolerances": {
+      "allocated_basis": "0",
+      "closing_basis": "0",
+      "realized_gain_or_loss": "0"
+    },
+    "tolerance_notes": {},
+    "oracle_output_hash": "sha256:9a57072a67878c476da4c2465ab31698d70591d1720fea23d0cd527ab22eef03"
+  }
+}

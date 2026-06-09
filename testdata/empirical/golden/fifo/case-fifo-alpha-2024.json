@@ -1,0 +1,63 @@
+{
+  "fixture_version": "1",
+  "dataset_version": "1",
+  "case_id": "case-fifo-alpha-2024",
+  "method": "fifo",
+  "year": 2024,
+  "asset_identity_key": "asset-alpha",
+  "values": {
+    "realized_gain_or_loss": "19.6666666667",
+    "allocated_basis": "17.3333333333",
+    "closing_quantity": "8",
+    "closing_basis": "93.9999999999"
+  },
+  "matches": [
+    {
+      "disposed_source_id": "emp-act-000053",
+      "acquisition_source_id": "emp-act-000004",
+      "matched_quantity": "1",
+      "matched_basis": "3.3333333333",
+      "matched_proceeds": "21",
+      "matched_gain_or_loss": "17.6666666667",
+      "support_label": "hledger_backed"
+    },
+    {
+      "disposed_source_id": "emp-act-000055",
+      "acquisition_source_id": "emp-act-000006",
+      "matched_quantity": "1",
+      "matched_basis": "14",
+      "matched_proceeds": "16",
+      "matched_gain_or_loss": "2",
+      "support_label": "hledger_backed"
+    }
+  ],
+  "unsupported_segments": [],
+  "metadata": {
+    "hledger_version": "1.99.2",
+    "command_arguments": [
+      "-n",
+      "-f",
+      "testdata/empirical/hledger/fifo/case-fifo-alpha-2024.journal",
+      "print",
+      "--lots",
+      "--explicit",
+      "-O",
+      "json",
+      "-b",
+      "2024-01-01",
+      "-e",
+      "2025-01-01"
+    ],
+    "dataset_input_hash": "sha256:680845580ca1311d610f4730dd026f683fedb6a0c27b2aefb7cbb26e630114bf",
+    "hledger_input_hash": "sha256:52fe001816aa3915c99fcb367b1370b7a6e2db3d2739e36db8686081c5dedddc",
+    "decimal_policy": "scale=16,rounding=half_up",
+    "normalization_version": "1",
+    "financial_tolerances": {
+      "allocated_basis": "0",
+      "closing_basis": "0",
+      "realized_gain_or_loss": "0"
+    },
+    "tolerance_notes": {},
+    "oracle_output_hash": "sha256:f7467772a136ad08ec005a1e50b13b3d39cdd20c188960db7d8bbb59e7841366"
+  }
+}

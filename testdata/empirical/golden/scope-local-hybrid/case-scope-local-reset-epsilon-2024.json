@@ -1,0 +1,106 @@
+{
+  "fixture_version": "1",
+  "dataset_version": "1",
+  "case_id": "case-scope-local-reset-epsilon-2024",
+  "method": "scope_local_hybrid",
+  "year": 2024,
+  "asset_identity_key": "asset-epsilon",
+  "values": {
+    "realized_gain_or_loss": "47.5575396825",
+    "allocated_basis": "107.4424603175",
+    "closing_quantity": "8",
+    "closing_basis": "171.9999999999"
+  },
+  "matches": [
+    {
+      "disposed_source_id": "emp-act-000093",
+      "acquisition_source_id": "emp-act-000044",
+      "matched_quantity": "1",
+      "matched_basis": "24.7619047619",
+      "matched_proceeds": "33",
+      "matched_gain_or_loss": "8.2380952381",
+      "support_label": "hledger_backed"
+    },
+    {
+      "disposed_source_id": "emp-act-000095",
+      "acquisition_source_id": "emp-act-000046",
+      "matched_quantity": "1",
+      "matched_basis": "20",
+      "matched_proceeds": "28",
+      "matched_gain_or_loss": "8",
+      "support_label": "hledger_backed"
+    },
+    {
+      "disposed_source_id": "emp-act-000097",
+      "acquisition_source_id": "emp-act-000048",
+      "matched_quantity": "1",
+      "matched_basis": "20.7777777778",
+      "matched_proceeds": "29.5",
+      "matched_gain_or_loss": "8.7222222222",
+      "support_label": "hledger_backed"
+    },
+    {
+      "disposed_source_id": "emp-act-000097",
+      "acquisition_source_id": "emp-act-000050",
+      "matched_quantity": "1",
+      "matched_basis": "20.7777777778",
+      "matched_proceeds": "29.5",
+      "matched_gain_or_loss": "8.7222222222",
+      "support_label": "hledger_backed"
+    },
+    {
+      "disposed_source_id": "emp-act-000099",
+      "acquisition_source_id": "emp-act-000091",
+      "matched_quantity": "1",
+      "matched_basis": "21.125",
+      "matched_proceeds": "35",
+      "matched_gain_or_loss": "13.875",
+      "support_label": "hledger_backed"
+    }
+  ],
+  "unsupported_segments": [
+    {
+      "case_id": "case-scope-local-reset-epsilon-2024",
+      "method": "scope_local_hybrid",
+      "activity_source_ids": [
+        "emp-act-000096",
+        "emp-act-000097",
+        "emp-act-000098",
+        "emp-act-000099",
+        "emp-act-000100",
+        "emp-act-000141",
+        "emp-act-000142"
+      ],
+      "reason": "Hybrid reset and independent-scope assertions require project-owned composition rules",
+      "comparison_policy": "project_composition_only"
+    }
+  ],
+  "metadata": {
+    "hledger_version": "1.99.2",
+    "command_arguments": [
+      "-n",
+      "-f",
+      "testdata/empirical/hledger/scope-local-hybrid/case-scope-local-reset-epsilon-2024.journal",
+      "print",
+      "--lots",
+      "--explicit",
+      "-O",
+      "json",
+      "-b",
+      "2024-01-01",
+      "-e",
+      "2025-01-01"
+    ],
+    "dataset_input_hash": "sha256:680845580ca1311d610f4730dd026f683fedb6a0c27b2aefb7cbb26e630114bf",
+    "hledger_input_hash": "sha256:4d701484eaa9122d4d71fbdd38dbb4cb258e58d886bd5b66d318ed4e9dc61701",
+    "decimal_policy": "scale=16,rounding=half_up",
+    "normalization_version": "1",
+    "financial_tolerances": {
+      "allocated_basis": "0",
+      "closing_basis": "0",
+      "realized_gain_or_loss": "0"
+    },
+    "tolerance_notes": {},
+    "oracle_output_hash": "sha256:19f16ba16546681a14d8b951f7947db2def8b9527a2686459469d7c6be33c263"
+  }
+}

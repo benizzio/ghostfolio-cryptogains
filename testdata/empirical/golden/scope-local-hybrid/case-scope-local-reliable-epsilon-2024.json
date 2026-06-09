@@ -1,0 +1,81 @@
+{
+  "fixture_version": "1",
+  "dataset_version": "1",
+  "case_id": "case-scope-local-reliable-epsilon-2024",
+  "method": "scope_local_hybrid",
+  "year": 2024,
+  "asset_identity_key": "asset-epsilon",
+  "values": {
+    "realized_gain_or_loss": "1",
+    "allocated_basis": "60",
+    "closing_quantity": "8",
+    "closing_basis": "123.3333333332"
+  },
+  "matches": [
+    {
+      "disposed_source_id": "emp-act-000093",
+      "acquisition_source_id": "emp-act-000091",
+      "scope_id": "wallet-epsilon-primary",
+      "matched_quantity": "1",
+      "matched_basis": "29",
+      "matched_proceeds": "33",
+      "matched_gain_or_loss": "4",
+      "support_label": "hledger_backed"
+    },
+    {
+      "disposed_source_id": "emp-act-000095",
+      "acquisition_source_id": "emp-act-000092",
+      "scope_id": "wallet-epsilon-primary",
+      "matched_quantity": "1",
+      "matched_basis": "31",
+      "matched_proceeds": "28",
+      "matched_gain_or_loss": "-3",
+      "support_label": "hledger_backed"
+    }
+  ],
+  "unsupported_segments": [
+    {
+      "case_id": "case-scope-local-reliable-epsilon-2024",
+      "method": "scope_local_hybrid",
+      "activity_source_ids": [
+        "emp-act-000041",
+        "emp-act-000042",
+        "emp-act-000091",
+        "emp-act-000092",
+        "emp-act-000093",
+        "emp-act-000094",
+        "emp-act-000095"
+      ],
+      "reason": "Hybrid lifecycle composition remains project-owned outside the hledger-backed scope slice",
+      "comparison_policy": "project_composition_only"
+    }
+  ],
+  "metadata": {
+    "hledger_version": "1.99.2",
+    "command_arguments": [
+      "-n",
+      "-f",
+      "testdata/empirical/hledger/scope-local-hybrid/case-scope-local-reliable-epsilon-2024.journal",
+      "print",
+      "--lots",
+      "--explicit",
+      "-O",
+      "json",
+      "-b",
+      "2024-01-01",
+      "-e",
+      "2025-01-01"
+    ],
+    "dataset_input_hash": "sha256:680845580ca1311d610f4730dd026f683fedb6a0c27b2aefb7cbb26e630114bf",
+    "hledger_input_hash": "sha256:53beb656310ee719cce3c20d937296a6c3cc322637c6d0f678fcc53a40629bb5",
+    "decimal_policy": "scale=16,rounding=half_up",
+    "normalization_version": "1",
+    "financial_tolerances": {
+      "allocated_basis": "0",
+      "closing_basis": "0",
+      "realized_gain_or_loss": "0"
+    },
+    "tolerance_notes": {},
+    "oracle_output_hash": "sha256:3b66eb7ac147718988cd9747e727a3efb75159557e22f9feb8fec26b40e02c5a"
+  }
+}

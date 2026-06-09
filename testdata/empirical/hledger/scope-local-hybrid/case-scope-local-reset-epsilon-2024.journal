@@ -1,0 +1,89 @@
+commodity EPS  ; lots: AVERAGE
+
+2023-01-05 buy emp-act-000041
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  1 EPS {2023-01-05, "emp-act-000041", $22}
+    assets:cash:USD  -$22
+
+2023-01-05 buy emp-act-000042
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  2 EPS {2023-01-05, "emp-act-000042", $24}
+    assets:cash:USD  -$48
+
+2023-01-05 sell emp-act-000043
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  -1 EPS {} @ $26  ; posting_source_id: emp-act-000043
+    assets:cash:USD  $26
+
+2023-03-10 buy emp-act-000044
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  3 EPS {2023-03-10, "emp-act-000044", $3.3333333333333333}
+    assets:cash:USD  -$10
+
+2023-04-15 sell emp-act-000045
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  -1 EPS {} @ $21  ; posting_source_id: emp-act-000045
+    assets:cash:USD  $21
+
+2023-06-20 buy emp-act-000046
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  1 EPS {2023-06-20, "emp-act-000046", $26}
+    assets:cash:USD  -$26
+
+2023-07-25 sell emp-act-000047
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  -2 EPS {} @ $22.5  ; posting_source_id: emp-act-000047
+    assets:cash:USD  $45
+
+2023-09-01 buy emp-act-000048
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  1 EPS {2023-09-01, "emp-act-000048", $28}
+    assets:cash:USD  -$28
+
+2023-09-01 sell emp-act-000049
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  -1 EPS {} @ $28  ; posting_source_id: emp-act-000049
+    assets:cash:USD  $28
+
+2023-11-05 buy emp-act-000050
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  1 EPS {2023-11-05, "emp-act-000050", $25}
+    assets:cash:USD  -$25
+
+2024-01-05 buy emp-act-000091
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  1 EPS {2024-01-05, "emp-act-000091", $29}
+    assets:cash:USD  -$29
+
+2024-01-05 buy emp-act-000092
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  2 EPS {2024-01-05, "emp-act-000092", $31}
+    assets:cash:USD  -$62
+
+2024-01-05 sell emp-act-000093
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  -1 EPS {} @ $33  ; posting_source_id: emp-act-000093
+    assets:cash:USD  $33
+
+2024-03-10 buy emp-act-000094
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  3 EPS {2024-03-10, "emp-act-000094", $3.3333333333333333}
+    assets:cash:USD  -$10
+
+2024-04-15 sell emp-act-000095
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  -1 EPS {} @ $28  ; posting_source_id: emp-act-000095
+    assets:cash:USD  $28
+
+2024-06-20 buy emp-act-000096
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  1 EPS {2024-06-20, "emp-act-000096", $33}
+    assets:cash:USD  -$33
+
+2024-07-25 sell emp-act-000097
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  -2 EPS {} @ $29.5  ; posting_source_id: emp-act-000097
+    assets:cash:USD  $59
+
+2024-09-01 buy emp-act-000098
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  1 EPS {2024-09-01, "emp-act-000098", $35}
+    assets:cash:USD  -$35
+
+2024-09-01 sell emp-act-000099
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  -1 EPS {} @ $35  ; posting_source_id: emp-act-000099
+    assets:cash:USD  $35
+
+2024-11-05 buy emp-act-000100
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  1 EPS {2024-11-05, "emp-act-000100", $32}
+    assets:cash:USD  -$32
+
+2025-01-05 buy emp-act-000141
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  1 EPS {2025-01-05, "emp-act-000141", $36}
+    assets:cash:USD  -$36
+
+2025-01-05 buy emp-act-000142
+    assets:empirical:scope-local-hybrid:fallback:asset-epsilon  2 EPS {2025-01-05, "emp-act-000142", $38}
+    assets:cash:USD  -$76

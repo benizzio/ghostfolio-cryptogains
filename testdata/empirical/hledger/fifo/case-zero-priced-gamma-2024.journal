@@ -1,0 +1,81 @@
+commodity GAMMA  ; lots: FIFO
+
+2023-01-05 buy emp-act-000021
+    assets:empirical:fifo:asset-gamma  1 GAMMA {2023-01-05, "emp-act-000021", $16}
+    assets:cash:USD  -$16
+
+2023-01-05 buy emp-act-000022
+    assets:empirical:fifo:asset-gamma  2 GAMMA {2023-01-05, "emp-act-000022", $18}
+    assets:cash:USD  -$36
+
+2023-01-05 sell emp-act-000023
+    assets:empirical:fifo:asset-gamma  -1 GAMMA {} @ $20  ; posting_source_id: emp-act-000023
+    assets:cash:USD  $20
+
+2023-03-10 buy emp-act-000024
+    assets:empirical:fifo:asset-gamma  3 GAMMA {2023-03-10, "emp-act-000024", $3.3333333333333333}
+    assets:cash:USD  -$10
+
+2023-04-15 sell emp-act-000025
+    assets:empirical:fifo:asset-gamma  -1 GAMMA {} @ $15  ; posting_source_id: emp-act-000025
+    assets:cash:USD  $15
+
+2023-06-20 buy emp-act-000026
+    assets:empirical:fifo:asset-gamma  1 GAMMA {2023-06-20, "emp-act-000026", $20}
+    assets:cash:USD  -$20
+
+2023-07-25 sell emp-act-000027
+    assets:empirical:fifo:asset-gamma  -2 GAMMA {} @ $16.5  ; posting_source_id: emp-act-000027
+    assets:cash:USD  $33
+
+2023-09-01 buy emp-act-000028
+    assets:empirical:fifo:asset-gamma  1 GAMMA {2023-09-01, "emp-act-000028", $22}
+    assets:cash:USD  -$22
+
+2023-09-01 sell emp-act-000029
+    assets:empirical:fifo:asset-gamma  -1 GAMMA {} @ $22  ; posting_source_id: emp-act-000029
+    assets:cash:USD  $22
+
+2023-11-05 buy emp-act-000030
+    assets:empirical:fifo:asset-gamma  1 GAMMA {2023-11-05, "emp-act-000030", $19}
+    assets:cash:USD  -$19
+
+2024-01-05 buy emp-act-000071
+    assets:empirical:fifo:asset-gamma  1 GAMMA {2024-01-05, "emp-act-000071", $23}
+    assets:cash:USD  -$23
+
+2024-01-05 buy emp-act-000072
+    assets:empirical:fifo:asset-gamma  2 GAMMA {2024-01-05, "emp-act-000072", $25}
+    assets:cash:USD  -$50
+
+2024-01-05 sell emp-act-000073
+    assets:empirical:fifo:asset-gamma  -1 GAMMA {} @ $27  ; posting_source_id: emp-act-000073
+    assets:cash:USD  $27
+
+2024-03-10 buy emp-act-000074
+    assets:empirical:fifo:asset-gamma  3 GAMMA {2024-03-10, "emp-act-000074", $3.3333333333333333}
+    assets:cash:USD  -$10
+
+2024-04-15 sell emp-act-000075
+    assets:empirical:fifo:asset-gamma  -1 GAMMA {} @ $22  ; posting_source_id: emp-act-000075
+    assets:cash:USD  $22
+
+2024-06-20 buy emp-act-000076
+    assets:empirical:fifo:asset-gamma  1 GAMMA {2024-06-20, "emp-act-000076", $27}
+    assets:cash:USD  -$27
+
+2024-07-25 sell emp-act-000077
+    assets:empirical:fifo:asset-gamma  -2 GAMMA {} @ $23.5  ; posting_source_id: emp-act-000077
+    assets:cash:USD  $47
+
+2024-09-01 buy emp-act-000078
+    assets:empirical:fifo:asset-gamma  1 GAMMA {2024-09-01, "emp-act-000078", $29}
+    assets:cash:USD  -$29
+
+2024-09-01 sell emp-act-000079
+    assets:empirical:fifo:asset-gamma  -1 GAMMA {} @ $29  ; posting_source_id: emp-act-000079
+    assets:cash:USD  $29
+
+2024-11-05 zero-priced reduction emp-act-000080 from emp-act-000072
+    assets:empirical:fifo:asset-gamma  -1 GAMMA {2024-01-05, "emp-act-000072", $25}
+    equity:zero-priced-reduction  1 GAMMA

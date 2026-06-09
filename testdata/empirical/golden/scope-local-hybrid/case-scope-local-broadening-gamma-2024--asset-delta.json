@@ -1,0 +1,67 @@
+{
+  "fixture_version": "1",
+  "dataset_version": "1",
+  "case_id": "case-scope-local-broadening-gamma-2024",
+  "method": "scope_local_hybrid",
+  "year": 2024,
+  "asset_identity_key": "asset-delta",
+  "values": {
+    "realized_gain_or_loss": "7.8095238095",
+    "allocated_basis": "22.1904761905",
+    "closing_quantity": "9",
+    "closing_basis": "161.9999999999"
+  },
+  "matches": [
+    {
+      "disposed_source_id": "emp-act-000083",
+      "acquisition_source_id": "emp-act-000034",
+      "matched_quantity": "1",
+      "matched_basis": "22.1904761905",
+      "matched_proceeds": "30",
+      "matched_gain_or_loss": "7.8095238095",
+      "support_label": "hledger_backed"
+    }
+  ],
+  "unsupported_segments": [
+    {
+      "case_id": "case-scope-local-broadening-gamma-2024",
+      "method": "scope_local_hybrid",
+      "activity_source_ids": [
+        "emp-act-000081",
+        "emp-act-000082",
+        "emp-act-000083",
+        "emp-act-000084"
+      ],
+      "reason": "Hybrid broadening and fallback activation remain partly project-owned composition rules",
+      "comparison_policy": "project_composition_only"
+    }
+  ],
+  "metadata": {
+    "hledger_version": "1.99.2",
+    "command_arguments": [
+      "-n",
+      "-f",
+      "testdata/empirical/hledger/scope-local-hybrid/case-scope-local-broadening-gamma-2024.journal",
+      "print",
+      "--lots",
+      "--explicit",
+      "-O",
+      "json",
+      "-b",
+      "2024-01-01",
+      "-e",
+      "2025-01-01"
+    ],
+    "dataset_input_hash": "sha256:680845580ca1311d610f4730dd026f683fedb6a0c27b2aefb7cbb26e630114bf",
+    "hledger_input_hash": "sha256:83d0105e4f0ede4af27aca4aeb9afea54e1a73c9657aa3a11eef56c90d88e066",
+    "decimal_policy": "scale=16,rounding=half_up",
+    "normalization_version": "1",
+    "financial_tolerances": {
+      "allocated_basis": "0",
+      "closing_basis": "0",
+      "realized_gain_or_loss": "0"
+    },
+    "tolerance_notes": {},
+    "oracle_output_hash": "sha256:187ec12a55aff3a2b79af69fadeb89dc3436449a96849349f65edba83cdca05a"
+  }
+}
