@@ -1,8 +1,10 @@
 # Contract: Empirical Calculation Tests
 
+**Bugfix**: 2026-06-10 — [BUG-001] Updated empirical test contract for rotki-backed pure-method fixtures, Scope-Local Hybrid composite assertions, and supported-fixture skip failures.
+
 ## Scope
 
-This contract defines the isolated empirical Go tests that compare project calculation output against normalized hledger oracle fixtures.
+This contract defines the isolated empirical Go tests that compare project calculation output against normalized external-oracle and composite-oracle fixtures.
 
 ## Package
 
@@ -29,7 +31,7 @@ make test
 make coverage
 ```
 
-Fixture generation or regeneration must be explicit and documented by implementation tasks. Normal fixture-backed test runs must not require hledger when all required golden fixtures are present.
+Fixture generation or regeneration must be explicit and documented by implementation tasks. Normal fixture-backed test runs must not require external oracle generation when all required golden fixtures are present.
 
 ## Test Boundary Rules
 
@@ -58,7 +60,7 @@ Empirical tests must not call or assert:
 
 1. Validate `testdata/empirical/financial-dataset.yaml`.
 2. Load required golden fixtures from `testdata/empirical/golden/`.
-3. Generate a missing fixture with the vendored hledger oracle only when the fixture is absent and generation is allowed by the test helper policy.
+3. Generate a missing fixture with the documented external oracle or composite oracle only when the fixture is absent and generation is allowed by the test helper policy.
 4. Translate dataset rows into a `syncmodel.ProtectedActivityCache` equivalent.
 5. For each comparable case, create a `reportmodel.ReportRequest` for the fixture year and method.
 6. Call `calculate.Calculate`.
@@ -76,7 +78,7 @@ The empirical suite must compare every supported project cost-basis method:
 - Average Cost Basis
 - Scope-Local Hybrid (`scope_local_hybrid`)
 
-Scope-Local Hybrid (`scope_local_hybrid`) comparisons must distinguish hledger-backed sub-evidence from project-owned composition rules.
+Scope-Local Hybrid (`scope_local_hybrid`) comparisons must distinguish rotki-backed arithmetic assertions from project-owned composition rules.
 
 ## Required Field Coverage
 
@@ -88,15 +90,16 @@ Comparable output must include at least:
 - closing basis
 - full-liquidation effects when the fixture records source IDs, evidence type, and expected values
 - method-specific lot or pool evidence when the fixture records source IDs, evidence type, and expected values
-- zero-priced holding reduction effects
+- zero-priced holding reduction effects through non-oracle unit, integration, or contract tests only; they are not counted as empirical external-oracle fixture coverage after BUG-001
 
 ## Comparability Rules
 
 - A field is comparable only when the oracle fixture contains a normalized expected value for the same case, method, year, asset, and source-row segment.
 - A field is not comparable when an unsupported segment covers that field.
 - Unsupported fields must be reported as skipped with the unsupported reason; they must not be counted as matched external-oracle assertions.
-- Scope-Local Hybrid assertions must be labeled `hledger_backed` or `project_composition_rule`.
+- Scope-Local Hybrid assertions must be labeled `rotki_backed` or `project_composition_rule`.
 - A `project_composition_rule` assertion must include a stable rule ID and the source-row segment it covers.
+- Supported empirical fixture groups must fail if skipped before project calculation and oracle comparison. Only fixture-backed unsupported field-level segments may be skipped with an explicit reason.
 
 ## Precision Rules
 
@@ -105,13 +108,13 @@ Comparable output must include at least:
 - The default selected policy is the project's production 16-decimal round-half-up internal calculation policy.
 - Accepted `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` values use the form `scale=<digits>,rounding=half_up`.
 - The required accepted value is `scale=16,rounding=half_up`, matching the production default.
-- Additional hledger-aligned accepted values may be added only when hledger cannot align with the production default, and each added value must be documented with the hledger version and reason.
-- If hledger cannot be configured or normalized to match the default policy for every valid case, empirical tests must set `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` to the hledger-established policy before invoking project calculation.
+- Additional external-oracle-aligned accepted values may be added only when the selected external oracle cannot align with the production default, and each added value must be documented with the oracle name, pinned version or commit, and reason.
+- If the selected external oracle cannot be configured or normalized to match the default policy for every valid case, empirical tests must set `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` to the external-oracle-established policy before invoking project calculation.
 - Production behavior must keep the 16-decimal default when `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` is unset.
-- Financial value fields may use documented per-field tolerances only for residual hledger/project deviations after decimal-policy alignment.
+- Financial value fields may use documented per-field tolerances only for residual external-oracle/project deviations after decimal-policy alignment.
 - Quantity tolerance is always zero.
 - Non-zero financial tolerances must not exceed one unit at the selected decimal-policy scale. For the production 16-decimal policy, the maximum is `0.0000000000000001`.
-- A non-zero financial tolerance must include a fixture note explaining why exact equality is not achievable for that hledger-derived value.
+- A non-zero financial tolerance must include a fixture note explaining why exact equality is not achievable for that external-oracle-derived value.
 - Comparison code must use decimal arithmetic only.
 - Floating-point math is invalid in dataset parsing, normalization, and comparison.
 
@@ -144,8 +147,8 @@ Failure output must not include:
 ## Golden Fixture Policy
 
 - Golden fixtures are authoritative for fixture-backed tests.
-- hledger generation must not run when required fixtures are present.
-- If generation is needed because a fixture is absent, failure to find or execute vendored hledger must produce an actionable setup error.
+- External oracle generation must not run when required fixtures are present.
+- If generation is needed because a fixture is absent, failure to find or execute the documented external oracle boundary must produce an actionable setup error.
 - Regeneration must update hashes and metadata together with expected values.
 - Fixture drift must be visible through changed hashes or changed normalized values.
 

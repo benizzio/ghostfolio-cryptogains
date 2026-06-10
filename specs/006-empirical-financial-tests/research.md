@@ -1,16 +1,18 @@
 # Research: Empirical Solidified Financial Tests
 
+**Bugfix**: 2026-06-10 — [BUG-001] Replaced stale hledger-only oracle research with rotki-backed pure-method oracle and Scope-Local Hybrid composite-oracle decisions.
+
 ## Decision: Store The Empirical Dataset As Project-Owned YAML
 
 Use `testdata/empirical/financial-dataset.yaml` as the canonical empirical external dataset. The file is synthetic, simplified, human-readable, and validates with project-owned Go code before any oracle or calculation comparison runs.
 
-**Rationale**: The specification requires a clear maintainable format without hidden transformation logic. YAML supports explicit named fields and readable activity records better than positional CSV while staying reviewable in Git. A single canonical dataset avoids separate hand-maintained inputs for hledger and project calculation.
+**Rationale**: The specification requires a clear maintainable format without hidden transformation logic. YAML supports explicit named fields and readable activity records better than positional CSV while staying reviewable in Git. A single canonical dataset avoids separate hand-maintained inputs for ~~hledger~~ external-oracle adapters and project calculation.
 
 **Alternatives considered**:
 
 - CSV: rejected because nested source scope, coverage tags, and optional monetary fields become hard to review without hidden column conventions.
 - JSON: rejected because it is strict and machine-friendly but less maintainable for a large hand-reviewed synthetic ledger.
-- hledger journal as the canonical dataset: rejected because the project also needs source IDs, scope reliability, zero-priced-reduction explanations, and project-specific ordering metadata that should not be hidden in hledger syntax.
+- ~~hledger journal as the canonical dataset~~ External-oracle-native input as the canonical dataset: rejected because the project also needs source IDs, scope reliability, zero-priced-reduction explanations where applicable, and project-specific ordering metadata that should not be hidden in external tool syntax.
 
 ## Decision: Keep Dataset Creation In This Dedicated Dataset-Maintenance Spec
 
@@ -24,52 +26,52 @@ Create and populate the empirical dataset in this feature, then treat it as read
 - Defer dataset creation to a later feature after adding tests: rejected because empirical tests need a stable external dataset and golden fixtures to be meaningful.
 - Make the dataset generated only from code: rejected because the spec requires a human-readable external dataset without hidden transformation logic.
 
-## Decision: Use hledger As A Vendored Test-Time External Oracle
+## Decision: Use ~~hledger As A Vendored Test-Time External Oracle~~ A Rotki-Backed Test-Time External Oracle For Pure Methods
 
-Use hledger as a separate repository-vendored command-line tool for oracle generation. The Go code invokes it only from test-helper or tool code when a required golden fixture is absent or when maintainers explicitly regenerate fixtures.
+~~Use hledger as a separate repository-vendored command-line tool for oracle generation.~~ BUG-001 supersedes the hledger-only oracle decision. Use a pinned rotki-based test-time oracle adapter for FIFO, LIFO, HIFO, and Average Cost aggregate fixture generation. The Go code invokes external oracle tooling only from test-helper or tool code when a required golden fixture is absent or when maintainers explicitly regenerate fixtures.
 
-**Rationale**: The spec requires hledger as the external oracle. hledger is an actively maintained plain-text-accounting engine with cost-basis and lot support, command-line output formats, and GPL-3.0-or-later licensing. The latest GitHub release observed during planning is `1.52.1`, published 2026-04-28, with release assets carrying SHA-256 digests. Vendoring keeps empirical tests reproducible and avoids dependence on the developer's system installation.
+**Rationale**: ~~The spec requires hledger as the external oracle. hledger is an actively maintained plain-text-accounting engine with cost-basis and lot support, command-line output formats, and GPL-3.0-or-later licensing.~~ The BUG-001 evidence shows the hledger-backed fixture set skipped 11 of 13 supported groups before project calculation and oracle comparison. Rotki is the planned external oracle for pure FIFO, LIFO, HIFO, and Average Cost aggregate expected values because it can provide the method coverage needed by the patched acceptance criteria. Pinning source version or commit, adapter constraints, arguments, and hashes keeps empirical tests reproducible and avoids dependence on the developer's system installation.
 
 **Alternatives considered**:
 
-- Use system hledger from `PATH`: rejected because version drift would make oracle output unstable and would fail the repository-vendored-tool requirement.
-- Link or import hledger libraries: rejected because runtime and Go test code must not embed hledger or hledger-lib; the oracle boundary is a separate command.
-- Use Beancount or Ledger as the primary oracle: rejected because the spec identifies hledger as the primary tool for FIFO, LIFO, HIFO, average-cost, and lot evidence. Beancount and Ledger can remain research references only.
+- Use system hledger from `PATH`: rejected because version drift would make oracle output unstable and because hledger-only output is no longer sufficient for BUG-001 acceptance.
+- Link or import hledger or rotki runtime libraries into production code: rejected because runtime and Go test code must not embed hledger, hledger-lib, rotki, or rotki runtime code; the oracle boundary is test-time only.
+- Use Beancount or Ledger as the primary oracle: rejected because they do not resolve the BUG-001 method coverage gap. Beancount and Ledger can remain research references only.
 - Hand-author all expected values: rejected because this would not be an external oracle and would provide weaker drift detection.
 
-## Decision: Vendor GPL-Compliant Source Materials, Not Binary-Only Artifacts
+## Decision: Vendor Or Document License-Compatible External Oracle Materials, Not Binary-Only Artifacts
 
-Vendor hledger materials under `third_party/hledger` with GPL-3.0-or-later license text, upstream source URL, selected version, source checksum, platform support notes, complete corresponding source under `third_party/hledger/source/`, and supported executable artifacts under `third_party/hledger/bin/<goos>-<goarch>/hledger` with checksums.
+Vendor or document external oracle materials under `third_party/` with applicable license text, upstream source URL, pinned version or commit, source checksum, platform support notes, adapter constraints, supported artifact paths, and checksums. Any retained hledger materials remain test-time-only historical or auxiliary artifacts. Rotki source provenance and licensing must be documented before fixture regeneration.
 
-**Rationale**: hledger's README identifies GPLv3-or-later licensing, and the upstream repository includes a GPLv3 license. The repository is GPLv3, so vendoring is compatible only when license and corresponding-source obligations are preserved. The spec explicitly prohibits binary-only vendoring and requires supported executable artifacts to be backed by complete corresponding source.
+**Rationale**: The repository is GPLv3, so external oracle materials are acceptable only when applicable license and source-distribution obligations are preserved. The spec explicitly prohibits undocumented binary-only vendoring and requires source provenance, license text, version or commit identity, checksums, and platform support notes.
 
 **Alternatives considered**:
 
-- Commit only a downloaded executable: rejected because binary-only vendoring is prohibited and would not provide corresponding source.
-- Fetch hledger at test time: rejected because it harms reproducibility and can make CI dependent on network availability.
-- Document manual installation instead of vendoring: rejected because the spec requires a repository-vendored test-time tool.
+- Commit only a downloaded executable: rejected because binary-only vendoring is prohibited unless source-distribution obligations are satisfied and documented.
+- Fetch external oracle source or artifacts at test time: rejected because it harms reproducibility and can make CI dependent on network availability.
+- Document manual installation instead of repository-controlled provenance: rejected because fixture generation must be reproducible from documented, pinned oracle materials.
 
 ## Decision: Persist Normalized Oracle Output As Golden Fixtures
 
 Store normalized oracle outputs under `testdata/empirical/golden/` and make empirical tests consume those fixtures by default. Generate fixtures only when missing or explicitly requested by maintainers.
 
-**Rationale**: Persisted fixtures make normal tests deterministic and avoid invoking hledger on every run. Input and output hashes expose drift when the dataset, hledger input, oracle code, or hledger version changes.
+**Rationale**: Persisted fixtures make normal tests deterministic and avoid invoking external oracle generation on every run. Input and output hashes expose drift when the dataset, external-oracle input, adapter code, composite-rule version, or pinned oracle identity changes.
 
 **Alternatives considered**:
 
-- Generate oracle results on every test run: rejected because it requires hledger for all empirical runs and increases runtime and platform fragility.
-- Never generate in tests: rejected because the spec permits hledger generation when a required fixture is absent.
-- Store only human-readable hledger terminal output: rejected because tests need normalized assertable data rather than terminal formatting.
+- Generate oracle results on every test run: rejected because it requires external oracle tooling for all empirical runs and increases runtime and platform fragility.
+- Never generate in tests: rejected because the spec permits external oracle generation when a required fixture is absent.
+- Store only human-readable external-oracle terminal output: rejected because tests need normalized assertable data rather than terminal formatting.
 
 ## Decision: Normalize Oracle Output To Project-Owned JSON
 
 Use project-owned JSON golden fixtures with decimal values represented as strings and explicit metadata for version, command, hashes, normalization, method, year, asset, fields, and unsupported cases.
 
-**Rationale**: JSON is better for machine assertions than hledger's terminal output and is easier to hash deterministically than loosely formatted text. Decimal strings preserve exactness and avoid floating-point parsing.
+**Rationale**: JSON is better for machine assertions than external-oracle terminal output and is easier to hash deterministically than loosely formatted text. Decimal strings preserve exactness and avoid floating-point parsing.
 
 **Alternatives considered**:
 
-- Compare hledger terminal output directly: rejected because terminal output is presentation, not a stable calculation contract.
+- Compare external-oracle terminal output directly: rejected because terminal output is presentation, not a stable calculation contract.
 - Store Go source fixtures: rejected because it would hide expected data in code and make review harder.
 - Store binary fixtures: rejected because they are not human-reviewable.
 
@@ -97,42 +99,42 @@ Place empirical solidified financial tests under `tests/empirical` as a complete
 - Add package-local tests under `internal/report`: rejected because the dataset and oracle comparison span multiple packages and should stay isolated.
 - Add only unit tests: rejected because the objective is empirical integration validation of the calculation layer.
 
-## Decision: Cover Scope-Local Hybrid With hledger-Backed Sub-Evidence Plus Project Composition Rules
+## Decision: Cover Scope-Local Hybrid With Rotki-Backed Arithmetic Plus Project Composition Rules
 
-For Scope-Local Hybrid (`scope_local_hybrid`), use hledger to validate representable per-scope exact matching and average-cost portions, then apply documented project-owned composition rules for fallback activation, carry-forward until zero, reset after zero, and independent scope state.
+For Scope-Local Hybrid (`scope_local_hybrid`), use a separate composite oracle. The composite oracle may use rotki-backed arithmetic assertions for valid subproblems, then applies documented project-owned composition rules for fallback activation, carry-forward until zero, reset after zero, and independent scope state.
 
-**Rationale**: hledger does not model this project's full hybrid lifecycle as one native method. Using hledger for representable subproblems keeps external evidence where possible while avoiding false claims that hledger directly implements the project's hybrid method.
+**Rationale**: No single selected external oracle models this project's full hybrid lifecycle as one native method. Using rotki-backed arithmetic where valid keeps external evidence where possible while avoiding false claims that any external tool directly implements the project's hybrid method.
 
 **Alternatives considered**:
 
-- Treat hledger as a native scope-local-hybrid oracle: rejected because that would be inaccurate.
+- Treat any selected external oracle as a native scope-local-hybrid oracle: rejected because that would be inaccurate.
 - Exclude Scope-Local Hybrid from empirical testing: rejected because the spec requires every supported method.
-- Hand-author all hybrid expected results without hledger evidence: rejected because it weakens the empirical external-oracle objective.
+- Hand-author all hybrid expected results without external-oracle-backed arithmetic evidence where available: rejected because it weakens the empirical external-oracle objective.
 
 ## Decision: Mark Faithfully Unrepresentable Cases As Unsupported For External Comparison
 
-If a dataset case cannot be represented in hledger without changing its financial meaning, the oracle marks that case unsupported for external-oracle comparison with a reason.
+If a dataset case cannot be represented in the selected external oracle or composite oracle without changing its financial meaning, the oracle marks that case unsupported for external-oracle comparison with a reason. BUG-001 removes zero-priced holding reductions from empirical external-oracle fixture scope instead of carrying them as supported fixture groups or hledger-specific unsupported segments.
 
 **Rationale**: Silent approximation would create false confidence and could hide drift. Explicit unsupported markers preserve dataset coverage while making oracle limits visible.
 
 **Alternatives considered**:
 
-- Fabricate expected values for unsupported hledger cases: rejected because it is not external-oracle evidence.
-- Remove unsupported edge cases from the dataset: rejected because the dataset must cover project-supported edge cases.
-- Fail the whole suite on any unsupported case: rejected because some project-specific semantics may legitimately lack a direct hledger representation.
+- Fabricate expected values for unsupported selected-oracle cases: rejected because it is not external-oracle evidence.
+- Remove unsupported project edge cases from all testing: rejected because the project must still cover project-supported edge cases through non-oracle unit, integration, or contract tests when they are outside empirical external-oracle scope.
+- Fail the whole suite on any unsupported case: rejected because some project-specific semantics may legitimately lack a direct selected-oracle representation.
 
 ## Decision: Align Decimal Policy First, Then Apply Tight Financial Tolerances
 
-Quantities compare by exact decimal equality after normalization. Financial fields are compared after one selected decimal policy is applied to both hledger oracle output and project calculation output. The oracle first attempts to configure or normalize hledger-derived values to this project's production internal policy: 16 decimal places with round-half-up handling for required non-terminating divisions and proportional allocations. If hledger cannot be configured to match that policy for every otherwise valid empirical case, the implementation must expose a test-scoped external environment variable, expected as `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY`, and empirical tests must set it to the hledger-established decimal policy for those runs. Production behavior keeps the 16-decimal default when the variable is unset. After decimal-policy alignment, calculated financial values may use documented per-field tolerances for residual external-oracle deviations. Quantity tolerance is `0`. Non-zero financial tolerances must be declared per field, must not exceed one unit at the selected decimal-policy scale, and must include a note explaining why exact equality is not achievable for that hledger-derived value.
+Quantities compare by exact decimal equality after normalization. Financial fields are compared after one selected decimal policy is applied to both external-oracle output and project calculation output. The oracle first attempts to configure or normalize external-oracle-derived values to this project's production internal policy: 16 decimal places with round-half-up handling for required non-terminating divisions and proportional allocations. If the selected external oracle cannot be configured to match that policy for every otherwise valid empirical case, the implementation must expose a test-scoped external environment variable, expected as `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY`, and empirical tests must set it to the external-oracle-established decimal policy for those runs. Production behavior keeps the 16-decimal default when the variable is unset. After decimal-policy alignment, calculated financial values may use documented per-field tolerances for residual external-oracle deviations. Quantity tolerance is `0`. Non-zero financial tolerances must be declared per field, must not exceed one unit at the selected decimal-policy scale, and must include a note explaining why exact equality is not achievable for that external-oracle-derived value.
 
-**Rationale**: Empirical validation should minimize avoidable differences by aligning decimal policy before comparison. hledger may still produce small residual deviations because it is an external accounting engine with its own internal representation and reporting behavior. A documented per-field tolerance prevents immaterial oracle/tooling differences from failing the suite, while the decimal-policy alignment step and one-unit-at-scale cap keep the comparison sensitive to actual calculation drift.
+**Rationale**: Empirical validation should minimize avoidable differences by aligning decimal policy before comparison. A selected external oracle may still produce small residual deviations because it is an external accounting engine with its own internal representation and reporting behavior. A documented per-field tolerance prevents immaterial oracle/tooling differences from failing the suite, while the decimal-policy alignment step and one-unit-at-scale cap keep the comparison sensitive to actual calculation drift.
 
 **Alternatives considered**:
 
 - Use broad global comparison deltas: rejected because they can hide systematic method differences.
 - Use tolerance without first aligning decimal policy: rejected because avoidable precision mismatches would consume the tolerance budget and weaken drift detection.
 - Require exact equality for every financial value after policy alignment: rejected because small residual external-oracle deviations may still occur and should not fail otherwise valid empirical cases.
-- Require exact equality under the production 16-decimal policy regardless of hledger precision behavior: rejected because it could reject valid external evidence when hledger's established policy cannot be made to match the project's production default.
+- Require exact equality under the production 16-decimal policy regardless of selected-oracle precision behavior: rejected because it could reject valid external evidence when the selected oracle's established policy cannot be made to match the project's production default.
 - Use floating-point comparisons: rejected by the constitution.
 
 ## Decision: Keep Currency Conversion Permanently Out Of Scope

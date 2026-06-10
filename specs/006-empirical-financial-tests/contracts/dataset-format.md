@@ -1,8 +1,10 @@
 # Contract: Empirical Dataset Format
 
+**Bugfix**: 2026-06-10 — [BUG-001] Updated dataset contract wording for selected external-oracle inputs and zero-priced external-oracle exclusion.
+
 ## Scope
 
-This contract defines the synthetic empirical external dataset consumed by hledger oracle generation and empirical calculation tests.
+This contract defines the synthetic empirical external dataset consumed by selected external-oracle generation and empirical calculation tests.
 
 ## Location
 
@@ -84,14 +86,14 @@ cases:
 
 - `source_id` is required, unique, stable, and deterministic.
 - `occurred_at` is required and must be RFC3339 with a source offset.
-- `deterministic_order` is required and must reproduce same-date project calculation order and hledger input order.
+- `deterministic_order` is required and must reproduce same-date project calculation order and selected external-oracle input order.
 - `activity_type` is either `BUY` or `SELL`.
 - `asset_identity_key` is required and is the calculation grouping key.
 - `asset_symbol` is required and is a display label only.
 - `quantity` is required and must be a positive decimal string.
 - Priced `BUY` and priced `SELL` rows require `currency` and enough monetary values to calculate gross value, fee, basis, and proceeds without cross-currency conversion.
 - `fee_amount: "0"` is valid and distinct from a missing fee.
-- Zero-priced holding reductions are `SELL` rows with `zero_priced_reduction_explanation`, no proceeds, no realized gain, and no realized loss.
+- Zero-priced holding reductions are `SELL` rows with `zero_priced_reduction_explanation`, no proceeds, no realized gain, and no realized loss. After BUG-001, these rows are excluded from empirical external-oracle fixture coverage and remain covered by non-oracle unit, integration, or contract tests.
 - Decimal fields are strings. Numeric YAML values are invalid for financial fields.
 - Coverage tags on rows and cases must be stable identifiers, not prose.
 
@@ -114,7 +116,7 @@ Dataset content must not contain:
 - real account or wallet names
 - personally identifying names
 - proprietary financial records
-- copied upstream hledger, Ledger, or Beancount fixture rows
+- copied upstream hledger, rotki, Ledger, Beancount, or other external-oracle fixture rows
 
 ## Read-Only Rule
 
