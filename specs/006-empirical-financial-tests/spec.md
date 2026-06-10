@@ -38,6 +38,7 @@ The specification is kept in `spec.md` for repository tooling compatibility, but
 - Q: Can hledger remain the sole external oracle for every supported empirical method? -> A: No. FIFO, LIFO, HIFO, and Average Cost aggregate comparisons must use a pinned rotki-based test-time oracle adapter. Scope-Local Hybrid must use a separate composite oracle with rotki-backed arithmetic assertions and documented project-owned composition-rule assertions.
 - Q: Are zero-priced holding reductions part of the external-oracle comparison scope? -> A: No. They remain project behavior that must be covered by non-oracle unit, integration, or contract tests, and they must not be counted as supported external-oracle fixture coverage.
 - Q: May empirical tests pass when supported fixture groups are skipped before project calculation and oracle comparison? -> A: No. Supported fixtures must execute calculation and comparison, and unexpected supported fixture skips must fail acceptance.
+- Q: May BUG-001 remediation depend on a developer-local rotki installation or unstaged prototype outputs? -> A: No. Rotki-backed remediation must first establish a repository-controlled boundary. Acceptable evidence is pinned rotki materials under version control or committed raw rotki outputs with provenance metadata under repository-controlled paths.
 
 ## Terms Used In This Spec
 
@@ -164,6 +165,7 @@ Each requirement applies to internal test infrastructure, not to user-facing app
 - **DEP-005**: The ~~vendored hledger executable-and-source model, supported version, version-detection command~~ selected oracle vendoring or adapter model, supported version or commit, version-detection or provenance check, platform support, license compliance notes, failure modes, and reproducibility implications MUST be documented before implementation.
 - **DEP-006**: The empirical test command MUST require the repository-vendored ~~hledger executable under `third_party/hledger/bin/<goos>-<goarch>/hledger`~~ external oracle artifact or adapter source only when a required golden fixture is absent and generation is needed. Fixture-backed tests MAY run on platforms without a supported oracle executable. Fixture generation MUST fail with an actionable setup error when the required oracle boundary is missing, not executable on the current platform, or reports an unsupported version or commit.
 - **DEP-007**: The rotki-based oracle adapter MUST be pinned to a documented source version or commit, MUST record adapter constraints for FIFO, LIFO, HIFO, and Average Cost aggregate comparisons, and MUST exclude zero-priced holding reductions from external-oracle fixture generation.
+- **DEP-008**: BUG-001 remediation MUST establish a repository-controlled rotki boundary before rotki-backed fixture normalization is considered complete. Acceptable evidence is either vendored or otherwise pinned rotki materials sufficient for documented execution, or committed raw rotki outputs plus provenance metadata under `testdata/empirical/rotki/`. Developer-local or CI-global rotki installations MUST NOT be the only source of truth.
 
 ## Dataset Coverage Requirements
 

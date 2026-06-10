@@ -12,7 +12,7 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 **Organization**: This specification intentionally has internal validation objectives instead of user-facing stories. The objectives are mapped to story labels for checklist traceability: `US1` = Maintain An Empirical External Dataset, `US2` = Produce An ~~hledger-Backed~~ External Oracle, `US3` = Add Empirical Solidified Financial Integration Tests.
 
-**Bugfix**: 2026-06-10 — [BUG-001] Updated from bugfix patch.
+**Bugfix**: 2026-06-10 — [BUG-001] Updated from bugfix patch, including explicit repository-controlled rotki-boundary bootstrap tasks.
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -144,12 +144,14 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 **Purpose**: Replace the hledger-only empirical oracle acceptance path that skipped most supported fixtures, restore comparison breadth, and fail on unexpected supported fixture skips.
 
-**Dependencies**: T064 before T067; T065 before T066; T066 before T067, T068, T069, and T070; T067, T068, T069, T070, T071, and T072 before reopened T052 and Phase 7 polish verification.
+**Dependencies**: T064 before T067; T065 before T073; T073 before T066 and T074; T066 and T074 before T067, T068, T069, and T070; T067, T068, T069, T070, T071, T072, and T074 before reopened T052 and Phase 7 polish verification.
 
 - [ ] T064 [US2] Remove zero-priced holding reduction cases from empirical external-oracle dataset scope, generated oracle inputs, golden fixtures, and empirical covered-case expectations while preserving zero-priced behavior coverage in non-oracle unit, integration, or contract tests across `testdata/empirical/financial-dataset.yaml`, `testdata/empirical/golden/`, `testdata/empirical/hledger/`, `tests/empirical/`, `tests/unit/`, and `tests/integration/`
-- [ ] T065 [P] [US2] Document rotki dependency license text, source provenance, pinned version or commit, checksums, adapter constraints, platform support, and hledger-only supersession in `third_party/rotki/README.md` and `specs/006-empirical-financial-tests/research.md`
-- [ ] T066 [US2] Implement the pinned rotki-based test-time oracle adapter for FIFO, LIFO, HIFO, and Average Cost aggregate fixtures in `tools/empiricaloracle/` and `tests/empirical/fixture/`
-- [ ] T067 [US2] Regenerate pure external-oracle golden fixtures from rotki after zero-priced external-oracle cases are removed under `testdata/empirical/golden/` and update fixture metadata for source provenance, adapter arguments, hashes, and decimal policy
+- [ ] T065 [P] [US2] Create and document the repository-controlled rotki boundary policy, license text, source provenance, pinned version or commit, checksums, adapter constraints, platform support, and hledger-only supersession in `third_party/rotki/README.md` and `specs/006-empirical-financial-tests/research.md`
+- [ ] T073 [US2] Add repository-controlled rotki boundary materials under `third_party/rotki/` and `testdata/empirical/rotki/`, including committed raw rotki outputs or stable normalization inputs with provenance metadata for FIFO, LIFO, HIFO, and Average Cost aggregate cases, so BUG-001 remediation does not depend on developer-local rotki installation
+- [ ] T074 [P] [US2] Add boundary verification tests or checks that fail with an actionable setup error when the required repository-controlled rotki materials or committed raw rotki outputs are missing in `tools/empiricaloracle/` and `tests/empirical/`
+- [ ] T066 [US2] Implement the pinned rotki-based test-time oracle adapter for FIFO, LIFO, HIFO, and Average Cost aggregate fixtures against the repository-controlled rotki boundary or committed raw rotki outputs in `tools/empiricaloracle/` and `tests/empirical/fixture/`
+- [ ] T067 [US2] Regenerate pure external-oracle golden fixtures from the repository-controlled rotki boundary or committed raw rotki outputs after zero-priced external-oracle cases are removed under `testdata/empirical/golden/` and update fixture metadata for source provenance, adapter arguments, hashes, and decimal policy
 - [ ] T068 [US2] Replace HIFO hledger fixtures with rotki HIFO fixtures and add or preserve a deterministic non-zero-priced HIFO tie-break case in `testdata/empirical/golden/` and `testdata/empirical/financial-dataset.yaml`
 - [ ] T069 [US2] Limit Average Cost empirical comparisons to aggregate realized gain or loss, allocated basis, closing quantity, and closing basis until project-compatible pool provenance exists in `tests/empirical/fixture/comparison.go` and `tests/empirical/fixture/project_output.go`
 - [ ] T070 [US2] Add a separate Scope-Local Hybrid composite oracle package that combines rotki-backed arithmetic sub-oracles with documented project-owned composition-rule assertions under `tools/empiricaloracle/` and `tests/empirical/fixture/`
@@ -187,7 +189,7 @@ description: "Task list for Empirical Solidified Financial Tests"
 - **US1 Dataset (Phase 3)**: Depends on Foundational completion.
 - **US2 Oracle (Phase 4)**: Depends on US1 because ~~hledger journals~~ external-oracle inputs and golden fixtures are generated from the validated dataset.
 - **US3 Empirical Tests (Phase 5)**: Depends on US1 and US2 because comparisons require the validated dataset and golden fixtures.
-- **BUG-001 Remediation (Phase 6)**: Depends on US1, reopened US2 oracle fixture work, and reopened US3 empirical comparison work; blocks polish acceptance and reopened T052.
+- **BUG-001 Remediation (Phase 6)**: Depends on US1, reopened US2 oracle fixture work, reopened US3 empirical comparison work, and a new repository-controlled rotki-boundary bootstrap; blocks polish acceptance and reopened T052.
 - **Polish (Phase 7)**: Depends on all selected objective phases and BUG-001 remediation completion.
 
 ### Objective Dependency Graph
@@ -205,6 +207,7 @@ Setup -> Foundational -> US1 Dataset -> US2 Oracle -> US3 Empirical Tests -> BUG
 - T040, T041, T042, T043, and T044 can run in parallel once US2 is complete.
 - T053, T054, T055, T058, T061, and T062 can run in parallel during Polish.
 - T065 and T072 can run in parallel with independent implementation work after BUG-001 remediation starts.
+- T074 can run in parallel with T066 after T073 establishes the repository-controlled rotki boundary materials.
 
 ---
 
