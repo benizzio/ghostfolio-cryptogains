@@ -159,7 +159,7 @@ func normalizeProjectCalculationOutput(
 		}
 
 		var normalizedMatches []ProjectMatchEvidence
-			normalizedMatches, err = normalizeProjectLiquidationMatches(report.CostBasisMethod, liquidation)
+			normalizedMatches, err = normalizeProjectLiquidationMatches(liquidation)
 		if err != nil {
 			return ProjectCalculationOutput{}, fmt.Errorf(
 				"normalize project output %s %s liquidation %s matches: %w",
@@ -237,7 +237,6 @@ func findProjectReferenceEntry(report reportmodel.CapitalGainsReport, assetIdent
 // evidence into the stable empirical comparison shape.
 // Authored by: OpenCode
 func normalizeProjectLiquidationMatches(
-	method reportmodel.CostBasisMethod,
 	liquidation reportmodel.LiquidationCalculation,
 ) ([]ProjectMatchEvidence, error) {
 	var normalized = make([]ProjectMatchEvidence, 0, len(liquidation.Matches))
