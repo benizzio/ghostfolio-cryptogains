@@ -37,8 +37,8 @@ func TestOracleLoadOracleOutputsLoadsValidatedFixtures(t *testing.T) {
 	if outputs[0].CaseID != scopeLocalHybrid.CaseID || outputs[0].Method != reportmodel.CostBasisMethodScopeLocalHybrid || outputs[0].Year != 2024 {
 		t.Fatalf("unexpected first fixture: %+v", outputs[0])
 	}
-	if outputs[0].Metadata.HledgerVersion != "1.99.2" {
-		t.Fatalf("unexpected hledger version: got %q want %q", outputs[0].Metadata.HledgerVersion, "1.99.2")
+	if outputs[0].Metadata.OracleName != "rotki" {
+		t.Fatalf("unexpected oracle name: got %q want %q", outputs[0].Metadata.OracleName, "rotki")
 	}
 	if outputs[0].Values.RealizedGainOrLoss != "5" || outputs[0].Values.AllocatedBasis != "10" || outputs[0].Values.ClosingQuantity != "0.5" || outputs[0].Values.ClosingBasis != "6" {
 		t.Fatalf("unexpected canonical comparable values: %+v", outputs[0].Values)
@@ -46,7 +46,7 @@ func TestOracleLoadOracleOutputsLoadsValidatedFixtures(t *testing.T) {
 	if len(outputs[0].Matches) != 2 {
 		t.Fatalf("unexpected match count: got %d want %d", len(outputs[0].Matches), 2)
 	}
-	if outputs[0].Matches[0].SupportLabel != EvidenceSupportLabelHledgerBacked || outputs[0].Matches[1].SupportLabel != EvidenceSupportLabelProjectCompositionRule {
+	if outputs[0].Matches[0].SupportLabel != EvidenceSupportLabelRotkiBacked || outputs[0].Matches[1].SupportLabel != EvidenceSupportLabelProjectCompositionRule {
 		t.Fatalf("unexpected support labels: %+v", outputs[0].Matches)
 	}
 	if len(outputs[0].UnsupportedSegments) != 1 || outputs[0].UnsupportedSegments[0].ComparisonPolicy != ComparisonPolicySkipExternalOracle {
@@ -84,14 +84,14 @@ func TestOracleParseOracleOutputRejectsMissingRequiredMetadata(t *testing.T) {
 	var output = newValidOracleOutputFixture(t, reportmodel.CostBasisMethodFIFO, "case-missing-metadata-2024", 2024, "asset-alpha", false)
 	var payload = marshalOracleOutputFixtureToMap(t, output)
 	var metadata = requireOracleOutputNestedMap(t, payload, "metadata")
-	delete(metadata, "hledger_version")
+	delete(metadata, "oracle_name")
 
 	var rawContent = marshalOracleOutputMap(t, payload)
 	_, err := ParseOracleOutput("testdata/empirical/golden/missing-metadata.json", []byte(rawContent))
 	if err == nil {
 		t.Fatal("expected missing metadata rejection, got nil")
 	}
-	assertOracleOutputErrorContainsAll(t, err, "metadata.hledger_version", "required_field")
+	assertOracleOutputErrorContainsAll(t, err, "metadata.oracle_name", "required_field")
 }
 
 // TestOracleValidateOracleOutputRejectsNonCanonicalDecimalAndToleranceIssues
@@ -168,12 +168,15 @@ func newValidOracleOutputFixture(t *testing.T, method reportmodel.CostBasisMetho
 		},
 		UnsupportedSegments: []UnsupportedOracleSegment{},
 		Metadata: OracleGenerationRun{
-			HledgerVersion:       "1.99.2",
-			CommandArguments:     []string{"-f", "testdata/empirical/hledger/" + method.FilenameSlug() + ".journal", "print"},
-			DatasetInputHash:     stableOracleFixtureHashText(caseID + ":dataset"),
-			HledgerInputHash:     stableOracleFixtureHashText(caseID + ":hledger"),
-			DecimalPolicy:        "scale=16,rounding=half_up",
-			NormalizationVersion: "1",
+			OracleName:              "rotki",
+			SourceURL:               "https://github.com/rotki/rotki",
+			VersionOrCommit:         "v1.43.1",
+			AdapterArguments:        []string{"--boundary", "testdata/empirical/rotki/bootstrap-boundary.json", "--case", caseID, "--method", method.FilenameSlug()},
+			AdapterConstraints:      []string{"zero-priced holding reductions excluded from external-oracle fixture generation"},
+			DatasetInputHash:        stableOracleFixtureHashText(caseID + ":dataset"),
+			ExternalOracleInputHash: stableOracleFixtureHashText(caseID + ":oracle-input"),
+			DecimalPolicy:           "scale=16,rounding=half_up",
+			NormalizationVersion:    "1",
 			FinancialTolerances: map[string]string{
 				"realized_gain_or_loss": "0.0000000000000001",
 				"allocated_basis":       "0",
@@ -203,7 +206,7 @@ func newValidOracleOutputFixture(t *testing.T, method reportmodel.CostBasisMetho
 				CaseID:            caseID,
 				Method:            method,
 				ActivitySourceIDs: []string{"emp-act-000090", "emp-act-000099"},
-				Reason:            "Synthetic zero-priced reduction stays outside faithful hledger representation for this case",
+				Reason:            "Synthetic zero-priced reduction stays outside the faithful external-oracle representation for this case",
 				ComparisonPolicy:  ComparisonPolicySkipExternalOracle,
 			},
 		}
@@ -226,7 +229,7 @@ func defaultOracleOutputSupportLabel(method reportmodel.CostBasisMethod, composi
 		return EvidenceSupportLabelProjectCompositionRule
 	}
 	if method == reportmodel.CostBasisMethodScopeLocalHybrid {
-		return EvidenceSupportLabelHledgerBacked
+		return EvidenceSupportLabelRotkiBacked
 	}
 
 	return ""

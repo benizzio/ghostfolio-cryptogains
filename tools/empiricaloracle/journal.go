@@ -63,6 +63,9 @@ func renderJournals(dataset fixture.EmpiricalDataset, rawDatasetContent string) 
 	var caseIndex int
 
 	for caseIndex = range dataset.Cases {
+		if dataset.Cases[caseIndex].OracleSupport == fixture.OracleSupportUnsupported {
+			continue
+		}
 		var methodIndex int
 		for methodIndex = range dataset.Cases[caseIndex].Methods {
 			var output, err = renderJournal(dataset, rawDatasetContent, dataset.Cases[caseIndex], dataset.Cases[caseIndex].Methods[methodIndex])
@@ -75,7 +78,7 @@ func renderJournals(dataset fixture.EmpiricalDataset, rawDatasetContent string) 
 	}
 
 	sort.Slice(outputs, func(left int, right int) bool {
-		return outputs[left].ledger.HledgerJournalPath < outputs[right].ledger.HledgerJournalPath
+		return outputs[left].ledger.ExternalOracleInputPath < outputs[right].ledger.ExternalOracleInputPath
 	})
 
 	return outputs, nil
@@ -112,13 +115,13 @@ func renderJournal(
 
 	return journal{
 		ledger: fixture.OracleInputLedger{
-			LedgerID:           journalLedgerID(method, empiricalCase.CaseID),
-			Method:             strings.TrimSpace(string(method)),
-			CaseIDs:            []string{strings.TrimSpace(empiricalCase.CaseID)},
-			HledgerJournalPath: journalPath,
-			DatasetInputHash:   stablePrefixedSHA256Hash([]byte(rawDatasetContent)),
-			HledgerInputHash:   stablePrefixedSHA256Hash([]byte(content)),
-			GenerationNotes:    copiedNotes,
+			LedgerID:                journalLedgerID(method, empiricalCase.CaseID),
+			Method:                  strings.TrimSpace(string(method)),
+			CaseIDs:                 []string{strings.TrimSpace(empiricalCase.CaseID)},
+			ExternalOracleInputPath: journalPath,
+			DatasetInputHash:        stablePrefixedSHA256Hash([]byte(rawDatasetContent)),
+			ExternalOracleInputHash: stablePrefixedSHA256Hash([]byte(content)),
+			GenerationNotes:         copiedNotes,
 		},
 		content: content,
 	}, nil

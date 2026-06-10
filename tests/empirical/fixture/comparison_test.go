@@ -65,11 +65,12 @@ func TestCompareProjectCalculationOutputComparesMatchEvidence(t *testing.T) {
 
 	var oracle = comparisonOracleFixture()
 	oracle.Method = reportmodel.CostBasisMethodScopeLocalHybrid
-	oracle.Matches[0].SupportLabel = EvidenceSupportLabelHledgerBacked
+	oracle.Matches[0].SupportLabel = EvidenceSupportLabelRotkiBacked
 	oracle.Matches[0].ScopeID = "wallet-alpha"
 	var project = comparisonProjectFixture()
 	project.Method = reportmodel.CostBasisMethodScopeLocalHybrid
-	project.Matches[0].SupportLabel = EvidenceSupportLabelHledgerBacked
+	project.Matches[0].SupportLabel = EvidenceSupportLabelRotkiBacked
+	project.Matches[0].ScopeID = "wallet-alpha"
 	project.Matches[0].MatchedBasis = "11"
 
 	var outcome, err = CompareProjectCalculationOutput(project, oracle)
@@ -128,6 +129,39 @@ func TestCompareProjectCalculationOutputRecordsUnsupportedSegmentSkips(t *testin
 	var compositionOnly = comparisonSkipByPolicy(t, outcome.Skips, ComparisonPolicyProjectCompositionOnly)
 	if !equalStringSlices(compositionOnly.RelevantSourceIDs, []string{"sell-3"}) {
 		t.Fatalf("unexpected project_composition_only skip: %+v", compositionOnly)
+	}
+}
+
+// TestCompareProjectCalculationOutputOmitsAverageCostMatchEvidence verifies the
+// comparator ignores match-evidence drift for average-cost aggregate-only
+// fixtures.
+// Authored by: OpenCode
+func TestCompareProjectCalculationOutputOmitsAverageCostMatchEvidence(t *testing.T) {
+	t.Parallel()
+
+	var oracle = comparisonOracleFixture()
+	oracle.Method = reportmodel.CostBasisMethodAverageCost
+	oracle.Matches = []OracleMatchEvidence{{
+		DisposedSourceID:    "sell-1",
+		AcquisitionSourceID: "AVERAGE_COST_POOL",
+		MatchedQuantity:     "99",
+		MatchedBasis:        "99",
+	}}
+	var project = comparisonProjectFixture()
+	project.Method = reportmodel.CostBasisMethodAverageCost
+	project.Matches = []ProjectMatchEvidence{{
+		DisposedSourceID:    "sell-1",
+		AcquisitionSourceID: "AVERAGE_COST_POOL",
+		MatchedQuantity:     "1",
+		MatchedBasis:        "10",
+	}}
+
+	var outcome, err = CompareProjectCalculationOutput(project, oracle)
+	if err != nil {
+		t.Fatalf("compare average-cost aggregate-only output: %v", err)
+	}
+	if len(outcome.Results) != 4 {
+		t.Fatalf("expected only aggregate comparison results for average-cost fixture, got %+v", outcome.Results)
 	}
 }
 

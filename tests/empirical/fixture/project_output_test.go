@@ -126,8 +126,8 @@ func TestNormalizeProjectCalculationOutputHandlesReferenceOnlyAssets(t *testing.
 }
 
 // TestNormalizeProjectCalculationOutputLabelsScopeLocalHybridEvidence verifies
-// scope-local hybrid match evidence uses the hledger-backed label when the
-// project report exposes comparable match rows.
+// scope-local hybrid match evidence uses the rotki-backed arithmetic label when
+// the project report exposes comparable match rows.
 // Authored by: OpenCode
 func TestNormalizeProjectCalculationOutputLabelsScopeLocalHybridEvidence(t *testing.T) {
 	t.Parallel()
@@ -161,11 +161,46 @@ func TestNormalizeProjectCalculationOutputLabelsScopeLocalHybridEvidence(t *test
 	if len(output.Matches) != 1 {
 		t.Fatalf("unexpected scope-local match count: %d", len(output.Matches))
 	}
-	if output.Matches[0].SupportLabel != EvidenceSupportLabelHledgerBacked {
-		t.Fatalf("unexpected scope-local support label: got %q want %q", output.Matches[0].SupportLabel, EvidenceSupportLabelHledgerBacked)
+	if output.Matches[0].SupportLabel != EvidenceSupportLabelRotkiBacked {
+		t.Fatalf("unexpected scope-local support label: got %q want %q", output.Matches[0].SupportLabel, EvidenceSupportLabelRotkiBacked)
 	}
 	if output.Matches[0].ScopeID != "" {
 		t.Fatalf("expected scope id to remain empty when unavailable in report output, got %q", output.Matches[0].ScopeID)
+	}
+}
+
+// TestNormalizeProjectCalculationOutputOmitsAverageCostMatchEvidence verifies
+// the empirical fixture layer keeps average-cost comparisons aggregate-only.
+// Authored by: OpenCode
+func TestNormalizeProjectCalculationOutputOmitsAverageCostMatchEvidence(t *testing.T) {
+	t.Parallel()
+
+	var report = reportmodel.CapitalGainsReport{
+		Year:            2024,
+		CostBasisMethod: reportmodel.CostBasisMethodAverageCost,
+		DetailSections: []reportmodel.AssetDetailSection{{
+			AssetIdentityKey: "asset-delta",
+			ClosingQuantity:  fixtureDecimal(t, "1"),
+			ClosingCostBasis: fixtureDecimal(t, "20"),
+			LiquidationSummaries: []reportmodel.LiquidationCalculation{{
+				SourceID:       "delta-sell-1",
+				AllocatedBasis: fixtureDecimal(t, "10"),
+				GainOrLoss:     fixtureDecimal(t, "5"),
+				Matches: []reportmodel.BasisMatch{{
+					AcquisitionSourceID: "AVERAGE_COST_POOL",
+					MatchedQuantity:     fixtureDecimal(t, "1"),
+					MatchedBasis:        fixtureDecimal(t, "10"),
+				}},
+			}},
+		}},
+	}
+
+	var output, err = NormalizeProjectCalculationOutput("case-average-cost-2024", report, "asset-delta")
+	if err != nil {
+		t.Fatalf("normalize average-cost project output: %v", err)
+	}
+	if len(output.Matches) != 0 {
+		t.Fatalf("expected aggregate-only average-cost output to omit match evidence, got %+v", output.Matches)
 	}
 }
 

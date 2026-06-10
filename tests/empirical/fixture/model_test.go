@@ -24,7 +24,7 @@ func TestEmpiricalModelEnumValuesMatchSpecification(t *testing.T) {
 		{name: "oracle_support_supported", got: string(OracleSupportSupported), want: "supported"},
 		{name: "oracle_support_partially_supported", got: string(OracleSupportPartiallySupported), want: "partially_supported"},
 		{name: "oracle_support_unsupported", got: string(OracleSupportUnsupported), want: "unsupported"},
-		{name: "evidence_support_label_hledger_backed", got: string(EvidenceSupportLabelHledgerBacked), want: "hledger_backed"},
+		{name: "evidence_support_label_rotki_backed", got: string(EvidenceSupportLabelRotkiBacked), want: "rotki_backed"},
 		{name: "evidence_support_label_project_composition_rule", got: string(EvidenceSupportLabelProjectCompositionRule), want: "project_composition_rule"},
 		{name: "comparison_policy_skip_external_oracle", got: string(ComparisonPolicySkipExternalOracle), want: "skip_external_oracle"},
 		{name: "comparison_policy_project_composition_only", got: string(ComparisonPolicyProjectCompositionOnly), want: "project_composition_only"},
@@ -101,8 +101,12 @@ func TestOracleAndComparisonModelContracts(t *testing.T) {
 	assertStructFieldTypeAndTags(t, valuesType, "ClosingBasis", reflect.TypeOf(""), "closing_basis", "closing_basis")
 
 	var metadataType = reflect.TypeOf(OracleGenerationRun{})
-	assertStructFieldTypeAndTags(t, metadataType, "HledgerVersion", reflect.TypeOf(""), "hledger_version", "hledger_version")
-	assertStructFieldTypeAndTags(t, metadataType, "CommandArguments", reflect.TypeOf([]string{}), "command_arguments", "command_arguments")
+	assertStructFieldTypeAndTags(t, metadataType, "OracleName", reflect.TypeOf(""), "oracle_name", "oracle_name")
+	assertStructFieldTypeAndTags(t, metadataType, "SourceURL", reflect.TypeOf(""), "source_url", "source_url")
+	assertStructFieldTypeAndTags(t, metadataType, "VersionOrCommit", reflect.TypeOf(""), "version_or_commit", "version_or_commit")
+	assertStructFieldTypeAndTags(t, metadataType, "AdapterArguments", reflect.TypeOf([]string{}), "adapter_arguments", "adapter_arguments")
+	assertStructFieldTypeAndTags(t, metadataType, "AdapterConstraints", reflect.TypeOf([]string{}), "adapter_constraints", "adapter_constraints")
+	assertStructFieldTypeAndTags(t, metadataType, "ExternalOracleInputHash", reflect.TypeOf(""), "external_oracle_input_hash", "external_oracle_input_hash")
 	assertStructFieldTypeAndTags(t, metadataType, "DecimalPolicy", reflect.TypeOf(""), "decimal_policy", "decimal_policy")
 	assertStructFieldTypeAndTags(t, metadataType, "FinancialTolerances", reflect.TypeOf(map[string]string{}), "financial_tolerances", "financial_tolerances")
 	assertStructFieldTypeAndTags(t, metadataType, "ToleranceNotes", reflect.TypeOf(map[string]string{}), "tolerance_notes", "tolerance_notes")
@@ -202,16 +206,19 @@ func TestOracleOutputAndComparisonJSONContracts(t *testing.T) {
 				MatchedBasis:        "10",
 				MatchedProceeds:     "15",
 				MatchedGainOrLoss:   "5",
-				SupportLabel:        EvidenceSupportLabelHledgerBacked,
+				SupportLabel:        EvidenceSupportLabelRotkiBacked,
 			},
 		},
 		Metadata: OracleGenerationRun{
-			HledgerVersion:       "1.52.1",
-			CommandArguments:     []string{"-f", "testdata/empirical/hledger/fifo.journal", "print"},
-			DatasetInputHash:     "sha256:dataset",
-			HledgerInputHash:     "sha256:ledger",
-			DecimalPolicy:        "scale=16,rounding=half_up",
-			NormalizationVersion: "1",
+			OracleName:              "rotki",
+			SourceURL:               "https://github.com/rotki/rotki",
+			VersionOrCommit:         "v1.43.1",
+			AdapterArguments:        []string{"--boundary", "testdata/empirical/rotki/bootstrap-boundary.json", "--case", "case-fifo-basic-2024"},
+			AdapterConstraints:      []string{"zero-priced holding reductions excluded"},
+			DatasetInputHash:        "sha256:dataset",
+			ExternalOracleInputHash: "sha256:ledger",
+			DecimalPolicy:           "scale=16,rounding=half_up",
+			NormalizationVersion:    "1",
 			FinancialTolerances: map[string]string{
 				"allocated_basis": "0.0000000000000001",
 			},

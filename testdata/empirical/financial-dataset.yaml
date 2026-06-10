@@ -1825,7 +1825,7 @@ cases:
       - scope_local_narrowing
       - selected_year_in_year_activity
     oracle_support: partially_supported
-    unsupported_reason: "Hybrid lifecycle composition remains project-owned outside the hledger-backed scope slice"
+    unsupported_reason: "Hybrid lifecycle composition remains project-owned outside the repository-controlled composite scope slice"
   - case_id: case-scope-local-broadening-gamma-2024
     description: "Synthetic scope-local broadened slice from partial or unavailable scope data"
     methods:
@@ -1891,7 +1891,8 @@ cases:
       - zero_priced_holding_reduction_explicit_zero_fields
       - zero_result_liquidations
       - same_source_calendar_date_ordering
-    oracle_support: supported
+    oracle_support: unsupported
+    unsupported_reason: "Zero-priced holding reductions stay outside empirical external-oracle scope after BUG-001"
   - case_id: case-post-year-ignore-delta-2024
     description: "Synthetic 2024 report slice that includes after-year activity references for ignore-path review"
     methods:
@@ -1926,4 +1927,5 @@ cases:
     coverage_tags:
       - zero_priced_holding_reduction_missing_optional_fields
       - average_cost
-    oracle_support: supported
+    oracle_support: unsupported
+    unsupported_reason: "Zero-priced holding reductions stay outside empirical external-oracle scope after BUG-001"

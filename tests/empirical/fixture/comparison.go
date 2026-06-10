@@ -65,6 +65,10 @@ func CompareProjectCalculationOutput(
 	if _, err := parseOracleDecimalPolicy(oracle.Metadata.DecimalPolicy); err != nil {
 		return EmpiricalComparisonOutcome{}, fmt.Errorf("compare project output %s: invalid decimal policy: %w", oracle.CaseID, err)
 	}
+	if oracle.Method == reportmodel.CostBasisMethodAverageCost {
+		oracle.Matches = nil
+		project.Matches = nil
+	}
 
 	var valueComparisons = []struct {
 		field         string
@@ -458,6 +462,16 @@ func compareMatchMetadata(
 			index,
 			expected.AcquisitionSourceID,
 			actual.AcquisitionSourceID,
+		)
+	}
+	if expected.ScopeID != actual.ScopeID {
+		return fmt.Errorf(
+			"compare project output %s %s: matches[%d].scope_id mismatch: expected %s got %s",
+			oracle.CaseID,
+			oracle.AssetIdentityKey,
+			index,
+			expected.ScopeID,
+			actual.ScopeID,
 		)
 	}
 	if expected.SupportLabel != actual.SupportLabel {

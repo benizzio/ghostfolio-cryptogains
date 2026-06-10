@@ -6,89 +6,41 @@
   "year": 2024,
   "asset_identity_key": "asset-delta",
   "values": {
-    "realized_gain_or_loss": "43.0039682539",
-    "allocated_basis": "96.9960317461",
+    "realized_gain_or_loss": "13.0087654320987654",
+    "allocated_basis": "18.9912345679012346",
     "closing_quantity": "8",
-    "closing_basis": "156.9999999999"
+    "closing_basis": "161.938641975308642"
   },
-  "matches": [
+  "matches": [],
+  "unsupported_segments": [
     {
-      "disposed_source_id": "emp-act-000083",
-      "acquisition_source_id": "emp-act-000034",
-      "matched_quantity": "1",
-      "matched_basis": "22.1904761905",
-      "matched_proceeds": "30",
-      "matched_gain_or_loss": "7.8095238095",
-      "support_label": "hledger_backed"
-    },
-    {
-      "disposed_source_id": "emp-act-000085",
-      "acquisition_source_id": "emp-act-000036",
-      "matched_quantity": "1",
-      "matched_basis": "18",
-      "matched_proceeds": "25",
-      "matched_gain_or_loss": "7",
-      "support_label": "hledger_backed"
-    },
-    {
-      "disposed_source_id": "emp-act-000087",
-      "acquisition_source_id": "emp-act-000038",
-      "matched_quantity": "1",
-      "matched_basis": "18.7777777778",
-      "matched_proceeds": "26.5",
-      "matched_gain_or_loss": "7.7222222222",
-      "support_label": "hledger_backed"
-    },
-    {
-      "disposed_source_id": "emp-act-000087",
-      "acquisition_source_id": "emp-act-000040",
-      "matched_quantity": "1",
-      "matched_basis": "18.7777777778",
-      "matched_proceeds": "26.5",
-      "matched_gain_or_loss": "7.7222222222",
-      "support_label": "hledger_backed"
-    },
-    {
-      "disposed_source_id": "emp-act-000089",
-      "acquisition_source_id": "emp-act-000081",
-      "matched_quantity": "1",
-      "matched_basis": "19.25",
-      "matched_proceeds": "32",
-      "matched_gain_or_loss": "12.75",
-      "support_label": "hledger_backed"
+      "case_id": "case-post-year-ignore-delta-2024",
+      "method": "average_cost",
+      "activity_source_ids": [
+        "emp-act-000089"
+      ],
+      "reason": "Average-cost pool provenance remains outside the repository-controlled aggregate oracle boundary",
+      "comparison_policy": "skip_external_oracle"
     }
   ],
-  "unsupported_segments": [],
   "metadata": {
-    "hledger_version": "1.99.2",
-    "command_arguments": [
-      "-n",
-      "-f",
-      "testdata/empirical/hledger/average-cost/case-post-year-ignore-delta-2024.journal",
-      "print",
-      "--lots",
-      "--explicit",
-      "-O",
-      "json",
-      "-b",
-      "2024-01-01",
-      "-e",
-      "2025-01-01",
-      "--next-command--",
-      "-n",
-      "-f",
-      "testdata/empirical/hledger/average-cost/case-post-year-ignore-delta-2024.journal",
-      "balance",
-      "-H",
-      "--lots",
-      "-O",
-      "json",
-      "-e",
-      "2025-01-01",
-      "assets:empirical"
+    "oracle_name": "rotki",
+    "source_url": "https://github.com/rotki/rotki",
+    "version_or_commit": "a2e00be49a0ea36e7563a5d235cfa6a7c91edbfb",
+    "adapter_arguments": [
+      "--boundary",
+      "testdata/empirical/rotki/bootstrap-boundary.json",
+      "--input",
+      "testdata/empirical/rotki/average-cost/case-post-year-ignore-delta-2024.json",
+      "--method",
+      "average_cost"
     ],
-    "dataset_input_hash": "sha256:680845580ca1311d610f4730dd026f683fedb6a0c27b2aefb7cbb26e630114bf",
-    "hledger_input_hash": "sha256:f9a27264ad06bcda1520f37018291cf2aa2c935065913a6c714d881d5e8dd3e8",
+    "adapter_constraints": [
+      "Repository-controlled pure-method bootstrap input",
+      "Average-cost comparison is limited to aggregate values until project-compatible pool provenance exists"
+    ],
+    "dataset_input_hash": "sha256:6287f862061b1f51d795694ab768b1927ff4422cc94b10a7ef053b45ef581042",
+    "external_oracle_input_hash": "sha256:c07cf3838eecbcea9c2d931fa533b25ed528f5893bcca1d73b17e758c76443ff",
     "decimal_policy": "scale=16,rounding=half_up",
     "normalization_version": "1",
     "financial_tolerances": {
@@ -97,6 +49,6 @@
       "realized_gain_or_loss": "0"
     },
     "tolerance_notes": {},
-    "oracle_output_hash": "sha256:cb6507591494fe513f4ba4777fae4b358477e7434bb9223961840e3345987d75"
+    "oracle_output_hash": "sha256:9ea2c8ed1a63d3cb39233a76cdd07206d5be17f65c1ffad7b8df75cb863f693e"
   }
 }

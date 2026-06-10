@@ -273,8 +273,8 @@ func TestJournalRenderJournalsAreCaseScopedAndPopulateMetadata(t *testing.T) {
 	if alpha.ledger.DatasetInputHash != datasetHash {
 		t.Fatalf("unexpected alpha dataset hash: got %q want %q", alpha.ledger.DatasetInputHash, datasetHash)
 	}
-	if alpha.ledger.HledgerInputHash != stablePrefixedSHA256Hash([]byte(alpha.content)) {
-		t.Fatalf("unexpected alpha journal hash metadata: got %q want %q", alpha.ledger.HledgerInputHash, stablePrefixedSHA256Hash([]byte(alpha.content)))
+	if alpha.ledger.ExternalOracleInputHash != stablePrefixedSHA256Hash([]byte(alpha.content)) {
+		t.Fatalf("unexpected alpha journal hash metadata: got %q want %q", alpha.ledger.ExternalOracleInputHash, stablePrefixedSHA256Hash([]byte(alpha.content)))
 	}
 	if strings.Contains(alpha.content, "beta-buy") {
 		t.Fatalf("expected alpha journal to stay case-scoped, got:\n%s", alpha.content)
@@ -289,8 +289,8 @@ func TestJournalRenderJournalsAreCaseScopedAndPopulateMetadata(t *testing.T) {
 	if beta.ledger.DatasetInputHash != datasetHash {
 		t.Fatalf("unexpected beta dataset hash: got %q want %q", beta.ledger.DatasetInputHash, datasetHash)
 	}
-	if beta.ledger.HledgerInputHash != stablePrefixedSHA256Hash([]byte(beta.content)) {
-		t.Fatalf("unexpected beta journal hash metadata: got %q want %q", beta.ledger.HledgerInputHash, stablePrefixedSHA256Hash([]byte(beta.content)))
+	if beta.ledger.ExternalOracleInputHash != stablePrefixedSHA256Hash([]byte(beta.content)) {
+		t.Fatalf("unexpected beta journal hash metadata: got %q want %q", beta.ledger.ExternalOracleInputHash, stablePrefixedSHA256Hash([]byte(beta.content)))
 	}
 	if strings.Contains(beta.content, "alpha-buy") {
 		t.Fatalf("expected beta journal to stay case-scoped, got:\n%s", beta.content)
@@ -461,7 +461,7 @@ func findJournalByPath(t *testing.T, outputs []journal, wantPath string) journal
 
 	var index int
 	for index = range outputs {
-		if outputs[index].ledger.HledgerJournalPath == wantPath {
+		if outputs[index].ledger.ExternalOracleInputPath == wantPath {
 			return outputs[index]
 		}
 	}

@@ -59,6 +59,8 @@ func TestEmpiricalCalculationFixtures(t *testing.T) {
 
 	var failureMessages = make([]string, 0, len(oracleOutputs))
 	var comparisonCount int
+	var executedFixtureGroupCount int
+	var skippedFixtureGroups []string
 	var outputIndex int
 
 	for outputIndex = range oracleOutputs {
@@ -69,9 +71,12 @@ func TestEmpiricalCalculationFixtures(t *testing.T) {
 		}
 
 		t.Run(empiricalFixtureSubtestName(expected), func(t *testing.T) {
-			if skipReason, shouldSkip := empiricalCaseComparisonSkipReason(dataset, empiricalCase, expected.Method); shouldSkip {
-				t.Skip(skipReason)
-			}
+			defer func() {
+				if t.Skipped() {
+					skippedFixtureGroups = append(skippedFixtureGroups, empiricalFixtureSubtestName(expected))
+				}
+			}()
+			executedFixtureGroupCount++
 
 			if strings.TrimSpace(expected.Metadata.DecimalPolicy) != "" {
 				t.Setenv("GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY", expected.Metadata.DecimalPolicy)
@@ -89,15 +94,19 @@ func TestEmpiricalCalculationFixtures(t *testing.T) {
 			if runErr != nil {
 				t.Fatalf("normalize project output: %v", runErr)
 			}
-			if shouldSkipCaseMatchEvidence(dataset, empiricalCase, expected.Method) {
-				expected.Matches = nil
-				projectOutput.Matches = nil
-			}
-
 			var comparisonOutcome fixture.EmpiricalComparisonOutcome
 			comparisonOutcome, runErr = fixture.CompareProjectCalculationOutput(projectOutput, expected)
 			if runErr != nil {
 				t.Fatalf("compare project output: %v", runErr)
+			}
+			if len(comparisonOutcome.Skips) != 0 {
+				var skipIndex int
+				for skipIndex = range comparisonOutcome.Skips {
+					t.Logf("empirical unsupported segment: policy=%s case=%s method=%s asset=%s reason=%s", comparisonOutcome.Skips[skipIndex].ComparisonPolicy, comparisonOutcome.Skips[skipIndex].CaseID, comparisonOutcome.Skips[skipIndex].Method, comparisonOutcome.Skips[skipIndex].AssetIdentityKey, comparisonOutcome.Skips[skipIndex].Reason)
+				}
+			}
+			if len(comparisonOutcome.Results) == 0 {
+				t.Fatal("expected at least one comparable assertion for supported empirical fixture group")
 			}
 
 			comparisonCount += len(comparisonOutcome.Results)
@@ -112,6 +121,12 @@ func TestEmpiricalCalculationFixtures(t *testing.T) {
 
 	if comparisonCount == 0 {
 		t.Fatal("expected at least one comparable empirical assertion")
+	}
+	if len(skippedFixtureGroups) != 0 {
+		t.Fatalf("supported empirical fixture groups must not skip before project calculation and oracle comparison: %s", strings.Join(skippedFixtureGroups, ", "))
+	}
+	if executedFixtureGroupCount != len(oracleOutputs) {
+		t.Fatalf("expected every supported empirical fixture group to execute project calculation and oracle comparison: executed %d of %d", executedFixtureGroupCount, len(oracleOutputs))
 	}
 	if len(failureMessages) != 0 {
 		t.Fatalf("empirical calculation mismatches:\n- %s", strings.Join(failureMessages, "\n- "))
@@ -144,54 +159,6 @@ func findEmpiricalCase(dataset fixture.EmpiricalDataset, caseID string, method r
 
 	return fixture.EmpiricalCase{}, false
 }
-
-// shouldSkipCaseMatchEvidence reports whether this empirical case currently
-// lacks directly comparable project-side match provenance.
-// Authored by: OpenCode
-func shouldSkipCaseMatchEvidence(dataset fixture.EmpiricalDataset, empiricalCase fixture.EmpiricalCase, method reportmodel.CostBasisMethod) bool {
-	if method == reportmodel.CostBasisMethodAverageCost || method == reportmodel.CostBasisMethodScopeLocalHybrid {
-		return true
-	}
-
-	var sourceIDs = make(map[string]struct{}, len(empiricalCase.ActivitySourceIDs))
-	var sourceIndex int
-	for sourceIndex = range empiricalCase.ActivitySourceIDs {
-		sourceIDs[empiricalCase.ActivitySourceIDs[sourceIndex]] = struct{}{}
-	}
-
-	var activityIndex int
-	for activityIndex = range dataset.Activities {
-		if _, ok := sourceIDs[dataset.Activities[activityIndex].SourceID]; !ok {
-			continue
-		}
-		if strings.TrimSpace(dataset.Activities[activityIndex].ZeroPricedReductionExplanation) != "" {
-			return true
-		}
-	}
-
-	return false
-}
-
-// empiricalCaseComparisonSkipReason reports whether one case currently falls
-// outside the comparable empirical boundary exposed by the project report model.
-// Authored by: OpenCode
-func empiricalCaseComparisonSkipReason(dataset fixture.EmpiricalDataset, empiricalCase fixture.EmpiricalCase, method reportmodel.CostBasisMethod) (string, bool) {
-	if method == reportmodel.CostBasisMethodAverageCost {
-		return "average_cost empirical comparison is skipped because report output does not preserve case-slice pool provenance", true
-	}
-	if method == reportmodel.CostBasisMethodHIFO {
-		return "hifo empirical comparison is skipped because persisted oracle precision still differs from calculation-layer financial normalization", true
-	}
-	if method == reportmodel.CostBasisMethodScopeLocalHybrid {
-		return "scope_local_hybrid empirical comparison is skipped because report output does not preserve comparable composition-rule provenance", true
-	}
-	if shouldSkipCaseMatchEvidence(dataset, empiricalCase, method) {
-		return "zero-priced empirical comparison is skipped because report output does not preserve comparable zero-priced lifecycle provenance", true
-	}
-
-	return "", false
-}
-
 
 // loadExpectedOracleOutputs loads the exact fixture set implied by the dataset-
 // derived expected paths.

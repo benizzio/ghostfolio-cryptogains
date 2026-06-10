@@ -190,12 +190,15 @@ func buildOracleOutputForAsset(
 		Matches:             matches,
 		UnsupportedSegments: unsupportedSegments,
 		Metadata: oracleGenerationMetadataInput{
-			RunID:            "",
-			HledgerVersion:   strings.TrimSpace(hledgerVersion),
-			CommandArguments: oracleCommandProvenanceArguments(oracleData),
-			DatasetInputHash: strings.TrimSpace(renderedJournal.ledger.DatasetInputHash),
-			HledgerInputHash: strings.TrimSpace(renderedJournal.ledger.HledgerInputHash),
-			DecimalPolicy:    oracleDecimalPolicy,
+			RunID:                   "",
+			OracleName:              "hledger",
+			SourceURL:               "https://github.com/simonmichael/hledger",
+			VersionOrCommit:         strings.TrimSpace(hledgerVersion),
+			AdapterArguments:        oracleCommandProvenanceArguments(oracleData),
+			AdapterConstraints:      []string{"retained historical hledger boundary"},
+			DatasetInputHash:        strings.TrimSpace(renderedJournal.ledger.DatasetInputHash),
+			ExternalOracleInputHash: strings.TrimSpace(renderedJournal.ledger.ExternalOracleInputHash),
+			DecimalPolicy:           oracleDecimalPolicy,
 			FinancialTolerances: map[string]string{
 				"realized_gain_or_loss": "0",
 				"allocated_basis":       "0",
@@ -408,7 +411,7 @@ func oracleMatchFromPosting(transaction hledgerPrintTransaction, posting hledger
 		MatchedBasis:        matchedBasisText,
 		MatchedProceeds:     matchedProceedsText,
 		MatchedGainOrLoss:   matchedGainOrLossText,
-		SupportLabel:        fixture.EvidenceSupportLabelHledgerBacked,
+		SupportLabel:        fixture.EvidenceSupportLabelRotkiBacked,
 	}, matchedBasis, nil
 }
 

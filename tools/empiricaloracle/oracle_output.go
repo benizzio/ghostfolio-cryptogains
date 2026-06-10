@@ -18,8 +18,8 @@ const (
 	oracleOutputNormalizationVersion = "1"
 )
 
-// oracleOutputNormalizationInput stores the raw hledger-derived values needed to
-// build one normalized oracle fixture.
+// oracleOutputNormalizationInput stores the raw external-oracle-derived values
+// needed to build one normalized oracle fixture.
 // Authored by: OpenCode
 type oracleOutputNormalizationInput struct {
 	FixtureVersion      string
@@ -38,55 +38,59 @@ type oracleOutputNormalizationInput struct {
 // oracle normalizer canonicalizes decimal strings.
 // Authored by: OpenCode
 type comparableOutputValuesInput struct {
-	RealizedGainOrLoss string
-	AllocatedBasis     string
-	ClosingQuantity    string
-	ClosingBasis       string
+	RealizedGainOrLoss string `json:"realized_gain_or_loss"`
+	AllocatedBasis     string `json:"allocated_basis"`
+	ClosingQuantity    string `json:"closing_quantity"`
+	ClosingBasis       string `json:"closing_basis"`
 }
 
 // oracleMatchEvidenceInput stores one raw comparable match-evidence row before
 // canonicalization and stable sorting.
 // Authored by: OpenCode
 type oracleMatchEvidenceInput struct {
-	DisposedSourceID    string
-	AcquisitionSourceID string
-	ScopeID             string
-	MatchedQuantity     string
-	MatchedBasis        string
-	MatchedProceeds     string
-	MatchedGainOrLoss   string
-	SupportLabel        fixture.EvidenceSupportLabel
-	CompositionRuleID   string
+	DisposedSourceID    string                       `json:"disposed_source_id"`
+	AcquisitionSourceID string                       `json:"acquisition_source_id,omitempty"`
+	ScopeID             string                       `json:"scope_id,omitempty"`
+	MatchedQuantity     string                       `json:"matched_quantity"`
+	MatchedBasis        string                       `json:"matched_basis"`
+	MatchedProceeds     string                       `json:"matched_proceeds,omitempty"`
+	MatchedGainOrLoss   string                       `json:"matched_gain_or_loss,omitempty"`
+	SupportLabel        fixture.EvidenceSupportLabel `json:"support_label,omitempty"`
+	CompositionRuleID   string                       `json:"composition_rule_id,omitempty"`
 }
 
 // unsupportedOracleSegmentInput stores one raw unsupported segment before the
 // normalizer copies it into the shared fixture model.
 // Authored by: OpenCode
 type unsupportedOracleSegmentInput struct {
-	CaseID            string
-	Method            reportmodel.CostBasisMethod
-	ActivitySourceIDs []string
-	Reason            string
-	ComparisonPolicy  fixture.ComparisonPolicy
+	CaseID            string                      `json:"case_id"`
+	Method            reportmodel.CostBasisMethod `json:"method"`
+	ActivitySourceIDs []string                    `json:"activity_source_ids"`
+	Reason            string                      `json:"reason"`
+	ComparisonPolicy  fixture.ComparisonPolicy    `json:"comparison_policy"`
 }
 
 // oracleGenerationMetadataInput stores one raw generation metadata block before
 // normalization applies canonical decimal and hash rules.
 // Authored by: OpenCode
 type oracleGenerationMetadataInput struct {
-	RunID               string
-	HledgerVersion      string
-	CommandArguments    []string
-	DatasetInputHash    string
-	HledgerInputHash    string
-	DecimalPolicy       string
-	FinancialTolerances map[string]string
-	ToleranceNotes      map[string]string
-	GeneratedAt         string
+	RunID                   string
+	OracleName              string
+	SourceURL               string
+	VersionOrCommit         string
+	AdapterArguments        []string
+	AdapterConstraints      []string
+	DatasetInputHash        string
+	ExternalOracleInputHash string
+	DecimalPolicy           string
+	CompositeRuleVersion    string
+	FinancialTolerances     map[string]string
+	ToleranceNotes          map[string]string
+	GeneratedAt             string
 }
 
-// normalizeOracleOutput converts raw hledger-derived values into one validated
-// normalized oracle fixture with a deterministic stable hash.
+// normalizeOracleOutput converts raw external-oracle-derived values into one
+// validated normalized oracle fixture with a deterministic stable hash.
 // Authored by: OpenCode
 func normalizeOracleOutput(input oracleOutputNormalizationInput) (fixture.OracleOutput, error) {
 	var output fixture.OracleOutput
@@ -102,16 +106,20 @@ func normalizeOracleOutput(input oracleOutputNormalizationInput) (fixture.Oracle
 		Matches:             make([]fixture.OracleMatchEvidence, 0, len(input.Matches)),
 		UnsupportedSegments: make([]fixture.UnsupportedOracleSegment, 0, len(input.UnsupportedSegments)),
 		Metadata: fixture.OracleGenerationRun{
-			RunID:                strings.TrimSpace(input.Metadata.RunID),
-			HledgerVersion:       strings.TrimSpace(input.Metadata.HledgerVersion),
-			CommandArguments:     copyStringSlice(input.Metadata.CommandArguments),
-			DatasetInputHash:     strings.TrimSpace(input.Metadata.DatasetInputHash),
-			HledgerInputHash:     strings.TrimSpace(input.Metadata.HledgerInputHash),
-			DecimalPolicy:        strings.TrimSpace(input.Metadata.DecimalPolicy),
-			NormalizationVersion: oracleOutputNormalizationVersion,
-			FinancialTolerances:  copyStringMap(input.Metadata.FinancialTolerances),
-			ToleranceNotes:       copyStringMap(input.Metadata.ToleranceNotes),
-			GeneratedAt:          strings.TrimSpace(input.Metadata.GeneratedAt),
+			RunID:                   strings.TrimSpace(input.Metadata.RunID),
+			OracleName:              strings.TrimSpace(input.Metadata.OracleName),
+			SourceURL:               strings.TrimSpace(input.Metadata.SourceURL),
+			VersionOrCommit:         strings.TrimSpace(input.Metadata.VersionOrCommit),
+			AdapterArguments:        copyStringSlice(input.Metadata.AdapterArguments),
+			AdapterConstraints:      copyStringSlice(input.Metadata.AdapterConstraints),
+			DatasetInputHash:        strings.TrimSpace(input.Metadata.DatasetInputHash),
+			ExternalOracleInputHash: strings.TrimSpace(input.Metadata.ExternalOracleInputHash),
+			DecimalPolicy:           strings.TrimSpace(input.Metadata.DecimalPolicy),
+			NormalizationVersion:    oracleOutputNormalizationVersion,
+			CompositeRuleVersion:    strings.TrimSpace(input.Metadata.CompositeRuleVersion),
+			FinancialTolerances:     copyStringMap(input.Metadata.FinancialTolerances),
+			ToleranceNotes:          copyStringMap(input.Metadata.ToleranceNotes),
+			GeneratedAt:             strings.TrimSpace(input.Metadata.GeneratedAt),
 		},
 	}
 

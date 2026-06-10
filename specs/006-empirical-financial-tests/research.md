@@ -51,6 +51,23 @@ Vendor or document external oracle materials under `third_party/` with applicabl
 - Fetch external oracle source or artifacts at test time: rejected because it harms reproducibility and can make CI dependent on network availability.
 - Document manual installation instead of repository-controlled provenance: rejected because fixture generation must be reproducible from documented, pinned oracle materials.
 
+## Decision: Bootstrap The rotki Boundary With Repository-Controlled Provenance And Normalization Inputs
+
+Pin rotki to release tag `v1.43.1`, resolving to commit `a2e00be49a0ea36e7563a5d235cfa6a7c91edbfb`, and record the upstream source archive URL `https://github.com/rotki/rotki/archive/refs/tags/v1.43.1.tar.gz` with SHA-256 `8434b653104f8d5b0638e98d88a5ef256fac7720cc459eb33b729e2848900e3b`. Copy the upstream `LICENSE.md` text from `https://raw.githubusercontent.com/rotki/rotki/v1.43.1/LICENSE.md`, whose fetched SHA-256 is `eb6f58a98d8bdb6d3c8fee3817543589f3cd0921d14748fa0630edff2d4c08b0`, into `third_party/rotki/LICENSE.md` as repository-controlled license evidence.
+
+Because this checkout still lacks verified raw rotki outputs and does not vendor a rotki source checkout or executable, store repository-controlled normalization inputs and intended capture paths under `testdata/empirical/rotki/bootstrap-boundary.json`. These inputs cover synthetic `fifo`, `lifo`, `hifo`, and `average_cost` aggregate cases only, explicitly exclude zero-priced holding reductions, and do not claim rotki was executed in this checkout. Empirical verification must continue to rely on committed golden fixtures by default and must not require a developer-local rotki installation. Platform support notes stay descriptive only at this stage: the upstream README documents Windows, macOS, and Linux support, but this bootstrap commit is platform-neutral because it adds provenance and synthetic inputs rather than an executable boundary.
+
+**Rationale**: BUG-001 requires repository-controlled rotki evidence before adapter completion can be considered done. A pinned provenance record plus committed synthetic normalization inputs is the smallest verifiable boundary that unblocks later adapter work without fabricating raw oracle outputs or depending on undocumented local state.
+
+**Alternatives considered**:
+
+- Claim local prototype outputs as repository evidence: rejected because they are not reproducible from version-controlled materials in this checkout.
+- Commit invented raw rotki responses: rejected because that would falsely imply a verified oracle execution.
+- Require maintainers to install rotki locally before the boundary exists: rejected because BUG-001 explicitly disallows developer-local installation as the only source of truth.
+- Vendor the full rotki source tree in this patch: rejected for now as a larger change set than needed to establish the minimum repository-controlled bootstrap boundary.
+
+Co-authored by: OpenCode
+
 ## Decision: Persist Normalized Oracle Output As Golden Fixtures
 
 Store normalized oracle outputs under `testdata/empirical/golden/` and make empirical tests consume those fixtures by default. Generate fixtures only when missing or explicitly requested by maintainers.

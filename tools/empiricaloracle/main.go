@@ -39,8 +39,9 @@ func main() {
 	os.Exit(1)
 }
 
-// run validates the synthetic dataset, renders case-scoped journals, invokes
-// vendored hledger, and persists normalized oracle fixtures.
+// run validates the synthetic dataset, writes retained hledger journals where
+// applicable, consumes repository-controlled oracle boundary inputs, and
+// persists normalized oracle fixtures.
 // Authored by: OpenCode
 func run(args []string, stdout io.Writer) error {
 	if stdout == nil {
@@ -57,7 +58,7 @@ func run(args []string, stdout io.Writer) error {
 	flagSet.Usage = func() {
 		_, _ = fmt.Fprintln(stdout, "Usage: empiricaloracle [flags]")
 		_, _ = fmt.Fprintln(stdout)
-		_, _ = fmt.Fprintln(stdout, "Generate empirical hledger journals and normalized golden fixtures.")
+		_, _ = fmt.Fprintln(stdout, "Generate empirical oracle inputs and normalized golden fixtures.")
 		flagSet.PrintDefaults()
 	}
 
@@ -104,10 +105,12 @@ func run(args []string, stdout io.Writer) error {
 	if err = fixture.ValidateDatasetCoverage(dataset); err != nil {
 		return fmt.Errorf("empiricaloracle: validate dataset coverage: %w", err)
 	}
+	var datasetInputHash = stablePrefixedSHA256Hash([]byte(rawDatasetContent))
 
 	var hledgerVersion string
 	var hledger vendoredHledgerCommand
 	var hledgerReady bool
+	var rotkiBoundaryVerified bool
 
 	var journals []journal
 	journals, err = renderJournals(dataset, rawDatasetContent)
@@ -126,7 +129,7 @@ func run(args []string, stdout io.Writer) error {
 		}
 
 		var journalRelativePath string
-		journalRelativePath, err = remapOutputRelativePath(outputRootRelativePath, journals[journalIndex].ledger.HledgerJournalPath)
+		journalRelativePath, err = remapOutputRelativePath(outputRootRelativePath, journals[journalIndex].ledger.ExternalOracleInputPath)
 		if err != nil {
 			return fmt.Errorf("empiricaloracle: remap journal path: %w", err)
 		}
@@ -146,6 +149,65 @@ func run(args []string, stdout io.Writer) error {
 			return fmt.Errorf("empiricaloracle: collect missing golden fixtures for case %s method %s: %w", empiricalCase.CaseID, method, err)
 		}
 		if len(missingGoldenPaths) == 0 {
+			continue
+		}
+		if isRepositoryControlledBoundaryMethod(method) {
+			if !rotkiBoundaryVerified {
+				if err = verifyRotkiBoundaryMaterials(repositoryRoot, dataset); err != nil {
+					return fmt.Errorf("empiricaloracle: verify repository-controlled rotki boundary: %w", err)
+				}
+				rotkiBoundaryVerified = true
+			}
+
+			var assetIndex int
+			for assetIndex = range empiricalCase.AssetIdentityKeys {
+				var assetIdentityKey = strings.TrimSpace(empiricalCase.AssetIdentityKeys[assetIndex])
+				var goldenRelativePath = goldenFixtureRelativePath(outputRootRelativePath, empiricalCase, method, assetIdentityKey)
+				if !*regenerate {
+					var exists bool
+					exists, err = artifactExists(repositoryRoot, goldenRelativePath)
+					if err != nil {
+						return fmt.Errorf("empiricaloracle: stat golden fixture %s: %w", goldenRelativePath, err)
+					}
+					if exists {
+						continue
+					}
+				}
+
+				var boundaryInput boundaryOracleInput
+				var boundaryInputRelativePath string
+				var rawBoundaryInput []byte
+				boundaryInput, boundaryInputRelativePath, rawBoundaryInput, err = loadBoundaryOracleInput(repositoryRoot, empiricalCase, method, assetIdentityKey)
+				if err != nil {
+					return fmt.Errorf("empiricaloracle: load repository-controlled boundary input for case %s method %s asset %s: %w", empiricalCase.CaseID, method, assetIdentityKey, err)
+				}
+
+				var output fixture.OracleOutput
+				if method == reportmodel.CostBasisMethodScopeLocalHybrid {
+					output, err = buildScopeLocalHybridCompositeOracleOutput(dataset, datasetInputHash, empiricalCase, assetIdentityKey, boundaryInput, boundaryInputRelativePath, rawBoundaryInput)
+				} else {
+					output, err = buildBoundaryOracleOutputForAsset(dataset, datasetInputHash, empiricalCase, method, assetIdentityKey, boundaryInput, boundaryInputRelativePath, rawBoundaryInput)
+				}
+				if err != nil {
+					return fmt.Errorf("empiricaloracle: build boundary oracle output for case %s method %s asset %s: %w", empiricalCase.CaseID, method, assetIdentityKey, err)
+				}
+
+				var rawOutput []byte
+				rawOutput, err = marshalValidatedOracleOutput(goldenRelativePath, output)
+				if err != nil {
+					return fmt.Errorf("empiricaloracle: marshal golden fixture %s: %w", goldenRelativePath, err)
+				}
+
+				var wroteGolden bool
+				wroteGolden, err = writeArtifact(repositoryRoot, goldenRelativePath, rawOutput, *regenerate)
+				if err != nil {
+					return fmt.Errorf("empiricaloracle: write golden fixture %s: %w", goldenRelativePath, err)
+				}
+				if wroteGolden {
+					goldenWriteCount++
+				}
+			}
+
 			continue
 		}
 		if !hledgerReady {

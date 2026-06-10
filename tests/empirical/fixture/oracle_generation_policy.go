@@ -112,7 +112,8 @@ func (err oracleFixtureGenerationError) Error() string {
 }
 
 // ExpectedGoldenFixturePaths returns the deterministic repository-relative
-// golden fixture paths implied by one validated empirical dataset.
+// golden fixture paths implied by one validated empirical dataset's oracle-
+// supported cases.
 //
 // Example:
 //
@@ -131,6 +132,9 @@ func ExpectedGoldenFixturePaths(outputRoot string, dataset EmpiricalDataset) []s
 
 	for caseIndex = range dataset.Cases {
 		var empiricalCase = dataset.Cases[caseIndex]
+		if empiricalCase.OracleSupport == OracleSupportUnsupported {
+			continue
+		}
 		var methodIndex int
 
 		for methodIndex = range empiricalCase.Methods {

@@ -1,0 +1,190 @@
+{
+  "boundary_version": "1",
+  "artifact_kind": "repository_controlled_rotki_bootstrap",
+  "bugfix_id": "BUG-001",
+  "status": "bootstrap_inputs_only",
+  "executed_in_this_checkout": false,
+  "developer_local_install_required": false,
+  "synthetic_only": true,
+  "upstream": {
+    "name": "rotki",
+    "repository_url": "https://github.com/rotki/rotki",
+    "release_tag": "v1.43.1",
+    "resolved_commit": "a2e00be49a0ea36e7563a5d235cfa6a7c91edbfb",
+    "signed_tag_object": "b35a3c934eedf23b1387ff564b6386fb2ce3f201",
+    "source_archive_url": "https://github.com/rotki/rotki/archive/refs/tags/v1.43.1.tar.gz",
+    "source_archive_sha256": "8434b653104f8d5b0638e98d88a5ef256fac7720cc459eb33b729e2848900e3b",
+    "license_url": "https://raw.githubusercontent.com/rotki/rotki/v1.43.1/LICENSE.md",
+    "license_sha256": "eb6f58a98d8bdb6d3c8fee3817543589f3cd0921d14748fa0630edff2d4c08b0"
+  },
+  "dataset": {
+    "path": "testdata/empirical/financial-dataset.yaml",
+    "sha256": "6287f862061b1f51d795694ab768b1927ff4422cc94b10a7ef053b45ef581042"
+  },
+  "adapter_constraints": [
+    "Only fifo, lifo, hifo, and average_cost pure-method aggregate comparisons belong to this boundary.",
+    "Zero-priced holding reductions are excluded from external-oracle fixture generation.",
+    "Scope-local hybrid remains a composite oracle and is not a native rotki method in this manifest.",
+    "Cases must stay synthetic-only and single-currency.",
+    "Runtime application code must not import, link, or execute rotki.",
+    "This manifest is valid even when no raw rotki outputs are committed yet."
+  ],
+  "cases": [
+    {
+      "case_id": "case-fifo-alpha-2024",
+      "method": "fifo",
+      "year": 2024,
+      "asset_identity_keys": [
+        "asset-alpha"
+      ],
+      "activity_source_ids": [
+        "emp-act-000001",
+        "emp-act-000002",
+        "emp-act-000051",
+        "emp-act-000052",
+        "emp-act-000053",
+        "emp-act-000054",
+        "emp-act-000055"
+      ],
+      "coverage_tags": [
+        "fifo",
+        "multi_year_opening_history",
+        "pre_year_opening_positions",
+        "selected_year_single_lot_liquidation",
+        "same_source_calendar_date_ordering",
+        "gain_cases",
+        "partial_liquidations"
+      ],
+      "normalization_input_status": "committed",
+      "raw_output_status": "not_committed",
+      "intended_capture_path": "testdata/empirical/rotki/raw/fifo/case-fifo-alpha-2024.json"
+    },
+    {
+      "case_id": "case-lifo-beta-2024",
+      "method": "lifo",
+      "year": 2024,
+      "asset_identity_keys": [
+        "asset-beta"
+      ],
+      "activity_source_ids": [
+        "emp-act-000011",
+        "emp-act-000012",
+        "emp-act-000061",
+        "emp-act-000062",
+        "emp-act-000063",
+        "emp-act-000065",
+        "emp-act-000067"
+      ],
+      "coverage_tags": [
+        "lifo",
+        "selected_year_multi_lot_liquidation",
+        "fees_on_priced_activity",
+        "loss_cases",
+        "negative_yearly_totals"
+      ],
+      "normalization_input_status": "committed",
+      "raw_output_status": "not_committed",
+      "intended_capture_path": "testdata/empirical/rotki/raw/lifo/case-lifo-beta-2024.json"
+    },
+    {
+      "case_id": "case-hifo-gamma-2024",
+      "method": "hifo",
+      "year": 2024,
+      "asset_identity_keys": [
+        "asset-gamma"
+      ],
+      "activity_source_ids": [
+        "emp-act-000021",
+        "emp-act-000022",
+        "emp-act-000071",
+        "emp-act-000072",
+        "emp-act-000073",
+        "emp-act-000074",
+        "emp-act-000075"
+      ],
+      "coverage_tags": [
+        "hifo",
+        "hifo_deterministic_tie_breaking",
+        "gain_cases",
+        "rounded_internal_division_or_allocation"
+      ],
+      "normalization_input_status": "committed",
+      "raw_output_status": "not_committed",
+      "intended_capture_path": "testdata/empirical/rotki/raw/hifo/case-hifo-gamma-2024.json"
+    },
+    {
+      "case_id": "case-average-cost-delta-2024",
+      "method": "average_cost",
+      "year": 2024,
+      "asset_identity_keys": [
+        "asset-delta"
+      ],
+      "activity_source_ids": [
+        "emp-act-000031",
+        "emp-act-000032",
+        "emp-act-000081",
+        "emp-act-000082",
+        "emp-act-000084",
+        "emp-act-000085",
+        "emp-act-000086"
+      ],
+      "coverage_tags": [
+        "average_cost",
+        "average_cost_multiple_acquisitions",
+        "average_cost_partial_disposal",
+        "acquisitions"
+      ],
+      "normalization_input_status": "committed",
+      "raw_output_status": "not_committed",
+      "intended_capture_path": "testdata/empirical/rotki/raw/average-cost/case-average-cost-delta-2024.json"
+    },
+    {
+      "case_id": "case-average-cost-reset-delta-2024",
+      "method": "average_cost",
+      "year": 2024,
+      "asset_identity_keys": [
+        "asset-delta"
+      ],
+      "activity_source_ids": [
+        "emp-act-000083",
+        "emp-act-000085",
+        "emp-act-000087"
+      ],
+      "coverage_tags": [
+        "average_cost",
+        "average_cost_pool_reset_after_zero",
+        "average_cost_reacquisition_after_zero"
+      ],
+      "normalization_input_status": "committed",
+      "raw_output_status": "not_committed",
+      "intended_capture_path": "testdata/empirical/rotki/raw/average-cost/case-average-cost-reset-delta-2024.json"
+    },
+    {
+      "case_id": "case-post-year-ignore-delta-2024",
+      "method": "average_cost",
+      "year": 2024,
+      "asset_identity_keys": [
+        "asset-delta"
+      ],
+      "activity_source_ids": [
+        "emp-act-000089"
+      ],
+      "coverage_tags": [
+        "post_selected_year_ignored_activity",
+        "excluded_assets_from_selected_year_main_results"
+      ],
+      "normalization_input_status": "committed",
+      "raw_output_status": "not_committed",
+      "intended_capture_path": "testdata/empirical/rotki/raw/average-cost/case-post-year-ignore-delta-2024.json"
+    }
+  ],
+  "composite_inputs": [
+    {
+      "method": "scope_local_hybrid",
+      "directory": "testdata/empirical/rotki/scope-local-hybrid",
+      "status": "committed_inputs_only",
+      "rule_version": "scope_local_hybrid_composite_v1"
+    }
+  ],
+  "authored_by": "OpenCode"
+}

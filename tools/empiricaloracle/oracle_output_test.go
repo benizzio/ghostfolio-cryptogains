@@ -47,12 +47,15 @@ func TestOracleNormalizeOracleOutputCanonicalizesAndHashesDeterministically(t *t
 			},
 		},
 		Metadata: oracleGenerationMetadataInput{
-			RunID:            "run-001",
-			HledgerVersion:   "1.99.2",
-			CommandArguments: []string{"-f", "testdata/empirical/hledger/fifo.journal", "print"},
-			DatasetInputHash: stablePrefixedSHA256Hash([]byte("dataset")),
-			HledgerInputHash: stablePrefixedSHA256Hash([]byte("hledger")),
-			DecimalPolicy:    "scale=16,rounding=half_up",
+			RunID:                   "run-001",
+			OracleName:              "rotki",
+			SourceURL:               "https://github.com/rotki/rotki",
+			VersionOrCommit:         "v1.43.1",
+			AdapterArguments:        []string{"--boundary", "testdata/empirical/rotki/bootstrap-boundary.json", "--case", "case-fifo-basic-2024"},
+			AdapterConstraints:      []string{"zero-priced holding reductions excluded from external-oracle fixture generation"},
+			DatasetInputHash:        stablePrefixedSHA256Hash([]byte("dataset")),
+			ExternalOracleInputHash: stablePrefixedSHA256Hash([]byte("oracle-input")),
+			DecimalPolicy:           "scale=16,rounding=half_up",
 			FinancialTolerances: map[string]string{
 				"realized_gain_or_loss": "0.0000000000000001",
 				"allocated_basis":       "0",
@@ -70,7 +73,7 @@ func TestOracleNormalizeOracleOutputCanonicalizesAndHashesDeterministically(t *t
 		t.Fatalf("normalize oracle output: %v", err)
 	}
 
-	if output.FixtureVersion != "1" || output.Metadata.NormalizationVersion != "1" || output.Metadata.HledgerVersion != "1.99.2" {
+	if output.FixtureVersion != "1" || output.Metadata.NormalizationVersion != "1" || output.Metadata.OracleName != "rotki" {
 		t.Fatalf("unexpected metadata versions: %+v", output.Metadata)
 	}
 	if output.Values.RealizedGainOrLoss != "5" || output.Values.AllocatedBasis != "10" || output.Values.ClosingQuantity != "0.5" || output.Values.ClosingBasis != "6" {
@@ -127,13 +130,16 @@ func TestOracleStableOracleOutputHashExcludesSelfReferentialMetadata(t *testing.
 		}},
 		UnsupportedSegments: []fixture.UnsupportedOracleSegment{},
 		Metadata: fixture.OracleGenerationRun{
-			RunID:                "run-001",
-			HledgerVersion:       "1.99.2",
-			CommandArguments:     []string{"-f", "testdata/empirical/hledger/fifo.journal", "print"},
-			DatasetInputHash:     stablePrefixedSHA256Hash([]byte("dataset")),
-			HledgerInputHash:     stablePrefixedSHA256Hash([]byte("hledger")),
-			DecimalPolicy:        "scale=16,rounding=half_up",
-			NormalizationVersion: "1",
+			RunID:                   "run-001",
+			OracleName:              "rotki",
+			SourceURL:               "https://github.com/rotki/rotki",
+			VersionOrCommit:         "v1.43.1",
+			AdapterArguments:        []string{"--boundary", "testdata/empirical/rotki/bootstrap-boundary.json", "--case", "case-fifo-basic-2024"},
+			AdapterConstraints:      []string{"zero-priced holding reductions excluded from external-oracle fixture generation"},
+			DatasetInputHash:        stablePrefixedSHA256Hash([]byte("dataset")),
+			ExternalOracleInputHash: stablePrefixedSHA256Hash([]byte("oracle-input")),
+			DecimalPolicy:           "scale=16,rounding=half_up",
+			NormalizationVersion:    "1",
 			FinancialTolerances: map[string]string{
 				"realized_gain_or_loss": "0",
 				"allocated_basis":       "0",
@@ -189,11 +195,14 @@ func TestOracleNormalizeOracleOutputRejectsInvalidNormalizedFixture(t *testing.T
 			MatchedGainOrLoss: "5",
 		}},
 		Metadata: oracleGenerationMetadataInput{
-			HledgerVersion:   "1.99.2",
-			CommandArguments: []string{"-f", "testdata/empirical/hledger/scope-local-hybrid.journal", "print"},
-			DatasetInputHash: stablePrefixedSHA256Hash([]byte("dataset")),
-			HledgerInputHash: stablePrefixedSHA256Hash([]byte("hledger")),
-			DecimalPolicy:    "scale=16,rounding=half_up",
+			OracleName:              "scope_local_hybrid_composite",
+			SourceURL:               "https://github.com/rotki/rotki",
+			VersionOrCommit:         "v1.43.1",
+			AdapterArguments:        []string{"--boundary", "testdata/empirical/rotki/bootstrap-boundary.json", "--case", "case-scope-local-hybrid-2024"},
+			AdapterConstraints:      []string{"scope_local_hybrid uses documented project composition rules"},
+			DatasetInputHash:        stablePrefixedSHA256Hash([]byte("dataset")),
+			ExternalOracleInputHash: stablePrefixedSHA256Hash([]byte("oracle-input")),
+			DecimalPolicy:           "scale=16,rounding=half_up",
 			FinancialTolerances: map[string]string{
 				"realized_gain_or_loss": "0.0000000000000001",
 				"allocated_basis":       "0",
@@ -245,11 +254,14 @@ func TestOracleNormalizeOracleOutputProducesStrictJSONShape(t *testing.T) {
 			ClosingBasis:       "6",
 		},
 		Metadata: oracleGenerationMetadataInput{
-			HledgerVersion:   "1.99.2",
-			CommandArguments: []string{"-f", "testdata/empirical/hledger/fifo.journal", "print"},
-			DatasetInputHash: stablePrefixedSHA256Hash([]byte("dataset")),
-			HledgerInputHash: stablePrefixedSHA256Hash([]byte("hledger")),
-			DecimalPolicy:    "scale=16,rounding=half_up",
+			OracleName:              "rotki",
+			SourceURL:               "https://github.com/rotki/rotki",
+			VersionOrCommit:         "v1.43.1",
+			AdapterArguments:        []string{"--boundary", "testdata/empirical/rotki/bootstrap-boundary.json", "--case", "case-fifo-json-shape-2024"},
+			AdapterConstraints:      []string{"zero-priced holding reductions excluded from external-oracle fixture generation"},
+			DatasetInputHash:        stablePrefixedSHA256Hash([]byte("dataset")),
+			ExternalOracleInputHash: stablePrefixedSHA256Hash([]byte("oracle-input")),
+			DecimalPolicy:           "scale=16,rounding=half_up",
 			FinancialTolerances: map[string]string{
 				"realized_gain_or_loss": "0",
 				"allocated_basis":       "0",

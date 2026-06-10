@@ -159,7 +159,7 @@ func normalizeProjectCalculationOutput(
 		}
 
 		var normalizedMatches []ProjectMatchEvidence
-			normalizedMatches, err = normalizeProjectLiquidationMatches(liquidation)
+		normalizedMatches, err = normalizeProjectLiquidationMatches(liquidation)
 		if err != nil {
 			return ProjectCalculationOutput{}, fmt.Errorf(
 				"normalize project output %s %s liquidation %s matches: %w",
@@ -201,6 +201,9 @@ func normalizeProjectCalculationOutput(
 	sort.Slice(output.Matches, func(left int, right int) bool {
 		return projectMatchSortKey(output.Matches[left]) < projectMatchSortKey(output.Matches[right])
 	})
+	if report.CostBasisMethod == reportmodel.CostBasisMethodAverageCost {
+		output.Matches = nil
+	}
 
 	return output, nil
 }
@@ -247,7 +250,7 @@ func normalizeProjectLiquidationMatches(
 		var normalizedMatch = ProjectMatchEvidence{
 			DisposedSourceID:    strings.TrimSpace(liquidation.SourceID),
 			AcquisitionSourceID: strings.TrimSpace(match.AcquisitionSourceID),
-			SupportLabel:        EvidenceSupportLabelHledgerBacked,
+			SupportLabel:        EvidenceSupportLabelRotkiBacked,
 		}
 
 		var err error

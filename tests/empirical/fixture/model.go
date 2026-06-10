@@ -6,7 +6,7 @@ import (
 )
 
 // OracleSupport identifies whether one empirical case is fully comparable to the
-// external hledger-backed oracle.
+// selected external-oracle boundary.
 // Authored by: OpenCode
 type OracleSupport string
 
@@ -28,16 +28,16 @@ const (
 )
 
 // EvidenceSupportLabel identifies whether one comparable evidence segment comes
-// directly from hledger-backed output or from a documented project-owned
+// from rotki-backed arithmetic evidence or from a documented project-owned
 // composition rule.
 // Authored by: OpenCode
 type EvidenceSupportLabel string
 
 const (
-	// EvidenceSupportLabelHledgerBacked identifies evidence that comes directly
-	// from the external oracle.
+	// EvidenceSupportLabelRotkiBacked identifies evidence that comes directly from
+	// the rotki-backed arithmetic boundary.
 	// Authored by: OpenCode
-	EvidenceSupportLabelHledgerBacked EvidenceSupportLabel = "hledger_backed"
+	EvidenceSupportLabelRotkiBacked EvidenceSupportLabel = "rotki_backed"
 
 	// EvidenceSupportLabelProjectCompositionRule identifies evidence that is
 	// produced by a documented project-owned composition rule.
@@ -46,7 +46,7 @@ const (
 )
 
 // ComparisonPolicy identifies how empirical comparison code treats a dataset
-// segment that hledger cannot represent faithfully.
+// segment that the selected external oracle cannot represent faithfully.
 // Authored by: OpenCode
 type ComparisonPolicy string
 
@@ -126,17 +126,17 @@ type EmpiricalCase struct {
 	UnsupportedReason string                        `json:"unsupported_reason,omitempty" yaml:"unsupported_reason,omitempty"`
 }
 
-// OracleInputLedger stores one generated hledger-compatible input ledger and
-// its reproducibility metadata.
+// OracleInputLedger stores one generated external-oracle input artifact and its
+// reproducibility metadata.
 // Authored by: OpenCode
 type OracleInputLedger struct {
-	LedgerID           string   `json:"ledger_id" yaml:"ledger_id"`
-	Method             string   `json:"method" yaml:"method"`
-	CaseIDs            []string `json:"case_ids" yaml:"case_ids"`
-	HledgerJournalPath string   `json:"hledger_journal_path" yaml:"hledger_journal_path"`
-	DatasetInputHash   string   `json:"dataset_input_hash" yaml:"dataset_input_hash"`
-	HledgerInputHash   string   `json:"hledger_input_hash" yaml:"hledger_input_hash"`
-	GenerationNotes    []string `json:"generation_notes" yaml:"generation_notes"`
+	LedgerID                string   `json:"ledger_id" yaml:"ledger_id"`
+	Method                  string   `json:"method" yaml:"method"`
+	CaseIDs                 []string `json:"case_ids" yaml:"case_ids"`
+	ExternalOracleInputPath string   `json:"external_oracle_input_path" yaml:"external_oracle_input_path"`
+	DatasetInputHash        string   `json:"dataset_input_hash" yaml:"dataset_input_hash"`
+	ExternalOracleInputHash string   `json:"external_oracle_input_hash" yaml:"external_oracle_input_hash"`
+	GenerationNotes         []string `json:"generation_notes" yaml:"generation_notes"`
 }
 
 // ComparableOutputValues stores the canonical decimal-string values that are
@@ -150,24 +150,28 @@ type ComparableOutputValues struct {
 }
 
 // OracleGenerationRun stores the persisted metadata recorded for one
-// deterministic hledger-backed oracle generation run.
+// deterministic external-oracle or composite-oracle generation run.
 // Authored by: OpenCode
 type OracleGenerationRun struct {
-	RunID                string            `json:"run_id,omitempty" yaml:"run_id,omitempty"`
-	HledgerVersion       string            `json:"hledger_version" yaml:"hledger_version"`
-	CommandArguments     []string          `json:"command_arguments" yaml:"command_arguments"`
-	DatasetInputHash     string            `json:"dataset_input_hash" yaml:"dataset_input_hash"`
-	HledgerInputHash     string            `json:"hledger_input_hash" yaml:"hledger_input_hash"`
-	DecimalPolicy        string            `json:"decimal_policy" yaml:"decimal_policy"`
-	NormalizationVersion string            `json:"normalization_version" yaml:"normalization_version"`
-	FinancialTolerances  map[string]string `json:"financial_tolerances" yaml:"financial_tolerances"`
-	ToleranceNotes       map[string]string `json:"tolerance_notes" yaml:"tolerance_notes"`
-	OracleOutputHash     string            `json:"oracle_output_hash" yaml:"oracle_output_hash"`
-	GeneratedAt          string            `json:"generated_at,omitempty" yaml:"generated_at,omitempty"`
+	RunID                   string            `json:"run_id,omitempty" yaml:"run_id,omitempty"`
+	OracleName              string            `json:"oracle_name" yaml:"oracle_name"`
+	SourceURL               string            `json:"source_url" yaml:"source_url"`
+	VersionOrCommit         string            `json:"version_or_commit" yaml:"version_or_commit"`
+	AdapterArguments        []string          `json:"adapter_arguments" yaml:"adapter_arguments"`
+	AdapterConstraints      []string          `json:"adapter_constraints" yaml:"adapter_constraints"`
+	DatasetInputHash        string            `json:"dataset_input_hash" yaml:"dataset_input_hash"`
+	ExternalOracleInputHash string            `json:"external_oracle_input_hash" yaml:"external_oracle_input_hash"`
+	DecimalPolicy           string            `json:"decimal_policy" yaml:"decimal_policy"`
+	NormalizationVersion    string            `json:"normalization_version" yaml:"normalization_version"`
+	CompositeRuleVersion    string            `json:"composite_rule_version,omitempty" yaml:"composite_rule_version,omitempty"`
+	FinancialTolerances     map[string]string `json:"financial_tolerances" yaml:"financial_tolerances"`
+	ToleranceNotes          map[string]string `json:"tolerance_notes" yaml:"tolerance_notes"`
+	OracleOutputHash        string            `json:"oracle_output_hash" yaml:"oracle_output_hash"`
+	GeneratedAt             string            `json:"generated_at,omitempty" yaml:"generated_at,omitempty"`
 }
 
-// OracleOutput stores one normalized golden fixture derived from hledger output
-// and project-owned normalization.
+// OracleOutput stores one normalized golden fixture derived from external-oracle
+// or composite-oracle output and project-owned normalization.
 // Authored by: OpenCode
 type OracleOutput struct {
 	FixtureVersion      string                      `json:"fixture_version" yaml:"fixture_version"`

@@ -112,6 +112,7 @@ Edge-case coverage tags:
 - `financial-dataset.yaml` is the canonical empirical source dataset. After the dataset-maintenance feature lands, treat it as read-only outside later dataset-maintenance specs.
 - `golden/` stores normalized oracle JSON fixtures generated from the dataset.
 - `hledger/` stores generated hledger journal inputs derived from the dataset.
+- Cases marked `oracle_support: unsupported` stay in the dataset for structural and non-oracle coverage, but do not require `golden/` or `hledger/` artifacts.
 - Generate or refresh derived artifacts only through `tools/empiricaloracle` once later phases implement the command behavior. Do not hand-edit generated fixtures.
 - Runtime application code must not read or write empirical fixture artifacts.
 
@@ -130,4 +131,6 @@ Edge-case coverage tags:
 ## Current State
 
 - `financial-dataset.yaml` is the repository-backed synthetic empirical dataset baseline for phase 3 validation.
-- `golden/` and `hledger/` remain intentionally empty until later phases generate oracle artifacts.
+- `golden/` contains the current normalized oracle fixture baseline for the supported empirical fixture groups.
+- `hledger/` retains generated historical or auxiliary journals for the remaining test-time boundary.
+- `rotki/` contains the repository-controlled rotki bootstrap manifest and normalization inputs used by BUG-001 remediation.

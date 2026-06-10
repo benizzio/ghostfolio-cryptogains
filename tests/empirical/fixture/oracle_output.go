@@ -361,7 +361,7 @@ func (validator *oracleOutputValidator) validateMatch(index int, match OracleMat
 	validator.validateOptionalCanonicalDecimal("match_index", referenceValue, "matched_gain_or_loss", match.MatchedGainOrLoss)
 
 	switch match.SupportLabel {
-	case "", EvidenceSupportLabelHledgerBacked:
+	case "", EvidenceSupportLabelRotkiBacked:
 	case EvidenceSupportLabelProjectCompositionRule:
 		if strings.TrimSpace(match.CompositionRuleID) == "" {
 			validator.addIssue("match_index", referenceValue, "composition_rule_id", "composition_rule", "project_composition_rule evidence requires composition_rule_id")
@@ -438,28 +438,33 @@ func (validator *oracleOutputValidator) validateUnsupportedSegment(index int, se
 // Authored by: OpenCode
 func (validator *oracleOutputValidator) validateMetadata() {
 	var metadata = validator.output.Metadata
-	validator.validateRequiredTextField("metadata.hledger_version", metadata.HledgerVersion)
+	validator.validateRequiredTextField("metadata.oracle_name", metadata.OracleName)
+	validator.validateRequiredTextField("metadata.source_url", metadata.SourceURL)
+	validator.validateRequiredTextField("metadata.version_or_commit", metadata.VersionOrCommit)
 	validator.validateRequiredTextField("metadata.decimal_policy", metadata.DecimalPolicy)
 	validator.validateRequiredTextField("metadata.normalization_version", metadata.NormalizationVersion)
 
-	if metadata.CommandArguments == nil {
-		validator.addIssue("case_id", validator.output.CaseID, "metadata.command_arguments", "schema", "command_arguments must be present as a JSON array")
-	} else if len(metadata.CommandArguments) == 0 {
-		validator.addIssue("case_id", validator.output.CaseID, "metadata.command_arguments", "required_field", "command_arguments must contain at least one argument")
+	if metadata.AdapterArguments == nil {
+		validator.addIssue("case_id", validator.output.CaseID, "metadata.adapter_arguments", "schema", "adapter_arguments must be present as a JSON array")
+	} else if len(metadata.AdapterArguments) == 0 {
+		validator.addIssue("case_id", validator.output.CaseID, "metadata.adapter_arguments", "required_field", "adapter_arguments must contain at least one argument")
 	} else {
 		var index int
-		for index = range metadata.CommandArguments {
-			if strings.TrimSpace(metadata.CommandArguments[index]) != "" {
+		for index = range metadata.AdapterArguments {
+			if strings.TrimSpace(metadata.AdapterArguments[index]) != "" {
 				continue
 			}
 
-			validator.addIssue("case_id", validator.output.CaseID, "metadata.command_arguments", "command_arguments", "command_arguments must not contain blank values")
+			validator.addIssue("case_id", validator.output.CaseID, "metadata.adapter_arguments", "adapter_arguments", "adapter_arguments must not contain blank values")
 			break
 		}
 	}
+	if metadata.AdapterConstraints == nil {
+		validator.addIssue("case_id", validator.output.CaseID, "metadata.adapter_constraints", "schema", "adapter_constraints must be present as a JSON array")
+	}
 
 	validator.validateSHA256Field("metadata.dataset_input_hash", metadata.DatasetInputHash)
-	validator.validateSHA256Field("metadata.hledger_input_hash", metadata.HledgerInputHash)
+	validator.validateSHA256Field("metadata.external_oracle_input_hash", metadata.ExternalOracleInputHash)
 	validator.validateSHA256Field("metadata.oracle_output_hash", metadata.OracleOutputHash)
 
 	var policy oracleDecimalPolicy
@@ -859,7 +864,8 @@ func canonicalUnsupportedOracleSegments(segments []UnsupportedOracleSegment) ([]
 // canonicalOracleGenerationRun canonicalizes the hash-relevant generation metadata.
 // Authored by: OpenCode
 func canonicalOracleGenerationRun(metadata OracleGenerationRun) (OracleGenerationRun, error) {
-	metadata.CommandArguments = copyStringSlice(metadata.CommandArguments)
+	metadata.AdapterArguments = copyStringSlice(metadata.AdapterArguments)
+	metadata.AdapterConstraints = copyStringSlice(metadata.AdapterConstraints)
 	metadata.FinancialTolerances = copyStringMap(metadata.FinancialTolerances)
 	metadata.ToleranceNotes = copyStringMap(metadata.ToleranceNotes)
 

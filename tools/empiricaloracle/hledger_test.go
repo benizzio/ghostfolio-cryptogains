@@ -98,8 +98,8 @@ func TestHledgerBuildOracleComparableValuesDerivesMatchesAndClosingBalances(t *t
 	if matches[0].MatchedQuantity != "1" || matches[0].MatchedBasis != "10" || matches[0].MatchedProceeds != "15" || matches[0].MatchedGainOrLoss != "5" {
 		t.Fatalf("unexpected matched values: %+v", matches[0])
 	}
-	if matches[0].SupportLabel != fixture.EvidenceSupportLabelHledgerBacked {
-		t.Fatalf("expected hledger-backed support label, got %+v", matches[0])
+	if matches[0].SupportLabel != fixture.EvidenceSupportLabelRotkiBacked {
+		t.Fatalf("expected rotki-backed support label, got %+v", matches[0])
 	}
 }
 
@@ -149,12 +149,12 @@ func TestOracleBuildUnsupportedSegmentsFiltersByAssetAndOmissions(t *testing.T) 
 		[]string{omissionNote},
 		[]oracleMatchEvidenceInput{{
 			DisposedSourceID: "gamma-buy",
-			SupportLabel:     fixture.EvidenceSupportLabelHledgerBacked,
+			SupportLabel:     fixture.EvidenceSupportLabelRotkiBacked,
 		}},
 	)
 
 	if len(segments) != 1 {
-		t.Fatalf("expected only omission unsupported segment after hledger-backed filtering, got %+v", segments)
+		t.Fatalf("expected only omission unsupported segment after rotki-backed filtering, got %+v", segments)
 	}
 	if len(segments[0].ActivitySourceIDs) != 1 || segments[0].ActivitySourceIDs[0] != "gamma-zero" {
 		t.Fatalf("expected omitted zero-priced activity ids, got %+v", segments[0])

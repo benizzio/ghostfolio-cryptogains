@@ -21,10 +21,10 @@ func buildUnsupportedSegments(
 ) []unsupportedOracleSegmentInput {
 	var segments = make([]unsupportedOracleSegmentInput, 0, 2)
 	var omittedZeroPricedSourceIDs = omittedZeroPricedReductionSourceIDs(dataset, empiricalCase, method, assetIdentityKey, generationNotes)
-	var hledgerCoveredSourceIDs = hledgerBackedSourceIDSet(matches)
+	var coveredSourceIDs = rotkiBackedSourceIDSet(matches)
 
 	if empiricalCase.OracleSupport != fixture.OracleSupportSupported {
-		var assetSourceIDs = filterUncoveredSourceIDs(caseAssetSourceIDs(dataset, empiricalCase, assetIdentityKey), hledgerCoveredSourceIDs, omittedZeroPricedSourceIDs)
+		var assetSourceIDs = filterUncoveredSourceIDs(caseAssetSourceIDs(dataset, empiricalCase, assetIdentityKey), coveredSourceIDs, omittedZeroPricedSourceIDs)
 		if len(assetSourceIDs) != 0 {
 			segments = append(segments, unsupportedOracleSegmentInput{
 				CaseID:            strings.TrimSpace(empiricalCase.CaseID),
@@ -36,7 +36,7 @@ func buildUnsupportedSegments(
 		}
 	}
 
-	omittedZeroPricedSourceIDs = filterUncoveredSourceIDs(omittedZeroPricedSourceIDs, hledgerCoveredSourceIDs, nil)
+	omittedZeroPricedSourceIDs = filterUncoveredSourceIDs(omittedZeroPricedSourceIDs, coveredSourceIDs, nil)
 	if len(omittedZeroPricedSourceIDs) != 0 {
 		segments = append(segments, unsupportedOracleSegmentInput{
 			CaseID:            strings.TrimSpace(empiricalCase.CaseID),
@@ -50,13 +50,14 @@ func buildUnsupportedSegments(
 	return segments
 }
 
-// hledgerBackedSourceIDSet returns the source identifiers already covered by hledger-backed match evidence.
+// rotkiBackedSourceIDSet returns the source identifiers already covered by
+// rotki-backed match evidence.
 // Authored by: OpenCode
-func hledgerBackedSourceIDSet(matches []oracleMatchEvidenceInput) map[string]struct{} {
+func rotkiBackedSourceIDSet(matches []oracleMatchEvidenceInput) map[string]struct{} {
 	var coveredSourceIDs = make(map[string]struct{})
 	var match oracleMatchEvidenceInput
 	for _, match = range matches {
-		if match.SupportLabel != fixture.EvidenceSupportLabelHledgerBacked {
+		if match.SupportLabel != fixture.EvidenceSupportLabelRotkiBacked {
 			continue
 		}
 		if strings.TrimSpace(match.DisposedSourceID) != "" {
