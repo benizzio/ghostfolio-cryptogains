@@ -2,8 +2,11 @@ GO ?= go
 GOCOVERAGEPLUS ?= $(GO) run github.com/Fabianexe/gocoverageplus@v1.2.0
 ARGS ?=
 PRODUCTION_PACKAGES = $(shell $(GO) run ./tools/coverpkg -go $(GO) ./cmd/... ./internal/...)
+MODULE_PATH = $(shell $(GO) list -m)
+ALL_PACKAGES = $(shell $(GO) list ./...)
+NON_EMPIRICAL_PACKAGES = $(filter-out $(MODULE_PATH)/tests/empirical,$(ALL_PACKAGES))
 
-.PHONY: run run-dev test coverage
+.PHONY: run run-dev test test-empirical regenerate-empirical-fixtures coverage
 
 run:
 	$(GO) run ./cmd/ghostfolio-cryptogains $(ARGS)
@@ -11,8 +14,14 @@ run:
 run-dev:
 	$(GO) run ./cmd/ghostfolio-cryptogains --dev-mode $(ARGS)
 
-test:
-	$(GO) test ./...
+test: test-empirical
+	$(GO) test $(NON_EMPIRICAL_PACKAGES)
+
+test-empirical:
+	$(GO) test ./tests/empirical -count=1 -v
+
+regenerate-empirical-fixtures:
+	$(GO) run ./tools/empiricaloracle --regenerate
 
 coverage:
 	mkdir -p dist/coverage

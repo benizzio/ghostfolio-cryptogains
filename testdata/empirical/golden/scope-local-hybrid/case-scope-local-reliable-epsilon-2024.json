@@ -40,11 +40,7 @@
       "activity_source_ids": [
         "emp-act-000041",
         "emp-act-000042",
-        "emp-act-000091",
-        "emp-act-000092",
-        "emp-act-000093",
-        "emp-act-000094",
-        "emp-act-000095"
+        "emp-act-000094"
       ],
       "reason": "Hybrid lifecycle composition remains project-owned outside the hledger-backed scope slice",
       "comparison_policy": "project_composition_only"
@@ -64,7 +60,19 @@
       "-b",
       "2024-01-01",
       "-e",
-      "2025-01-01"
+      "2025-01-01",
+      "--next-command--",
+      "-n",
+      "-f",
+      "testdata/empirical/hledger/scope-local-hybrid/case-scope-local-reliable-epsilon-2024.journal",
+      "balance",
+      "-H",
+      "--lots",
+      "-O",
+      "json",
+      "-e",
+      "2025-01-01",
+      "assets:empirical"
     ],
     "dataset_input_hash": "sha256:680845580ca1311d610f4730dd026f683fedb6a0c27b2aefb7cbb26e630114bf",
     "hledger_input_hash": "sha256:53beb656310ee719cce3c20d937296a6c3cc322637c6d0f678fcc53a40629bb5",
@@ -76,6 +84,6 @@
       "realized_gain_or_loss": "0"
     },
     "tolerance_notes": {},
-    "oracle_output_hash": "sha256:3b66eb7ac147718988cd9747e727a3efb75159557e22f9feb8fec26b40e02c5a"
+    "oracle_output_hash": "sha256:72fa5d4fcebe8a37d8eb383cae052d6c2bc9ca9afc0d74c875f057b349476013"
   }
 }

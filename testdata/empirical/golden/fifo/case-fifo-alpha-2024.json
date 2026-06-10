@@ -46,7 +46,19 @@
       "-b",
       "2024-01-01",
       "-e",
-      "2025-01-01"
+      "2025-01-01",
+      "--next-command--",
+      "-n",
+      "-f",
+      "testdata/empirical/hledger/fifo/case-fifo-alpha-2024.journal",
+      "balance",
+      "-H",
+      "--lots",
+      "-O",
+      "json",
+      "-e",
+      "2025-01-01",
+      "assets:empirical"
     ],
     "dataset_input_hash": "sha256:680845580ca1311d610f4730dd026f683fedb6a0c27b2aefb7cbb26e630114bf",
     "hledger_input_hash": "sha256:52fe001816aa3915c99fcb367b1370b7a6e2db3d2739e36db8686081c5dedddc",
@@ -58,6 +70,6 @@
       "realized_gain_or_loss": "0"
     },
     "tolerance_notes": {},
-    "oracle_output_hash": "sha256:f7467772a136ad08ec005a1e50b13b3d39cdd20c188960db7d8bbb59e7841366"
+    "oracle_output_hash": "sha256:7a67466495ae6f2b03df4995372786f676add5f443dcb046ba511961f6ab649e"
   }
 }

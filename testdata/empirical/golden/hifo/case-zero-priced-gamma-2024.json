@@ -73,7 +73,19 @@
       "-b",
       "2024-01-01",
       "-e",
-      "2025-01-01"
+      "2025-01-01",
+      "--next-command--",
+      "-n",
+      "-f",
+      "testdata/empirical/hledger/hifo/case-zero-priced-gamma-2024.journal",
+      "balance",
+      "-H",
+      "--lots",
+      "-O",
+      "json",
+      "-e",
+      "2025-01-01",
+      "assets:empirical"
     ],
     "dataset_input_hash": "sha256:680845580ca1311d610f4730dd026f683fedb6a0c27b2aefb7cbb26e630114bf",
     "hledger_input_hash": "sha256:591532d5fbf7c6bed1261c0254b6f06ff1236dd7dafd10e2960c645a6f8d4c0f",
@@ -85,6 +97,6 @@
       "realized_gain_or_loss": "0"
     },
     "tolerance_notes": {},
-    "oracle_output_hash": "sha256:5cc9c370a38a798410302a98df009d497f20858aa57f9a35073639bba0d8d01a"
+    "oracle_output_hash": "sha256:efd5cf71ef1c7c83045c7d39ac2d10b5c7de6dbf4138ba14e56a14c3d12ffa05"
   }
 }

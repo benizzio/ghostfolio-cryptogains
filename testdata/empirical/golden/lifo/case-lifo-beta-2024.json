@@ -64,7 +64,19 @@
       "-b",
       "2024-01-01",
       "-e",
-      "2025-01-01"
+      "2025-01-01",
+      "--next-command--",
+      "-n",
+      "-f",
+      "testdata/empirical/hledger/lifo/case-lifo-beta-2024.journal",
+      "balance",
+      "-H",
+      "--lots",
+      "-O",
+      "json",
+      "-e",
+      "2025-01-01",
+      "assets:empirical"
     ],
     "dataset_input_hash": "sha256:680845580ca1311d610f4730dd026f683fedb6a0c27b2aefb7cbb26e630114bf",
     "hledger_input_hash": "sha256:009374eb3883aa66fac783188e641710c2d67eaeb92d4859d19f3a0550bbe1e6",
@@ -76,6 +88,6 @@
       "realized_gain_or_loss": "0"
     },
     "tolerance_notes": {},
-    "oracle_output_hash": "sha256:ed75cdfe842d3fee709966e3377e8deced5a4395de400d4dfdaa74573bd8aa54"
+    "oracle_output_hash": "sha256:5c1ccd7a0a6bd77a50c870715c88e24a7c6406b38d0688684688362a775936dd"
   }
 }

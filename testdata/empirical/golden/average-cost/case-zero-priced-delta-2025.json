@@ -74,7 +74,19 @@
       "-b",
       "2025-01-01",
       "-e",
-      "2026-01-01"
+      "2026-01-01",
+      "--next-command--",
+      "-n",
+      "-f",
+      "testdata/empirical/hledger/average-cost/case-zero-priced-delta-2025.journal",
+      "balance",
+      "-H",
+      "--lots",
+      "-O",
+      "json",
+      "-e",
+      "2026-01-01",
+      "assets:empirical"
     ],
     "dataset_input_hash": "sha256:680845580ca1311d610f4730dd026f683fedb6a0c27b2aefb7cbb26e630114bf",
     "hledger_input_hash": "sha256:6060312876e0d47a906a39bc6cc40a57a2063b40f1446048ed570e67f36610cc",
@@ -86,6 +98,6 @@
       "realized_gain_or_loss": "0"
     },
     "tolerance_notes": {},
-    "oracle_output_hash": "sha256:a7e1f85030bc4d45eeda702af6d4ae80e41aa47e3e399cb1019161ad55fe3e1b"
+    "oracle_output_hash": "sha256:e7cd4a4853991a896421aa2014639fc17d3e37e3a749bd494e5f1d008a588243"
   }
 }

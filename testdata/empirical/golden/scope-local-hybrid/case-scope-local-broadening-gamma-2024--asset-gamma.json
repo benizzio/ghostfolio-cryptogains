@@ -38,9 +38,7 @@
       "activity_source_ids": [
         "emp-act-000071",
         "emp-act-000072",
-        "emp-act-000073",
         "emp-act-000074",
-        "emp-act-000075",
         "emp-act-000076"
       ],
       "reason": "Hybrid broadening and fallback activation remain partly project-owned composition rules",
@@ -61,7 +59,19 @@
       "-b",
       "2024-01-01",
       "-e",
-      "2025-01-01"
+      "2025-01-01",
+      "--next-command--",
+      "-n",
+      "-f",
+      "testdata/empirical/hledger/scope-local-hybrid/case-scope-local-broadening-gamma-2024.journal",
+      "balance",
+      "-H",
+      "--lots",
+      "-O",
+      "json",
+      "-e",
+      "2025-01-01",
+      "assets:empirical"
     ],
     "dataset_input_hash": "sha256:680845580ca1311d610f4730dd026f683fedb6a0c27b2aefb7cbb26e630114bf",
     "hledger_input_hash": "sha256:83d0105e4f0ede4af27aca4aeb9afea54e1a73c9657aa3a11eef56c90d88e066",
@@ -73,6 +83,6 @@
       "realized_gain_or_loss": "0"
     },
     "tolerance_notes": {},
-    "oracle_output_hash": "sha256:9a57072a67878c476da4c2465ab31698d70591d1720fea23d0cd527ab22eef03"
+    "oracle_output_hash": "sha256:3ab9855321150ea524e1d2b00b5ef44341147b3cad2c8dcc98a4b5b950163f7c"
   }
 }
