@@ -223,10 +223,50 @@ Required HIFO follow-up: add or preserve a targeted HIFO deterministic tie-break
 
 Expected result: remove the `hifo` runtime skip after rotki HIFO fixtures replace hledger fixtures and HIFO tie-break behavior is explicitly verified or match evidence is limited to aggregate comparisons.
 
+### Fix Scope-Local Hybrid With a Separate Composite Oracle
+
+Decision: validate `scope_local_hybrid` with a separate hybrid oracle package that composes rotki-backed arithmetic sub-oracles with documented project composition rules.
+
+Reason: no credible external tool models the full Scope-Local Hybrid method as one native cost-basis method. Rotki can validate the arithmetic subproblems, but the project still owns the routing and lifecycle rules that make this method unique.
+
+Package boundary:
+
+| Package | Responsibility | Allowed oracle basis |
+| --- | --- | --- |
+| Pure external rotki oracle package | Generate FIFO, LIFO, HIFO, and Average Cost / ACB fixtures directly from rotki-supported methods. | `rotki_backed` only. |
+| Hybrid composite oracle package | Generate Scope-Local Hybrid fixtures by applying documented composition rules and delegating sub-calculation arithmetic to rotki. | `rotki_backed` and `project_composition_rule`. |
+
+The hybrid composite oracle must remain separate from the pure external oracle so Scope-Local Hybrid assertions do not dilute the meaning of a pure rotki-backed fixture.
+
+Composite oracle design:
+
+| Scope-Local Hybrid behavior | Planned oracle treatment |
+| --- | --- |
+| Reliable wallet/account scope narrowing | `project_composition_rule`, because this is project-specific routing. |
+| Asset-level broadening when scope data is unreliable, unavailable, missing, or unsupported | `project_composition_rule`, because this is project-specific routing. |
+| Exact single-scope disposal arithmetic before fallback | `rotki_backed`, using rotki FIFO-compatible matching for the scoped subproblem. |
+| Fallback activation when a scope can no longer stay exact | `project_composition_rule`, because the activation condition is project-specific. |
+| Scope-local fallback disposal arithmetic | `rotki_backed`, using rotki ACB for the scoped pool. |
+| Fallback carry-forward until the scope reaches zero | `project_composition_rule`, with rotki-backed arithmetic for each disposal. |
+| Same-scope reset after zero | `project_composition_rule`, because reset semantics are project-specific lifecycle behavior. |
+| Independent other-scope state | `project_composition_rule`, with per-scope rotki-backed arithmetic where applicable. |
+| Final aggregate realized gain, allocated basis, closing quantity, and closing basis | Composite sum of per-scope `rotki_backed` arithmetic and documented composition state. |
+
+Required safeguards:
+
+1. The hybrid composite oracle must not import or call `internal/report/basis/scope_local_hybrid.go` or `internal/report/calculate` Scope-Local Hybrid code.
+2. Composition rules must be implemented from the spec as independent test-oracle logic with stable rule IDs.
+3. Every Scope-Local Hybrid fixture assertion must label each comparable value or evidence segment as `rotki_backed` or `project_composition_rule`.
+4. Failure output must include the relevant rule ID for every `project_composition_rule` assertion.
+5. Rotki-backed sub-results must record rotki commit identity and adapter provenance independently from composition-rule metadata.
+6. Zero-priced holding reductions must remain out of the empirical oracle scope before Scope-Local Hybrid fixtures are regenerated.
+
+Expected result: remove the `scope_local_hybrid` runtime skip after the hybrid composite oracle generates fixtures that expose comparable aggregate values and labeled evidence. This does not make Scope-Local Hybrid a pure external-oracle assertion; it makes it an auditable composite assertion with external arithmetic checks and explicit project-owned composition rules.
+
 ## Current Blocking Themes
 
 1. hledger must be replaced by a rotki-based external oracle adapter before Average Cost and HIFO skips can be removed safely.
 2. Zero-priced holding reductions must be removed from empirical oracle scope and retained in traditional project tests.
 3. Average Cost should compare aggregate values only until project-compatible pool provenance exists.
 4. HIFO match evidence should remain aggregate-only or be gated by a deterministic tie-break fixture.
-5. Scope-Local Hybrid still lacks a credible external oracle because its composition rules are project-specific.
+5. Scope-Local Hybrid must use a separate composite oracle package because its routing and lifecycle rules are project-specific.
