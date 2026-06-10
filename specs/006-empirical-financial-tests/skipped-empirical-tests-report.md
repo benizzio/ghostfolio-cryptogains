@@ -154,8 +154,79 @@ Required cleanup when applying this fix:
 
 Expected result: zero-priced holding reductions stop contributing empirical-oracle skips. The empirical suite remains focused on externally verifiable calculation correctness and precision, while project-specific zero-priced behavior remains covered by non-oracle tests.
 
+### Replace hledger With Rotki as the Empirical Oracle
+
+Decision: replace hledger with a test-time rotki-based oracle adapter for empirical methods that rotki can model: `fifo`, `lifo`, `hifo`, and `average_cost` through rotki ACB.
+
+Reason: hledger cannot currently produce faithful fixtures for this project's moving weighted-average pool. Disposable experiments showed both `lots: AVERAGE` and `lots: AVERAGEALL` differ materially from project average-cost output. A disposable rotki prototype matched project aggregate output for FIFO, LIFO, HIFO, and ACB within the configured tolerance.
+
+Prototype evidence:
+
+| Method | Case | Result | Notes |
+| --- | --- | --- | --- |
+| `fifo` | `case-fifo-alpha-2024` | Pass | Aggregate values matched within tolerance. |
+| `lifo` | `case-lifo-beta-2024` | Pass | Aggregate values matched within tolerance. |
+| `hifo` | `case-hifo-gamma-2024` | Pass | Aggregate values matched within tolerance; add a focused deterministic tie-break check before relying on HIFO match provenance. |
+| `average_cost` / rotki ACB | `case-average-cost-delta-2024` | Pass | Aggregate values matched within tolerance. |
+| `average_cost` / rotki ACB | `case-average-cost-reset-delta-2024` | Pass | Aggregate values matched within tolerance. |
+
+Prototype tolerance standard:
+
+| Field type | Required tolerance | Observed prototype result |
+| --- | --- | --- |
+| Quantity fields | Exact `0` difference | Passed for tested cases. |
+| Financial fields | Difference no greater than `0.0000000000000001` | Passed for tested cases. |
+
+Implementation approach:
+
+1. Pin a specific rotki commit in oracle metadata.
+2. Add a test-time rotki oracle adapter under repository tooling, isolated from production application code.
+3. Record rotki AGPL-3.0 license text, source provenance, commit identity, and adapter constraints.
+4. Generate new golden fixtures from rotki for `fifo`, `lifo`, `hifo`, and `average_cost` after zero-priced cases are removed from empirical oracle scope.
+5. Remove hledger generated journals, hledger golden fixture provenance, and hledger vendoring checks once rotki replacement fixtures are available.
+6. Update empirical fixture metadata from hledger-specific fields to generic external-oracle fields that can record rotki command or adapter provenance.
+7. Keep runtime application code independent from rotki. The adapter must remain test-time or fixture-generation-only.
+
+### Fix Average Cost With Rotki ACB Aggregate Comparisons
+
+Decision: use rotki ACB as the external oracle for `average_cost` aggregate values only.
+
+Reason: rotki's ACB implementation tracks current amount and current total cost basis, then calculates disposal cost from `current_total_acb / current_amount`. This matches the project moving weighted-average pool model more closely than hledger's lot-shaped `AVERAGE` output.
+
+Average-cost comparison policy after applying this fix:
+
+| Comparison area | Planned behavior |
+| --- | --- |
+| `values.realized_gain_or_loss` | Compare against rotki ACB. |
+| `values.allocated_basis` | Compare against rotki ACB. |
+| `values.closing_quantity` | Compare exactly against rotki ACB. |
+| `values.closing_basis` | Compare against rotki ACB. |
+| `matches` | Do not compare for average cost unless a later adapter exposes project-compatible pool provenance. |
+
+Expected result: remove the broad `average_cost` runtime skip after fixtures are regenerated from rotki and zero-priced average-cost cases are removed. Average-cost empirical validation then covers aggregate calculation correctness and precision, while pool-provenance evidence remains out of scope for the external oracle.
+
+### Fix HIFO Precision With Rotki HIFO Fixtures
+
+Decision: replace hledger HIFO fixtures with rotki HIFO fixtures.
+
+Reason: the current HIFO skip is caused by persisted hledger oracle precision diverging from calculation-layer financial normalization. The disposable rotki prototype matched project HIFO aggregate values within the required tolerance for the standard HIFO case.
+
+HIFO comparison policy after applying this fix:
+
+| Comparison area | Planned behavior |
+| --- | --- |
+| Aggregate financial values | Compare against rotki HIFO fixtures. |
+| Closing quantity | Compare exactly against rotki HIFO fixtures. |
+| Match evidence | Compare only after adding a focused deterministic tie-break fixture proving rotki and project acquisition ordering agree for equal-cost HIFO candidates. |
+
+Required HIFO follow-up: add or preserve a targeted HIFO deterministic tie-break empirical case that does not include zero-priced reductions. This is needed because rotki HIFO prioritizes highest acquisition rate, while the project has explicit deterministic tie-breaking requirements.
+
+Expected result: remove the `hifo` runtime skip after rotki HIFO fixtures replace hledger fixtures and HIFO tie-break behavior is explicitly verified or match evidence is limited to aggregate comparisons.
+
 ## Current Blocking Themes
 
-1. Report output lacks provenance needed to compare method-specific lifecycle slices for average-cost, scope-local hybrid, and zero-priced reductions.
-2. HIFO oracle fixtures have persisted precision that does not yet match calculation-layer financial normalization.
-3. Fixture-level unsupported segment metadata exists, but the main empirical calculation test does not currently surface it because broad method-level skips short-circuit earlier.
+1. hledger must be replaced by a rotki-based external oracle adapter before Average Cost and HIFO skips can be removed safely.
+2. Zero-priced holding reductions must be removed from empirical oracle scope and retained in traditional project tests.
+3. Average Cost should compare aggregate values only until project-compatible pool provenance exists.
+4. HIFO match evidence should remain aggregate-only or be gated by a deterministic tie-break fixture.
+5. Scope-Local Hybrid still lacks a credible external oracle because its composition rules are project-specific.
