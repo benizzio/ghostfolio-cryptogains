@@ -56,6 +56,45 @@ func TestScanSyntheticOnlyContentAllowsReviewedSyntheticPlaceholders(t *testing.
 	}
 }
 
+// TestScanSyntheticOnlyContentRejectsGenericFreeTextSensitiveContent verifies generic prose fields still reject real names and token-like content.
+//
+// Authored by: OpenCode
+func TestScanSyntheticOnlyContentRejectsGenericFreeTextSensitiveContent(t *testing.T) {
+	t.Parallel()
+
+	var content = strings.Join([]string{
+		`description: "Reviewed against John Doe sample history"`,
+		`note: "Temporary secret tok_live_1234567890abcdefghijklmnop must not persist"`,
+	}, "\n")
+
+	var issues = ScanSyntheticOnlyContent("testdata/empirical/financial-dataset.yaml", content)
+
+	if len(issues) != 2 {
+		t.Fatalf("expected 2 issues, got %d: %#v", len(issues), issues)
+	}
+
+	assertIssueKind(t, issues[0], violationRealNameLike, "description", 1)
+	assertIssueKind(t, issues[1], violationTokenLikeValue, "note", 2)
+}
+
+// TestScanSyntheticOnlyContentAllowsGenericFreeTextSyntheticPlaceholders verifies generic prose fields do not reject clearly synthetic placeholders.
+//
+// Authored by: OpenCode
+func TestScanSyntheticOnlyContentAllowsGenericFreeTextSyntheticPlaceholders(t *testing.T) {
+	t.Parallel()
+
+	var content = strings.Join([]string{
+		`description: "Synthetic Placeholder User reviewed this fixture"`,
+		`note: "Use synthetic_demo_token_0001 during oracle review"`,
+	}, "\n")
+
+	var issues = ScanSyntheticOnlyContent("testdata/empirical/golden/fifo.json", content)
+
+	if len(issues) != 0 {
+		t.Fatalf("expected no issues, got %d: %#v", len(issues), issues)
+	}
+}
+
 // TestValidateSyntheticOnlyContentReturnsGroupedNonSecretError verifies grouped validation output remains actionable and does not echo secret-like text.
 //
 // Authored by: OpenCode

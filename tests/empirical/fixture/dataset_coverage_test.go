@@ -116,6 +116,21 @@ func TestValidateDatasetCoverageRejectsEachMissingEdgeCaseTag(t *testing.T) {
 	}
 }
 
+// TestValidateDatasetCoverageRejectsTopLevelOrActivityOnlyTags verifies dataset-level or activity-level tag unions do not satisfy the case-level coverage contract.
+//
+// Authored by: OpenCode
+func TestValidateDatasetCoverageRejectsTopLevelOrActivityOnlyTags(t *testing.T) {
+	t.Parallel()
+
+	var dataset = newDatasetCoverageFixture()
+	dataset.Cases[0].CoverageTags = nil
+	dataset.Activities[0].CoverageTags = []string{requiredMethodCoverageTags[0]}
+	dataset.CoverageTags = append(dataset.CoverageTags, requiredMethodCoverageTags[0])
+
+	var err = ValidateDatasetCoverage(dataset)
+	assertMissingCoverageTagError(t, err, requiredMethodCoverageTags[0])
+}
+
 // newDatasetCoverageFixture builds one minimal dataset fixture whose coverage
 // fields intentionally satisfy the required method and edge-case tag contract.
 // Authored by: OpenCode

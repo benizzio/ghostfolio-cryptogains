@@ -117,22 +117,22 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 ### Tests for User Story 3
 
-- [ ] T040 [P] [US3] Add dataset-to-project translation tests for `syncmodel.ProtectedActivityCache`, activity ordering, scope reliability, selected currency context, and zero-priced holding reductions in `tests/empirical/fixture/project_translation_test.go`
-- [ ] T041 [P] [US3] Add project calculation output normalization tests for realized gain or loss, allocated basis, closing quantity, closing basis, comparable full-liquidation effects, comparable matches, and reference-only assets in `tests/empirical/fixture/project_output_test.go`
-- [ ] T042 [P] [US3] Add decimal comparator tests for exact quantity equality, capped per-field financial tolerances, selected decimal policy, difference formatting, and failure context in `tests/empirical/fixture/comparison_test.go`
-- [ ] T043 [P] [US3] Add isolation boundary tests that reject Ghostfolio, TUI, snapshot, Markdown, report output writer, OS opener, filename, and Documents-path usage in `tests/empirical/isolation_test.go`
-- [ ] T044 [P] [US3] Add fixture-backed empirical integration test skeleton for all supported methods and comparable cases in `tests/empirical/empirical_calculation_test.go`
+- [X] T040 [P] [US3] Add dataset-to-project translation tests for `syncmodel.ProtectedActivityCache`, activity ordering, scope reliability, selected currency context, and zero-priced holding reductions in `tests/empirical/fixture/project_translation_test.go`
+- [X] T041 [P] [US3] Add project calculation output normalization tests for realized gain or loss, allocated basis, closing quantity, closing basis, comparable full-liquidation effects, comparable matches, and reference-only assets in `tests/empirical/fixture/project_output_test.go`
+- [X] T042 [P] [US3] Add decimal comparator tests for exact quantity equality, capped per-field financial tolerances, selected decimal policy, difference formatting, and failure context in `tests/empirical/fixture/comparison_test.go`
+- [X] T043 [P] [US3] Add isolation boundary tests that reject Ghostfolio, TUI, snapshot, Markdown, report output writer, OS opener, filename, and Documents-path usage in `tests/empirical/isolation_test.go`
+- [X] T044 [P] [US3] Add fixture-backed empirical integration test skeleton for all supported methods and comparable cases in `tests/empirical/empirical_calculation_test.go`
 
 ### Implementation for User Story 3
 
-- [ ] T045 [US3] Implement dataset-to-`syncmodel.ProtectedActivityCache` translation in `tests/empirical/fixture/project_translation.go`
-- [ ] T046 [US3] Implement project calculation runner for every supported method, case, and report year in `tests/empirical/fixture/project_calculation.go`
-- [ ] T047 [US3] Implement `reportmodel.CapitalGainsReport` normalization into project comparison output in `tests/empirical/fixture/project_output.go`
-- [ ] T048 [US3] Implement decimal comparison, per-field tolerance handling, and non-secret failure formatting in `tests/empirical/fixture/comparison.go`
-- [ ] T049 [US3] Implement hledger generation policy guard that skips execution when fixtures exist and permits generation only for missing fixtures in `tests/empirical/fixture/oracle_generation_policy.go`
-- [ ] T050 [US3] Complete the empirical integration flow that validates dataset, loads fixtures, conditionally generates missing fixtures, runs project calculation, normalizes output, and compares every comparable case while reporting unsupported fields with reasons in `tests/empirical/empirical_calculation_test.go`
-- [ ] T051 [US3] Implement static isolation assertions for forbidden package imports and forbidden output artifacts in `tests/empirical/isolation_test.go`
-- [ ] T052 [US3] Run `go test ./tests/empirical -count=1 -v` for `tests/empirical/empirical_calculation_test.go`
+- [X] T045 [US3] Implement dataset-to-`syncmodel.ProtectedActivityCache` translation in `tests/empirical/fixture/project_translation.go`
+- [X] T046 [US3] Implement project calculation runner for every supported method, case, and report year in `tests/empirical/fixture/project_calculation.go`
+- [X] T047 [US3] Implement `reportmodel.CapitalGainsReport` normalization into project comparison output in `tests/empirical/fixture/project_output.go`
+- [X] T048 [US3] Implement decimal comparison, per-field tolerance handling, and non-secret failure formatting in `tests/empirical/fixture/comparison.go`
+- [X] T049 [US3] Implement hledger generation policy guard that skips execution when fixtures exist and permits generation only for missing fixtures in `tests/empirical/fixture/oracle_generation_policy.go`
+- [X] T050 [US3] Complete the empirical integration flow that validates dataset, loads fixtures, conditionally generates missing fixtures, runs project calculation, normalizes output, and compares every comparable case while reporting unsupported fields with reasons in `tests/empirical/empirical_calculation_test.go`
+- [X] T051 [US3] Implement static isolation assertions for forbidden package imports and forbidden output artifacts in `tests/empirical/isolation_test.go`
+- [X] T052 [US3] Run `go test ./tests/empirical -count=1 -v` for `tests/empirical/empirical_calculation_test.go`
 
 **Checkpoint**: Empirical calculation tests run as an isolated supplemental suite and compare calculation output only.
 

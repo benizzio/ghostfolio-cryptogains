@@ -147,21 +147,58 @@ func TestOracleBuildUnsupportedSegmentsFiltersByAssetAndOmissions(t *testing.T) 
 		reportmodel.CostBasisMethodScopeLocalHybrid,
 		"asset-gamma",
 		[]string{omissionNote},
+		[]oracleMatchEvidenceInput{{
+			DisposedSourceID: "gamma-buy",
+			SupportLabel:     fixture.EvidenceSupportLabelHledgerBacked,
+		}},
 	)
 
-	if len(segments) != 2 {
-		t.Fatalf("expected case-level and omission unsupported segments, got %+v", segments)
+	if len(segments) != 1 {
+		t.Fatalf("expected only omission unsupported segment after hledger-backed filtering, got %+v", segments)
 	}
-	if len(segments[0].ActivitySourceIDs) != 2 || segments[0].ActivitySourceIDs[0] != "gamma-buy" || segments[0].ActivitySourceIDs[1] != "gamma-zero" {
-		t.Fatalf("expected asset-filtered case activity ids, got %+v", segments[0])
+	if len(segments[0].ActivitySourceIDs) != 1 || segments[0].ActivitySourceIDs[0] != "gamma-zero" {
+		t.Fatalf("expected omitted zero-priced activity ids, got %+v", segments[0])
 	}
 	if segments[0].ComparisonPolicy != fixture.ComparisonPolicyProjectCompositionOnly {
-		t.Fatalf("expected project-composition-only case policy, got %+v", segments[0])
+		t.Fatalf("expected project-composition-only omission policy, got %+v", segments[0])
 	}
-	if len(segments[1].ActivitySourceIDs) != 1 || segments[1].ActivitySourceIDs[0] != "gamma-zero" {
-		t.Fatalf("expected omitted zero-priced activity ids, got %+v", segments[1])
+}
+
+// TestOracleCommandProvenanceArgumentsIncludePrintAndBalance verifies metadata records both hledger inputs needed to derive one oracle fixture.
+//
+// Authored by: OpenCode
+func TestOracleCommandProvenanceArgumentsIncludePrintAndBalance(t *testing.T) {
+	t.Parallel()
+
+	var arguments = oracleCommandProvenanceArguments(hledgerJournalOracleData{
+		printCommandArguments:   oraclePrintCommandArguments("testdata/empirical/hledger/fifo/case-alpha.journal", 2024),
+		balanceCommandArguments: oracleClosingBalanceCommandArguments("testdata/empirical/hledger/fifo/case-alpha.journal", 2024),
+	})
+
+	if len(arguments) == 0 {
+		t.Fatal("expected command provenance arguments, got none")
 	}
-	if segments[1].ComparisonPolicy != fixture.ComparisonPolicyProjectCompositionOnly {
-		t.Fatalf("expected project-composition-only omission policy, got %+v", segments[1])
+	if !containsString(arguments, "print") || !containsString(arguments, "balance") {
+		t.Fatalf("expected print and balance commands in provenance, got %#v", arguments)
 	}
+	if !containsString(arguments, "--next-command--") {
+		t.Fatalf("expected command separator in provenance, got %#v", arguments)
+	}
+	if !containsString(arguments, "testdata/empirical/hledger/fifo/case-alpha.journal") {
+		t.Fatalf("expected journal path in provenance, got %#v", arguments)
+	}
+}
+
+// containsString reports whether one string slice contains the expected exact value.
+//
+// Authored by: OpenCode
+func containsString(values []string, want string) bool {
+	var value string
+	for _, value = range values {
+		if value == want {
+			return true
+		}
+	}
+
+	return false
 }

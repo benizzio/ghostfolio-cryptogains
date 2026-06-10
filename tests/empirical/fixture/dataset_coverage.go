@@ -20,12 +20,18 @@ import (
 //
 // Authored by: OpenCode
 func ValidateDatasetCoverage(dataset EmpiricalDataset) error {
-	var availableTags = collectDatasetCoverageTags(dataset)
 	var missingTags = make([]string, 0)
 	var tag string
 
-	for _, tag = range allRequiredDatasetCoverageTags() {
-		if _, ok := availableTags[tag]; ok {
+	for _, tag = range requiredMethodCoverageTagSet() {
+		if caseLevelMethodCoveragePresent(dataset, tag) {
+			continue
+		}
+
+		missingTags = append(missingTags, tag)
+	}
+	for _, tag = range requiredEdgeCaseCoverageTagSet() {
+		if caseLevelCoverageTagPresent(dataset, tag) {
 			continue
 		}
 
@@ -40,29 +46,50 @@ func ValidateDatasetCoverage(dataset EmpiricalDataset) error {
 	return fmt.Errorf("dataset coverage validation failed: missing required coverage tag(s): %s", strings.Join(missingTags, ", "))
 }
 
-// collectDatasetCoverageTags merges dataset-level, activity-level, and case-level coverage tags.
+// caseLevelMethodCoveragePresent reports whether one case explicitly covers the required method tag and applies that method.
 // Authored by: OpenCode
-func collectDatasetCoverageTags(dataset EmpiricalDataset) map[string]struct{} {
-	var tags = make(map[string]struct{}, len(dataset.CoverageTags))
-	var tag string
-	var activity EmpiricalActivity
+func caseLevelMethodCoveragePresent(dataset EmpiricalDataset, tag string) bool {
 	var caseRecord EmpiricalCase
 
-	for _, tag = range dataset.CoverageTags {
-		tags[tag] = struct{}{}
-	}
-	for _, activity = range dataset.Activities {
-		for _, tag = range activity.CoverageTags {
-			tags[tag] = struct{}{}
-		}
-	}
 	for _, caseRecord = range dataset.Cases {
-		for _, tag = range caseRecord.CoverageTags {
-			tags[tag] = struct{}{}
+		if !caseHasCoverageTag(caseRecord, tag) {
+			continue
+		}
+		if !datasetCaseHasMethod(caseRecord, reportmodel.CostBasisMethod(tag)) {
+			continue
+		}
+
+		return true
+	}
+
+	return false
+}
+
+// datasetCaseHasMethod reports whether one case declares the required supported method.
+// Authored by: OpenCode
+func datasetCaseHasMethod(caseRecord EmpiricalCase, method reportmodel.CostBasisMethod) bool {
+	var declaredMethod reportmodel.CostBasisMethod
+	for _, declaredMethod = range caseRecord.Methods {
+		if declaredMethod == method {
+			return true
 		}
 	}
 
-	return tags
+	return false
+}
+
+// caseLevelCoverageTagPresent reports whether one case explicitly declares the required edge-case coverage tag.
+// Authored by: OpenCode
+func caseLevelCoverageTagPresent(dataset EmpiricalDataset, tag string) bool {
+	var caseRecord EmpiricalCase
+
+	for _, caseRecord = range dataset.Cases {
+		if caseHasCoverageTag(caseRecord, tag) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // requiredMethodCoverageTagSet returns the stable required method coverage tag identifiers.

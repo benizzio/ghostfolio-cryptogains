@@ -17,6 +17,10 @@ import (
 )
 
 var stderrWriter io.Writer = os.Stderr
+var resolveVendoredHledgerCommand = newVendoredHledgerCommand
+var captureVendoredHledgerVersion = func(ctx context.Context, command vendoredHledgerCommand) (string, error) {
+	return command.captureVersion(ctx)
+}
 
 const defaultEmpiricalOutputRoot = "testdata/empirical"
 
@@ -101,17 +105,9 @@ func run(args []string, stdout io.Writer) error {
 		return fmt.Errorf("empiricaloracle: validate dataset coverage: %w", err)
 	}
 
-	var hledger vendoredHledgerCommand
-	hledger, err = newVendoredHledgerCommand()
-	if err != nil {
-		return fmt.Errorf("empiricaloracle: build vendored hledger command: %w", err)
-	}
-
 	var hledgerVersion string
-	hledgerVersion, err = hledger.captureVersion(ctx)
-	if err != nil {
-		return fmt.Errorf("empiricaloracle: capture vendored hledger version: %w", err)
-	}
+	var hledger vendoredHledgerCommand
+	var hledgerReady bool
 
 	var journals []journal
 	journals, err = renderJournals(dataset, rawDatasetContent)
@@ -151,6 +147,19 @@ func run(args []string, stdout io.Writer) error {
 		}
 		if len(missingGoldenPaths) == 0 {
 			continue
+		}
+		if !hledgerReady {
+			hledger, err = resolveVendoredHledgerCommand()
+			if err != nil {
+				return fmt.Errorf("empiricaloracle: build vendored hledger command: %w", err)
+			}
+
+			hledgerVersion, err = captureVendoredHledgerVersion(ctx, hledger)
+			if err != nil {
+				return fmt.Errorf("empiricaloracle: capture vendored hledger version: %w", err)
+			}
+
+			hledgerReady = true
 		}
 
 		if !*regenerate {

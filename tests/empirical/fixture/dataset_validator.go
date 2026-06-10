@@ -110,6 +110,7 @@ func (issueError empiricalDatasetValidationError) Error() string {
 // empiricalDatasetValidator keeps the current structural validation state.
 // Authored by: OpenCode
 type empiricalDatasetValidator struct {
+	activitiesBySourceID                 map[string]EmpiricalActivity
 	dataset                              EmpiricalDataset
 	hasReliableScope                     bool
 	hasUnreliableOrUnavailableScope      bool
@@ -127,6 +128,7 @@ type empiricalDatasetValidator struct {
 // Authored by: OpenCode
 func newEmpiricalDatasetValidator(path string, dataset EmpiricalDataset) empiricalDatasetValidator {
 	return empiricalDatasetValidator{
+		activitiesBySourceID:                 make(map[string]EmpiricalActivity, len(dataset.Activities)),
 		dataset:                              dataset,
 		issues:                               make([]empiricalDatasetValidationIssue, 0),
 		path:                                 path,
@@ -142,6 +144,7 @@ func newEmpiricalDatasetValidator(path string, dataset EmpiricalDataset) empiric
 // validate runs the full structural dataset validation pass.
 // Authored by: OpenCode
 func (validator *empiricalDatasetValidator) validate() {
+	validator.validateDatasetVersion()
 	validator.validateDatasetCount()
 	validator.validateSupportedMethods()
 	validator.validateDeclaredYears()
@@ -149,6 +152,16 @@ func (validator *empiricalDatasetValidator) validate() {
 	validator.validateYearSpan()
 	validator.validateCases()
 	validator.validateScopePresence()
+}
+
+// validateDatasetVersion enforces the required dataset schema version marker.
+// Authored by: OpenCode
+func (validator *empiricalDatasetValidator) validateDatasetVersion() {
+	if strings.TrimSpace(validator.dataset.DatasetVersion) != "" {
+		return
+	}
+
+	validator.addIssue("", "", "dataset_version", "required_field", "dataset_version must be non-empty")
 }
 
 // validateDatasetCount enforces the minimum empirical activity count.
@@ -217,6 +230,11 @@ func (validator *empiricalDatasetValidator) validateActivity(activity *Empirical
 	var referenceValue = strings.TrimSpace(activity.SourceID)
 
 	validator.validateActivitySourceID(referenceValue)
+	if referenceValue != "" {
+		if _, exists := validator.activitiesBySourceID[referenceValue]; !exists {
+			validator.activitiesBySourceID[referenceValue] = *activity
+		}
+	}
 	validator.validateActivityOrdering(activity, referenceValue)
 	validator.validateActivityBasics(activity, referenceValue)
 	validator.validateActivityFinancialFields(activity, referenceValue)
@@ -287,6 +305,10 @@ func (validator *empiricalDatasetValidator) validateActivityFinancialFields(acti
 
 	if strings.TrimSpace(activity.ZeroPricedReductionExplanation) != "" {
 		validator.validateZeroPricedReduction(activity, sourceID)
+		return
+	}
+	if activity.ActivityType == syncmodel.ActivityTypeSell && strings.TrimSpace(activity.GrossValue) == "" && strings.TrimSpace(activity.UnitPrice) == "" {
+		validator.addIssue("source_id", sourceID, "zero_priced_reduction_explanation", "pricing", "SELL activity rows must include gross_value and unit_price or declare zero_priced_reduction_explanation")
 		return
 	}
 
@@ -386,6 +408,13 @@ func (validator *empiricalDatasetValidator) validateCases() {
 // Authored by: OpenCode
 func (validator *empiricalDatasetValidator) validateCase(caseRecord *EmpiricalCase) {
 	var caseID = strings.TrimSpace(caseRecord.CaseID)
+	var declaredAssets = make(map[string]struct{}, len(caseRecord.AssetIdentityKeys))
+	var referencedAssets = make(map[string]struct{}, len(caseRecord.AssetIdentityKeys))
+	var seenCaseMethods = make(map[reportmodel.CostBasisMethod]struct{}, len(caseRecord.Methods))
+	var seenCaseSourceIDs = make(map[string]struct{}, len(caseRecord.ActivitySourceIDs))
+	var hasSelectedYearActivity bool
+	var method reportmodel.CostBasisMethod
+	var sourceID string
 	if caseID == "" {
 		validator.addIssue("", "", "case_id", "case_id", "case_id must be non-empty")
 	} else {
@@ -396,24 +425,88 @@ func (validator *empiricalDatasetValidator) validateCase(caseRecord *EmpiricalCa
 		}
 	}
 
-	var method reportmodel.CostBasisMethod
+	if len(caseRecord.Methods) == 0 {
+		validator.addIssue("case_id", caseID, "methods", "supported_methods", "case must declare at least one supported method")
+	}
 	for _, method = range caseRecord.Methods {
+		if _, exists := seenCaseMethods[method]; exists {
+			validator.addIssue("case_id", caseID, "methods", "supported_methods", fmt.Sprintf("case must not repeat method %s", method))
+			continue
+		}
+		seenCaseMethods[method] = struct{}{}
 		if !isSupportedCostBasisMethod(method) {
 			validator.addIssue("case_id", caseID, "methods", "supported_methods", fmt.Sprintf("case uses unsupported method %s", method))
+			continue
 		}
+		if _, exists := validator.seenSupportedMethods[method]; !exists {
+			validator.addIssue("case_id", caseID, "methods", "supported_methods", fmt.Sprintf("case method %s must also be declared in supported_methods", method))
+		}
+	}
+	if len(caseRecord.AssetIdentityKeys) == 0 {
+		validator.addIssue("case_id", caseID, "asset_identity_keys", "asset_identity_keys", "case must declare at least one asset_identity_key")
+	}
+	for _, assetIdentityKey := range caseRecord.AssetIdentityKeys {
+		var trimmedAssetIdentityKey = strings.TrimSpace(assetIdentityKey)
+		if trimmedAssetIdentityKey == "" {
+			validator.addIssue("case_id", caseID, "asset_identity_keys", "asset_identity_keys", "case asset_identity_keys must not contain blank values")
+			continue
+		}
+		if _, exists := declaredAssets[trimmedAssetIdentityKey]; exists {
+			validator.addIssue("case_id", caseID, "asset_identity_keys", "asset_identity_keys", fmt.Sprintf("case must not repeat asset_identity_key %s", trimmedAssetIdentityKey))
+			continue
+		}
+
+		declaredAssets[trimmedAssetIdentityKey] = struct{}{}
 	}
 	if len(caseRecord.ActivitySourceIDs) == 0 {
 		validator.addIssue("case_id", caseID, "activity_source_ids", "activity_source_ids", "case must reference at least one activity source_id")
 	}
-	var sourceID string
 	for _, sourceID = range caseRecord.ActivitySourceIDs {
-		if _, exists := validator.seenActivitySourceIDs[sourceID]; exists {
+		var trimmedSourceID = strings.TrimSpace(sourceID)
+		if trimmedSourceID == "" {
+			validator.addIssue("case_id", caseID, "activity_source_ids", "activity_source_ids", "case activity_source_ids must not contain blank values")
 			continue
 		}
-		validator.addIssue("case_id", caseID, "activity_source_ids", "activity_source_ids", fmt.Sprintf("case references unknown source_id %s", sourceID))
+		if _, exists := seenCaseSourceIDs[trimmedSourceID]; exists {
+			validator.addIssue("case_id", caseID, "activity_source_ids", "activity_source_ids", fmt.Sprintf("case must not repeat source_id %s", trimmedSourceID))
+			continue
+		}
+		seenCaseSourceIDs[trimmedSourceID] = struct{}{}
+
+		var activity, exists = validator.activitiesBySourceID[trimmedSourceID]
+		if !exists {
+			validator.addIssue("case_id", caseID, "activity_source_ids", "activity_source_ids", fmt.Sprintf("case references unknown source_id %s", trimmedSourceID))
+			continue
+		}
+
+		if len(declaredAssets) != 0 {
+			if _, assetExists := declaredAssets[strings.TrimSpace(activity.AssetIdentityKey)]; !assetExists {
+				validator.addIssue("case_id", caseID, "asset_identity_keys", "asset_identity_keys", fmt.Sprintf("case source_id %s uses asset_identity_key %s outside asset_identity_keys", trimmedSourceID, strings.TrimSpace(activity.AssetIdentityKey)))
+			} else {
+				referencedAssets[strings.TrimSpace(activity.AssetIdentityKey)] = struct{}{}
+			}
+		}
+
+		var activityYear, yearValid = empiricalActivityYear(activity)
+		if !yearValid {
+			continue
+		}
+		if activityYear == caseRecord.Year {
+			hasSelectedYearActivity = true
+		}
 	}
 	if _, exists := validator.supportedYearsFromDatasetDeclaration[caseRecord.Year]; !exists {
 		validator.addIssue("case_id", caseID, "year", "supported_years", fmt.Sprintf("case year %d is not declared in supported_years", caseRecord.Year))
+	}
+	for assetIdentityKey := range declaredAssets {
+		if _, exists := referencedAssets[assetIdentityKey]; exists {
+			continue
+		}
+
+		validator.addIssue("case_id", caseID, "asset_identity_keys", "asset_identity_keys", fmt.Sprintf("case asset_identity_key %s must be referenced by at least one activity_source_id", assetIdentityKey))
+	}
+	if len(caseRecord.ActivitySourceIDs) != 0 && !hasSelectedYearActivity {
+		validator.addIssue("case_id", caseID, "year", "supported_years", "case must reference at least one activity_source_id that occurs in the selected year")
 	}
 	validator.validateCaseOracleSupport(caseRecord, caseID)
 }
@@ -532,4 +625,28 @@ func sortedYearsFromSet(years map[int]struct{}) []int {
 
 	sort.Ints(values)
 	return values
+}
+
+// empiricalActivityYear returns the source-calendar year for one activity when the timestamp is valid.
+// Authored by: OpenCode
+func empiricalActivityYear(activity EmpiricalActivity) (int, bool) {
+	var occurredAt, err = time.Parse(time.RFC3339Nano, strings.TrimSpace(activity.OccurredAt))
+	if err != nil {
+		return 0, false
+	}
+
+	return occurredAt.Year(), true
+}
+
+// caseHasCoverageTag reports whether one case declares the required coverage tag.
+// Authored by: OpenCode
+func caseHasCoverageTag(caseRecord EmpiricalCase, tag string) bool {
+	var coverageTag string
+	for _, coverageTag = range caseRecord.CoverageTags {
+		if strings.TrimSpace(coverageTag) == strings.TrimSpace(tag) {
+			return true
+		}
+	}
+
+	return false
 }

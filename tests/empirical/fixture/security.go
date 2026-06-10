@@ -24,7 +24,9 @@ var copiedFixturePostingPattern = regexp.MustCompile(`^(?:Assets|Liabilities|Equ
 var beancountDirectivePattern = regexp.MustCompile(`^(?:option|plugin|include|open|close|balance|commodity|pushtag|poptag)\s+`)
 var jwtLikePattern = regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\b`)
 var opaqueTokenValuePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._~+/=-]{11,}$`)
+var opaqueTokenContentPattern = regexp.MustCompile(`\b[A-Za-z0-9][A-Za-z0-9._~+/=]{15,}\b`)
 var realNamePattern = regexp.MustCompile(`^[A-Z][a-z]+(?:['-][A-Z][a-z]+)?(?:\s+[A-Z][a-z]+(?:['-][A-Z][a-z]+)?){1,2}$`)
+var realNameContentPattern = regexp.MustCompile(`\b[A-Z][a-z]+(?:['-][A-Z][a-z]+)?(?:\s+[A-Z][a-z]+(?:['-][A-Z][a-z]+)?){1,2}\b`)
 
 var realNameFields = map[string]struct{}{
 	"account_name": {},
@@ -66,6 +68,21 @@ var tokenFields = map[string]struct{}{
 	"id_token":      {},
 	"refresh_token": {},
 	"token":         {},
+}
+
+var genericFreeTextFields = map[string]struct{}{
+	"comment":     {},
+	"description": {},
+	"details":     {},
+	"label":       {},
+	"memo":        {},
+	"message":     {},
+	"name":        {},
+	"note":        {},
+	"reason":      {},
+	"summary":     {},
+	"text":        {},
+	"title":       {},
 }
 
 // SyntheticContentIssue describes one synthetic-only validation failure without exposing the matched text.
@@ -169,9 +186,15 @@ func ScanSyntheticOnlyContent(location string, content string) []SyntheticConten
 		if hasField && looksLikeTokenField(fieldName, fieldValue) {
 			issues = append(issues, newSyntheticContentIssue(normalizedLocation, lineNumber, fieldName, violationTokenLikeValue, "remove the token-like field value or replace it with reviewed synthetic placeholder text"))
 		}
+		if hasField && looksLikeGenericFreeTextToken(fieldName, fieldValue) {
+			issues = append(issues, newSyntheticContentIssue(normalizedLocation, lineNumber, fieldName, violationTokenLikeValue, "remove the token-like free-text content or replace it with reviewed synthetic placeholder text"))
+		}
 
 		if hasField && looksLikeRealNameField(fieldName, fieldValue) {
 			issues = append(issues, newSyntheticContentIssue(normalizedLocation, lineNumber, fieldName, violationRealNameLike, "use a clearly synthetic label instead of a real-person name"))
+		}
+		if hasField && looksLikeGenericFreeTextRealName(fieldName, fieldValue) {
+			issues = append(issues, newSyntheticContentIssue(normalizedLocation, lineNumber, fieldName, violationRealNameLike, "remove the real-person name from free-text content or replace it with a clearly synthetic placeholder"))
 		}
 
 		if looksLikeCopiedFixtureLine(trimmedLine) {
@@ -335,6 +358,74 @@ func looksLikeTokenField(field string, value string) bool {
 	return opaqueTokenValuePattern.MatchString(value)
 }
 
+// looksLikeGenericFreeTextToken detects opaque token-like content embedded in generic prose fields.
+//
+// Authored by: OpenCode
+func looksLikeGenericFreeTextToken(field string, value string) bool {
+	if _, ok := tokenFields[field]; ok {
+		return false
+	}
+	if !isGenericFreeTextField(field) {
+		return false
+	}
+
+	var matches = opaqueTokenContentPattern.FindAllString(value, -1)
+	var match string
+	for _, match = range matches {
+		if containsSyntheticMarker(match) {
+			continue
+		}
+		if containsLetter(match) && containsDigit(match) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// looksLikeGenericFreeTextRealName detects real-person names embedded in generic prose fields.
+//
+// Authored by: OpenCode
+func looksLikeGenericFreeTextRealName(field string, value string) bool {
+	if _, ok := realNameFields[field]; ok {
+		return false
+	}
+	if !isGenericFreeTextField(field) {
+		return false
+	}
+
+	var matches = realNameContentPattern.FindAllString(value, -1)
+	var match string
+	for _, match = range matches {
+		if containsSyntheticMarker(match) {
+			continue
+		}
+
+		return true
+	}
+
+	return false
+}
+
+// isGenericFreeTextField reports whether a field conventionally stores free-form prose.
+//
+// Authored by: OpenCode
+func isGenericFreeTextField(field string) bool {
+	if _, ok := genericFreeTextFields[field]; ok {
+		return true
+	}
+
+	return strings.HasSuffix(field, "_description") ||
+		strings.HasSuffix(field, "_details") ||
+		strings.HasSuffix(field, "_label") ||
+		strings.HasSuffix(field, "_message") ||
+		strings.HasSuffix(field, "_note") ||
+		strings.HasSuffix(field, "_reason") ||
+		strings.HasSuffix(field, "_summary") ||
+		strings.HasSuffix(field, "_text") ||
+		strings.HasSuffix(field, "_title")
+}
+
 // containsSyntheticMarker allows clearly synthetic placeholder text to pass name and token heuristics.
 //
 // Authored by: OpenCode
@@ -348,4 +439,22 @@ func containsSyntheticMarker(value string) bool {
 	}
 
 	return false
+}
+
+// containsLetter reports whether one candidate includes an ASCII letter.
+//
+// Authored by: OpenCode
+func containsLetter(value string) bool {
+	return strings.IndexFunc(value, func(character rune) bool {
+		return character >= 'A' && character <= 'Z' || character >= 'a' && character <= 'z'
+	}) >= 0
+}
+
+// containsDigit reports whether one candidate includes an ASCII digit.
+//
+// Authored by: OpenCode
+func containsDigit(value string) bool {
+	return strings.IndexFunc(value, func(character rune) bool {
+		return character >= '0' && character <= '9'
+	}) >= 0
 }

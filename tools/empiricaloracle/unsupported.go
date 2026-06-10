@@ -17,11 +17,14 @@ func buildUnsupportedSegments(
 	method reportmodel.CostBasisMethod,
 	assetIdentityKey string,
 	generationNotes []string,
+	matches []oracleMatchEvidenceInput,
 ) []unsupportedOracleSegmentInput {
 	var segments = make([]unsupportedOracleSegmentInput, 0, 2)
+	var omittedZeroPricedSourceIDs = omittedZeroPricedReductionSourceIDs(dataset, empiricalCase, method, assetIdentityKey, generationNotes)
+	var hledgerCoveredSourceIDs = hledgerBackedSourceIDSet(matches)
 
 	if empiricalCase.OracleSupport != fixture.OracleSupportSupported {
-		var assetSourceIDs = caseAssetSourceIDs(dataset, empiricalCase, assetIdentityKey)
+		var assetSourceIDs = filterUncoveredSourceIDs(caseAssetSourceIDs(dataset, empiricalCase, assetIdentityKey), hledgerCoveredSourceIDs, omittedZeroPricedSourceIDs)
 		if len(assetSourceIDs) != 0 {
 			segments = append(segments, unsupportedOracleSegmentInput{
 				CaseID:            strings.TrimSpace(empiricalCase.CaseID),
@@ -33,7 +36,7 @@ func buildUnsupportedSegments(
 		}
 	}
 
-	var omittedZeroPricedSourceIDs = omittedZeroPricedReductionSourceIDs(dataset, empiricalCase, method, assetIdentityKey, generationNotes)
+	omittedZeroPricedSourceIDs = filterUncoveredSourceIDs(omittedZeroPricedSourceIDs, hledgerCoveredSourceIDs, nil)
 	if len(omittedZeroPricedSourceIDs) != 0 {
 		segments = append(segments, unsupportedOracleSegmentInput{
 			CaseID:            strings.TrimSpace(empiricalCase.CaseID),
@@ -45,6 +48,52 @@ func buildUnsupportedSegments(
 	}
 
 	return segments
+}
+
+// hledgerBackedSourceIDSet returns the source identifiers already covered by hledger-backed match evidence.
+// Authored by: OpenCode
+func hledgerBackedSourceIDSet(matches []oracleMatchEvidenceInput) map[string]struct{} {
+	var coveredSourceIDs = make(map[string]struct{})
+	var match oracleMatchEvidenceInput
+	for _, match = range matches {
+		if match.SupportLabel != fixture.EvidenceSupportLabelHledgerBacked {
+			continue
+		}
+		if strings.TrimSpace(match.DisposedSourceID) != "" {
+			coveredSourceIDs[strings.TrimSpace(match.DisposedSourceID)] = struct{}{}
+		}
+		if strings.TrimSpace(match.AcquisitionSourceID) != "" {
+			coveredSourceIDs[strings.TrimSpace(match.AcquisitionSourceID)] = struct{}{}
+		}
+	}
+
+	return coveredSourceIDs
+}
+
+// filterUncoveredSourceIDs removes already-covered or separately-classified source identifiers while preserving stable sorted order.
+// Authored by: OpenCode
+func filterUncoveredSourceIDs(sourceIDs []string, coveredSourceIDs map[string]struct{}, excludedSourceIDs []string) []string {
+	var excludedSourceIDSet = make(map[string]struct{}, len(excludedSourceIDs))
+	var excludedSourceID string
+	for _, excludedSourceID = range excludedSourceIDs {
+		excludedSourceIDSet[strings.TrimSpace(excludedSourceID)] = struct{}{}
+	}
+
+	var filtered = make([]string, 0, len(sourceIDs))
+	var sourceID string
+	for _, sourceID = range sourceIDs {
+		var trimmedSourceID = strings.TrimSpace(sourceID)
+		if _, covered := coveredSourceIDs[trimmedSourceID]; covered {
+			continue
+		}
+		if _, excluded := excludedSourceIDSet[trimmedSourceID]; excluded {
+			continue
+		}
+
+		filtered = append(filtered, trimmedSourceID)
+	}
+
+	return filtered
 }
 
 // caseAssetSourceIDs returns the case source identifiers filtered to the target

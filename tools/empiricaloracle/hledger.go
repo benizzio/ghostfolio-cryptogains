@@ -20,8 +20,10 @@ const oracleDecimalPolicy = "scale=16,rounding=half_up"
 // to build one or more oracle fixtures from a rendered case journal.
 // Authored by: OpenCode
 type hledgerJournalOracleData struct {
-	balanceRows       []hledgerBalanceAccountRow
-	printTransactions []hledgerPrintTransaction
+	balanceCommandArguments []string
+	balanceRows             []hledgerBalanceAccountRow
+	printCommandArguments   []string
+	printTransactions       []hledgerPrintTransaction
 }
 
 // hledgerPrintTransaction stores the hledger JSON print fields required by the
@@ -122,6 +124,7 @@ func collectHledgerJournalOracleData(
 	journalRelativePath string,
 	year int,
 ) (hledgerJournalOracleData, error) {
+	var printCommandArguments = oraclePrintCommandArguments(journalRelativePath, year)
 	var rawPrintOutput, err = runVendoredHledgerCommand(ctx, command, journalRelativePath, oraclePrintSubcommandArguments(year)...)
 	if err != nil {
 		return hledgerJournalOracleData{}, err
@@ -133,6 +136,7 @@ func collectHledgerJournalOracleData(
 		return hledgerJournalOracleData{}, err
 	}
 
+	var balanceCommandArguments = oracleClosingBalanceCommandArguments(journalRelativePath, year)
 	var rawBalanceOutput []byte
 	rawBalanceOutput, err = runVendoredHledgerCommand(ctx, command, journalRelativePath, oracleClosingBalanceSubcommandArguments(year)...)
 	if err != nil {
@@ -146,8 +150,10 @@ func collectHledgerJournalOracleData(
 	}
 
 	return hledgerJournalOracleData{
-		balanceRows:       balanceRows,
-		printTransactions: printTransactions,
+		balanceCommandArguments: balanceCommandArguments,
+		balanceRows:             balanceRows,
+		printCommandArguments:   printCommandArguments,
+		printTransactions:       printTransactions,
 	}, nil
 }
 
@@ -172,7 +178,7 @@ func buildOracleOutputForAsset(
 		return fixture.OracleOutput{}, err
 	}
 
-	var unsupportedSegments = buildUnsupportedSegments(dataset, empiricalCase, method, assetIdentityKey, renderedJournal.ledger.GenerationNotes)
+	var unsupportedSegments = buildUnsupportedSegments(dataset, empiricalCase, method, assetIdentityKey, renderedJournal.ledger.GenerationNotes, matches)
 
 	return normalizeOracleOutput(oracleOutputNormalizationInput{
 		DatasetVersion:      strings.TrimSpace(dataset.DatasetVersion),
@@ -186,7 +192,7 @@ func buildOracleOutputForAsset(
 		Metadata: oracleGenerationMetadataInput{
 			RunID:            "",
 			HledgerVersion:   strings.TrimSpace(hledgerVersion),
-			CommandArguments: oraclePrintCommandArguments(journalRelativePath, empiricalCase.Year),
+			CommandArguments: oracleCommandProvenanceArguments(oracleData),
 			DatasetInputHash: strings.TrimSpace(renderedJournal.ledger.DatasetInputHash),
 			HledgerInputHash: strings.TrimSpace(renderedJournal.ledger.HledgerInputHash),
 			DecimalPolicy:    oracleDecimalPolicy,
@@ -574,6 +580,26 @@ func runVendoredHledgerCommand(
 func oraclePrintCommandArguments(journalRelativePath string, year int) []string {
 	var arguments = []string{"-n", "-f", strings.TrimSpace(journalRelativePath)}
 	arguments = append(arguments, oraclePrintSubcommandArguments(year)...)
+	return arguments
+}
+
+// oracleClosingBalanceCommandArguments returns the persisted repository-relative balance command arguments recorded in fixture metadata.
+// Authored by: OpenCode
+func oracleClosingBalanceCommandArguments(journalRelativePath string, year int) []string {
+	var arguments = []string{"-n", "-f", strings.TrimSpace(journalRelativePath)}
+	arguments = append(arguments, oracleClosingBalanceSubcommandArguments(year)...)
+	return arguments
+}
+
+// oracleCommandProvenanceArguments records both print and balance command inputs in stable metadata order.
+// Authored by: OpenCode
+func oracleCommandProvenanceArguments(oracleData hledgerJournalOracleData) []string {
+	var arguments = make([]string, 0, len(oracleData.printCommandArguments)+len(oracleData.balanceCommandArguments)+1)
+	arguments = append(arguments, copyStringSlice(oracleData.printCommandArguments)...)
+	if len(oracleData.printCommandArguments) != 0 && len(oracleData.balanceCommandArguments) != 0 {
+		arguments = append(arguments, "--next-command--")
+	}
+	arguments = append(arguments, copyStringSlice(oracleData.balanceCommandArguments)...)
 	return arguments
 }
 
