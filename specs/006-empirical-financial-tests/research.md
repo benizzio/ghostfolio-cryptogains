@@ -48,23 +48,25 @@ Vendor or document external oracle materials under `third_party/` with applicabl
 **Alternatives considered**:
 
 - Commit only a downloaded executable: rejected because binary-only vendoring is prohibited unless source-distribution obligations are satisfied and documented.
-- Fetch external oracle source or artifacts at test time: rejected because it harms reproducibility and can make CI dependent on network availability.
+- Fetch external oracle source during normal fixture-backed tests: rejected because it harms reproducibility and can make CI dependent on network availability. BUG-002 permits only the explicit fixture-regeneration command to download or reuse verified pinned rotki source in the untracked source cache.
 - Document manual installation instead of repository-controlled provenance: rejected because fixture generation must be reproducible from documented, pinned oracle materials.
 
-## Decision: Bootstrap The rotki Boundary With Repository-Controlled Provenance And Normalization Inputs
+## Decision: Use Verified Untracked rotki Source For Fixture Regeneration
 
 Pin rotki to release tag `v1.43.1`, resolving to commit `a2e00be49a0ea36e7563a5d235cfa6a7c91edbfb`, and record the upstream source archive URL `https://github.com/rotki/rotki/archive/refs/tags/v1.43.1.tar.gz` with SHA-256 `8434b653104f8d5b0638e98d88a5ef256fac7720cc459eb33b729e2848900e3b`. Copy the upstream `LICENSE.md` text from `https://raw.githubusercontent.com/rotki/rotki/v1.43.1/LICENSE.md`, whose fetched SHA-256 is `eb6f58a98d8bdb6d3c8fee3817543589f3cd0921d14748fa0630edff2d4c08b0`, into `third_party/rotki/LICENSE.md` as repository-controlled license evidence.
 
-Because this checkout still lacks verified raw rotki outputs and does not vendor a rotki source checkout or executable, store repository-controlled normalization inputs and intended capture paths under `testdata/empirical/rotki/bootstrap-boundary.json`. These inputs cover synthetic `fifo`, `lifo`, `hifo`, and `average_cost` aggregate cases only, explicitly exclude zero-priced holding reductions, and do not claim rotki was executed in this checkout. Empirical verification must continue to rely on committed golden fixtures by default and must not require a developer-local rotki installation. Platform support notes stay descriptive only at this stage: the upstream README documents Windows, macOS, and Linux support, but this bootstrap commit is platform-neutral because it adds provenance and synthetic inputs rather than an executable boundary.
+BUG-002 supersedes the BUG-001 bootstrap shortcut that accepted committed raw rotki outputs or repository-controlled normalization inputs as oracle evidence. Explicit fixture regeneration must download or reuse the pinned rotki source under `.cache/empiricaloracle/rotki-source/`, verify the configured source URL, commit or tag, checksum, and adapter constraints, then execute rotki calculation code through the project-owned local adapter boundary. The rotki source cache is untracked and covered by `.gitignore`. Normal fixture-backed empirical tests must continue to rely on committed golden fixtures and must not download rotki, require the source cache, or invoke oracle generation.
 
-**Rationale**: BUG-001 requires repository-controlled rotki evidence before adapter completion can be considered done. A pinned provenance record plus committed synthetic normalization inputs is the smallest verifiable boundary that unblocks later adapter work without fabricating raw oracle outputs or depending on undocumented local state.
+Committed files under `testdata/empirical/rotki/` are retained as historical BUG-001 bootstrap metadata only. They are not authoritative regeneration evidence and must not be used as the source of regenerated oracle data.
+
+**Rationale**: BUG-002 requires regenerated fixtures to derive from executed pinned rotki source while avoiding vendored rotki code and developer-global installations. A verified untracked source cache keeps the repository free of rotki source while still making the regeneration boundary reproducible from documented provenance and checksums.
 
 **Alternatives considered**:
 
 - Claim local prototype outputs as repository evidence: rejected because they are not reproducible from version-controlled materials in this checkout.
-- Commit invented raw rotki responses: rejected because that would falsely imply a verified oracle execution.
-- Require maintainers to install rotki locally before the boundary exists: rejected because BUG-001 explicitly disallows developer-local installation as the only source of truth.
-- Vendor the full rotki source tree in this patch: rejected for now as a larger change set than needed to establish the minimum repository-controlled bootstrap boundary.
+- Commit raw rotki responses or hand-authored rotki datasets: rejected because BUG-002 requires regenerated oracle data to come from executed pinned rotki source through the local adapter boundary.
+- Require maintainers to install rotki locally: rejected because developer-global installations are not reproducible oracle evidence.
+- Vendor the full rotki source tree: rejected because BUG-002 requires a non-vendored untracked source acquisition path.
 
 Co-authored by: OpenCode
 

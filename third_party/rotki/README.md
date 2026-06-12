@@ -1,9 +1,10 @@
 # Repository-Controlled rotki Boundary
 
-This directory records the repository-controlled rotki provenance required by BUG-001.
-It does not vendor a rotki source checkout, built artifact, or executable in this
-commit. This checkout therefore does not rely on a developer-local rotki
-installation and does not claim rotki was executed here.
+This directory records the repository-controlled rotki provenance required by
+BUG-001 and the BUG-002 source-acquisition supersession. It does not vendor a
+rotki source checkout, built artifact, or executable. This checkout therefore
+does not rely on a developer-local rotki installation and does not claim rotki
+was executed here.
 
 ## Why This Exists
 
@@ -12,9 +13,14 @@ installation and does not claim rotki was executed here.
   `hifo`, and `average_cost` aggregate comparisons.
 - `scope_local_hybrid` remains a composite oracle and is not documented here as a
   native rotki method.
-- When exact raw rotki captures are absent, repository-controlled normalization
-  inputs under `testdata/empirical/rotki/` remain the source of truth for later
-  adapter completion.
+- BUG-002 rejects committed raw rotki captures, hand-authored rotki datasets,
+  developer-global installations, and vendored rotki source as oracle evidence.
+- Explicit golden-fixture regeneration must download or reuse the verified
+  pinned rotki source under `.cache/empiricaloracle/rotki-source/`, which is an
+  untracked project-local cache path.
+- Repository-controlled normalization inputs under `testdata/empirical/rotki/`
+  are retained as historical bootstrap metadata only. They are not the source of
+  regenerated oracle data.
 
 ## Upstream Pin And Verifiable Sources
 
@@ -39,8 +45,12 @@ installation and does not claim rotki was executed here.
   local source tree under `third_party/rotki/`.
 - Empirical tests must use committed golden fixtures by default and must not rely
   on a developer-local rotki installation.
-- Future regeneration work may only use repository-controlled rotki materials or
-  committed raw captures with provenance metadata.
+- Explicit regeneration may only use the verified untracked source cache path
+  documented above and must fail when provenance, checksum, commit or tag, or
+  adapter constraints do not match.
+- Normal fixture-backed empirical tests must not download rotki, require the
+  untracked source cache, or invoke oracle generation while committed golden
+  fixtures are present.
 
 ## Adapter Constraints
 

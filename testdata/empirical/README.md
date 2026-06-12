@@ -114,6 +114,8 @@ Edge-case coverage tags:
 - `hledger/` stores generated hledger journal inputs derived from the dataset.
 - Cases marked `oracle_support: unsupported` stay in the dataset for structural and non-oracle coverage, but do not require `golden/` or `hledger/` artifacts.
 - Generate or refresh derived artifacts only through `tools/empiricaloracle` once later phases implement the command behavior. Do not hand-edit generated fixtures.
+- BUG-002 regeneration must obtain rotki data only by verifying and executing pinned rotki source from the untracked project-local cache path `.cache/empiricaloracle/rotki-source/`.
+- Normal fixture-backed empirical test runs must not download rotki, require the untracked source cache, or invoke oracle generation while committed golden fixtures are present.
 - Runtime application code must not read or write empirical fixture artifacts.
 
 ## Synthetic-Only Policy
@@ -133,4 +135,4 @@ Edge-case coverage tags:
 - `financial-dataset.yaml` is the repository-backed synthetic empirical dataset baseline for phase 3 validation.
 - `golden/` contains the current normalized oracle fixture baseline for the supported empirical fixture groups.
 - `hledger/` retains generated historical or auxiliary journals for the remaining test-time boundary.
-- `rotki/` contains the repository-controlled rotki bootstrap manifest and normalization inputs used by BUG-001 remediation.
+- `rotki/` contains historical BUG-001 rotki bootstrap metadata only. BUG-002 supersedes it as oracle evidence for regeneration.

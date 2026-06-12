@@ -2,6 +2,7 @@
 .idea/
 .vscode/
 .cache
+.cache/empiricaloracle/rotki-source/
 .specify/extensions/.cache/
 Thumbs.db
 .env*
