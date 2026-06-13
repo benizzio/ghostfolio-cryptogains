@@ -443,6 +443,7 @@ func (validator *oracleOutputValidator) validateMetadata() {
 	validator.validateRequiredTextField("metadata.version_or_commit", metadata.VersionOrCommit)
 	validator.validateRequiredTextField("metadata.decimal_policy", metadata.DecimalPolicy)
 	validator.validateRequiredTextField("metadata.normalization_version", metadata.NormalizationVersion)
+	validator.validateSHA256Field("metadata.source_checksum", metadata.SourceChecksum)
 
 	if metadata.AdapterArguments == nil {
 		validator.addIssue("case_id", validator.output.CaseID, "metadata.adapter_arguments", "schema", "adapter_arguments must be present as a JSON array")

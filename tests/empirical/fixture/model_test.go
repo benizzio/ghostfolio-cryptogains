@@ -103,6 +103,7 @@ func TestOracleAndComparisonModelContracts(t *testing.T) {
 	var metadataType = reflect.TypeOf(OracleGenerationRun{})
 	assertStructFieldTypeAndTags(t, metadataType, "OracleName", reflect.TypeOf(""), "oracle_name", "oracle_name")
 	assertStructFieldTypeAndTags(t, metadataType, "SourceURL", reflect.TypeOf(""), "source_url", "source_url")
+	assertStructFieldTypeAndTags(t, metadataType, "SourceChecksum", reflect.TypeOf(""), "source_checksum", "source_checksum")
 	assertStructFieldTypeAndTags(t, metadataType, "VersionOrCommit", reflect.TypeOf(""), "version_or_commit", "version_or_commit")
 	assertStructFieldTypeAndTags(t, metadataType, "AdapterArguments", reflect.TypeOf([]string{}), "adapter_arguments", "adapter_arguments")
 	assertStructFieldTypeAndTags(t, metadataType, "AdapterConstraints", reflect.TypeOf([]string{}), "adapter_constraints", "adapter_constraints")
@@ -211,7 +212,8 @@ func TestOracleOutputAndComparisonJSONContracts(t *testing.T) {
 		},
 		Metadata: OracleGenerationRun{
 			OracleName:              "rotki",
-			SourceURL:               "https://github.com/rotki/rotki",
+			SourceURL:               "https://github.com/rotki/rotki/archive/refs/tags/v1.43.1.tar.gz",
+			SourceChecksum:          "sha256:8434b653104f8d5b0638e98d88a5ef256fac7720cc459eb33b729e2848900e3b",
 			VersionOrCommit:         "v1.43.1",
 			AdapterArguments:        []string{"--boundary", "testdata/empirical/rotki/bootstrap-boundary.json", "--case", "case-fifo-basic-2024"},
 			AdapterConstraints:      []string{"zero-priced holding reductions excluded"},

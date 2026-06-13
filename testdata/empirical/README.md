@@ -116,6 +116,8 @@ Edge-case coverage tags:
 - Generate or refresh derived artifacts only through `tools/empiricaloracle` once later phases implement the command behavior. Do not hand-edit generated fixtures.
 - BUG-002 regeneration must obtain rotki data only by verifying and executing pinned rotki source from the untracked project-local cache path `.cache/empiricaloracle/rotki-source/`.
 - Normal fixture-backed empirical test runs must not download rotki, require the untracked source cache, or invoke oracle generation while committed golden fixtures are present.
+- Explicit regeneration may download or reuse the pinned source archive only under `.cache/empiricaloracle/rotki-source/`. Clean up that cache by removing the directory when you need to force a fresh verification pass.
+- `testdata/empirical/rotki/` is README-only deprecation metadata. Do not reintroduce committed raw rotki payloads, bootstrap manifests, or hand-authored adapter inputs there.
 - Runtime application code must not read or write empirical fixture artifacts.
 
 ## Synthetic-Only Policy
@@ -135,4 +137,4 @@ Edge-case coverage tags:
 - `financial-dataset.yaml` is the repository-backed synthetic empirical dataset baseline for phase 3 validation.
 - `golden/` contains the current normalized oracle fixture baseline for the supported empirical fixture groups.
 - `hledger/` retains generated historical or auxiliary journals for the remaining test-time boundary.
-- `rotki/` contains historical BUG-001 rotki bootstrap metadata only. BUG-002 supersedes it as oracle evidence for regeneration.
+- `rotki/` contains only README deprecation metadata for the removed BUG-001 bootstrap shortcut. BUG-002 supersedes it as oracle evidence for regeneration.

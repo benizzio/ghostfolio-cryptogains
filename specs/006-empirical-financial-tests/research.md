@@ -57,7 +57,7 @@ Pin rotki to release tag `v1.43.1`, resolving to commit `a2e00be49a0ea36e7563a5d
 
 BUG-002 supersedes the BUG-001 bootstrap shortcut that accepted committed raw rotki outputs or repository-controlled normalization inputs as oracle evidence. Explicit fixture regeneration must download or reuse the pinned rotki source under `.cache/empiricaloracle/rotki-source/`, verify the configured source URL, commit or tag, checksum, and adapter constraints, then execute rotki calculation code through the project-owned local adapter boundary. The rotki source cache is untracked and covered by `.gitignore`. Normal fixture-backed empirical tests must continue to rely on committed golden fixtures and must not download rotki, require the source cache, or invoke oracle generation.
 
-Committed files under `testdata/empirical/rotki/` are retained as historical BUG-001 bootstrap metadata only. They are not authoritative regeneration evidence and must not be used as the source of regenerated oracle data.
+`testdata/empirical/rotki/` is reduced to README-only deprecation metadata. Committed raw rotki payloads, bootstrap manifests, and hand-authored adapter inputs are not authoritative regeneration evidence and must not be used as the source of regenerated oracle data.
 
 **Rationale**: BUG-002 requires regenerated fixtures to derive from executed pinned rotki source while avoiding vendored rotki code and developer-global installations. A verified untracked source cache keeps the repository free of rotki source while still making the regeneration boundary reproducible from documented provenance and checksums.
 
@@ -67,6 +67,8 @@ Committed files under `testdata/empirical/rotki/` are retained as historical BUG
 - Commit raw rotki responses or hand-authored rotki datasets: rejected because BUG-002 requires regenerated oracle data to come from executed pinned rotki source through the local adapter boundary.
 - Require maintainers to install rotki locally: rejected because developer-global installations are not reproducible oracle evidence.
 - Vendor the full rotki source tree: rejected because BUG-002 requires a non-vendored untracked source acquisition path.
+
+Normal fixture-backed `go test ./tests/empirical -count=1 -v` runs must stay no-network when committed golden fixtures are present. Only explicit regeneration may download the pinned source archive, and it must write or reuse artifacts only below `.cache/empiricaloracle/rotki-source/`.
 
 Co-authored by: OpenCode
 

@@ -110,7 +110,8 @@ func run(args []string, stdout io.Writer) error {
 	var hledgerVersion string
 	var hledger vendoredHledgerCommand
 	var hledgerReady bool
-	var rotkiBoundaryVerified bool
+	var rotkiSource rotkiSourceRuntime
+	var rotkiSourceReady bool
 
 	var journals []journal
 	journals, err = renderJournals(dataset, rawDatasetContent)
@@ -152,11 +153,12 @@ func run(args []string, stdout io.Writer) error {
 			continue
 		}
 		if isRepositoryControlledBoundaryMethod(method) {
-			if !rotkiBoundaryVerified {
-				if err = verifyRotkiBoundaryMaterials(repositoryRoot, dataset); err != nil {
-					return fmt.Errorf("empiricaloracle: verify repository-controlled rotki boundary: %w", err)
+			if !rotkiSourceReady {
+				rotkiSource, err = resolveRotkiSourceRuntime()
+				if err != nil {
+					return fmt.Errorf("empiricaloracle: resolve verified rotki source runtime: %w", err)
 				}
-				rotkiBoundaryVerified = true
+				rotkiSourceReady = true
 			}
 
 			var assetIndex int
@@ -174,22 +176,14 @@ func run(args []string, stdout io.Writer) error {
 					}
 				}
 
-				var boundaryInput boundaryOracleInput
-				var boundaryInputRelativePath string
-				var rawBoundaryInput []byte
-				boundaryInput, boundaryInputRelativePath, rawBoundaryInput, err = loadBoundaryOracleInput(repositoryRoot, empiricalCase, method, assetIdentityKey)
-				if err != nil {
-					return fmt.Errorf("empiricaloracle: load repository-controlled boundary input for case %s method %s asset %s: %w", empiricalCase.CaseID, method, assetIdentityKey, err)
-				}
-
 				var output fixture.OracleOutput
 				if method == reportmodel.CostBasisMethodScopeLocalHybrid {
-					output, err = buildScopeLocalHybridCompositeOracleOutput(dataset, datasetInputHash, empiricalCase, assetIdentityKey, boundaryInput, boundaryInputRelativePath, rawBoundaryInput)
+					output, err = buildScopeLocalHybridCompositeOracleOutput(ctx, rotkiSource, repositoryRoot, dataset, datasetInputHash, empiricalCase, assetIdentityKey)
 				} else {
-					output, err = buildBoundaryOracleOutputForAsset(dataset, datasetInputHash, empiricalCase, method, assetIdentityKey, boundaryInput, boundaryInputRelativePath, rawBoundaryInput)
+					output, err = buildRotkiOracleOutputForAsset(ctx, rotkiSource, repositoryRoot, dataset, datasetInputHash, empiricalCase, method, assetIdentityKey)
 				}
 				if err != nil {
-					return fmt.Errorf("empiricaloracle: build boundary oracle output for case %s method %s asset %s: %w", empiricalCase.CaseID, method, assetIdentityKey, err)
+					return fmt.Errorf("empiricaloracle: build rotki-backed oracle output for case %s method %s asset %s: %w", empiricalCase.CaseID, method, assetIdentityKey, err)
 				}
 
 				var rawOutput []byte

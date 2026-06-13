@@ -49,7 +49,8 @@ func TestOracleNormalizeOracleOutputCanonicalizesAndHashesDeterministically(t *t
 		Metadata: oracleGenerationMetadataInput{
 			RunID:                   "run-001",
 			OracleName:              "rotki",
-			SourceURL:               "https://github.com/rotki/rotki",
+			SourceURL:               defaultRotkiSourceArchiveURL,
+			SourceChecksum:          defaultRotkiSourceChecksum,
 			VersionOrCommit:         "v1.43.1",
 			AdapterArguments:        []string{"--boundary", "testdata/empirical/rotki/bootstrap-boundary.json", "--case", "case-fifo-basic-2024"},
 			AdapterConstraints:      []string{"zero-priced holding reductions excluded from external-oracle fixture generation"},
@@ -132,7 +133,8 @@ func TestOracleStableOracleOutputHashExcludesSelfReferentialMetadata(t *testing.
 		Metadata: fixture.OracleGenerationRun{
 			RunID:                   "run-001",
 			OracleName:              "rotki",
-			SourceURL:               "https://github.com/rotki/rotki",
+			SourceURL:               defaultRotkiSourceArchiveURL,
+			SourceChecksum:          defaultRotkiSourceChecksum,
 			VersionOrCommit:         "v1.43.1",
 			AdapterArguments:        []string{"--boundary", "testdata/empirical/rotki/bootstrap-boundary.json", "--case", "case-fifo-basic-2024"},
 			AdapterConstraints:      []string{"zero-priced holding reductions excluded from external-oracle fixture generation"},
@@ -196,7 +198,8 @@ func TestOracleNormalizeOracleOutputRejectsInvalidNormalizedFixture(t *testing.T
 		}},
 		Metadata: oracleGenerationMetadataInput{
 			OracleName:              "scope_local_hybrid_composite",
-			SourceURL:               "https://github.com/rotki/rotki",
+			SourceURL:               defaultRotkiSourceArchiveURL,
+			SourceChecksum:          defaultRotkiSourceChecksum,
 			VersionOrCommit:         "v1.43.1",
 			AdapterArguments:        []string{"--boundary", "testdata/empirical/rotki/bootstrap-boundary.json", "--case", "case-scope-local-hybrid-2024"},
 			AdapterConstraints:      []string{"scope_local_hybrid uses documented project composition rules"},
@@ -255,7 +258,8 @@ func TestOracleNormalizeOracleOutputProducesStrictJSONShape(t *testing.T) {
 		},
 		Metadata: oracleGenerationMetadataInput{
 			OracleName:              "rotki",
-			SourceURL:               "https://github.com/rotki/rotki",
+			SourceURL:               defaultRotkiSourceArchiveURL,
+			SourceChecksum:          defaultRotkiSourceChecksum,
 			VersionOrCommit:         "v1.43.1",
 			AdapterArguments:        []string{"--boundary", "testdata/empirical/rotki/bootstrap-boundary.json", "--case", "case-fifo-json-shape-2024"},
 			AdapterConstraints:      []string{"zero-priced holding reductions excluded from external-oracle fixture generation"},

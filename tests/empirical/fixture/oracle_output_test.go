@@ -40,6 +40,9 @@ func TestOracleLoadOracleOutputsLoadsValidatedFixtures(t *testing.T) {
 	if outputs[0].Metadata.OracleName != "rotki" {
 		t.Fatalf("unexpected oracle name: got %q want %q", outputs[0].Metadata.OracleName, "rotki")
 	}
+	if outputs[0].Metadata.SourceChecksum == "" {
+		t.Fatal("expected source checksum to be recorded")
+	}
 	if outputs[0].Values.RealizedGainOrLoss != "5" || outputs[0].Values.AllocatedBasis != "10" || outputs[0].Values.ClosingQuantity != "0.5" || outputs[0].Values.ClosingBasis != "6" {
 		t.Fatalf("unexpected canonical comparable values: %+v", outputs[0].Values)
 	}
@@ -169,7 +172,8 @@ func newValidOracleOutputFixture(t *testing.T, method reportmodel.CostBasisMetho
 		UnsupportedSegments: []UnsupportedOracleSegment{},
 		Metadata: OracleGenerationRun{
 			OracleName:              "rotki",
-			SourceURL:               "https://github.com/rotki/rotki",
+			SourceURL:               "https://github.com/rotki/rotki/archive/refs/tags/v1.43.1.tar.gz",
+			SourceChecksum:          "sha256:8434b653104f8d5b0638e98d88a5ef256fac7720cc459eb33b729e2848900e3b",
 			VersionOrCommit:         "v1.43.1",
 			AdapterArguments:        []string{"--boundary", "testdata/empirical/rotki/bootstrap-boundary.json", "--case", caseID, "--method", method.FilenameSlug()},
 			AdapterConstraints:      []string{"zero-priced holding reductions excluded from external-oracle fixture generation"},

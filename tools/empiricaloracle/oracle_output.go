@@ -77,6 +77,7 @@ type oracleGenerationMetadataInput struct {
 	RunID                   string
 	OracleName              string
 	SourceURL               string
+	SourceChecksum          string
 	VersionOrCommit         string
 	AdapterArguments        []string
 	AdapterConstraints      []string
@@ -109,6 +110,7 @@ func normalizeOracleOutput(input oracleOutputNormalizationInput) (fixture.Oracle
 			RunID:                   strings.TrimSpace(input.Metadata.RunID),
 			OracleName:              strings.TrimSpace(input.Metadata.OracleName),
 			SourceURL:               strings.TrimSpace(input.Metadata.SourceURL),
+			SourceChecksum:          strings.TrimSpace(input.Metadata.SourceChecksum),
 			VersionOrCommit:         strings.TrimSpace(input.Metadata.VersionOrCommit),
 			AdapterArguments:        copyStringSlice(input.Metadata.AdapterArguments),
 			AdapterConstraints:      copyStringSlice(input.Metadata.AdapterConstraints),

@@ -18,9 +18,10 @@ was executed here.
 - Explicit golden-fixture regeneration must download or reuse the verified
   pinned rotki source under `.cache/empiricaloracle/rotki-source/`, which is an
   untracked project-local cache path.
-- Repository-controlled normalization inputs under `testdata/empirical/rotki/`
-  are retained as historical bootstrap metadata only. They are not the source of
-  regenerated oracle data.
+- `testdata/empirical/rotki/` now carries only a README tombstone that records
+  BUG-001 deprecation. No committed raw rotki payload, bootstrap manifest, or
+  hand-authored adapter input under that path is authoritative regeneration
+  evidence.
 
 ## Upstream Pin And Verifiable Sources
 
@@ -48,6 +49,9 @@ was executed here.
 - Explicit regeneration may only use the verified untracked source cache path
   documented above and must fail when provenance, checksum, commit or tag, or
   adapter constraints do not match.
+- Regeneration must not read committed raw rotki payloads from
+  `testdata/empirical/rotki/` and must not depend on any vendored
+  `third_party/rotki/source/` checkout.
 - Normal fixture-backed empirical tests must not download rotki, require the
   untracked source cache, or invoke oracle generation while committed golden
   fixtures are present.

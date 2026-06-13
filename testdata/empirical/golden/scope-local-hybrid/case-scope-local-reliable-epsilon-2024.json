@@ -36,33 +36,37 @@
       "case_id": "case-scope-local-reliable-epsilon-2024",
       "method": "scope_local_hybrid",
       "activity_source_ids": [
+        "emp-act-000041",
+        "emp-act-000042",
         "emp-act-000091",
         "emp-act-000092",
-        "emp-act-000093",
-        "emp-act-000095"
+        "emp-act-000094"
       ],
-      "reason": "Scope-local hybrid match provenance remains project composition only in the repository-controlled composite boundary",
+      "reason": "Hybrid lifecycle composition remains project-owned outside the repository-controlled composite scope slice",
       "comparison_policy": "project_composition_only"
     }
   ],
   "metadata": {
     "oracle_name": "scope_local_hybrid_composite",
-    "source_url": "https://github.com/rotki/rotki",
+    "source_url": "https://github.com/rotki/rotki/archive/refs/tags/v1.43.1.tar.gz",
+    "source_checksum": "sha256:8434b653104f8d5b0638e98d88a5ef256fac7720cc459eb33b729e2848900e3b",
     "version_or_commit": "a2e00be49a0ea36e7563a5d235cfa6a7c91edbfb",
     "adapter_arguments": [
-      "--boundary",
-      "testdata/empirical/rotki/bootstrap-boundary.json",
+      "--source-root",
+      ".cache/empiricaloracle/rotki-source/rotki-1.43.1",
       "--input",
-      "testdata/empirical/rotki/scope-local-hybrid/case-scope-local-reliable-epsilon-2024.json",
+      ".cache/empiricaloracle/oracle-inputs/scope-local-hybrid/case-scope-local-reliable-epsilon-2024.json",
+      "--rotki-method",
+      "average_cost",
       "--method",
       "scope_local_hybrid"
     ],
     "adapter_constraints": [
-      "Composite oracle input with repository-controlled arithmetic baseline",
-      "Scope-local routing and lifecycle assertions remain project-owned"
+      "Verified pinned rotki source archive execution from an untracked project-local cache",
+      "Scope-local routing and lifecycle assertions remain documented project-owned composition rules"
     ],
     "dataset_input_hash": "sha256:6287f862061b1f51d795694ab768b1927ff4422cc94b10a7ef053b45ef581042",
-    "external_oracle_input_hash": "sha256:695c5bf3fe102754bde46af18cedcc0caee086629eda305fc9d8f36a0ba075cf",
+    "external_oracle_input_hash": "sha256:32cda2bd8c7d3d50b8f4170a3be2fae3281d845fe9277cbe146d6c84f78123e7",
     "decimal_policy": "scale=16,rounding=half_up",
     "normalization_version": "1",
     "composite_rule_version": "scope_local_hybrid_composite_v1",
@@ -72,6 +76,6 @@
       "realized_gain_or_loss": "0"
     },
     "tolerance_notes": {},
-    "oracle_output_hash": "sha256:a7b92f8323506e55ffed74df749db71e34d11b2d205b089fe5886fad4783daf2"
+    "oracle_output_hash": "sha256:3f0f45da432571095f66b710a25c559f2f372545e8c8d4e0709bbb4574d5ff07"
   }
 }

@@ -156,6 +156,7 @@ type OracleGenerationRun struct {
 	RunID                   string            `json:"run_id,omitempty" yaml:"run_id,omitempty"`
 	OracleName              string            `json:"oracle_name" yaml:"oracle_name"`
 	SourceURL               string            `json:"source_url" yaml:"source_url"`
+	SourceChecksum          string            `json:"source_checksum" yaml:"source_checksum"`
 	VersionOrCommit         string            `json:"version_or_commit" yaml:"version_or_commit"`
 	AdapterArguments        []string          `json:"adapter_arguments" yaml:"adapter_arguments"`
 	AdapterConstraints      []string          `json:"adapter_constraints" yaml:"adapter_constraints"`

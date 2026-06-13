@@ -1,64 +1,57 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path"
-	"path/filepath"
 	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/empirical/fixture"
+	"github.com/cockroachdb/apd/v3"
 )
 
-const (
-	rotkiBoundaryRootRepositoryPath     = "testdata/empirical/rotki"
-	rotkiBoundaryManifestRepositoryPath = "testdata/empirical/rotki/bootstrap-boundary.json"
-	rotkiBoundaryReadmeRepositoryPath   = "third_party/rotki/README.md"
-	rotkiBoundaryLicenseRepositoryPath  = "third_party/rotki/LICENSE.md"
-	defaultCompositeRuleVersion         = "scope_local_hybrid_composite_v1"
-	defaultPureOracleName               = "rotki"
-	defaultHybridCompositeOracleName    = "scope_local_hybrid_composite"
-	defaultRotkiSourceURL               = "https://github.com/rotki/rotki"
-	defaultRotkiVersionOrCommit         = "a2e00be49a0ea36e7563a5d235cfa6a7c91edbfb"
-)
+const rotkiOracleInputRootRepositoryPath = ".cache/empiricaloracle/oracle-inputs"
 
-// boundaryOracleInput stores one repository-controlled normalization input used
-// to build one golden oracle fixture without requiring a local rotki install in
-// this checkout.
+// rotkiOracleActivityInput stores one generated adapter activity row.
 // Authored by: OpenCode
-type boundaryOracleInput struct {
-	CaseID               string                          `json:"case_id"`
-	Method               reportmodel.CostBasisMethod     `json:"method"`
-	Year                 int                             `json:"year"`
-	AssetIdentityKey     string                          `json:"asset_identity_key"`
-	OracleName           string                          `json:"oracle_name"`
-	SourceURL            string                          `json:"source_url"`
-	VersionOrCommit      string                          `json:"version_or_commit"`
-	AdapterArguments     []string                        `json:"adapter_arguments"`
-	AdapterConstraints   []string                        `json:"adapter_constraints"`
-	CompositeRuleVersion string                          `json:"composite_rule_version,omitempty"`
-	Values               comparableOutputValuesInput     `json:"values"`
-	Matches              []oracleMatchEvidenceInput      `json:"matches"`
-	UnsupportedSegments  []unsupportedOracleSegmentInput `json:"unsupported_segments"`
-	FinancialTolerances  map[string]string               `json:"financial_tolerances"`
-	ToleranceNotes       map[string]string               `json:"tolerance_notes"`
+type rotkiOracleActivityInput struct {
+	SourceID           string                  `json:"source_id"`
+	OccurredAt         string                  `json:"occurred_at"`
+	DeterministicOrder int                     `json:"deterministic_order"`
+	ActivityType       string                  `json:"activity_type"`
+	AssetIdentityKey   string                  `json:"asset_identity_key"`
+	AssetSymbol        string                  `json:"asset_symbol"`
+	Quantity           string                  `json:"quantity"`
+	GrossValue         string                  `json:"gross_value,omitempty"`
+	FeeAmount          string                  `json:"fee_amount,omitempty"`
+	SourceScope        *fixture.EmpiricalScope `json:"source_scope,omitempty"`
 }
 
-// rotkiBoundaryManifest stores the repository-controlled bootstrap manifest
-// metadata required by boundary verification.
+// rotkiOracleInput stores one deterministic generated adapter input written to
+// the repository-local untracked cache before rotki execution.
 // Authored by: OpenCode
-type rotkiBoundaryManifest struct {
-	Dataset struct {
-		Path   string `json:"path"`
-		SHA256 string `json:"sha256"`
-	} `json:"dataset"`
+type rotkiOracleInput struct {
+	CaseID                      string                      `json:"case_id"`
+	Method                      reportmodel.CostBasisMethod `json:"method"`
+	RotkiMethod                 string                      `json:"rotki_method"`
+	Year                        int                         `json:"year"`
+	AssetIdentityKey            string                      `json:"asset_identity_key"`
+	ComparisonActivitySourceIDs []string                    `json:"comparison_activity_source_ids"`
+	Activities                  []rotkiOracleActivityInput  `json:"activities"`
+}
+
+// rotkiOracleCapture stores the direct adapter JSON result before fixture
+// normalization applies the shared validation contract.
+// Authored by: OpenCode
+type rotkiOracleCapture struct {
+	Values  comparableOutputValuesInput `json:"values"`
+	Matches []oracleMatchEvidenceInput  `json:"matches"`
 }
 
 // isRepositoryControlledBoundaryMethod reports whether fixture regeneration for
-// the method should use repository-controlled boundary inputs instead of the
-// retained hledger execution path.
+// the method should use the rotki source boundary instead of hledger.
 // Authored by: OpenCode
 func isRepositoryControlledBoundaryMethod(method reportmodel.CostBasisMethod) bool {
 	switch method {
@@ -73,154 +66,66 @@ func isRepositoryControlledBoundaryMethod(method reportmodel.CostBasisMethod) bo
 	}
 }
 
-// verifyRotkiBoundaryMaterials checks that the repository-controlled rotki
-// boundary files required by BUG-001 are present before regeneration uses them.
+// isRotkiPureMethod reports whether one method maps directly to a rotki
+// cost-basis method.
 // Authored by: OpenCode
-func verifyRotkiBoundaryMaterials(repositoryRoot string, dataset fixture.EmpiricalDataset) error {
-	var requiredRepositoryPaths = []string{
-		rotkiBoundaryReadmeRepositoryPath,
-		rotkiBoundaryLicenseRepositoryPath,
-		rotkiBoundaryManifestRepositoryPath,
+func isRotkiPureMethod(method reportmodel.CostBasisMethod) bool {
+	switch method {
+	case reportmodel.CostBasisMethodFIFO,
+		reportmodel.CostBasisMethodLIFO,
+		reportmodel.CostBasisMethodHIFO,
+		reportmodel.CostBasisMethodAverageCost:
+		return true
+	default:
+		return false
 	}
-	var index int
-	for index = range requiredRepositoryPaths {
-		var filesystemPath = filepath.Join(repositoryRoot, filepath.FromSlash(requiredRepositoryPaths[index]))
-		if _, err := os.Stat(filesystemPath); err != nil {
-			if os.IsNotExist(err) {
-				return fmt.Errorf("repository-controlled rotki boundary is missing required file %s", requiredRepositoryPaths[index])
-			}
-			return fmt.Errorf("stat repository-controlled rotki boundary file %s: %w", requiredRepositoryPaths[index], err)
-		}
-	}
-
-	var manifestPath = filepath.Join(repositoryRoot, filepath.FromSlash(rotkiBoundaryManifestRepositoryPath))
-	var rawManifest, err = os.ReadFile(manifestPath)
-	if err != nil {
-		return fmt.Errorf("read repository-controlled rotki boundary manifest: %w", err)
-	}
-	var manifest rotkiBoundaryManifest
-	if err = json.Unmarshal(rawManifest, &manifest); err != nil {
-		return fmt.Errorf("decode repository-controlled rotki boundary manifest: %w", err)
-	}
-	if strings.TrimSpace(manifest.Dataset.Path) == "" || strings.TrimSpace(manifest.Dataset.SHA256) == "" {
-		return fmt.Errorf("repository-controlled rotki boundary manifest must record dataset path and sha256")
-	}
-	var manifestDatasetPath = filepath.Join(repositoryRoot, filepath.FromSlash(strings.TrimSpace(manifest.Dataset.Path)))
-	var rawDataset []byte
-	rawDataset, err = os.ReadFile(manifestDatasetPath)
-	if err != nil {
-		return fmt.Errorf("read manifest dataset %s: %w", manifest.Dataset.Path, err)
-	}
-	var actualDatasetHash = strings.TrimPrefix(stablePrefixedSHA256Hash(rawDataset), "sha256:")
-	if strings.TrimSpace(manifest.Dataset.SHA256) != actualDatasetHash {
-		return fmt.Errorf("repository-controlled rotki boundary manifest dataset sha256 mismatch: expected %s got %s", strings.TrimSpace(manifest.Dataset.SHA256), actualDatasetHash)
-	}
-
-	var caseIndex int
-	for caseIndex = range dataset.Cases {
-		var empiricalCase = dataset.Cases[caseIndex]
-		if empiricalCase.OracleSupport == fixture.OracleSupportUnsupported {
-			continue
-		}
-
-		var methodIndex int
-		for methodIndex = range empiricalCase.Methods {
-			var method = empiricalCase.Methods[methodIndex]
-			if !isRepositoryControlledBoundaryMethod(method) {
-				continue
-			}
-
-			var assetIndex int
-			for assetIndex = range empiricalCase.AssetIdentityKeys {
-				var relativePath = boundaryOracleInputRelativePath(empiricalCase, method, empiricalCase.AssetIdentityKeys[assetIndex])
-				var filesystemPath = filepath.Join(repositoryRoot, filepath.FromSlash(relativePath))
-				if _, err := os.Stat(filesystemPath); err != nil {
-					if os.IsNotExist(err) {
-						return fmt.Errorf("repository-controlled rotki boundary input is missing: %s", relativePath)
-					}
-					return fmt.Errorf("stat repository-controlled rotki boundary input %s: %w", relativePath, err)
-				}
-			}
-		}
-	}
-
-	return nil
 }
 
-// loadBoundaryOracleInput reads one repository-controlled normalization input.
+// buildRotkiOracleOutputForAsset generates one pure-method oracle fixture from
+// deterministic adapter input plus verified pinned rotki source execution.
 // Authored by: OpenCode
-func loadBoundaryOracleInput(repositoryRoot string, empiricalCase fixture.EmpiricalCase, method reportmodel.CostBasisMethod, assetIdentityKey string) (boundaryOracleInput, string, []byte, error) {
-	var relativePath = boundaryOracleInputRelativePath(empiricalCase, method, assetIdentityKey)
-	var filesystemPath = filepath.Join(repositoryRoot, filepath.FromSlash(relativePath))
-	var rawContent, err = os.ReadFile(filesystemPath)
-	if err != nil {
-		return boundaryOracleInput{}, "", nil, fmt.Errorf("read repository-controlled boundary input %s: %w", relativePath, err)
-	}
-
-	var input boundaryOracleInput
-	if err = json.Unmarshal(rawContent, &input); err != nil {
-		return boundaryOracleInput{}, "", nil, fmt.Errorf("decode repository-controlled boundary input %s: %w", relativePath, err)
-	}
-
-	if strings.TrimSpace(input.CaseID) == "" || input.Method == "" || input.Year <= 0 || strings.TrimSpace(input.AssetIdentityKey) == "" {
-		return boundaryOracleInput{}, "", nil, fmt.Errorf("repository-controlled boundary input %s is missing required identity fields", relativePath)
-	}
-
-	return input, relativePath, rawContent, nil
-}
-
-// boundaryOracleInputRelativePath returns the repository-relative normalization
-// input path for one case, method, and asset.
-// Authored by: OpenCode
-func boundaryOracleInputRelativePath(empiricalCase fixture.EmpiricalCase, method reportmodel.CostBasisMethod, assetIdentityKey string) string {
-	var baseName = strings.TrimSpace(empiricalCase.CaseID)
-	if len(empiricalCase.AssetIdentityKeys) > 1 {
-		baseName += "--" + strings.TrimSpace(assetIdentityKey)
-	}
-
-	return path.Join(rotkiBoundaryRootRepositoryPath, method.FilenameSlug(), baseName+".json")
-}
-
-// buildBoundaryOracleOutputForAsset converts one repository-controlled boundary
-// input into one normalized oracle fixture.
-// Authored by: OpenCode
-func buildBoundaryOracleOutputForAsset(
+func buildRotkiOracleOutputForAsset(
+	ctx context.Context,
+	runtime rotkiSourceRuntime,
+	repositoryRoot string,
 	dataset fixture.EmpiricalDataset,
 	datasetInputHash string,
 	empiricalCase fixture.EmpiricalCase,
 	method reportmodel.CostBasisMethod,
 	assetIdentityKey string,
-	input boundaryOracleInput,
-	inputRelativePath string,
-	rawInput []byte,
 ) (fixture.OracleOutput, error) {
-	var oracleName = strings.TrimSpace(input.OracleName)
-	if oracleName == "" {
-		oracleName = defaultPureOracleName
-		if method == reportmodel.CostBasisMethodScopeLocalHybrid {
-			oracleName = defaultHybridCompositeOracleName
-		}
+	var _, inputRelativePath, rawInput, err = buildRotkiOracleInput(empiricalCase, method, assetIdentityKey, selectRotkiOracleActivities(dataset, empiricalCase, assetIdentityKey), false)
+	if err != nil {
+		return fixture.OracleOutput{}, err
 	}
-	var sourceURL = strings.TrimSpace(input.SourceURL)
-	if sourceURL == "" {
-		sourceURL = defaultRotkiSourceURL
-	}
-	var versionOrCommit = strings.TrimSpace(input.VersionOrCommit)
-	if versionOrCommit == "" {
-		versionOrCommit = defaultRotkiVersionOrCommit
-	}
-	var adapterArguments = copyStringSlice(input.AdapterArguments)
-	if len(adapterArguments) == 0 {
-		adapterArguments = []string{"--boundary", rotkiBoundaryManifestRepositoryPath, "--input", inputRelativePath, "--method", method.FilenameSlug()}
-	}
-	var adapterConstraints = copyStringSlice(input.AdapterConstraints)
-	if len(adapterConstraints) == 0 {
-		adapterConstraints = []string{"repository-controlled normalization input"}
+	if _, err = writeArtifact(repositoryRoot, inputRelativePath, rawInput, true); err != nil {
+		return fixture.OracleOutput{}, fmt.Errorf("write generated rotki adapter input %s: %w", inputRelativePath, err)
 	}
 
-	var compositeRuleVersion = strings.TrimSpace(input.CompositeRuleVersion)
-	if method == reportmodel.CostBasisMethodScopeLocalHybrid && compositeRuleVersion == "" {
-		compositeRuleVersion = defaultCompositeRuleVersion
+	var capture rotkiOracleCapture
+	var verifiedSource verifiedRotkiSource
+	capture, _, verifiedSource, err = runtime.captureOracleOutput(ctx, inputRelativePath, rotkiMethodForCase(method))
+	if err != nil {
+		return fixture.OracleOutput{}, err
+	}
+	capture, err = roundRotkiOracleCapture(capture)
+	if err != nil {
+		return fixture.OracleOutput{}, fmt.Errorf("round rotki oracle capture for case %s method %s asset %s: %w", empiricalCase.CaseID, method, assetIdentityKey, err)
+	}
+
+	var matches = capture.Matches
+	var adapterConstraints = []string{
+		"Verified pinned rotki source archive execution from an untracked project-local cache",
+		"Zero-priced holding reductions are excluded from external-oracle fixture generation",
+	}
+	var unsupportedSegments []unsupportedOracleSegmentInput
+	if method == reportmodel.CostBasisMethodAverageCost {
+		adapterConstraints = []string{
+			"Verified pinned rotki source archive execution from an untracked project-local cache",
+			"Average-cost comparison is limited to aggregate values until project-compatible pool provenance exists",
+		}
+		matches = nil
+		unsupportedSegments = buildAverageCostUnsupportedSegments(dataset, empiricalCase, assetIdentityKey)
 	}
 
 	return normalizeOracleOutput(oracleOutputNormalizationInput{
@@ -229,21 +134,376 @@ func buildBoundaryOracleOutputForAsset(
 		Method:              method,
 		Year:                empiricalCase.Year,
 		AssetIdentityKey:    strings.TrimSpace(assetIdentityKey),
-		Values:              input.Values,
-		Matches:             input.Matches,
-		UnsupportedSegments: input.UnsupportedSegments,
+		Values:              capture.Values,
+		Matches:             matches,
+		UnsupportedSegments: unsupportedSegments,
 		Metadata: oracleGenerationMetadataInput{
-			OracleName:              oracleName,
-			SourceURL:               sourceURL,
-			VersionOrCommit:         versionOrCommit,
-			AdapterArguments:        adapterArguments,
+			OracleName:              defaultRotkiPureOracleName,
+			SourceURL:               verifiedSource.SourceURL,
+			SourceChecksum:          verifiedSource.SourceChecksum,
+			VersionOrCommit:         verifiedSource.VersionOrCommit,
+			AdapterArguments:        buildRotkiAdapterArguments(inputRelativePath, method, verifiedSource.SourceRootRelativePath),
 			AdapterConstraints:      adapterConstraints,
 			DatasetInputHash:        strings.TrimSpace(datasetInputHash),
 			ExternalOracleInputHash: stablePrefixedSHA256Hash(rawInput),
 			DecimalPolicy:           oracleDecimalPolicy,
-			CompositeRuleVersion:    compositeRuleVersion,
-			FinancialTolerances:     copyStringMap(input.FinancialTolerances),
-			ToleranceNotes:          copyStringMap(input.ToleranceNotes),
+			FinancialTolerances:     map[string]string{"realized_gain_or_loss": "0", "allocated_basis": "0", "closing_basis": "0"},
+			ToleranceNotes:          map[string]string{},
 		},
 	})
+}
+
+// buildRotkiCompositeOracleOutputForAsset generates one scope-local hybrid
+// composite fixture from rotki ACB arithmetic plus project-owned scope semantics.
+// Authored by: OpenCode
+func buildRotkiCompositeOracleOutputForAsset(
+	ctx context.Context,
+	runtime rotkiSourceRuntime,
+	repositoryRoot string,
+	dataset fixture.EmpiricalDataset,
+	datasetInputHash string,
+	empiricalCase fixture.EmpiricalCase,
+	assetIdentityKey string,
+) (fixture.OracleOutput, error) {
+	var activities = selectRotkiOracleActivities(dataset, empiricalCase, assetIdentityKey)
+	var _, inputRelativePath, rawInput, err = buildRotkiOracleInput(empiricalCase, reportmodel.CostBasisMethodScopeLocalHybrid, assetIdentityKey, activities, true)
+	if err != nil {
+		return fixture.OracleOutput{}, err
+	}
+	if _, err = writeArtifact(repositoryRoot, inputRelativePath, rawInput, true); err != nil {
+		return fixture.OracleOutput{}, fmt.Errorf("write generated scope-local hybrid adapter input %s: %w", inputRelativePath, err)
+	}
+
+	var capture rotkiOracleCapture
+	var verifiedSource verifiedRotkiSource
+	capture, _, verifiedSource, err = runtime.captureOracleOutput(ctx, inputRelativePath, reportMethod("average_cost"))
+	if err != nil {
+		return fixture.OracleOutput{}, err
+	}
+	capture, err = roundRotkiOracleCapture(capture)
+	if err != nil {
+		return fixture.OracleOutput{}, fmt.Errorf("round rotki composite capture for case %s asset %s: %w", empiricalCase.CaseID, assetIdentityKey, err)
+	}
+
+	return normalizeOracleOutput(oracleOutputNormalizationInput{
+		DatasetVersion:      strings.TrimSpace(dataset.DatasetVersion),
+		CaseID:              strings.TrimSpace(empiricalCase.CaseID),
+		Method:              reportmodel.CostBasisMethodScopeLocalHybrid,
+		Year:                empiricalCase.Year,
+		AssetIdentityKey:    strings.TrimSpace(assetIdentityKey),
+		Values:              capture.Values,
+		Matches:             capture.Matches,
+		UnsupportedSegments: buildUnsupportedSegments(dataset, empiricalCase, reportmodel.CostBasisMethodScopeLocalHybrid, assetIdentityKey, nil, capture.Matches),
+		Metadata: oracleGenerationMetadataInput{
+			OracleName:              defaultRotkiHybridCompositeOracleName,
+			SourceURL:               verifiedSource.SourceURL,
+			SourceChecksum:          verifiedSource.SourceChecksum,
+			VersionOrCommit:         verifiedSource.VersionOrCommit,
+			AdapterArguments:        buildRotkiAdapterArguments(inputRelativePath, reportmodel.CostBasisMethodScopeLocalHybrid, verifiedSource.SourceRootRelativePath),
+			AdapterConstraints:      []string{"Verified pinned rotki source archive execution from an untracked project-local cache", "Scope-local routing and lifecycle assertions remain documented project-owned composition rules"},
+			DatasetInputHash:        strings.TrimSpace(datasetInputHash),
+			ExternalOracleInputHash: stablePrefixedSHA256Hash(rawInput),
+			DecimalPolicy:           oracleDecimalPolicy,
+			CompositeRuleVersion:    defaultRotkiCompositeRuleVersion,
+			FinancialTolerances:     map[string]string{"realized_gain_or_loss": "0", "allocated_basis": "0", "closing_basis": "0"},
+			ToleranceNotes:          map[string]string{},
+		},
+	})
+}
+
+// buildRotkiOracleInput renders one deterministic untracked adapter input.
+// Authored by: OpenCode
+func buildRotkiOracleInput(
+	empiricalCase fixture.EmpiricalCase,
+	method reportmodel.CostBasisMethod,
+	assetIdentityKey string,
+	activities []fixture.EmpiricalActivity,
+	composite bool,
+) (rotkiOracleInput, string, []byte, error) {
+	var activityInputs = make([]rotkiOracleActivityInput, 0, len(activities))
+	var activityIndex int
+	for activityIndex = range activities {
+		activityInputs = append(activityInputs, rotkiOracleActivityInput{
+			SourceID:           strings.TrimSpace(activities[activityIndex].SourceID),
+			OccurredAt:         strings.TrimSpace(activities[activityIndex].OccurredAt),
+			DeterministicOrder: activities[activityIndex].DeterministicOrder,
+			ActivityType:       string(activities[activityIndex].ActivityType),
+			AssetIdentityKey:   strings.TrimSpace(activities[activityIndex].AssetIdentityKey),
+			AssetSymbol:        strings.TrimSpace(activities[activityIndex].AssetSymbol),
+			Quantity:           strings.TrimSpace(activities[activityIndex].Quantity),
+			GrossValue:         strings.TrimSpace(activities[activityIndex].GrossValue),
+			FeeAmount:          strings.TrimSpace(activities[activityIndex].FeeAmount),
+			SourceScope:        activities[activityIndex].SourceScope,
+		})
+	}
+
+	var input = rotkiOracleInput{
+		CaseID:                      strings.TrimSpace(empiricalCase.CaseID),
+		Method:                      method,
+		RotkiMethod:                 string(rotkiMethodForCase(method)),
+		Year:                        empiricalCase.Year,
+		AssetIdentityKey:            strings.TrimSpace(assetIdentityKey),
+		ComparisonActivitySourceIDs: comparisonSourceIDsForCaseActivities(empiricalCase, assetIdentityKey, activities),
+		Activities:                  activityInputs,
+	}
+	if composite {
+		input.RotkiMethod = "average_cost"
+	}
+
+	var rawInput, err = json.MarshalIndent(input, "", "  ")
+	if err != nil {
+		return rotkiOracleInput{}, "", nil, fmt.Errorf("marshal generated rotki adapter input: %w", err)
+	}
+
+	return input, generatedRotkiOracleInputRelativePath(method, empiricalCase, assetIdentityKey), append(rawInput, '\n'), nil
+}
+
+// selectRotkiOracleActivities chooses the deterministic activity history that
+// feeds one generated rotki adapter input.
+// Authored by: OpenCode
+func selectRotkiOracleActivities(dataset fixture.EmpiricalDataset, empiricalCase fixture.EmpiricalCase, assetIdentityKey string) []fixture.EmpiricalActivity {
+	var latestSelectedYearActivity *fixture.EmpiricalActivity
+	var activitiesBySourceID = datasetActivitiesBySourceID(dataset)
+	var sourceIndex int
+	for sourceIndex = range empiricalCase.ActivitySourceIDs {
+		var activity, found = activitiesBySourceID[strings.TrimSpace(empiricalCase.ActivitySourceIDs[sourceIndex])]
+		if !found {
+			continue
+		}
+		if strings.TrimSpace(activity.AssetIdentityKey) != strings.TrimSpace(assetIdentityKey) {
+			continue
+		}
+		if activityYear(activity) != empiricalCase.Year {
+			continue
+		}
+		if latestSelectedYearActivity == nil || compareJournalActivities(activity, *latestSelectedYearActivity) > 0 {
+			var copiedActivity = activity
+			latestSelectedYearActivity = &copiedActivity
+		}
+	}
+
+	var selected = make([]fixture.EmpiricalActivity, 0)
+	var activityIndex int
+	for activityIndex = range dataset.Activities {
+		var activity = dataset.Activities[activityIndex]
+		if strings.TrimSpace(activity.AssetIdentityKey) != strings.TrimSpace(assetIdentityKey) {
+			continue
+		}
+		var year = activityYear(activity)
+		if year < empiricalCase.Year {
+			selected = append(selected, activity)
+			continue
+		}
+		if year > empiricalCase.Year || latestSelectedYearActivity == nil {
+			continue
+		}
+		if compareJournalActivities(activity, *latestSelectedYearActivity) <= 0 {
+			selected = append(selected, activity)
+		}
+	}
+
+	return selected
+}
+
+// comparisonSourceIDsForCaseActivities returns the selected-year comparison slice
+// passed into the generated adapter input.
+// Authored by: OpenCode
+func comparisonSourceIDsForCaseActivities(empiricalCase fixture.EmpiricalCase, assetIdentityKey string, activities []fixture.EmpiricalActivity) []string {
+	var selectedSourceIDs = make(map[string]struct{}, len(activities))
+	var activityIndex int
+	for activityIndex = range activities {
+		selectedSourceIDs[strings.TrimSpace(activities[activityIndex].SourceID)] = struct{}{}
+	}
+
+	var comparisonSourceIDs = make([]string, 0)
+	var sourceIndex int
+	for sourceIndex = range empiricalCase.ActivitySourceIDs {
+		var sourceID = strings.TrimSpace(empiricalCase.ActivitySourceIDs[sourceIndex])
+		if sourceID == "" {
+			continue
+		}
+		if _, found := selectedSourceIDs[sourceID]; !found {
+			continue
+		}
+		comparisonSourceIDs = append(comparisonSourceIDs, sourceID)
+	}
+
+	return comparisonSourceIDs
+}
+
+// generatedRotkiOracleInputRelativePath returns one repository-relative cache
+// path for the generated adapter input.
+// Authored by: OpenCode
+func generatedRotkiOracleInputRelativePath(empiricalCaseMethod reportmodel.CostBasisMethod, empiricalCase fixture.EmpiricalCase, assetIdentityKey string) string {
+	var baseName = strings.TrimSpace(empiricalCase.CaseID)
+	if len(empiricalCase.AssetIdentityKeys) > 1 {
+		baseName += "--" + strings.TrimSpace(assetIdentityKey)
+	}
+
+	return path.Join(rotkiOracleInputRootRepositoryPath, empiricalCaseMethod.FilenameSlug(), baseName+".json")
+}
+
+// buildRotkiAdapterArguments records the deterministic adapter arguments used by
+// one fixture regeneration run.
+// Authored by: OpenCode
+func buildRotkiAdapterArguments(inputRelativePath string, method reportmodel.CostBasisMethod, sourceRootRelativePath string) []string {
+	var rotkiMethod = string(rotkiMethodForCase(method))
+	if method == reportmodel.CostBasisMethodScopeLocalHybrid {
+		rotkiMethod = "average_cost"
+	}
+
+	return []string{
+		"--source-root",
+		sourceRootRelativePath,
+		"--input",
+		inputRelativePath,
+		"--rotki-method",
+		rotkiMethod,
+		"--method",
+		string(method),
+	}
+}
+
+// rotkiMethodForCase maps one project method to the adapter's direct rotki
+// method selector.
+// Authored by: OpenCode
+func rotkiMethodForCase(method reportmodel.CostBasisMethod) reportMethod {
+	switch method {
+	case reportmodel.CostBasisMethodFIFO:
+		return reportMethod("fifo")
+	case reportmodel.CostBasisMethodLIFO:
+		return reportMethod("lifo")
+	case reportmodel.CostBasisMethodHIFO:
+		return reportMethod("hifo")
+	default:
+		return reportMethod("average_cost")
+	}
+}
+
+// buildAverageCostUnsupportedSegments records the aggregate-only unsupported
+// pool provenance for average-cost fixtures.
+// Authored by: OpenCode
+func buildAverageCostUnsupportedSegments(
+	dataset fixture.EmpiricalDataset,
+	empiricalCase fixture.EmpiricalCase,
+	assetIdentityKey string,
+) []unsupportedOracleSegmentInput {
+	var relevantSellSourceIDs = make([]string, 0)
+	var activitiesBySourceID = datasetActivitiesBySourceID(dataset)
+	var sourceIndex int
+	for sourceIndex = range empiricalCase.ActivitySourceIDs {
+		var sourceID = strings.TrimSpace(empiricalCase.ActivitySourceIDs[sourceIndex])
+		var activity, found = activitiesBySourceID[sourceID]
+		if !found {
+			continue
+		}
+		if strings.TrimSpace(activity.AssetIdentityKey) != strings.TrimSpace(assetIdentityKey) {
+			continue
+		}
+		if activityYear(activity) != empiricalCase.Year {
+			continue
+		}
+		if strings.TrimSpace(string(activity.ActivityType)) != "SELL" {
+			continue
+		}
+		relevantSellSourceIDs = append(relevantSellSourceIDs, sourceID)
+	}
+
+	if len(relevantSellSourceIDs) == 0 {
+		return nil
+	}
+
+	return []unsupportedOracleSegmentInput{{
+		CaseID:            strings.TrimSpace(empiricalCase.CaseID),
+		Method:            reportmodel.CostBasisMethodAverageCost,
+		ActivitySourceIDs: relevantSellSourceIDs,
+		Reason:            "Average-cost pool provenance remains outside the verified rotki aggregate oracle boundary",
+		ComparisonPolicy:  fixture.ComparisonPolicySkipExternalOracle,
+	}}
+}
+
+// activityYear parses one empirical activity year from its persisted timestamp.
+// Authored by: OpenCode
+func activityYear(activity fixture.EmpiricalActivity) int {
+	var occurredAt = strings.TrimSpace(activity.OccurredAt)
+	if len(occurredAt) < 4 {
+		return 0
+	}
+
+	var year int
+	_, _ = fmt.Sscanf(occurredAt[:4], "%d", &year)
+	return year
+}
+
+// roundRotkiOracleCapture aligns raw adapter decimals to the repository report
+// decimal policy before fixture normalization persists them.
+// Authored by: OpenCode
+func roundRotkiOracleCapture(capture rotkiOracleCapture) (rotkiOracleCapture, error) {
+	var err error
+	capture.Values.RealizedGainOrLoss, err = roundRotkiDecimalString(capture.Values.RealizedGainOrLoss)
+	if err != nil {
+		return rotkiOracleCapture{}, fmt.Errorf("round realized_gain_or_loss: %w", err)
+	}
+	capture.Values.AllocatedBasis, err = roundRotkiDecimalString(capture.Values.AllocatedBasis)
+	if err != nil {
+		return rotkiOracleCapture{}, fmt.Errorf("round allocated_basis: %w", err)
+	}
+	capture.Values.ClosingQuantity, err = roundRotkiDecimalString(capture.Values.ClosingQuantity)
+	if err != nil {
+		return rotkiOracleCapture{}, fmt.Errorf("round closing_quantity: %w", err)
+	}
+	capture.Values.ClosingBasis, err = roundRotkiDecimalString(capture.Values.ClosingBasis)
+	if err != nil {
+		return rotkiOracleCapture{}, fmt.Errorf("round closing_basis: %w", err)
+	}
+
+	var matchIndex int
+	for matchIndex = range capture.Matches {
+		capture.Matches[matchIndex].MatchedQuantity, err = roundRotkiDecimalString(capture.Matches[matchIndex].MatchedQuantity)
+		if err != nil {
+			return rotkiOracleCapture{}, fmt.Errorf("round match %d matched_quantity: %w", matchIndex, err)
+		}
+		capture.Matches[matchIndex].MatchedBasis, err = roundRotkiDecimalString(capture.Matches[matchIndex].MatchedBasis)
+		if err != nil {
+			return rotkiOracleCapture{}, fmt.Errorf("round match %d matched_basis: %w", matchIndex, err)
+		}
+		capture.Matches[matchIndex].MatchedProceeds, err = roundRotkiDecimalString(capture.Matches[matchIndex].MatchedProceeds)
+		if err != nil {
+			return rotkiOracleCapture{}, fmt.Errorf("round match %d matched_proceeds: %w", matchIndex, err)
+		}
+		capture.Matches[matchIndex].MatchedGainOrLoss, err = roundRotkiDecimalString(capture.Matches[matchIndex].MatchedGainOrLoss)
+		if err != nil {
+			return rotkiOracleCapture{}, fmt.Errorf("round match %d matched_gain_or_loss: %w", matchIndex, err)
+		}
+	}
+
+	return capture, nil
+}
+
+// roundRotkiDecimalString rounds one rotki decimal to the production 16-decimal
+// half-up policy and returns its canonical persisted representation.
+// Authored by: OpenCode
+func roundRotkiDecimalString(raw string) (string, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "", nil
+	}
+
+	var value apd.Decimal
+	if _, _, err := value.SetString(strings.TrimSpace(raw)); err != nil {
+		return "", fmt.Errorf("parse decimal value %q: %w", raw, err)
+	}
+
+	var rounded apd.Decimal
+	var context = apd.BaseContext.WithPrecision(200)
+	context.Rounding = apd.RoundHalfUp
+	if _, err := context.Quantize(&rounded, &value, -16); err != nil {
+		return "", fmt.Errorf("quantize decimal value %q to scale 16: %w", raw, err)
+	}
+
+	var canonical, err = fixture.CanonicalDecimalString(rounded)
+	if err != nil {
+		return "", fmt.Errorf("canonicalize rounded decimal value %q: %w", raw, err)
+	}
+
+	return canonical, nil
 }

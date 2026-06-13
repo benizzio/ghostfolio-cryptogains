@@ -1,8 +1,8 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/empirical/fixture"
@@ -12,32 +12,25 @@ import (
 // composite-boundary input into a normalized scope-local-hybrid oracle fixture.
 // Authored by: OpenCode
 func buildScopeLocalHybridCompositeOracleOutput(
+	ctx context.Context,
+	runtime rotkiSourceRuntime,
+	repositoryRoot string,
 	dataset fixture.EmpiricalDataset,
 	datasetInputHash string,
 	empiricalCase fixture.EmpiricalCase,
 	assetIdentityKey string,
-	input boundaryOracleInput,
-	inputRelativePath string,
-	rawInput []byte,
 ) (fixture.OracleOutput, error) {
-	if reportmodel.CostBasisMethodScopeLocalHybrid != input.Method {
-		return fixture.OracleOutput{}, fmt.Errorf("scope-local-hybrid composite input %s must declare method %s", inputRelativePath, reportmodel.CostBasisMethodScopeLocalHybrid)
-	}
-	if strings.TrimSpace(input.CompositeRuleVersion) == "" {
-		input.CompositeRuleVersion = defaultCompositeRuleVersion
-	}
-	if strings.TrimSpace(input.OracleName) == "" {
-		input.OracleName = defaultHybridCompositeOracleName
+	if !caseHasMethod(empiricalCase, reportmodel.CostBasisMethodScopeLocalHybrid) {
+		return fixture.OracleOutput{}, fmt.Errorf("scope-local-hybrid case %s must declare method %s", empiricalCase.CaseID, reportmodel.CostBasisMethodScopeLocalHybrid)
 	}
 
-	return buildBoundaryOracleOutputForAsset(
+	return buildRotkiCompositeOracleOutputForAsset(
+		ctx,
+		runtime,
+		repositoryRoot,
 		dataset,
 		datasetInputHash,
 		empiricalCase,
-		reportmodel.CostBasisMethodScopeLocalHybrid,
 		assetIdentityKey,
-		input,
-		inputRelativePath,
-		rawInput,
 	)
 }

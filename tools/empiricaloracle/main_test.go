@@ -14,9 +14,11 @@ func TestRunDoesNotRequireVendoredHledgerWhenGoldenFixturesExist(t *testing.T) {
 
 	var priorResolveVendoredHledgerCommand = resolveVendoredHledgerCommand
 	var priorCaptureVendoredHledgerVersion = captureVendoredHledgerVersion
+	var priorResolveRotkiSourceRuntime = resolveRotkiSourceRuntime
 	t.Cleanup(func() {
 		resolveVendoredHledgerCommand = priorResolveVendoredHledgerCommand
 		captureVendoredHledgerVersion = priorCaptureVendoredHledgerVersion
+		resolveRotkiSourceRuntime = priorResolveRotkiSourceRuntime
 	})
 
 	resolveVendoredHledgerCommand = func() (vendoredHledgerCommand, error) {
@@ -26,6 +28,10 @@ func TestRunDoesNotRequireVendoredHledgerWhenGoldenFixturesExist(t *testing.T) {
 	captureVendoredHledgerVersion = func(ctx context.Context, command vendoredHledgerCommand) (string, error) {
 		t.Fatal("expected default fixture-backed run path to skip vendored hledger version capture")
 		return "", nil
+	}
+	resolveRotkiSourceRuntime = func() (rotkiSourceRuntime, error) {
+		t.Fatal("expected default fixture-backed run path to skip verified rotki source resolution")
+		return rotkiSourceRuntime{}, nil
 	}
 
 	if err := run(nil, io.Discard); err != nil {

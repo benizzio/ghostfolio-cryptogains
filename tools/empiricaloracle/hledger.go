@@ -193,6 +193,7 @@ func buildOracleOutputForAsset(
 			RunID:                   "",
 			OracleName:              "hledger",
 			SourceURL:               "https://github.com/simonmichael/hledger",
+			SourceChecksum:          stablePrefixedSHA256Hash([]byte("https://github.com/simonmichael/hledger@" + strings.TrimSpace(hledgerVersion))),
 			VersionOrCommit:         strings.TrimSpace(hledgerVersion),
 			AdapterArguments:        oracleCommandProvenanceArguments(oracleData),
 			AdapterConstraints:      []string{"retained historical hledger boundary"},

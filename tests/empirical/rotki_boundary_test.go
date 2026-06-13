@@ -1,9 +1,6 @@
 package empirical
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,83 +9,84 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/tests/empirical/fixture"
 )
 
-// TestRepositoryControlledRotkiBoundaryArtifactsArePresent verifies BUG-001's
-// repository-controlled rotki boundary files exist, parse, and remain
-// synthetic-only.
+// TestRotkiBoundaryMetadataStaysRepositoryControlled verifies BUG-002 keeps only
+// pinned provenance metadata in the repository while raw oracle captures stay
+// out of version control.
 // Authored by: OpenCode
-func TestRepositoryControlledRotkiBoundaryArtifactsArePresent(t *testing.T) {
+func TestRotkiBoundaryMetadataStaysRepositoryControlled(t *testing.T) {
 	t.Parallel()
 
 	var repositoryRoot = empiricalRepositoryRoot(t)
-	var artifactPaths = []string{
+	var metadataPaths = []string{
 		"third_party/rotki/README.md",
 		"third_party/rotki/LICENSE.md",
-		"testdata/empirical/rotki/bootstrap-boundary.json",
-		"testdata/empirical/rotki/fifo/case-fifo-alpha-2024.json",
-		"testdata/empirical/rotki/lifo/case-lifo-beta-2024.json",
-		"testdata/empirical/rotki/hifo/case-hifo-gamma-2024.json",
-		"testdata/empirical/rotki/average-cost/case-average-cost-delta-2024.json",
-		"testdata/empirical/rotki/average-cost/case-average-cost-reset-delta-2024.json",
-		"testdata/empirical/rotki/average-cost/case-post-year-ignore-delta-2024.json",
-		"testdata/empirical/rotki/scope-local-hybrid/case-scope-local-reliable-epsilon-2024.json",
-		"testdata/empirical/rotki/scope-local-hybrid/case-scope-local-broadening-gamma-2024--asset-gamma.json",
-		"testdata/empirical/rotki/scope-local-hybrid/case-scope-local-broadening-gamma-2024--asset-delta.json",
-		"testdata/empirical/rotki/scope-local-hybrid/case-scope-local-reset-epsilon-2024.json",
+		"testdata/empirical/rotki/README.md",
 	}
 
 	var index int
-	var manifestPayload map[string]any
-	for index = range artifactPaths {
-		var filesystemPath = filepath.Join(repositoryRoot, filepath.FromSlash(artifactPaths[index]))
+	for index = range metadataPaths {
+		var filesystemPath = filepath.Join(repositoryRoot, filepath.FromSlash(metadataPaths[index]))
 		var rawContent, err = os.ReadFile(filesystemPath)
 		if err != nil {
-			t.Fatalf("read repository-controlled rotki boundary artifact %s: %v", artifactPaths[index], err)
+			t.Fatalf("read rotki boundary metadata %s: %v", metadataPaths[index], err)
 		}
 		if filepath.Base(filesystemPath) != "LICENSE.md" {
-			if err = fixture.ValidateSyntheticOnlyContent(artifactPaths[index], string(rawContent)); err != nil {
-				t.Fatalf("validate synthetic-only rotki boundary artifact %s: %v", artifactPaths[index], err)
+			if err = fixture.ValidateSyntheticOnlyContent(metadataPaths[index], string(rawContent)); err != nil {
+				t.Fatalf("validate synthetic-only rotki boundary metadata %s: %v", metadataPaths[index], err)
 			}
 		}
-		if filepath.Ext(filesystemPath) != ".json" {
+	}
+
+	var rotkiArtifactRoot = filepath.Join(repositoryRoot, filepath.FromSlash("testdata/empirical/rotki"))
+	var directoryEntries, err = os.ReadDir(rotkiArtifactRoot)
+	if err != nil {
+		t.Fatalf("read rotki metadata directory: %v", err)
+	}
+	for index = range directoryEntries {
+		if directoryEntries[index].IsDir() {
 			continue
 		}
-
-		var payload any
-		if err = json.Unmarshal(rawContent, &payload); err != nil {
-			t.Fatalf("decode repository-controlled rotki boundary artifact %s: %v", artifactPaths[index], err)
+		if directoryEntries[index].Name() == "README.md" {
+			continue
 		}
-		if artifactPaths[index] == "testdata/empirical/rotki/bootstrap-boundary.json" {
-			var ok bool
-			manifestPayload, ok = payload.(map[string]any)
-			if !ok {
-				t.Fatalf("unexpected manifest payload type: %T", payload)
-			}
-		}
-	}
-
-	var datasetPath = filepath.Join(repositoryRoot, "testdata/empirical/financial-dataset.yaml")
-	var rawDataset, err = os.ReadFile(datasetPath)
-	if err != nil {
-		t.Fatalf("read empirical dataset for manifest verification: %v", err)
-	}
-	var datasetSection, datasetSectionOK = manifestPayload["dataset"].(map[string]any)
-	if !datasetSectionOK {
-		t.Fatalf("rotki boundary manifest dataset section is missing or invalid: %#v", manifestPayload["dataset"])
-	}
-	var recordedHash, recordedHashOK = datasetSection["sha256"].(string)
-	if !recordedHashOK || strings.TrimSpace(recordedHash) == "" {
-		t.Fatalf("rotki boundary manifest dataset sha256 is missing: %#v", datasetSection)
-	}
-	var actualHash = strings.TrimPrefix(stableEmpiricalSHA256(rawDataset), "sha256:")
-	if recordedHash != actualHash {
-		t.Fatalf("rotki boundary manifest dataset sha256 mismatch: got %s want %s", recordedHash, actualHash)
+		t.Fatalf("committed raw rotki artifact %s must be removed after BUG-002", filepath.ToSlash(filepath.Join("testdata/empirical/rotki", directoryEntries[index].Name())))
 	}
 }
 
-// stableEmpiricalSHA256 returns the canonical prefixed SHA-256 text used by the
-// repository-controlled empirical boundary checks.
+// TestRotkiBoundaryRejectsVendoredSourceAndGlobalInstallAssumptions verifies
+// the repository keeps the verified rotki boundary in the untracked cache path
+// only and does not assume a developer-global rotki executable.
 // Authored by: OpenCode
-func stableEmpiricalSHA256(content []byte) string {
-	var sum = sha256.Sum256(content)
-	return "sha256:" + hex.EncodeToString(sum[:])
+func TestRotkiBoundaryRejectsVendoredSourceAndGlobalInstallAssumptions(t *testing.T) {
+	t.Parallel()
+
+	var repositoryRoot = empiricalRepositoryRoot(t)
+	var vendoredSourcePath = filepath.Join(repositoryRoot, filepath.FromSlash("third_party/rotki/source"))
+	if _, err := os.Stat(vendoredSourcePath); err == nil {
+		t.Fatalf("vendored rotki source must not exist at %s", filepath.ToSlash(vendoredSourcePath))
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat vendored rotki source path: %v", err)
+	}
+
+	var sourcePath = filepath.Join(repositoryRoot, filepath.FromSlash("tools/empiricaloracle/rotki_source.go"))
+	var rawSource, err = os.ReadFile(sourcePath)
+	if err != nil {
+		t.Fatalf("read rotki source runtime: %v", err)
+	}
+	var sourceText = string(rawSource)
+	if strings.Contains(sourceText, "LookPath(\"rotki\"") || strings.Contains(sourceText, "lookPath(\"rotki\"") {
+		t.Fatal("rotki regeneration must not depend on a developer-global rotki executable")
+	}
+	if !strings.Contains(sourceText, "python3") || !strings.Contains(sourceText, "python") {
+		t.Fatal("rotki regeneration must execute the project-owned Python adapter through a local Python runtime")
+	}
+
+	var gitignorePath = filepath.Join(repositoryRoot, ".gitignore")
+	var rawGitignore, readErr = os.ReadFile(gitignorePath)
+	if readErr != nil {
+		t.Fatalf("read .gitignore: %v", readErr)
+	}
+	if !strings.Contains(string(rawGitignore), ".cache/empiricaloracle/rotki-source/") {
+		t.Fatal("expected .gitignore to cover the untracked rotki source cache path")
+	}
 }
