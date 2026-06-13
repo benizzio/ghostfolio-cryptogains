@@ -15,7 +15,8 @@ import (
 
 const (
 	// DefaultEmpiricalArtifactRootRepositoryPath identifies the default repository-
-	// relative empirical artifact root shared by journals and golden fixtures.
+	// relative empirical artifact root shared by golden fixtures and generated
+	// oracle-input artifacts.
 	// Authored by: OpenCode
 	DefaultEmpiricalArtifactRootRepositoryPath = "testdata/empirical"
 
@@ -25,7 +26,8 @@ const (
 	MissingOracleFixtureGenerationEnvVar = "GHOSTFOLIO_CRYPTOGAINS_GENERATE_MISSING_FIXTURES"
 
 	// MissingOracleFixtureGenerationCommand documents the exact helper command
-	// used when absent fixtures are allowed to trigger generation.
+	// used when absent fixtures are allowed to trigger rotki or composite-oracle
+	// generation.
 	// Authored by: OpenCode
 	MissingOracleFixtureGenerationCommand = "go run ./tools/empiricaloracle"
 )
@@ -170,8 +172,8 @@ func ExpectedGoldenFixturePaths(outputRoot string, dataset EmpiricalDataset) []s
 //
 // The helper does nothing when every expected fixture already exists. When one
 // or more fixtures are absent, it either returns an actionable setup error or,
-// when `GHOSTFOLIO_CRYPTOGAINS_GENERATE_MISSING_FIXTURES=true`, runs
-// `go run ./tools/empiricaloracle` and rechecks only the absent fixture paths.
+// when `GHOSTFOLIO_CRYPTOGAINS_GENERATE_MISSING_FIXTURES=true`, runs the
+// repository-owned oracle generator and rechecks only the absent fixture paths.
 // Authored by: OpenCode
 func EnsureGoldenFixtures(ctx context.Context, repositoryRoot string, outputRoot string, dataset EmpiricalDataset) (OracleFixturePolicyResult, error) {
 	var expectedPaths = ExpectedGoldenFixturePaths(outputRoot, dataset)

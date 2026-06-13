@@ -107,7 +107,7 @@ func TestValidateSyntheticOnlyContentReturnsGroupedNonSecretError(t *testing.T) 
 		`owner_name: "John Doe"`,
 	}, "\n")
 
-	var err = ValidateSyntheticOnlyContent("testdata/empirical/hledger/fifo.journal", content)
+	var err = ValidateSyntheticOnlyContent("testdata/empirical/golden/fifo/case-alpha.json", content)
 
 	if err == nil {
 		t.Fatal("expected validation error, got nil")
@@ -120,7 +120,7 @@ func TestValidateSyntheticOnlyContentReturnsGroupedNonSecretError(t *testing.T) 
 
 	var message = err.Error()
 
-	if !strings.Contains(message, "testdata/empirical/hledger/fifo.journal failed synthetic-only content validation with 3 issue(s):") {
+	if !strings.Contains(message, "testdata/empirical/golden/fifo/case-alpha.json failed synthetic-only content validation with 3 issue(s):") {
 		t.Fatalf("expected grouped validation summary, got %q", message)
 	}
 

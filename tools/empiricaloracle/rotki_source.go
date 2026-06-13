@@ -87,7 +87,7 @@ func newRotkiSourceRuntime() (rotkiSourceRuntime, error) {
 		repositoryRoot:    repositoryRoot,
 		httpClient:        &http.Client{Timeout: 2 * time.Minute},
 		lookPath:          exec.LookPath,
-		runCombinedOutput: runVendoredHledgerCombinedOutput,
+		runCombinedOutput: runCombinedOutput,
 	}, nil
 }
 
@@ -151,7 +151,7 @@ func (runtime rotkiSourceRuntime) captureOracleOutput(
 
 	var runCommand = runtime.runCombinedOutput
 	if runCommand == nil {
-		runCommand = runVendoredHledgerCombinedOutput
+		runCommand = runCombinedOutput
 	}
 
 	var inputPath = filepath.Join(runtime.repositoryRoot, filepath.FromSlash(inputRelativePath))
@@ -383,7 +383,7 @@ func (runtime rotkiSourceRuntime) verifySourceArchiveChecksum() error {
 func (runtime rotkiSourceRuntime) verifyRemoteTagIdentity(ctx context.Context) error {
 	var runCommand = runtime.runCombinedOutput
 	if runCommand == nil {
-		runCommand = runVendoredHledgerCombinedOutput
+		runCommand = runCombinedOutput
 	}
 
 	var rawOutput, err = runCommand(

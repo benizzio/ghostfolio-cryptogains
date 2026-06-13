@@ -154,7 +154,7 @@ Fields:
 | `ledger_id` | string | Stable identifier for generated external-oracle input |
 | `method` | string | Cost-basis method or method family |
 | `case_ids` | string array | Dataset cases represented |
-| `external_oracle_input_path` | path | Repository path under `testdata/empirical/hledger/` for retained journals or untracked cache path under `.cache/empiricaloracle/oracle-inputs/` for generated rotki adapter inputs |
+| `external_oracle_input_path` | path | Untracked cache path under `.cache/empiricaloracle/oracle-inputs/` for generated rotki adapter inputs |
 | `dataset_input_hash` | string | Hash of the source dataset used to generate the ledger |
 | `external_oracle_input_hash` | string | Hash of the generated external-oracle input |
 | `generation_notes` | string array | Notes about representation or unsupported fragments |
@@ -184,12 +184,10 @@ Fields:
 | `source_url` | URL | Upstream source URL |
 | `license` | string | Applicable license identifier and compatibility notes |
 | `license_path` | path | Vendored license text path |
-| `source_path` | path | Repository-controlled vendored-source path or provenance path; rotki uses repository metadata under `third_party/rotki/` while verified source execution reuses the untracked cache root under `.cache/empiricaloracle/rotki-source/` |
-| `artifact_paths` | path array | Supported executable, adapter, manifest, generated-input, or source-cache paths under `third_party/`, `tools/empiricaloracle/`, or `.cache/empiricaloracle/` |
-| `executable_checksums` | string map | Checksum for each supported executable artifact when an executable exists |
-| `source_checksum` | string | Checksum for vendored source or documented source artifact |
+| `source_path` | path | Repository-controlled provenance path; rotki uses repository metadata under `third_party/rotki/` while verified source execution reuses the untracked cache root under `.cache/empiricaloracle/rotki-source/` |
+| `artifact_paths` | path array | Supported adapter, manifest, generated-input, provenance, or source-cache paths under `third_party/`, `tools/empiricaloracle/`, or `.cache/empiricaloracle/` |
+| `source_checksum` | string | Checksum for the documented pinned source artifact |
 | `adapter_constraints` | string array | Method support, unsupported case, and argument constraints for fixture generation |
-| `executable_path` | path nullable | Test-time command path when an executable boundary is available |
 | `platform_support` | string array | Supported local platforms for generation |
 
 Relationships:
@@ -200,8 +198,7 @@ Validation rules:
 
 - Binary-only vendoring is invalid unless the applicable license and source-distribution obligations are satisfied and documented.
 - License text, source provenance, pinned version or commit, and checksums must be present.
-- Each supported executable artifact has a matching checksum.
-- Runtime application code must not import or execute hledger, rotki, oracle adapters, or composite oracle helpers.
+- Runtime application code must not import or execute external-oracle tooling, oracle adapters, or composite oracle helpers.
 - Missing or unsupported external oracle boundary fails fixture generation with an actionable setup error, not normal fixture-backed comparisons.
 
 ## RotkiSourceVerificationManifest
@@ -352,7 +349,7 @@ Validation rules:
 
 - Reason is required.
 - Unsupported segments must not fabricate external-oracle-derived expected values.
-- Zero-priced holding reductions are excluded from empirical external-oracle fixture scope after BUG-001 and should not remain as supported fixture groups or hledger-specific unsupported segments.
+- Zero-priced holding reductions are excluded from empirical external-oracle fixture scope after BUG-001 and should not remain as supported fixture groups or superseded-boundary-specific unsupported segments.
 - Current committed hybrid fixtures use `project_composition_only` here for project-owned routing or lifecycle segments, and average-cost fixtures use `skip_external_oracle` here for pool-provenance gaps.
 
 ## ProjectCalculationOutput

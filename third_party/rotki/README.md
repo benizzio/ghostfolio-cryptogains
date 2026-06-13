@@ -67,10 +67,4 @@ was executed here.
 - Cases must remain single-currency and synthetic-only.
 - Runtime application code must not link, import, or execute rotki.
 
-## hledger-Only Supersession
-
-- The earlier hledger-only oracle assumption is superseded for BUG-001 acceptance.
-- The motivating defect was that the hledger-backed empirical run skipped most
-  supported fixture groups before project calculation and oracle comparison.
-
 Authored by: OpenCode

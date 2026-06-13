@@ -123,7 +123,7 @@ func caseAssetSourceIDs(dataset fixture.EmpiricalDataset, empiricalCase fixture.
 }
 
 // omittedZeroPricedReductionSourceIDs returns the zero-priced reduction rows for
-// one asset that the rendered journal explicitly omitted.
+// one asset that active external-oracle generation explicitly omits.
 // Authored by: OpenCode
 func omittedZeroPricedReductionSourceIDs(
 	dataset fixture.EmpiricalDataset,
@@ -166,10 +166,10 @@ func omittedZeroPricedReductionSourceIDs(
 }
 
 // omittedZeroPricedReductionReason returns the deterministic unsupported reason
-// recorded when a non-native lot mode omits one or more zero-priced reductions.
+// recorded when active external-oracle generation omits zero-priced reductions.
 // Authored by: OpenCode
 func omittedZeroPricedReductionReason(empiricalCase fixture.EmpiricalCase, method reportmodel.CostBasisMethod, sourceIDs []string) string {
-	return "journal omitted zero-priced reduction handling for " + strings.Join(sourceIDs, ", ") +
+	return "external-oracle generation omitted zero-priced reduction handling for " + strings.Join(sourceIDs, ", ") +
 		" because lot mode " + journalLotMode(method, empiricalCase.CaseID) + " does not support native zero-priced handling"
 }
 

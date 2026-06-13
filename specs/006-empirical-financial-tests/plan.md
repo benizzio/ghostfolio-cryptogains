@@ -109,7 +109,6 @@ testdata/
 └── empirical/
     ├── financial-dataset.yaml
     ├── golden/
-    ├── hledger/  # BUG-003 removal target
     ├── rotki/
     └── README.md
 
@@ -122,10 +121,6 @@ tools/
     └── rotki-source/
 
 third_party/
-├── hledger/  # BUG-003 removal target
-│   ├── bin/  # BUG-003 removal target
-│   │   └── <goos>-<goarch>/  # BUG-003 removal target
-│   └── source/  # BUG-003 removal target
 └── rotki/
     ├── LICENSE.md
     └── README.md
@@ -139,7 +134,7 @@ BUG-003 supersedes `testdata/empirical/hledger/` and `third_party/hledger/`: hle
 
 ## Empirical Design
 
-- `testdata/empirical/financial-dataset.yaml` is the canonical synthetic source ledger. It uses a simplified project-owned schema, not copied hledger, Ledger, or Beancount fixture text.
+- `testdata/empirical/financial-dataset.yaml` is the canonical synthetic source ledger. It uses a simplified project-owned schema, not copied external-oracle fixture text.
 - Dataset rows carry stable source IDs, timestamps, deterministic order, asset identity keys, display labels, activity type, quantity, monetary fields, one currency, fees, source scope, zero-priced reduction explanation, and coverage tags.
 - Dataset validation fails if there are fewer than 150 activities, fewer than 3 source-calendar years, missing required method tags, missing required edge-case tags, duplicate source IDs, unstable ordering fields, non-decimal numeric text, missing single-currency identity on priced rows, or real-looking secret material.
 - The oracle helper converts supported pure-method cases into generated JSON adapter inputs under `.cache/empiricaloracle/oracle-inputs/`, executes the project-owned Python adapter `tools/empiricaloracle/rotki_adapter.py` against verified pinned rotki source only when fixture generation is required, verifies pinned rotki source in an untracked project-local folder for explicit regeneration, captures external oracle source provenance, version or commit identity, signed-tag verification, adapter arguments, and normalizes results to project-owned JSON fixtures.

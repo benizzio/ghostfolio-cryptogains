@@ -17,10 +17,6 @@ import (
 )
 
 var stderrWriter io.Writer = os.Stderr
-var resolveVendoredHledgerCommand = newVendoredHledgerCommand
-var captureVendoredHledgerVersion = func(ctx context.Context, command vendoredHledgerCommand) (string, error) {
-	return command.captureVersion(ctx)
-}
 
 const defaultEmpiricalOutputRoot = "testdata/empirical"
 
@@ -39,9 +35,9 @@ func main() {
 	os.Exit(1)
 }
 
-// run validates the synthetic dataset, writes retained hledger journals where
-// applicable, consumes repository-controlled oracle boundary inputs, and
-// persists normalized oracle fixtures.
+// run validates the synthetic dataset, executes the active rotki-backed oracle
+// boundaries when regeneration is required, and persists normalized oracle
+// fixtures.
 // Authored by: OpenCode
 func run(args []string, stdout io.Writer) error {
 	if stdout == nil {
@@ -107,52 +103,31 @@ func run(args []string, stdout io.Writer) error {
 	}
 	var datasetInputHash = stablePrefixedSHA256Hash([]byte(rawDatasetContent))
 
-	var hledgerVersion string
-	var hledger vendoredHledgerCommand
-	var hledgerReady bool
 	var rotkiSource rotkiSourceRuntime
 	var rotkiSourceReady bool
 
-	var journals []journal
-	journals, err = renderJournals(dataset, rawDatasetContent)
-	if err != nil {
-		return fmt.Errorf("empiricaloracle: render journals: %w", err)
-	}
-
-	var journalWriteCount int
 	var goldenWriteCount int
-	var journalIndex int
-	for journalIndex = range journals {
-		var method = reportmodel.CostBasisMethod(journals[journalIndex].ledger.Method)
-		var empiricalCase, findErr = findEmpiricalCase(dataset, journals[journalIndex].ledger.CaseIDs[0], method)
-		if findErr != nil {
-			return fmt.Errorf("empiricaloracle: %w", findErr)
-		}
-
-		var journalRelativePath string
-		journalRelativePath, err = remapOutputRelativePath(outputRootRelativePath, journals[journalIndex].ledger.ExternalOracleInputPath)
-		if err != nil {
-			return fmt.Errorf("empiricaloracle: remap journal path: %w", err)
-		}
-
-		var wroteJournal bool
-		wroteJournal, err = writeArtifact(repositoryRoot, journalRelativePath, []byte(journals[journalIndex].content), *regenerate)
-		if err != nil {
-			return fmt.Errorf("empiricaloracle: write journal %s: %w", journalRelativePath, err)
-		}
-		if wroteJournal {
-			journalWriteCount++
-		}
-
-		var missingGoldenPaths []string
-		missingGoldenPaths, err = collectMissingGoldenPaths(outputRootRelativePath, empiricalCase, method, repositoryRoot, *regenerate)
-		if err != nil {
-			return fmt.Errorf("empiricaloracle: collect missing golden fixtures for case %s method %s: %w", empiricalCase.CaseID, method, err)
-		}
-		if len(missingGoldenPaths) == 0 {
+	var caseIndex int
+	for caseIndex = range dataset.Cases {
+		var empiricalCase = dataset.Cases[caseIndex]
+		if empiricalCase.OracleSupport == fixture.OracleSupportUnsupported {
 			continue
 		}
-		if isRepositoryControlledBoundaryMethod(method) {
+
+		var methodIndex int
+		for methodIndex = range empiricalCase.Methods {
+			var method = empiricalCase.Methods[methodIndex]
+			var missingGoldenPaths []string
+			missingGoldenPaths, err = collectMissingGoldenPaths(outputRootRelativePath, empiricalCase, method, repositoryRoot, *regenerate)
+			if err != nil {
+				return fmt.Errorf("empiricaloracle: collect missing golden fixtures for case %s method %s: %w", empiricalCase.CaseID, method, err)
+			}
+			if len(missingGoldenPaths) == 0 {
+				continue
+			}
+			if !isRepositoryControlledBoundaryMethod(method) {
+				return fmt.Errorf("empiricaloracle: unsupported oracle generation method %s for case %s", method, empiricalCase.CaseID)
+			}
 			if !rotkiSourceReady {
 				rotkiSource, err = resolveRotkiSourceRuntime()
 				if err != nil {
@@ -201,80 +176,10 @@ func run(args []string, stdout io.Writer) error {
 					goldenWriteCount++
 				}
 			}
-
-			continue
-		}
-		if !hledgerReady {
-			hledger, err = resolveVendoredHledgerCommand()
-			if err != nil {
-				return fmt.Errorf("empiricaloracle: build vendored hledger command: %w", err)
-			}
-
-			hledgerVersion, err = captureVendoredHledgerVersion(ctx, hledger)
-			if err != nil {
-				return fmt.Errorf("empiricaloracle: capture vendored hledger version: %w", err)
-			}
-
-			hledgerReady = true
-		}
-
-		if !*regenerate {
-			if err = ensureArtifactContentMatches(repositoryRoot, journalRelativePath, journals[journalIndex].content); err != nil {
-				return fmt.Errorf("empiricaloracle: %w", err)
-			}
-		}
-
-		var oracleData hledgerJournalOracleData
-		oracleData, err = collectHledgerJournalOracleData(ctx, hledger, journalRelativePath, empiricalCase.Year)
-		if err != nil {
-			return fmt.Errorf("empiricaloracle: collect hledger data for %s: %w", journalRelativePath, err)
-		}
-
-		var assetIndex int
-		for assetIndex = range empiricalCase.AssetIdentityKeys {
-			var assetIdentityKey = strings.TrimSpace(empiricalCase.AssetIdentityKeys[assetIndex])
-			var goldenRelativePath = goldenFixtureRelativePath(outputRootRelativePath, empiricalCase, method, assetIdentityKey)
-			if !*regenerate {
-				var exists bool
-				exists, err = artifactExists(repositoryRoot, goldenRelativePath)
-				if err != nil {
-					return fmt.Errorf("empiricaloracle: stat golden fixture %s: %w", goldenRelativePath, err)
-				}
-				if exists {
-					continue
-				}
-			}
-
-			var output fixture.OracleOutput
-			output, err = buildOracleOutputForAsset(dataset, empiricalCase, method, assetIdentityKey, hledgerVersion, journals[journalIndex], journalRelativePath, oracleData)
-			if err != nil {
-				return fmt.Errorf(
-					"empiricaloracle: build oracle output for case %s method %s asset %s: %w",
-					empiricalCase.CaseID,
-					method,
-					assetIdentityKey,
-					err,
-				)
-			}
-
-			var rawOutput []byte
-			rawOutput, err = marshalValidatedOracleOutput(goldenRelativePath, output)
-			if err != nil {
-				return fmt.Errorf("empiricaloracle: marshal golden fixture %s: %w", goldenRelativePath, err)
-			}
-
-			var wroteGolden bool
-			wroteGolden, err = writeArtifact(repositoryRoot, goldenRelativePath, rawOutput, *regenerate)
-			if err != nil {
-				return fmt.Errorf("empiricaloracle: write golden fixture %s: %w", goldenRelativePath, err)
-			}
-			if wroteGolden {
-				goldenWriteCount++
-			}
 		}
 	}
 
-	_, _ = fmt.Fprintf(stdout, "wrote %d journal artifact(s) and %d golden fixture(s)\n", journalWriteCount, goldenWriteCount)
+	_, _ = fmt.Fprintf(stdout, "wrote %d golden fixture(s)\n", goldenWriteCount)
 
 	return nil
 }

@@ -34,14 +34,14 @@ Create and populate the empirical dataset in this feature, then treat it as read
 
 **Alternatives considered**:
 
-- Use system hledger from `PATH`: rejected because version drift would make oracle output unstable and because hledger-only output is no longer sufficient for BUG-001 acceptance.
-- Link or import hledger or rotki runtime libraries into production code: rejected because runtime and Go test code must not embed hledger, hledger-lib, rotki, or rotki runtime code; the oracle boundary is test-time only.
+- Use the superseded plain-text-accounting boundary from `PATH`: rejected because version drift would make oracle output unstable and because the earlier single-oracle output is no longer sufficient for BUG-001 acceptance.
+- Link or import external-oracle runtime libraries into production code: rejected because runtime and Go test code must not embed external-oracle runtime code; the oracle boundary is test-time only.
 - Use Beancount or Ledger as the primary oracle: rejected because they do not resolve the BUG-001 method coverage gap. Beancount and Ledger can remain research references only.
 - Hand-author all expected values: rejected because this would not be an external oracle and would provide weaker drift detection.
 
 ## Decision: Vendor Or Document License-Compatible External Oracle Materials, Not Binary-Only Artifacts
 
-Vendor or document external oracle materials under `third_party/` with applicable license text, upstream source URL, pinned version or commit, source checksum, platform support notes, adapter constraints, supported artifact paths, and checksums. Any retained hledger materials remain test-time-only historical or auxiliary artifacts. Rotki source provenance and licensing must be documented before fixture regeneration.
+Document external oracle provenance materials under `third_party/` with applicable license text, upstream source URL, pinned version or commit, source checksum, platform support notes, adapter constraints, and supported artifact paths. Rotki source provenance and licensing must be documented before fixture regeneration.
 
 **Rationale**: The repository is GPLv3, so external oracle materials are acceptable only when applicable license and source-distribution obligations are preserved. The spec explicitly prohibits undocumented binary-only vendoring and requires source provenance, license text, version or commit identity, checksums, and platform support notes.
 
@@ -136,7 +136,7 @@ For Scope-Local Hybrid (`scope_local_hybrid`), use a separate composite oracle. 
 
 ## Decision: Mark Faithfully Unrepresentable Cases As Unsupported For External Comparison
 
-If a dataset case cannot be represented in the selected external oracle or composite oracle without changing its financial meaning, the oracle marks that case unsupported for external-oracle comparison with a reason. BUG-001 removes zero-priced holding reductions from empirical external-oracle fixture scope instead of carrying them as supported fixture groups or hledger-specific unsupported segments.
+If a dataset case cannot be represented in the selected external oracle or composite oracle without changing its financial meaning, the oracle marks that case unsupported for external-oracle comparison with a reason. BUG-001 removes zero-priced holding reductions from empirical external-oracle fixture scope instead of carrying them as supported fixture groups or superseded-boundary-specific unsupported segments.
 
 **Rationale**: Silent approximation would create false confidence and could hide drift. Explicit unsupported markers preserve dataset coverage while making oracle limits visible.
 

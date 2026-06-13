@@ -51,7 +51,7 @@ type rotkiOracleCapture struct {
 }
 
 // isRepositoryControlledBoundaryMethod reports whether fixture regeneration for
-// the method should use the rotki source boundary instead of hledger.
+// the method uses the active rotki or composite-oracle boundary.
 // Authored by: OpenCode
 func isRepositoryControlledBoundaryMethod(method reportmodel.CostBasisMethod) bool {
 	switch method {

@@ -111,8 +111,8 @@ Edge-case coverage tags:
 - Keep all content synthetic. Do not add real user activity, account names, wallet names, tokens, JWTs, proprietary financial records, snapshot payloads, Markdown reports, TUI text, or copied upstream fixture rows.
 - `financial-dataset.yaml` is the canonical empirical source dataset. After the dataset-maintenance feature lands, treat it as read-only outside later dataset-maintenance specs.
 - `golden/` stores normalized oracle JSON fixtures generated from the dataset.
-- `hledger/` stores generated hledger journal inputs derived from the dataset.
-- Cases marked `oracle_support: unsupported` stay in the dataset for structural and non-oracle coverage, but do not require `golden/` or `hledger/` artifacts.
+- Generated rotki adapter inputs are written only under `.cache/empiricaloracle/oracle-inputs/` during explicit regeneration and must not be committed.
+- Cases marked `oracle_support: unsupported` stay in the dataset for structural and non-oracle coverage, but do not require committed `golden/` fixtures.
 - Generate or refresh derived artifacts only through `tools/empiricaloracle` once later phases implement the command behavior. Do not hand-edit generated fixtures.
 - BUG-002 regeneration must obtain rotki data only by verifying and executing pinned rotki source from the untracked project-local cache path `.cache/empiricaloracle/rotki-source/`.
 - Normal fixture-backed empirical test runs must not download rotki, require the untracked source cache, or invoke oracle generation while committed golden fixtures are present.
@@ -136,5 +136,5 @@ Edge-case coverage tags:
 
 - `financial-dataset.yaml` is the repository-backed synthetic empirical dataset baseline for phase 3 validation.
 - `golden/` contains the current normalized oracle fixture baseline for the supported empirical fixture groups.
-- `hledger/` retains generated historical or auxiliary journals for the remaining test-time boundary.
+- `.cache/empiricaloracle/oracle-inputs/` is the untracked regeneration-only location for generated rotki adapter inputs.
 - `rotki/` contains only README deprecation metadata for the removed BUG-001 bootstrap shortcut. BUG-002 supersedes it as oracle evidence for regeneration.

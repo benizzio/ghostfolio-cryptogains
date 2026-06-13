@@ -1,10 +1,10 @@
-# Contract: ~~hledger Oracle Output~~ External Oracle Output
+# Contract: External Oracle Output
 
 **Bugfix**: 2026-06-10 — [BUG-001] Superseded the hledger-only output contract with rotki-backed pure-method fixtures and Scope-Local Hybrid composite-oracle fixture rules.
 
 ## Scope
 
-This contract defines generated external-oracle input files, normalized oracle golden fixtures, fixture metadata, unsupported-case handling, rotki-backed pure-method oracle expectations, Scope-Local Hybrid composite-oracle expectations, and retained hledger material expectations when applicable.
+This contract defines generated external-oracle input files, normalized oracle golden fixtures, fixture metadata, unsupported-case handling, rotki-backed pure-method oracle expectations, and Scope-Local Hybrid composite-oracle expectations.
 
 ## Locations
 
@@ -12,7 +12,6 @@ Generated external-oracle inputs:
 
 ```text
 .cache/empiricaloracle/oracle-inputs/
-testdata/empirical/hledger/       # retained deterministic hledger journals
 ```
 
 Normalized golden fixtures:
@@ -25,7 +24,6 @@ External oracle materials:
 
 ```text
 third_party/rotki/
-third_party/hledger/       # retained only when auxiliary or historical hledger materials remain relevant
 testdata/empirical/rotki/  # README-only deprecation metadata, not oracle evidence
 ```
 
@@ -229,18 +227,17 @@ Rules:
 
 ## External Oracle Provenance Contract
 
-`third_party/rotki/` and any retained `third_party/hledger/` materials must include:
+`third_party/rotki/` must include:
 
 - applicable license text
 - upstream source URL
 - selected version or commit
-- checksum for the pinned rotki source archive or vendored hledger source artifact
-- checksum for each supported vendored hledger executable artifact
+- checksum for the pinned rotki source archive
 - source provenance and corresponding source where the applicable license requires it
-- supported executable, source, or adapter artifact paths
+- supported source-cache, provenance, or adapter artifact paths
 - platform support notes
 - regeneration instructions
-- statement that runtime application code must not link, import, or execute hledger, rotki, oracle adapters, or composite oracle helpers
+- statement that runtime application code must not link, import, or execute external-oracle tooling, oracle adapters, or composite oracle helpers
 
 Superseded materials:
 

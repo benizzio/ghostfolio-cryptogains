@@ -16,7 +16,7 @@ Validate the internal empirical suite that:
 
 - Go 1.26.3 installed
 - repository dependencies available through normal Go module resolution
-- documented external oracle materials present under `third_party/rotki/` and retained hledger materials under `third_party/hledger/`
+- documented external oracle materials present under `third_party/rotki/`
 - committed golden fixtures present under `testdata/empirical/golden/` for normal fixture-backed test runs
 - local Python available as `python3` or `python` only when explicit regeneration is required
 - no real user data in `testdata/empirical/`
@@ -100,7 +100,6 @@ go run ./tools/empiricaloracle --regenerate
 
 Expected result:
 
-- the helper writes deterministic hledger journals under `testdata/empirical/hledger/`
 - the helper writes deterministic rotki adapter inputs under `.cache/empiricaloracle/oracle-inputs/`
 - the helper resolves the verified rotki source boundary only when a golden fixture is absent or `--regenerate` is used
 - external oracle name, source URL, pinned version or commit, and adapter constraints are checked and recorded
@@ -116,7 +115,6 @@ Inspect:
 
 ```text
 third_party/rotki/
-third_party/hledger/       # if retained for historical or auxiliary test-time material
 tools/empiricaloracle/
 ```
 
@@ -139,7 +137,6 @@ Inspect:
 testdata/empirical/financial-dataset.yaml
 testdata/empirical/golden/
 testdata/empirical/rotki/        # README-only deprecation metadata
-testdata/empirical/hledger/       # if retained for historical or auxiliary test-time material
 ```
 
 Expected result:
@@ -157,7 +154,7 @@ Recorded review evidence for the implemented empirical boundary:
 
 - A02 Cryptographic Failures: the empirical suite does not read or write protected snapshot storage; `tests/empirical/isolation_test.go` forbids `internal/snapshot` imports, and the suite works only from synthetic dataset and fixture files.
 - A07 Identification and Authentication Failures: the empirical suite does not call Ghostfolio authentication or transport code; `tests/empirical/isolation_test.go` forbids `internal/ghostfolio`, and synthetic-content validation rejects token-like and JWT-like fixture content.
-- A04 Insecure Design: normal fixture-backed runs load committed golden fixtures and do not require oracle generation; `tests/empirical/fixture/oracle_generation_policy.go` allows generation only after an explicit missing-fixture opt-in, and `tools/empiricaloracle/main_test.go` verifies the default helper path does not resolve rotki or hledger when fixtures already exist.
+- A04 Insecure Design: normal fixture-backed runs load committed golden fixtures and do not require oracle generation; `tests/empirical/fixture/oracle_generation_policy.go` allows generation only after an explicit missing-fixture opt-in, and `tools/empiricaloracle/main_test.go` verifies the default helper path does not resolve rotki when fixtures already exist.
 - A06 Vulnerable and Outdated Components: the rotki boundary is pinned to release `v1.43.1`, commit `a2e00be49a0ea36e7563a5d235cfa6a7c91edbfb`, and source checksum `sha256:8434b653104f8d5b0638e98d88a5ef256fac7720cc459eb33b729e2848900e3b` in `third_party/rotki/README.md`, and regeneration revalidates that pin in `tools/empiricaloracle/rotki_source.go`.
 - A08 Software and Data Integrity Failures: oracle fixtures record and validate `dataset_input_hash`, `external_oracle_input_hash`, `source_checksum`, and `oracle_output_hash`; `tests/empirical/fixture/oracle_output.go` revalidates canonical JSON and the stable fixture hash, and rotki boundary tests reject vendored source and committed raw rotki outputs as regeneration evidence.
 - A09 Security Logging and Monitoring Failures: comparison failures are formatted only with case, method, year, asset, field, expected value, actual value, difference, tolerance, decimal policy, and source IDs; the empirical isolation tests forbid report-output filenames and Documents-path handling, and fixture validation rejects secret-like content.
