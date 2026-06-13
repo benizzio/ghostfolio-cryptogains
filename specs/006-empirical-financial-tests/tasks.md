@@ -16,6 +16,8 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 **Bugfix**: 2026-06-12 — [BUG-002] Updated from bugfix patch, including untracked verified rotki source regeneration tasks and reopened raw-output shortcut completions.
 
+**Bugfix**: 2026-06-13 — [BUG-003] Updated from bugfix patch, including hledger boundary removal tasks and reopened hledger-retention completions.
+
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel because the task touches different files and has no dependency on another incomplete task.
@@ -28,9 +30,9 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 **Purpose**: Create the repository locations and documentation anchors needed by all empirical validation work.
 
-- [X] T001 Create empirical directory skeleton at `testdata/empirical/golden/`, `testdata/empirical/hledger/`, `tests/empirical/`, `tests/empirical/fixture/`, `tools/empiricaloracle/`, `third_party/hledger/bin/`, and `third_party/hledger/source/`
+- [ ] T001 ⚠️ Reopened (reopened — BUG-003): ~~Create empirical directory skeleton at `testdata/empirical/golden/`, `testdata/empirical/hledger/`, `tests/empirical/`, `tests/empirical/fixture/`, `tools/empiricaloracle/`, `third_party/hledger/bin/`, and `third_party/hledger/source/`~~ Remove obsolete hledger setup paths from the empirical skeleton and keep only active empirical dataset, golden fixture, `tests/empirical/`, `tools/empiricaloracle/`, and rotki provenance/cache paths
 - [X] T002 [P] Add empirical artifact operating notes in `testdata/empirical/README.md`
-- [X] T003 [P] Add hledger vendoring compliance notes for complete source, supported executable artifact paths, checksums, platform support, and no binary-only vendoring in `third_party/hledger/README.md`
+- [ ] T003 [P] ⚠️ Reopened (reopened — BUG-003): ~~Add hledger vendoring compliance notes for complete source, supported executable artifact paths, checksums, platform support, and no binary-only vendoring in `third_party/hledger/README.md`~~ Remove hledger vendoring compliance notes and active `third_party/hledger/README.md` references; keep only historical bug report references or strikethrough rationale
 - [X] T004 [P] Add compilable empirical oracle command skeleton in `tools/empiricaloracle/main.go` and `tools/empiricaloracle/doc.go`
 - [X] T005 [P] Add empirical test package documentation in `tests/empirical/doc.go` and `tests/empirical/fixture/doc.go`
 
@@ -57,7 +59,7 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 ## Phase 3: User Story 1 - Maintain An Empirical External Dataset (Priority: P1) MVP
 
-**Goal**: Add a synthetic, human-readable empirical dataset that validates independently without hledger or project calculation execution.
+**Goal**: Add a synthetic, human-readable empirical dataset that validates independently without ~~hledger~~ external oracle generation or project calculation execution.
 
 **Independent Test**: `go test ./tests/empirical -run TestEmpiricalDatasetValidation -count=1 -v` parses and validates `testdata/empirical/financial-dataset.yaml`, confirms at least 150 activities across at least 3 source-calendar years, confirms required method and edge-case coverage, confirms deterministic ordering, confirms one currency, and rejects non-synthetic fixture content.
 
@@ -77,7 +79,7 @@ description: "Task list for Empirical Solidified Financial Tests"
 - [X] T022 [US1] Wire `tests/empirical/dataset_validation_test.go` to load and validate `testdata/empirical/financial-dataset.yaml`
 - [X] T023 [US1] Run `go test ./tests/empirical -run TestEmpiricalDatasetValidation -count=1 -v` for `tests/empirical/dataset_validation_test.go` and `testdata/empirical/financial-dataset.yaml`
 
-**Checkpoint**: The dataset is independently valid and reviewable without hledger or project calculation output.
+**Checkpoint**: The dataset is independently valid and reviewable without ~~hledger~~ external oracle generation or project calculation output.
 
 ---
 
@@ -89,25 +91,25 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 ### Tests for User Story 2
 
-- [X] T024 [P] [US2] Add hledger vendoring contract tests for license text, source metadata, source checksum, supported executable artifact checksum, source presence, executable path, platform support, and runtime prohibition in `tests/empirical/hledger_vendoring_test.go`
+- [ ] T024 [P] [US2] ⚠️ Reopened (reopened — BUG-003): ~~Add hledger vendoring contract tests for license text, source metadata, source checksum, supported executable artifact checksum, source presence, executable path, platform support, and runtime prohibition in `tests/empirical/hledger_vendoring_test.go`~~ Remove hledger vendoring contract tests and keep only rotki/composite-oracle boundary checks required by the current oracle model
 - [X] T025 [P] [US2] Add oracle fixture schema tests for metadata, decimal strings, tolerances, hashes, methods, years, matches, and unsupported segments in `tests/empirical/fixture/oracle_output_test.go`
-- [X] T026 [P] [US2] Add vendored hledger command wrapper tests for version detection, explicit file arguments, missing executable errors, unsupported version errors, and environment isolation in `tools/empiricaloracle/command_test.go`
-- [X] T027 [P] [US2] Add hledger journal rendering tests for acquisitions, liquidations, fees, zero-priced reductions, same-date ordering, scope evidence, and unsupported cases in `tools/empiricaloracle/journal_test.go`
-- [X] T028 [P] [US2] Add oracle normalization and stable hash tests for hledger output, dataset input hash, hledger input hash, oracle output hash, and normalization version in `tools/empiricaloracle/oracle_output_test.go`
+- [ ] T026 [P] [US2] ⚠️ Reopened (reopened — BUG-003): ~~Add vendored hledger command wrapper tests for version detection, explicit file arguments, missing executable errors, unsupported version errors, and environment isolation in `tools/empiricaloracle/command_test.go`~~ Remove hledger command wrapper tests and verify no hledger command wrapper remains in `tools/empiricaloracle/`
+- [ ] T027 [P] [US2] ⚠️ Reopened (reopened — BUG-003): ~~Add hledger journal rendering tests for acquisitions, liquidations, fees, zero-priced reductions, same-date ordering, scope evidence, and unsupported cases in `tools/empiricaloracle/journal_test.go`~~ Remove hledger journal rendering tests and any active journal-rendering fixtures from `tools/empiricaloracle/`
+- [ ] T028 [P] [US2] ⚠️ Reopened (reopened — BUG-003): ~~Add oracle normalization and stable hash tests for hledger output, dataset input hash, hledger input hash, oracle output hash, and normalization version in `tools/empiricaloracle/oracle_output_test.go`~~ Remove hledger-output normalization expectations and keep stable hash tests tied to rotki/composite oracle outputs
 
 ### Implementation for User Story 2
 
-- [X] T029 [US2] Add GPL-compatible hledger license, source metadata, executable metadata, platform support notes, and checksums in `third_party/hledger/LICENSE`, `third_party/hledger/SOURCE.md`, and `third_party/hledger/README.md`
-- [X] T030 [US2] Add hledger complete corresponding source under `third_party/hledger/source/` and supported executable artifacts under `third_party/hledger/bin/<goos>-<goarch>/hledger`
-- [X] T031 [US2] Implement vendored hledger discovery from `third_party/hledger/bin/<goos>-<goarch>/hledger`, version capture, platform checks, explicit argument handling, and actionable setup errors in `tools/empiricaloracle/command.go`
-- [X] T032 [US2] Implement dataset-to-hledger journal rendering in `tools/empiricaloracle/journal.go`
+- [ ] T029 [US2] ⚠️ Reopened (reopened — BUG-003): ~~Add GPL-compatible hledger license, source metadata, executable metadata, platform support notes, and checksums in `third_party/hledger/LICENSE`, `third_party/hledger/SOURCE.md`, and `third_party/hledger/README.md`~~ Remove obsolete hledger license, source metadata, executable metadata, platform notes, and checksums from active project artifacts
+- [ ] T030 [US2] ⚠️ Reopened (reopened — BUG-003): ~~Add hledger complete corresponding source under `third_party/hledger/source/` and supported executable artifacts under `third_party/hledger/bin/<goos>-<goarch>/hledger`~~ Remove obsolete hledger source and executable artifacts from `third_party/hledger/`
+- [ ] T031 [US2] ⚠️ Reopened (reopened — BUG-003): ~~Implement vendored hledger discovery from `third_party/hledger/bin/<goos>-<goarch>/hledger`, version capture, platform checks, explicit argument handling, and actionable setup errors in `tools/empiricaloracle/command.go`~~ Remove hledger discovery and command execution code from `tools/empiricaloracle/command.go`
+- [ ] T032 [US2] ⚠️ Reopened (reopened — BUG-003): ~~Implement dataset-to-hledger journal rendering in `tools/empiricaloracle/journal.go`~~ Remove dataset-to-hledger journal rendering code from `tools/empiricaloracle/journal.go`
 - [X] T033 [US2] Implement normalized oracle output JSON generation and stable hashing in `tools/empiricaloracle/oracle_output.go`
 - [X] T034 [US2] Implement explicit unsupported-segment detection and serialization in `tools/empiricaloracle/unsupported.go`
 - [X] T035 [US2] Implement CLI generation and explicit regeneration flow in `tools/empiricaloracle/main.go`
-- [X] T036 [US2] Generate hledger journal fixtures in `testdata/empirical/hledger/` from `testdata/empirical/financial-dataset.yaml`
-- [X] T037 [US2] ⚠️ Reopened (reopened — BUG-002): Generate normalized golden fixtures for FIFO, LIFO, HIFO, average cost, and Scope-Local Hybrid (`scope_local_hybrid`) under `testdata/empirical/golden/`; hledger-only fixtures and committed raw rotki outputs are insufficient unless fixtures are regenerated from verified pinned rotki source execution through the local adapter boundary
+- [ ] T036 [US2] ⚠️ Reopened (reopened — BUG-003): ~~Generate hledger journal fixtures in `testdata/empirical/hledger/` from `testdata/empirical/financial-dataset.yaml`~~ Remove generated hledger journal fixtures from `testdata/empirical/hledger/`
+- [X] T037 [US2] ⚠️ Reopened (reopened — BUG-002): Generate normalized golden fixtures for FIFO, LIFO, HIFO, average cost, and Scope-Local Hybrid (`scope_local_hybrid`) under `testdata/empirical/golden/`; ~~hledger-only fixtures~~ committed raw rotki outputs are insufficient unless fixtures are regenerated from verified pinned rotki source execution through the local adapter boundary
 - [X] T038 [US2] Implement golden fixture loading and validation helpers in `tests/empirical/fixture/oracle_output.go`
-- [X] T039 [US2] Run `go test ./tools/empiricaloracle ./tests/empirical/fixture -run 'TestHledger|TestOracle|TestJournal' -count=1 -v` for `tools/empiricaloracle` and `tests/empirical/fixture/oracle_output_test.go`
+- [ ] T039 [US2] ⚠️ Reopened (reopened — BUG-003): ~~Run `go test ./tools/empiricaloracle ./tests/empirical/fixture -run 'TestHledger|TestOracle|TestJournal' -count=1 -v` for `tools/empiricaloracle` and `tests/empirical/fixture/oracle_output_test.go`~~ Run updated oracle tests that exclude hledger and journal-rendering expectations for `tools/empiricaloracle` and `tests/empirical/fixture/oracle_output_test.go`
 
 **Checkpoint**: Oracle fixtures are persisted, reproducible, metadata-complete, and generated only through the documented ~~vendored hledger~~ external oracle boundary.
 
@@ -133,7 +135,7 @@ description: "Task list for Empirical Solidified Financial Tests"
 - [X] T046 [US3] Implement project calculation runner for every supported method, case, and report year in `tests/empirical/fixture/project_calculation.go`
 - [X] T047 [US3] Implement `reportmodel.CapitalGainsReport` normalization into project comparison output in `tests/empirical/fixture/project_output.go`
 - [X] T048 [US3] Implement decimal comparison, per-field tolerance handling, and non-secret failure formatting in `tests/empirical/fixture/comparison.go`
-- [X] T049 [US3] Implement hledger generation policy guard that skips execution when fixtures exist and permits generation only for missing fixtures in `tests/empirical/fixture/oracle_generation_policy.go`
+- [ ] T049 [US3] ⚠️ Reopened (reopened — BUG-003): ~~Implement hledger generation policy guard that skips execution when fixtures exist and permits generation only for missing fixtures in `tests/empirical/fixture/oracle_generation_policy.go`~~ Replace hledger-specific generation policy wording with rotki/composite-oracle fixture generation policy in `tests/empirical/fixture/oracle_generation_policy.go`
 - [X] T050 [US3] ⚠️ Reopened (reopened — BUG-002): Complete the empirical integration flow that validates dataset, loads fixtures, conditionally generates missing fixtures only through the verified untracked rotki source boundary, runs project calculation, normalizes output, and compares every comparable supported case while reporting unsupported field-level segments with reasons in `tests/empirical/empirical_calculation_test.go`
 - [X] T051 [US3] Implement static isolation assertions for forbidden package imports and forbidden output artifacts in `tests/empirical/isolation_test.go`
 - [X] T052 [US3] ⚠️ Reopened (reopened — BUG-002): Run `go test ./tests/empirical -count=1 -v` for `tests/empirical/empirical_calculation_test.go` and verify supported fixture groups do not skip before project calculation and oracle comparison, and fixture-backed runs do not download rotki or invoke oracle generation
@@ -144,17 +146,17 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 ## Phase 6: BUG-001/BUG-002 Oracle Remediation (Blocking Before Polish Acceptance)
 
-**Purpose**: Replace the hledger-only empirical oracle acceptance path and BUG-001 raw-output shortcut, restore comparison breadth, require verified untracked pinned rotki source execution for regeneration, and fail on unexpected supported fixture skips.
+**Purpose**: Replace the ~~hledger-only~~ empirical oracle acceptance path and BUG-001 raw-output shortcut, restore comparison breadth, require verified untracked pinned rotki source execution for regeneration, and fail on unexpected supported fixture skips.
 
-**Dependencies**: T064 before T067; T065 before T073 and T075; T075 before T076; T076 before T077, T078, and T080; T077 before T066; T073 before T074; T066, T074, and T078 before T067, T068, T069, T070, and T079; T067, T068, T069, T070, T071, T072, T074, T078, T079, and T080 before reopened T052 and Phase 7 polish verification.
+**Dependencies**: T064 before T067; T065 before T073 and T075; T075 before T076; T076 before T077, T078, and T080; T077 before T066; T073 before T074; T066, T074, and T078 before T067, T068, T069, T070, and T079; T067, T068, T069, T070, T071, T072, T074, T078, T079, and T080 before reopened T052, Phase 7 hledger removal, and Phase 8 polish verification.
 
-- [X] T064 [US2] Remove zero-priced holding reduction cases from empirical external-oracle dataset scope, generated oracle inputs, golden fixtures, and empirical covered-case expectations while preserving zero-priced behavior coverage in non-oracle unit, integration, or contract tests across `testdata/empirical/financial-dataset.yaml`, `testdata/empirical/golden/`, `testdata/empirical/hledger/`, `tests/empirical/`, `tests/unit/`, and `tests/integration/`
-- [X] T065 [P] [US2] ⚠️ Reopened (reopened — BUG-002): Create and document the non-vendored rotki source boundary policy, license text, source provenance, pinned version or commit, checksums, adapter constraints, platform support, untracked source directory, and hledger-only supersession in `third_party/rotki/README.md` and `specs/006-empirical-financial-tests/research.md`
+- [X] T064 [US2] Remove zero-priced holding reduction cases from empirical external-oracle dataset scope, generated oracle inputs, golden fixtures, and empirical covered-case expectations while preserving zero-priced behavior coverage in non-oracle unit, integration, or contract tests across `testdata/empirical/financial-dataset.yaml`, `testdata/empirical/golden/`, ~~`testdata/empirical/hledger/`,~~ `tests/empirical/`, `tests/unit/`, and `tests/integration/`
+- [X] T065 [P] [US2] ⚠️ Reopened (reopened — BUG-002): Create and document the non-vendored rotki source boundary policy, license text, source provenance, pinned version or commit, checksums, adapter constraints, platform support, untracked source directory, and ~~hledger-only~~ oracle supersession in `third_party/rotki/README.md` and `specs/006-empirical-financial-tests/research.md`
 - [X] T073 [US2] ⚠️ Reopened (reopened — BUG-002): Replace repository-controlled raw rotki oracle evidence under `third_party/rotki/` and `testdata/empirical/rotki/` with committed project-owned provenance metadata and normalized golden fixtures only, so BUG-002 remediation does not depend on committed raw rotki outputs, hand-authored rotki datasets, developer-local rotki installation, or vendored rotki source
 - [X] T074 [P] [US2] ⚠️ Reopened (reopened — BUG-002): Add boundary verification tests or checks that fail with an actionable setup error when the required verified untracked rotki source acquisition path, provenance, checksum, or adapter constraint is missing, and reject committed raw rotki outputs in `tools/empiricaloracle/` and `tests/empirical/`
 - [X] T066 [US2] ⚠️ Reopened (reopened — BUG-002): Implement the pinned rotki-based test-time oracle adapter for FIFO, LIFO, HIFO, and Average Cost aggregate fixtures against verified untracked pinned rotki source execution, not committed raw rotki outputs or developer-global installations, in `tools/empiricaloracle/` and `tests/empirical/fixture/`
 - [X] T067 [US2] ⚠️ Reopened (reopened — BUG-002): Regenerate pure external-oracle golden fixtures from verified untracked pinned rotki source execution after zero-priced external-oracle cases are removed under `testdata/empirical/golden/` and update fixture metadata for source URL, pinned version or commit, source checksum, adapter arguments, hashes, and decimal policy
-- [X] T068 [US2] ⚠️ Reopened (reopened — BUG-002): Replace HIFO hledger fixtures with rotki HIFO fixtures regenerated from verified untracked pinned rotki source execution and add or preserve a deterministic non-zero-priced HIFO tie-break case in `testdata/empirical/golden/` and `testdata/empirical/financial-dataset.yaml`
+- [X] T068 [US2] ⚠️ Reopened (reopened — BUG-002): Replace HIFO ~~hledger fixtures~~ oracle fixtures with rotki HIFO fixtures regenerated from verified untracked pinned rotki source execution and add or preserve a deterministic non-zero-priced HIFO tie-break case in `testdata/empirical/golden/` and `testdata/empirical/financial-dataset.yaml`
 - [X] T069 [US2] Limit Average Cost empirical comparisons to aggregate realized gain or loss, allocated basis, closing quantity, and closing basis until project-compatible pool provenance exists in `tests/empirical/fixture/comparison.go` and `tests/empirical/fixture/project_output.go`
 - [X] T070 [US2] ⚠️ Reopened (reopened — BUG-002): Add a separate Scope-Local Hybrid composite oracle package that combines rotki-backed arithmetic sub-oracles regenerated from verified untracked pinned rotki source execution with documented project-owned composition-rule assertions under `tools/empiricaloracle/` and `tests/empirical/fixture/`
 - [X] T071 [US3] Remove broad top-level supported-fixture skip policies from `tests/empirical/empirical_calculation_test.go` while preserving only fixture-backed unsupported field-level skips with explicit reasons
@@ -170,21 +172,37 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 ---
 
-## Phase 7: Polish & Cross-Cutting Concerns
+## Phase 7: BUG-003 hledger Boundary Removal (Blocking Before Polish Acceptance)
 
-**Purpose**: Finalize documentation, repository verification, formatting, coverage wiring, fixture review, and BUG-001/BUG-002 oracle-remediation evidence after Phase 6 is complete.
+**Purpose**: Remove obsolete hledger dependency, fixture, tooling, metadata, and documentation surface from active feature scope while preserving historical bug report references and explicit strikethrough rationale.
+
+**Dependencies**: T081, T082, T083, and T084 depend on BUG-001/BUG-002 remediation fixture and rotki boundary tasks. T085 depends on T081 through T084. Reopened T058 and T063 depend on T085.
+
+- [ ] T081 [US2] Remove `third_party/hledger/` source, executable, license, README, source metadata, executable metadata, platform notes, and checksums from active project artifacts
+- [ ] T082 [US2] Remove `testdata/empirical/hledger/` generated journals and any active documentation that treats hledger journals as retained or auxiliary fixtures
+- [ ] T083 [US2] Remove hledger command, journal rendering, normalization, provenance, generation-policy, and vendoring tests or code from `tools/empiricaloracle/` and `tests/empirical/` unless a later non-oracle spec explicitly reintroduces a separate use
+- [ ] T084 [US2] Remove hledger-specific metadata and support labels from `testdata/empirical/golden/`, `specs/006-empirical-financial-tests/contracts/`, `specs/006-empirical-financial-tests/quickstart.md`, `testdata/empirical/README.md`, and oracle-output documentation except historical bug report references or explicit strikethrough rationale
+- [ ] T085 [P] [US2] Add a cleanup verification check that fails on active non-historical `hledger` or `hleger` references in source, tests, fixtures, active contracts, quickstart, README files, and oracle-output documentation after BUG-003 cleanup
+
+**Checkpoint**: Hledger is no longer present as an active oracle, fixture, dependency, tooling, metadata, or documentation boundary.
+
+---
+
+## Phase 8: Polish & Cross-Cutting Concerns
+
+**Purpose**: Finalize documentation, repository verification, formatting, coverage wiring, fixture review, BUG-001/BUG-002 oracle-remediation evidence, and BUG-003 hledger-removal evidence after Phase 6 and Phase 7 are complete.
 
 - [X] T053 [P] Update final empirical verification commands and oracle generation command after BUG-001 and BUG-002 remediation in `specs/006-empirical-financial-tests/quickstart.md`
-- [X] T054 [P] Update final fixture names, comparability labels, unsupported-case policy, rotki source execution metadata examples, composite-oracle metadata examples, and superseded hledger/raw-rotki-output metadata notes in `specs/006-empirical-financial-tests/contracts/oracle-output.md`
+- [X] T054 [P] Update final fixture names, comparability labels, unsupported-case policy, rotki source execution metadata examples, composite-oracle metadata examples, and superseded ~~hledger/raw-rotki-output~~ oracle-evidence metadata notes in `specs/006-empirical-financial-tests/contracts/oracle-output.md`
 - [X] T055 [P] Update empirical isolation notes for the rotki adapter, untracked source acquisition boundary, normal-test no-network rule, and composite oracle in `specs/006-empirical-financial-tests/contracts/empirical-tests.md`
 - [X] T056 Add `./tests/empirical` to the coverage test package list in `Makefile` while keeping `-coverpkg=$(PRODUCTION_PACKAGES)` unchanged
 - [X] T057 Run `gofmt` on Go files under `internal/support/math/`, `tests/empirical/`, and `tools/empiricaloracle/`
-- [X] T058 [P] Run synthetic and secret-content fixture review for `testdata/empirical/financial-dataset.yaml`, `testdata/empirical/golden/`, `testdata/empirical/hledger/`, `testdata/empirical/rotki/`, and `third_party/rotki/`, and verify no rotki source checkout is committed
+- [ ] T058 [P] ⚠️ Reopened (reopened — BUG-003): ~~Run synthetic and secret-content fixture review for `testdata/empirical/financial-dataset.yaml`, `testdata/empirical/golden/`, `testdata/empirical/hledger/`, `testdata/empirical/rotki/`, and `third_party/rotki/`, and verify no rotki source checkout is committed~~ Run synthetic and secret-content fixture review after hledger removal for `testdata/empirical/financial-dataset.yaml`, `testdata/empirical/golden/`, `testdata/empirical/rotki/`, and `third_party/rotki/`, and verify no hledger artifacts or rotki source checkout are committed
 - [X] T059 Run `make test` from the repository root for `Makefile` after BUG-001 and BUG-002 remediation is complete
 - [X] T060 Run `make coverage` from the repository root for `Makefile` after BUG-001 and BUG-002 remediation is complete
 - [X] T061 [P] Record OWASP Top 10 review evidence for empirical test infrastructure and the BUG-001/BUG-002 oracle replacement boundary in `specs/006-empirical-financial-tests/quickstart.md`
 - [X] T062 [P] Verify fixture-backed empirical test runtime target of 30 seconds or less with `go test ./tests/empirical -count=1 -v` after BUG-001 and BUG-002 remediation, verify no rotki download occurs, and document the observed result in `specs/006-empirical-financial-tests/quickstart.md`
-- [X] T063 Update `specs/006-empirical-financial-tests/spec.md`, `plan.md`, `research.md`, `data-model.md`, `quickstart.md`, and `contracts/oracle-output.md` to reflect the actually implemented external oracle provenance, rotki adapter constraints, verified untracked source execution boundary, Scope-Local Hybrid composite oracle, and superseded hledger-only/raw-rotki-output planning assumptions
+- [ ] T063 ⚠️ Reopened (reopened — BUG-003): Update `specs/006-empirical-financial-tests/spec.md`, `plan.md`, `research.md`, `data-model.md`, `quickstart.md`, and `contracts/oracle-output.md` to reflect the actually implemented external oracle provenance, rotki adapter constraints, verified untracked source execution boundary, Scope-Local Hybrid composite oracle, and ~~superseded hledger-only/raw-rotki-output planning assumptions~~ BUG-003 removal of hledger from active oracle, fixture, dependency, and documentation scope
 
 ---
 
@@ -197,26 +215,28 @@ description: "Task list for Empirical Solidified Financial Tests"
 - **US1 Dataset (Phase 3)**: Depends on Foundational completion.
 - **US2 Oracle (Phase 4)**: Depends on US1 because ~~hledger journals~~ external-oracle inputs and golden fixtures are generated from the validated dataset.
 - **US3 Empirical Tests (Phase 5)**: Depends on US1 and US2 because comparisons require the validated dataset and golden fixtures.
-- **BUG-001/BUG-002 Remediation (Phase 6)**: Depends on US1, reopened US2 oracle fixture work, reopened US3 empirical comparison work, a non-vendored verified rotki source acquisition boundary, and rejection of committed raw rotki outputs as oracle evidence; blocks polish acceptance and reopened T052.
-- **Polish (Phase 7)**: Depends on all selected objective phases and BUG-001/BUG-002 remediation completion.
+- **BUG-001/BUG-002 Remediation (Phase 6)**: Depends on US1, reopened US2 oracle fixture work, reopened US3 empirical comparison work, a non-vendored verified rotki source acquisition boundary, and rejection of committed raw rotki outputs as oracle evidence; blocks BUG-003 hledger removal, polish acceptance, and reopened T052.
+- **BUG-003 hledger Removal (Phase 7)**: Depends on BUG-001/BUG-002 remediation because rotki and composite-oracle paths must remain after hledger cleanup; blocks polish acceptance, reopened T058, and reopened T063.
+- **Polish (Phase 8)**: Depends on all selected objective phases, BUG-001/BUG-002 remediation completion, and BUG-003 hledger removal completion.
 
 ### Objective Dependency Graph
 
 ```text
-Setup -> Foundational -> US1 Dataset -> US2 Oracle -> US3 Empirical Tests -> BUG-001/BUG-002 Remediation -> Polish
+Setup -> Foundational -> US1 Dataset -> US2 Oracle -> US3 Empirical Tests -> BUG-001/BUG-002 Remediation -> BUG-003 hledger Removal -> Polish
 ```
 
 ### Parallel Opportunities
 
-- T002, T003, T004, and T005 can run in parallel after T001 creates directories.
+- T002, T003, T004, and T005 can run in parallel after T001 resolves setup paths.
 - T006, T008, T010, and T012 can run in parallel because they add tests in different files.
 - T014, T015, and T016 can run in parallel once Phase 2 is complete.
 - T024, T025, T026, T027, and T028 can run in parallel once US1 is complete.
 - T040, T041, T042, T043, and T044 can run in parallel once US2 is complete.
-- T053, T054, T055, T058, T061, and T062 can run in parallel during Polish.
+- T053, T054, T055, T061, and T062 can run in parallel during Polish after BUG-003 removal tasks complete.
 - T065 and T072 can run in parallel with independent implementation work after BUG-001 remediation starts.
 - T074 and T078 can run in parallel with source-boundary implementation after T076 establishes the verified rotki source acquisition path.
 - T080 can run in parallel with final fixture regeneration after T076 because it verifies the normal-test no-network rule and explicit-regeneration source path.
+- T081, T082, T083, and T084 can run in parallel after BUG-001/BUG-002 remediation establishes the active rotki and composite-oracle paths.
 
 ---
 
@@ -231,10 +251,10 @@ Task: "Add required coverage tag tests for every method and edge-case category f
 ## Parallel Example: User Story 2
 
 ```bash
-Task: "Add hledger vendoring contract tests for license text, source metadata, checksum, source presence, platform support, and runtime prohibition in tests/empirical/hledger_vendoring_test.go"
+Task: "Remove hledger vendoring contract tests and keep only rotki/composite-oracle boundary checks required by the current oracle model"
 Task: "Add oracle fixture schema tests for metadata, decimal strings, tolerances, hashes, methods, years, matches, and unsupported segments in tests/empirical/fixture/oracle_output_test.go"
-Task: "Add vendored hledger command wrapper tests for version detection, explicit file arguments, missing executable errors, unsupported version errors, and environment isolation in tools/empiricaloracle/command_test.go"
-Task: "Add hledger journal rendering tests for acquisitions, liquidations, fees, zero-priced reductions, same-date ordering, scope evidence, and unsupported cases in tools/empiricaloracle/journal_test.go"
+Task: "Remove hledger command wrapper tests and verify no hledger command wrapper remains in tools/empiricaloracle/"
+Task: "Remove hledger journal rendering tests and any active journal-rendering fixtures from tools/empiricaloracle/"
 ```
 
 ## Parallel Example: User Story 3
@@ -262,7 +282,8 @@ Task: "Add isolation boundary tests that reject Ghostfolio, TUI, snapshot, Markd
 1. Deliver US1 so the dataset is validated independently.
 2. Deliver US2 so ~~hledger inputs~~ external-oracle inputs and golden fixtures are reproducible from the dataset.
 3. Deliver US3 so project calculation output is compared to oracle fixtures.
-4. Run Polish verification with `go test ./tests/empirical -count=1 -v`, `make test`, and `make coverage`.
+4. Complete BUG-003 hledger removal.
+5. Run Polish verification with `go test ./tests/empirical -count=1 -v`, `make test`, and `make coverage`.
 
 ### Parallel Team Strategy
 
@@ -274,7 +295,7 @@ Task: "Add isolation boundary tests that reject Ghostfolio, TUI, snapshot, Markd
 
 ## Notes
 
-- Keep external oracle tooling behind a separate test-time boundary. Do not import, link, or execute hledger, rotki, or oracle adapters from runtime application code.
+- Keep external oracle tooling behind a separate test-time boundary. Do not import, link, or execute ~~hledger,~~ rotki, or oracle adapters from runtime application code.
 - Keep empirical artifacts synthetic. Do not add real tokens, JWTs, user activity, real account names, wallet names, proprietary financial records, raw protected snapshots, generated Markdown reports, TUI text, output filenames, or Documents paths.
 - Use `apd.Decimal` through existing decimal helpers. Do not introduce floating-point math in dataset parsing, oracle normalization, or comparison code.
 - Treat `testdata/empirical/financial-dataset.yaml` as read-only after this dataset-maintenance feature is complete.
