@@ -86,6 +86,55 @@ func TestDecimalPolicyConfiguration(t *testing.T) {
 	}
 }
 
+// TestDecimalPolicyConfigurationErrors verifies invalid decimal-policy
+// configuration forms and wrapped division-selection failures.
+// Authored by: OpenCode
+func TestDecimalPolicyConfigurationErrors(t *testing.T) {
+	for _, fixture := range []struct {
+		name        string
+		configured  string
+		wantMessage string
+	}{
+		{
+			name:        "missing comma separator",
+			configured:  "scale=16",
+			wantMessage: "must use the form",
+		},
+		{
+			name:        "empty scale",
+			configured:  "scale=,rounding=half_up",
+			wantMessage: "must use the form",
+		},
+		{
+			name:        "non digit scale",
+			configured:  "scale=1x,rounding=half_up",
+			wantMessage: "must use the form",
+		},
+		{
+			name:        "parse overflow",
+			configured:  "scale=999999999999999999999999999999999999,rounding=half_up",
+			wantMessage: "parse decimal policy",
+		},
+		{
+			name:        "unsupported scale",
+			configured:  "scale=15,rounding=half_up",
+			wantMessage: "is not supported",
+		},
+	} {
+		var fixture = fixture
+		t.Run(fixture.name, func(t *testing.T) {
+			t.Setenv(reportDecimalPolicyEnvironmentVariable, fixture.configured)
+
+			if _, err := selectedDecimalPolicy(); err == nil || !strings.Contains(err.Error(), fixture.wantMessage) {
+				t.Fatalf("expected decimal policy %q to fail with %q, got %v", fixture.configured, fixture.wantMessage, err)
+			}
+			if _, err := DivideFiniteRoundHalfUp(mustMathDecimal(t, "1"), mustMathDecimal(t, "3")); err == nil || !strings.Contains(err.Error(), "select division decimal policy") {
+				t.Fatalf("expected wrapped division decimal policy failure for %q, got %v", fixture.configured, err)
+			}
+		})
+	}
+}
+
 // TestRoundHalfUpDivisionAndFiniteValidation verifies the shared fixed-scale
 // division policy and finite-decimal guards.
 // Authored by: OpenCode

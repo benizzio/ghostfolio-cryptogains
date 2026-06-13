@@ -174,17 +174,17 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 **Purpose**: Finalize documentation, repository verification, formatting, coverage wiring, fixture review, and BUG-001/BUG-002 oracle-remediation evidence after Phase 6 is complete.
 
-- [ ] T053 [P] Update final empirical verification commands and oracle generation command after BUG-001 and BUG-002 remediation in `specs/006-empirical-financial-tests/quickstart.md`
-- [ ] T054 [P] Update final fixture names, comparability labels, unsupported-case policy, rotki source execution metadata examples, composite-oracle metadata examples, and superseded hledger/raw-rotki-output metadata notes in `specs/006-empirical-financial-tests/contracts/oracle-output.md`
-- [ ] T055 [P] Update empirical isolation notes for the rotki adapter, untracked source acquisition boundary, normal-test no-network rule, and composite oracle in `specs/006-empirical-financial-tests/contracts/empirical-tests.md`
-- [ ] T056 Add `./tests/empirical` to the coverage test package list in `Makefile` while keeping `-coverpkg=$(PRODUCTION_PACKAGES)` unchanged
-- [ ] T057 Run `gofmt` on Go files under `internal/support/math/`, `tests/empirical/`, and `tools/empiricaloracle/`
-- [ ] T058 [P] Run synthetic and secret-content fixture review for `testdata/empirical/financial-dataset.yaml`, `testdata/empirical/golden/`, `testdata/empirical/hledger/`, `testdata/empirical/rotki/`, and `third_party/rotki/`, and verify no rotki source checkout is committed
-- [ ] T059 Run `make test` from the repository root for `Makefile` after BUG-001 and BUG-002 remediation is complete
-- [ ] T060 Run `make coverage` from the repository root for `Makefile` after BUG-001 and BUG-002 remediation is complete
-- [ ] T061 [P] Record OWASP Top 10 review evidence for empirical test infrastructure and the BUG-001/BUG-002 oracle replacement boundary in `specs/006-empirical-financial-tests/quickstart.md`
-- [ ] T062 [P] Verify fixture-backed empirical test runtime target of 30 seconds or less with `go test ./tests/empirical -count=1 -v` after BUG-001 and BUG-002 remediation, verify no rotki download occurs, and document the observed result in `specs/006-empirical-financial-tests/quickstart.md`
-- [ ] T063 Update `specs/006-empirical-financial-tests/spec.md`, `plan.md`, `research.md`, `data-model.md`, `quickstart.md`, and `contracts/oracle-output.md` to reflect the actually implemented external oracle provenance, rotki adapter constraints, verified untracked source execution boundary, Scope-Local Hybrid composite oracle, and superseded hledger-only/raw-rotki-output planning assumptions
+- [X] T053 [P] Update final empirical verification commands and oracle generation command after BUG-001 and BUG-002 remediation in `specs/006-empirical-financial-tests/quickstart.md`
+- [X] T054 [P] Update final fixture names, comparability labels, unsupported-case policy, rotki source execution metadata examples, composite-oracle metadata examples, and superseded hledger/raw-rotki-output metadata notes in `specs/006-empirical-financial-tests/contracts/oracle-output.md`
+- [X] T055 [P] Update empirical isolation notes for the rotki adapter, untracked source acquisition boundary, normal-test no-network rule, and composite oracle in `specs/006-empirical-financial-tests/contracts/empirical-tests.md`
+- [X] T056 Add `./tests/empirical` to the coverage test package list in `Makefile` while keeping `-coverpkg=$(PRODUCTION_PACKAGES)` unchanged
+- [X] T057 Run `gofmt` on Go files under `internal/support/math/`, `tests/empirical/`, and `tools/empiricaloracle/`
+- [X] T058 [P] Run synthetic and secret-content fixture review for `testdata/empirical/financial-dataset.yaml`, `testdata/empirical/golden/`, `testdata/empirical/hledger/`, `testdata/empirical/rotki/`, and `third_party/rotki/`, and verify no rotki source checkout is committed
+- [X] T059 Run `make test` from the repository root for `Makefile` after BUG-001 and BUG-002 remediation is complete
+- [X] T060 Run `make coverage` from the repository root for `Makefile` after BUG-001 and BUG-002 remediation is complete
+- [X] T061 [P] Record OWASP Top 10 review evidence for empirical test infrastructure and the BUG-001/BUG-002 oracle replacement boundary in `specs/006-empirical-financial-tests/quickstart.md`
+- [X] T062 [P] Verify fixture-backed empirical test runtime target of 30 seconds or less with `go test ./tests/empirical -count=1 -v` after BUG-001 and BUG-002 remediation, verify no rotki download occurs, and document the observed result in `specs/006-empirical-financial-tests/quickstart.md`
+- [X] T063 Update `specs/006-empirical-financial-tests/spec.md`, `plan.md`, `research.md`, `data-model.md`, `quickstart.md`, and `contracts/oracle-output.md` to reflect the actually implemented external oracle provenance, rotki adapter constraints, verified untracked source execution boundary, Scope-Local Hybrid composite oracle, and superseded hledger-only/raw-rotki-output planning assumptions
 
 ---
 

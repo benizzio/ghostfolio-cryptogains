@@ -16,8 +16,9 @@ Validate the internal empirical suite that:
 
 - Go 1.26.3 installed
 - repository dependencies available through normal Go module resolution
-- documented external oracle materials present under `third_party/rotki/` and any retained hledger materials under `third_party/hledger/`
-- golden fixtures present under `testdata/empirical/golden/` for normal test runs
+- documented external oracle materials present under `third_party/rotki/` and retained hledger materials under `third_party/hledger/`
+- committed golden fixtures present under `testdata/empirical/golden/` for normal fixture-backed test runs
+- local Python available as `python3` or `python` only when explicit regeneration is required
 - no real user data in `testdata/empirical/`
 
 ## Validate Dataset And Fixtures
@@ -51,14 +52,14 @@ Expected result:
 
 - existing golden fixtures are loaded
 - external oracle generation is not invoked while required fixtures are present
+- committed unsupported segments are logged as informational `skip_external_oracle` or `project_composition_only` cases without skipping supported fixture groups
 - dataset rows are translated into calculation-layer inputs
 - `calculate.Calculate` runs for every comparable method and year
 - normalized project output matches oracle output under the documented decimal-policy and financial-tolerance contract
-- if the selected external oracle cannot match the production 16-decimal policy, the empirical command configures `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` to the external-oracle-established policy before project calculation runs
-- accepted decimal-policy values use the form `scale=<digits>,rounding=half_up`; `scale=16,rounding=half_up` is required and matches the production default
-- quantity tolerance is zero, and any non-zero financial tolerance is capped at one unit of the selected decimal-policy scale
+- the committed fixtures use `scale=16,rounding=half_up`, which matches the production default
+- quantity tolerance is zero, and the committed fixtures currently use zero financial tolerance for every compared financial field
 - failures, if any, identify case, method, year, asset, field, selected decimal policy, expected value, actual value, difference, tolerance, and source IDs
-- fixture-backed empirical tests complete in 30 seconds or less when required golden fixtures are present
+- observed in this checkout on 2026-06-13: `go test ./tests/empirical -count=1 -v` completed in `0.105s` wall-clock (`ok ... 0.042s`), with no fixture-generation or rotki-download step
 
 ## Run Full Repository Verification
 
@@ -72,18 +73,38 @@ make coverage
 Expected result:
 
 - existing contract, integration, unit, package-local, and empirical tests pass according to the final implementation task configuration
+- existing contract, integration, unit, package-local, and empirical tests pass
 - coverage gate still passes for maintained production packages
 - empirical tests remain supplemental and do not replace existing suites
 
 ## Missing Golden Fixture Path
 
 1. Remove or withhold one golden fixture in a controlled development branch.
-2. Run the documented empirical generation command implemented by this feature.
+2. Generate only the missing fixture with:
+
+```bash
+go run ./tools/empiricaloracle
+```
+
+3. If you want the test run itself to opt in to missing-fixture generation instead of failing with setup guidance, run:
+
+```bash
+GHOSTFOLIO_CRYPTOGAINS_GENERATE_MISSING_FIXTURES=true go test ./tests/empirical -count=1 -v
+```
+
+4. For an explicit full refresh of committed oracle artifacts, run:
+
+```bash
+go run ./tools/empiricaloracle --regenerate
+```
 
 Expected result:
 
-- the helper resolves the documented external oracle or adapter boundary
+- the helper writes deterministic hledger journals under `testdata/empirical/hledger/`
+- the helper writes deterministic rotki adapter inputs under `.cache/empiricaloracle/oracle-inputs/`
+- the helper resolves the verified rotki source boundary only when a golden fixture is absent or `--regenerate` is used
 - external oracle name, source URL, pinned version or commit, and adapter constraints are checked and recorded
+- rotki source checksum is checked and recorded
 - adapter or command arguments are explicit and recorded
 - generated external-oracle input and normalized output hashes are recorded
 - missing or unsupported external oracle boundaries fail with an actionable setup error
@@ -104,11 +125,11 @@ Expected result:
 - applicable license text is present
 - upstream source URL is documented
 - selected version or commit is documented
-- source and artifact checksums are documented
+- source checksum is documented
 - adapter constraints for FIFO, LIFO, HIFO, and Average Cost aggregate fixtures are documented
 - Scope-Local Hybrid composite-rule provenance is documented
-- supported artifact paths, platform support, and failure modes are documented
-- no prohibited binary-only vendoring is used
+- the verified rotki source cache path is `.cache/empiricaloracle/rotki-source/`
+- no vendored rotki source checkout or committed raw rotki output is used as oracle evidence
 
 ## Inspect Empirical Artifacts
 
@@ -117,29 +138,36 @@ Inspect:
 ```text
 testdata/empirical/financial-dataset.yaml
 testdata/empirical/golden/
-testdata/empirical/rotki/
+testdata/empirical/rotki/        # README-only deprecation metadata
 testdata/empirical/hledger/       # if retained for historical or auxiliary test-time material
 ```
 
 Expected result:
 
 - artifacts are synthetic and reviewable
-- golden fixtures include external oracle name, source URL, pinned version or commit, adapter arguments, dataset hash, external-oracle input hash, output hash, and normalization version
+- golden fixtures include external oracle name, source URL, source checksum, pinned version or commit, adapter arguments, dataset hash, external-oracle input hash, output hash, and normalization version
 - unsupported external-oracle field-level segments have explicit reasons and zero-priced holding reductions are not counted as supported external-oracle coverage
 - comparable fields are identified by case, method, year, asset, source-row segment, expected value, tolerance, and support status
-- Scope-Local Hybrid assertions are labeled as `rotki_backed` arithmetic evidence or `project_composition_rule`
+- current Scope-Local Hybrid fixtures use `rotki_backed` match evidence plus `project_composition_only` unsupported segments for project-owned lifecycle assertions
 - no artifact contains tokens, JWTs, real user data, protected snapshot payloads, generated Markdown reports, TUI text, or output paths
 
 ## OWASP Top 10 Review Evidence
 
-Before merge, record the OWASP Top 10 categories reviewed for this empirical test infrastructure and the resulting evidence. The review must cover at least the categories already scoped in `plan.md`: cryptographic failures, identification and authentication failures, insecure design, vulnerable and outdated components, software and data integrity failures, and logging or diagnostic leakage.
+Recorded review evidence for the implemented empirical boundary:
+
+- A02 Cryptographic Failures: the empirical suite does not read or write protected snapshot storage; `tests/empirical/isolation_test.go` forbids `internal/snapshot` imports, and the suite works only from synthetic dataset and fixture files.
+- A07 Identification and Authentication Failures: the empirical suite does not call Ghostfolio authentication or transport code; `tests/empirical/isolation_test.go` forbids `internal/ghostfolio`, and synthetic-content validation rejects token-like and JWT-like fixture content.
+- A04 Insecure Design: normal fixture-backed runs load committed golden fixtures and do not require oracle generation; `tests/empirical/fixture/oracle_generation_policy.go` allows generation only after an explicit missing-fixture opt-in, and `tools/empiricaloracle/main_test.go` verifies the default helper path does not resolve rotki or hledger when fixtures already exist.
+- A06 Vulnerable and Outdated Components: the rotki boundary is pinned to release `v1.43.1`, commit `a2e00be49a0ea36e7563a5d235cfa6a7c91edbfb`, and source checksum `sha256:8434b653104f8d5b0638e98d88a5ef256fac7720cc459eb33b729e2848900e3b` in `third_party/rotki/README.md`, and regeneration revalidates that pin in `tools/empiricaloracle/rotki_source.go`.
+- A08 Software and Data Integrity Failures: oracle fixtures record and validate `dataset_input_hash`, `external_oracle_input_hash`, `source_checksum`, and `oracle_output_hash`; `tests/empirical/fixture/oracle_output.go` revalidates canonical JSON and the stable fixture hash, and rotki boundary tests reject vendored source and committed raw rotki outputs as regeneration evidence.
+- A09 Security Logging and Monitoring Failures: comparison failures are formatted only with case, method, year, asset, field, expected value, actual value, difference, tolerance, decimal policy, and source IDs; the empirical isolation tests forbid report-output filenames and Documents-path handling, and fixture validation rejects secret-like content.
 
 Expected result:
 
-- the review confirms the suite does not touch protected storage or token boundaries
-- the review confirms persisted fixtures are synthetic and non-secret
-- the review records external oracle provenance, adapter, composite-oracle, and generated-fixture integrity controls
-- the review records failure-output leakage controls
+- the suite stays outside protected storage and token boundaries
+- persisted fixtures remain synthetic and non-secret
+- external-oracle provenance, adapter, composite-oracle, and fixture-integrity controls are documented and validated
+- failure output stays limited to non-secret comparison context
 
 ## Manual Failure Inspection
 

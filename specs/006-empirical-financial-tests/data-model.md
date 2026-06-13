@@ -154,7 +154,7 @@ Fields:
 | `ledger_id` | string | Stable identifier for generated external-oracle input |
 | `method` | string | Cost-basis method or method family |
 | `case_ids` | string array | Dataset cases represented |
-| `oracle_input_path` | path | Repository path under `testdata/empirical/<oracle>/` |
+| `external_oracle_input_path` | path | Repository path under `testdata/empirical/hledger/` for retained journals or untracked cache path under `.cache/empiricaloracle/oracle-inputs/` for generated rotki adapter inputs |
 | `dataset_input_hash` | string | Hash of the source dataset used to generate the ledger |
 | `external_oracle_input_hash` | string | Hash of the generated external-oracle input |
 | `generation_notes` | string array | Notes about representation or unsupported fragments |
@@ -184,9 +184,9 @@ Fields:
 | `source_url` | URL | Upstream source URL |
 | `license` | string | Applicable license identifier and compatibility notes |
 | `license_path` | path | Vendored license text path |
-| `source_path` | path | Repository-controlled source or source-provenance path under `third_party/` |
-| `artifact_paths` | path array | Supported executable, adapter, or source artifact paths under `third_party/` or `tools/empiricaloracle/` |
-| `executable_checksums` | string map | Checksum for each supported executable artifact |
+| `source_path` | path | Repository-controlled vendored-source path or provenance path; rotki uses repository metadata under `third_party/rotki/` while verified source execution reuses the untracked cache root under `.cache/empiricaloracle/rotki-source/` |
+| `artifact_paths` | path array | Supported executable, adapter, manifest, generated-input, or source-cache paths under `third_party/`, `tools/empiricaloracle/`, or `.cache/empiricaloracle/` |
+| `executable_checksums` | string map | Checksum for each supported executable artifact when an executable exists |
 | `source_checksum` | string | Checksum for vendored source or documented source artifact |
 | `adapter_constraints` | string array | Method support, unsupported case, and argument constraints for fixture generation |
 | `executable_path` | path nullable | Test-time command path when an executable boundary is available |
@@ -203,6 +203,36 @@ Validation rules:
 - Each supported executable artifact has a matching checksum.
 - Runtime application code must not import or execute hledger, rotki, oracle adapters, or composite oracle helpers.
 - Missing or unsupported external oracle boundary fails fixture generation with an actionable setup error, not normal fixture-backed comparisons.
+
+## RotkiSourceVerificationManifest
+
+Purpose: Untracked local verification record for the pinned rotki source archive and extracted source tree reused by explicit regeneration only.
+
+Fields:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `source_url` | URL | Pinned rotki source-archive URL |
+| `source_checksum` | string | Expected SHA-256 for the pinned archive |
+| `release_tag` | string | Pinned upstream release tag |
+| `resolved_commit` | string | Verified peeled commit for the pinned tag |
+| `signed_tag_object` | string | Verified signed tag object returned by `git ls-remote` |
+| `source_archive_path` | path | Untracked cache path for the pinned archive |
+| `source_root_path` | path | Untracked cache path for the extracted source tree |
+| `rotki_adapter_path` | path | Project-owned adapter path used for execution |
+| `verified_at` | timestamp | Verification timestamp |
+| `verification_method` | string | Current implementation value is `archive_sha256+git_ls_remote_tag` |
+
+Relationships:
+
+- Used by rotki-backed `OracleGenerationRun` values during explicit regeneration.
+- Refers to the `ExternalOracleBoundary` for pinned provenance and adapter metadata.
+
+Validation rules:
+
+- Must be written only under `.cache/empiricaloracle/rotki-source/verified-source.json`.
+- Must point to `.cache/empiricaloracle/rotki-source/rotki-v1.43.1.tar.gz` and `.cache/empiricaloracle/rotki-source/rotki-1.43.1` in the current implementation.
+- Must reject vendored rotki source paths such as `third_party/rotki/source`.
 
 ## OracleGenerationRun
 
@@ -226,7 +256,7 @@ Fields:
 
 Relationships:
 
-- Uses one `ExternalOracleBoundary`.
+- Uses one `ExternalOracleBoundary` and, for rotki-backed regeneration, one `RotkiSourceVerificationManifest`.
 - Reads one or more `OracleInputLedger` values.
 - Writes one or more `OracleOutput` fixtures.
 
@@ -285,8 +315,8 @@ Fields:
 | `matched_basis` | decimal string | Basis matched |
 | `matched_proceeds` | decimal string nullable | Proceeds evidence when comparable |
 | `matched_gain_or_loss` | decimal string nullable | Fragment-level result when comparable |
-| `support_label` | enum | `rotki_backed` or `project_composition_rule` |
-| `composition_rule_id` | string nullable | Required for `project_composition_rule` evidence |
+| `support_label` | enum | Current committed fixtures use `rotki_backed`; `project_composition_rule` remains reserved by the shared model but is not currently emitted |
+| `composition_rule_id` | string nullable | Reserved for future `project_composition_rule` evidence; current committed fixtures leave it empty |
 
 Relationships:
 
@@ -297,7 +327,7 @@ Validation rules:
 
 - Quantities sum to represented disposal quantities.
 - Missing selected-oracle evidence is explicit, not inferred silently.
-- Scope-Local Hybrid evidence is labeled as rotki-backed arithmetic evidence or project-owned composition-rule evidence.
+- Current Scope-Local Hybrid committed fixtures record rotki-backed arithmetic evidence here and move remaining project-owned routing or lifecycle segments into `UnsupportedOracleSegment` with `project_composition_only`.
 
 ## UnsupportedOracleSegment
 
@@ -323,6 +353,7 @@ Validation rules:
 - Reason is required.
 - Unsupported segments must not fabricate external-oracle-derived expected values.
 - Zero-priced holding reductions are excluded from empirical external-oracle fixture scope after BUG-001 and should not remain as supported fixture groups or hledger-specific unsupported segments.
+- Current committed hybrid fixtures use `project_composition_only` here for project-owned routing or lifecycle segments, and average-cost fixtures use `skip_external_oracle` here for pool-provenance gaps.
 
 ## ProjectCalculationOutput
 

@@ -11,8 +11,8 @@ This contract defines generated external-oracle input files, normalized oracle g
 Generated external-oracle inputs:
 
 ```text
-testdata/empirical/rotki/
-testdata/empirical/hledger/       # retained only when auxiliary or historical hledger inputs remain relevant
+.cache/empiricaloracle/oracle-inputs/
+testdata/empirical/hledger/       # retained deterministic hledger journals
 ```
 
 Normalized golden fixtures:
@@ -26,6 +26,7 @@ External oracle materials:
 ```text
 third_party/rotki/
 third_party/hledger/       # retained only when auxiliary or historical hledger materials remain relevant
+testdata/empirical/rotki/  # README-only deprecation metadata, not oracle evidence
 ```
 
 Oracle helper code:
@@ -40,50 +41,95 @@ tools/empiricaloracle/
 {
   "fixture_version": "1",
   "dataset_version": "1",
-  "case_id": "case-fifo-basic-2024",
+  "case_id": "case-fifo-alpha-2024",
   "method": "fifo",
   "year": 2024,
   "asset_identity_key": "asset-alpha",
   "values": {
-    "realized_gain_or_loss": "5",
-    "allocated_basis": "10",
-    "closing_quantity": "0",
-    "closing_basis": "0"
+    "realized_gain_or_loss": "19.6666666666666667",
+    "allocated_basis": "17.3333333333333333",
+    "closing_quantity": "8",
+    "closing_basis": "94"
   },
   "matches": [
     {
-      "disposed_source_id": "emp-act-000010",
-      "acquisition_source_id": "emp-act-000001",
+      "disposed_source_id": "emp-act-000053",
+      "acquisition_source_id": "emp-act-000004",
       "matched_quantity": "1",
-      "matched_basis": "10",
-      "matched_proceeds": "15",
-      "matched_gain_or_loss": "5"
+      "matched_basis": "3.3333333333333333",
+      "matched_proceeds": "21",
+      "matched_gain_or_loss": "17.6666666666666667",
+      "support_label": "rotki_backed"
     }
   ],
   "unsupported_segments": [],
   "metadata": {
     "oracle_name": "rotki",
-    "source_url": "https://github.com/rotki/rotki",
-    "version_or_commit": "<pinned-version-or-commit>",
-    "adapter_arguments": ["--method", "fifo", "--input", "testdata/empirical/rotki/fifo.json"],
-    "adapter_constraints": ["zero-priced reductions excluded from external-oracle fixture generation"],
+    "source_url": "https://github.com/rotki/rotki/archive/refs/tags/v1.43.1.tar.gz",
+    "source_checksum": "sha256:8434b653104f8d5b0638e98d88a5ef256fac7720cc459eb33b729e2848900e3b",
+    "version_or_commit": "a2e00be49a0ea36e7563a5d235cfa6a7c91edbfb",
+    "adapter_arguments": [
+      "--source-root",
+      ".cache/empiricaloracle/rotki-source/rotki-1.43.1",
+      "--input",
+      ".cache/empiricaloracle/oracle-inputs/fifo/case-fifo-alpha-2024.json",
+      "--rotki-method",
+      "fifo",
+      "--method",
+      "fifo"
+    ],
+    "adapter_constraints": [
+      "Verified pinned rotki source archive execution from an untracked project-local cache",
+      "Zero-priced holding reductions are excluded from external-oracle fixture generation"
+    ],
+    "dataset_input_hash": "sha256:6287f862061b1f51d795694ab768b1927ff4422cc94b10a7ef053b45ef581042",
+    "external_oracle_input_hash": "sha256:b53828dfc811cbb906acf379084a14b5ce30862453970205ed19c517692dd40f",
     "decimal_policy": "scale=16,rounding=half_up",
-    "dataset_input_hash": "sha256:...",
-    "external_oracle_input_hash": "sha256:...",
     "normalization_version": "1",
-    "composite_rule_version": null,
     "financial_tolerances": {
-      "realized_gain_or_loss": "0.0000000000000001",
-      "allocated_basis": "0.0000000000000001",
-      "closing_basis": "0.0000000000000001"
+      "realized_gain_or_loss": "0",
+      "allocated_basis": "0",
+      "closing_basis": "0"
     },
-    "tolerance_notes": {
-      "realized_gain_or_loss": "One-unit residual from external-oracle output scale after decimal-policy alignment for this fixture"
-    },
-    "oracle_output_hash": "sha256:..."
+    "tolerance_notes": {},
+    "oracle_output_hash": "sha256:dc2c394c49a645bcefbf2770e1ae874bcaa7c1910089eb25b39dc0d833a14c51"
   }
 }
 ```
+
+Scope-Local Hybrid composite fixtures use the same top-level shape with:
+
+```json
+{
+  "metadata": {
+    "oracle_name": "scope_local_hybrid_composite",
+    "adapter_arguments": [
+      "--source-root",
+      ".cache/empiricaloracle/rotki-source/rotki-1.43.1",
+      "--input",
+      ".cache/empiricaloracle/oracle-inputs/scope-local-hybrid/case-scope-local-reliable-epsilon-2024.json",
+      "--rotki-method",
+      "average_cost",
+      "--method",
+      "scope_local_hybrid"
+    ],
+    "composite_rule_version": "scope_local_hybrid_composite_v1"
+  }
+}
+```
+
+## Current Committed Fixture Set
+
+- `fifo/case-fifo-alpha-2024.json`
+- `lifo/case-lifo-beta-2024.json`
+- `hifo/case-hifo-gamma-2024.json`
+- `average-cost/case-average-cost-delta-2024.json`
+- `average-cost/case-average-cost-reset-delta-2024.json`
+- `average-cost/case-post-year-ignore-delta-2024.json`
+- `scope-local-hybrid/case-scope-local-broadening-gamma-2024--asset-delta.json`
+- `scope-local-hybrid/case-scope-local-broadening-gamma-2024--asset-gamma.json`
+- `scope-local-hybrid/case-scope-local-reliable-epsilon-2024.json`
+- `scope-local-hybrid/case-scope-local-reset-epsilon-2024.json`
 
 ## Required Metadata
 
@@ -91,6 +137,7 @@ Every golden fixture must include:
 
 - external oracle name
 - external oracle source URL
+- external oracle source checksum
 - pinned version or commit
 - exact adapter or command arguments
 - adapter constraints
@@ -127,8 +174,9 @@ Every golden fixture must include:
 
 - A field is comparable only when the fixture contains a normalized expected value for the same case, method, year, asset, and source-row segment.
 - Full-liquidation effects and method-specific lot or pool evidence are comparable only when the fixture records the evidence source IDs and expected values.
-- Scope-Local Hybrid (`scope_local_hybrid`) assertions must be labeled `rotki_backed` or `project_composition_rule`.
-- A `project_composition_rule` assertion must include a stable rule ID and the source-row segment it covers.
+- Current committed fixtures use `rotki_backed` match evidence only.
+- Scope-Local Hybrid (`scope_local_hybrid`) project-owned lifecycle assertions are currently represented by `unsupported_segments` with `comparison_policy: project_composition_only` rather than by committed `project_composition_rule` match rows.
+- The schema still permits `project_composition_rule` match evidence. If added later, it must include a stable `composition_rule_id` and the source-row segment it covers.
 - Unsupported fields must be reported as skipped with the unsupported reason and must not be counted as matched external-oracle assertions.
 - Supported empirical fixture groups must not be skipped before project calculation and oracle comparison. Unsupported field-level segments may be skipped only when fixture metadata records an explicit reason.
 
@@ -138,11 +186,23 @@ If the selected external oracle cannot represent a dataset segment without chang
 
 ```json
 {
-  "case_id": "case-selected-oracle-unrepresentable",
-  "method": "fifo",
-  "activity_source_ids": ["emp-act-000090"],
-  "reason": "selected external oracle cannot represent this field-level segment without changing financial meaning",
+  "case_id": "case-average-cost-delta-2024",
+  "method": "average_cost",
+  "activity_source_ids": ["emp-act-000085"],
+  "reason": "Average-cost pool provenance remains outside the verified rotki aggregate oracle boundary",
   "comparison_policy": "skip_external_oracle"
+}
+```
+
+Current committed Scope-Local Hybrid fixtures also use:
+
+```json
+{
+  "case_id": "case-scope-local-reliable-epsilon-2024",
+  "method": "scope_local_hybrid",
+  "activity_source_ids": ["emp-act-000041", "emp-act-000042", "emp-act-000091", "emp-act-000092", "emp-act-000094"],
+  "reason": "Hybrid lifecycle composition remains project-owned outside the repository-controlled composite scope slice",
+  "comparison_policy": "project_composition_only"
 }
 ```
 
@@ -158,8 +218,11 @@ Rules:
 
 - Empirical tests read golden fixtures by default.
 - External oracle generation is allowed only when a required fixture is absent or when an explicit regeneration command is used.
+- Fixture-backed test runs use `go test ./tests/empirical -count=1 -v` and must not require `.cache/empiricaloracle/rotki-source/` while committed fixtures are present.
+- Missing-fixture generation from the empirical tests is opt-in through `GHOSTFOLIO_CRYPTOGAINS_GENERATE_MISSING_FIXTURES=true`, which runs `go run ./tools/empiricaloracle`.
+- Explicit full regeneration uses `go run ./tools/empiricaloracle --regenerate`.
 - The command or adapter must resolve only repository-controlled external oracle boundaries and pinned source or artifact metadata.
-- The command or adapter must not use a developer's default local accounting configuration, external user data, or unpinned system installation.
+- The command or adapter must not use a developer's default local accounting configuration, a global `rotki` executable, committed raw rotki payloads, or unpinned system installation.
 - The command must pass explicit file arguments.
 - The command or adapter must record oracle name, source URL, pinned version or commit, adapter constraints, and arguments before normalization.
 - Missing, non-executable, or unsupported external oracle boundaries must fail fixture generation with an actionable setup error.
@@ -171,13 +234,18 @@ Rules:
 - applicable license text
 - upstream source URL
 - selected version or commit
-- checksum for vendored source or source artifact
-- checksum for each supported executable or adapter artifact
+- checksum for the pinned rotki source archive or vendored hledger source artifact
+- checksum for each supported vendored hledger executable artifact
 - source provenance and corresponding source where the applicable license requires it
 - supported executable, source, or adapter artifact paths
 - platform support notes
 - regeneration instructions
 - statement that runtime application code must not link, import, or execute hledger, rotki, oracle adapters, or composite oracle helpers
+
+Superseded materials:
+
+- `testdata/empirical/rotki/` must remain README-only deprecation metadata.
+- Committed raw rotki outputs, hand-authored rotki datasets, and `third_party/rotki/source/` are invalid oracle evidence.
 
 Binary-only vendoring is invalid unless the applicable license and source-distribution obligations are satisfied and documented.
 
