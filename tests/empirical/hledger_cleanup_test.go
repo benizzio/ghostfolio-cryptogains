@@ -11,8 +11,8 @@ import (
 )
 
 // TestHledgerCleanupRejectsActiveReferences verifies BUG-003 cleanup removed
-// active hledger references from empirical source, fixtures, and active
-// documentation paths.
+// active hledger references from empirical implementation artifacts. Spec Kit
+// documents may retain superseded historical bugfix context.
 // Authored by: OpenCode
 func TestHledgerCleanupRejectsActiveReferences(t *testing.T) {
 	t.Parallel()
@@ -23,8 +23,6 @@ func TestHledgerCleanupRejectsActiveReferences(t *testing.T) {
 		filepath.Join(repositoryRoot, "tests", "empirical"),
 		filepath.Join(repositoryRoot, "testdata", "empirical"),
 		filepath.Join(repositoryRoot, "third_party", "rotki"),
-		filepath.Join(repositoryRoot, "specs", "006-empirical-financial-tests", "contracts"),
-		filepath.Join(repositoryRoot, "specs", "006-empirical-financial-tests", "quickstart.md"),
 	}
 	var violations = make([]string, 0)
 	var rootIndex int

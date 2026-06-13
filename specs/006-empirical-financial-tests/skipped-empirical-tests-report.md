@@ -1,7 +1,7 @@
 # Skipped Empirical Financial Tests Report
 
-**Generated**: 2026-06-10  
-**Command used**: `go test ./tests/empirical -count=1 -v`  
+**Generated**: 2026-06-10
+**Command used**: `go test ./tests/empirical -count=1 -v`
 **Primary skip source**: `tests/empirical/empirical_calculation_test.go:71-73`, with skip policy in `empiricalCaseComparisonSkipReason` at `tests/empirical/empirical_calculation_test.go:178-190`.
 
 ## Summary

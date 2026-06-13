@@ -8,7 +8,7 @@ was executed here.
 
 ## Why This Exists
 
-- BUG-001 supersedes the previous hledger-only acceptance assumption.
+- BUG-001 supersedes the previous single-oracle acceptance assumption.
 - rotki is the planned pure-method external oracle boundary for `fifo`, `lifo`,
   `hifo`, and `average_cost` aggregate comparisons.
 - `scope_local_hybrid` remains a composite oracle and is not documented here as a

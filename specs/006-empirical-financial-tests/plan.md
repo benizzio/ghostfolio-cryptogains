@@ -58,7 +58,7 @@ BUG-003 dependency constraint: hledger is not retained as a historical or auxili
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-Pre-research gate status: PASS  
+Pre-research gate status: PASS
 Post-design gate status: PASS
 
 - [x] Security: This is internal test infrastructure with synthetic data only. The empirical dataset, ~~hledger journals~~ external-oracle inputs, and golden fixtures must not include real user activity, real account names, wallet names, tokens, JWTs, protected snapshot payloads, proprietary financial records, or copied upstream examples. No artifact is written to protected app storage, user Documents, or OS-specific application config. Token handling is not exercised by the empirical suite. Redaction review focuses on failure output, fixture content, and generated artifacts. OWASP Top 10 review evidence must be recorded before merge. OWASP review scope for implementation covers cryptographic failures only to confirm the suite does not touch protected storage, identification and authentication failures only to confirm no token boundary is involved, insecure design, vulnerable or outdated components, software and data integrity failures, and logging or diagnostic leakage.
