@@ -206,6 +206,30 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 ---
 
+## Phase 9: Coding Standards Drift Remediation
+
+**Purpose**: Remediate the coding-standards drift findings recorded in `specs/006-empirical-financial-tests/coding-standards-drift-report.md` after the normal implementation task list is complete.
+
+**Dependencies**: All prior setup, foundational, objective, bugfix, hledger-removal, and polish tasks must remain complete before starting this phase.
+
+- [ ] T086 Remediate CODE-STAND-DRIFT-001 (High) Shared Math Helper Reads Process Environment from `specs/006-empirical-financial-tests/coding-standards-drift-report.md#code-stand-drift-001-shared-math-helper-reads-process-environment` by moving `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` selection out of the shared math helper boundary and into an explicit caller/test boundary while preserving decimal-policy behavior in `internal/support/math/decimal_policy.go` and `internal/support/math/decimal_ops.go`
+- [ ] T087 Remediate CODE-STAND-DRIFT-002 (Medium) Empirical Fixture Duplicates Runtime Scope-Reliability Rules from `specs/006-empirical-financial-tests/coding-standards-drift-report.md#code-stand-drift-002-empirical-fixture-duplicates-runtime-scope-reliability-rules` by making `tests/empirical/fixture/project_translation.go` reuse a single runtime scope-reliability rule source instead of duplicating logic from `internal/sync/normalize/activity_history.go`
+- [ ] T088 Remediate CODE-STAND-DRIFT-003 (Medium) Oracle Command `run` Mixes Multiple Responsibilities from `specs/006-empirical-financial-tests/coding-standards-drift-report.md#code-stand-drift-003-oracle-command-run-mixes-multiple-responsibilities` by splitting CLI parsing, repository path resolution, dataset and fixture loading, rotki source setup, generation routing, artifact writing, and user-facing reporting responsibilities in `tools/empiricaloracle/main.go`
+- [ ] T089 Remediate CODE-STAND-DRIFT-004 (Medium) Rotki Adapter Boundary Uses Generic Payloads And Mixed Logic from `specs/006-empirical-financial-tests/coding-standards-drift-report.md#code-stand-drift-004-rotki-adapter-boundary-uses-generic-payloads-and-mixed-logic` by replacing generic payload interpretation with explicit adapter input/output parsing and splitting oracle execution, normalization, match-evidence, closing-state, and response construction in `tools/empiricaloracle/rotki_adapter.py`
+- [ ] T090 Remediate CODE-STAND-DRIFT-005 (Medium) Coverage Target Omits The Empirical Fixture Subpackage from `specs/006-empirical-financial-tests/coding-standards-drift-report.md#code-stand-drift-005-coverage-target-omits-the-empirical-fixture-subpackage` by updating `Makefile` coverage package execution so `./tests/empirical/fixture` tests such as `tests/empirical/fixture/model_test.go` run during `make coverage`
+- [ ] T091 Remediate CODE-STAND-DRIFT-006 (Medium) External Source Boundary Documentation Omits Required Integration Details from `specs/006-empirical-financial-tests/coding-standards-drift-report.md#code-stand-drift-006-external-source-boundary-documentation-omits-required-integration-details` by documenting the authentication model, expected external failure modes, and security implications for the GitHub archive download and `git ls-remote` verification boundary in `third_party/rotki/README.md`, aligned with `tools/empiricaloracle/rotki_source.go`
+- [ ] T092 Remediate CODE-STAND-DRIFT-007 (Low) AI-Authored Feature Packages Lack Package-Level Documentation from `specs/006-empirical-financial-tests/coding-standards-drift-report.md#code-stand-drift-007-ai-authored-feature-packages-lack-package-level-documentation` by adding or correcting package-level documentation and OpenCode authoring blocks for `tools/empiricaloracle/main.go`, `tests/empirical/dataset_validation_test.go`, `tests/empirical/fixture/model.go`, and the corresponding package `doc.go` files when present
+- [ ] T093 Remediate CODE-STAND-DRIFT-008 (Low) Dataset Validation Test Documentation Is Stale from `specs/006-empirical-financial-tests/coding-standards-drift-report.md#code-stand-drift-008-dataset-validation-test-documentation-is-stale` by updating comments in `tests/empirical/dataset_validation_test.go` so parser and validator hook documentation reflects the current `fixture.LoadEmpiricalDataset` and `fixture.ValidateEmpiricalDataset` implementation
+- [ ] T094 Remediate CODE-STAND-DRIFT-009 (Low) Active Oracle Code Retains Journal Terminology from `specs/006-empirical-financial-tests/coding-standards-drift-report.md#code-stand-drift-009-active-oracle-code-retains-journal-terminology` by replacing active journal and lot-mode naming with rotki/composite-oracle terminology in `tools/empiricaloracle/oracle_helpers.go`, `tools/empiricaloracle/unsupported.go`, and `specs/006-empirical-financial-tests/contracts/dataset-format.md`
+- [ ] T095 Remediate CODE-STAND-DRIFT-010 (Low) Exported Fixture Helper Lacks Public Usage Documentation from `specs/006-empirical-financial-tests/coding-standards-drift-report.md#code-stand-drift-010-exported-fixture-helper-lacks-public-usage-documentation` by expanding the public documentation for `NormalizeProjectCalculationOutputForCase` in `tests/empirical/fixture/project_output.go` with usage guidance suitable for callers in other packages
+- [ ] T096 Remediate CODE-STAND-DRIFT-011 (Low) Dead Helper Code Remains In Empirical Test Slice from `specs/006-empirical-financial-tests/coding-standards-drift-report.md#code-stand-drift-011-dead-helper-code-remains-in-empirical-test-slice` by removing the unused `allRequiredCoverageTags` helper from `tests/empirical/fixture/dataset_coverage_test.go` and the unused `calculate_open_state` helper from `tools/empiricaloracle/rotki_adapter.py`, adjusting tests only if a hidden dependency is found
+- [ ] T097 Run `gofmt` on Go files changed by coding-standards drift remediation under `internal/support/math/`, `internal/sync/normalize/`, `tests/empirical/`, and `tools/empiricaloracle/`
+- [ ] T098 Run coding-standards drift remediation verification with `go test ./tests/empirical/... ./tools/empiricaloracle ./internal/support/math ./internal/sync/normalize -count=1 -v`, `make test`, and `make coverage` from the repository root
+
+**Checkpoint**: Coding-standards drift findings are remediated and verified after the implementation feature work is complete.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -218,11 +242,12 @@ description: "Task list for Empirical Solidified Financial Tests"
 - **BUG-001/BUG-002 Remediation (Phase 6)**: Depends on US1, reopened US2 oracle fixture work, reopened US3 empirical comparison work, a non-vendored verified rotki source acquisition boundary, and rejection of committed raw rotki outputs as oracle evidence; blocks BUG-003 hledger removal, polish acceptance, and reopened T052.
 - **BUG-003 hledger Removal (Phase 7)**: Depends on BUG-001/BUG-002 remediation because rotki and composite-oracle paths must remain after hledger cleanup; blocks polish acceptance, reopened T058, and reopened T063.
 - **Polish (Phase 8)**: Depends on all selected objective phases, BUG-001/BUG-002 remediation completion, and BUG-003 hledger removal completion.
+- **Coding Standards Drift Remediation (Phase 9)**: Depends on all prior implementation, bugfix, hledger-removal, and polish tasks being complete.
 
 ### Objective Dependency Graph
 
 ```text
-Setup -> Foundational -> US1 Dataset -> US2 Oracle -> US3 Empirical Tests -> BUG-001/BUG-002 Remediation -> BUG-003 hledger Removal -> Polish
+Setup -> Foundational -> US1 Dataset -> US2 Oracle -> US3 Empirical Tests -> BUG-001/BUG-002 Remediation -> BUG-003 hledger Removal -> Polish -> Coding Standards Drift Remediation
 ```
 
 ### Parallel Opportunities
@@ -237,6 +262,7 @@ Setup -> Foundational -> US1 Dataset -> US2 Oracle -> US3 Empirical Tests -> BUG
 - T074 and T078 can run in parallel with source-boundary implementation after T076 establishes the verified rotki source acquisition path.
 - T080 can run in parallel with final fixture regeneration after T076 because it verifies the normal-test no-network rule and explicit-regeneration source path.
 - T081, T082, T083, and T084 can run in parallel after BUG-001/BUG-002 remediation establishes the active rotki and composite-oracle paths.
+- T090, T091, T093, T095, and T096 can run in parallel during coding-standards drift remediation because they touch independent files or documentation surfaces.
 
 ---
 
@@ -284,6 +310,7 @@ Task: "Add isolation boundary tests that reject Ghostfolio, TUI, snapshot, Markd
 3. Deliver US3 so project calculation output is compared to oracle fixtures.
 4. Complete BUG-003 hledger removal.
 5. Run Polish verification with `go test ./tests/empirical -count=1 -v`, `make test`, and `make coverage`.
+6. Complete coding-standards drift remediation after all normal implementation tasks are complete.
 
 ### Parallel Team Strategy
 
