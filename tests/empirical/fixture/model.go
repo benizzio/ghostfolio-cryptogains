@@ -1,3 +1,8 @@
+// Package fixture defines the project-owned empirical dataset, oracle fixture,
+// comparison, and project-output helper models used by empirical tests and the
+// regeneration-only oracle command.
+//
+// Authored by: OpenCode
 package fixture
 
 import (

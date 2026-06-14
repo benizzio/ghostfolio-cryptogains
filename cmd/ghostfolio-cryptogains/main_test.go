@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 )
 
 type fakeProgram struct {
@@ -72,6 +73,86 @@ func TestRunReturnsProgramError(t *testing.T) {
 
 	if err := run(); err == nil {
 		t.Fatalf("expected run error")
+	}
+}
+
+func TestRunAppliesDecimalPolicyOverrideFromEnvironment(t *testing.T) {
+	var previous = newProgram
+	defer func() { newProgram = previous }()
+	t.Cleanup(func() {
+		if err := supportmath.SetActiveDecimalPolicy(supportmath.DefaultDecimalPolicy()); err != nil {
+			t.Fatalf("reset active decimal policy: %v", err)
+		}
+	})
+
+	newProgram = func(model tea.Model, options ...tea.ProgramOption) programRunner {
+		return fakeProgram{}
+	}
+	t.Setenv("GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY", "scale=4,rounding=half_up")
+
+	var previousArgs = os.Args
+	defer func() { os.Args = previousArgs }()
+	os.Args = []string{"ghostfolio-cryptogains", "--config-dir", t.TempDir()}
+
+	if err := run(); err != nil {
+		t.Fatalf("run returned unexpected error: %v", err)
+	}
+	if got := supportmath.ActiveDecimalPolicy().CanonicalString(); got != "scale=4,rounding=half_up" {
+		t.Fatalf("unexpected active decimal policy after startup: %q", got)
+	}
+}
+
+func TestRunResetsDecimalPolicyToDefaultWhenEnvironmentUnset(t *testing.T) {
+	var previous = newProgram
+	defer func() { newProgram = previous }()
+
+	var customPolicy, err = supportmath.ParseDecimalPolicy("scale=4,rounding=half_up")
+	if err != nil {
+		t.Fatalf("parse custom decimal policy: %v", err)
+	}
+	if err = supportmath.SetActiveDecimalPolicy(customPolicy); err != nil {
+		t.Fatalf("set active decimal policy: %v", err)
+	}
+	t.Cleanup(func() {
+		if resetErr := supportmath.SetActiveDecimalPolicy(supportmath.DefaultDecimalPolicy()); resetErr != nil {
+			t.Fatalf("reset active decimal policy: %v", resetErr)
+		}
+	})
+
+	newProgram = func(model tea.Model, options ...tea.ProgramOption) programRunner {
+		return fakeProgram{}
+	}
+
+	var previousArgs = os.Args
+	defer func() { os.Args = previousArgs }()
+	os.Args = []string{"ghostfolio-cryptogains", "--config-dir", t.TempDir()}
+
+	if err = run(); err != nil {
+		t.Fatalf("run returned unexpected error: %v", err)
+	}
+	if got := supportmath.ActiveDecimalPolicy().CanonicalString(); got != supportmath.DefaultDecimalPolicy().CanonicalString() {
+		t.Fatalf("unexpected active decimal policy after startup: %q", got)
+	}
+}
+
+func TestRunReturnsDecimalPolicyConfigurationError(t *testing.T) {
+	t.Cleanup(func() {
+		if err := supportmath.SetActiveDecimalPolicy(supportmath.DefaultDecimalPolicy()); err != nil {
+			t.Fatalf("reset active decimal policy: %v", err)
+		}
+	})
+	t.Setenv("GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY", "scale=65,rounding=half_up")
+
+	var previousArgs = os.Args
+	defer func() { os.Args = previousArgs }()
+	os.Args = []string{"ghostfolio-cryptogains", "--config-dir", t.TempDir()}
+
+	var err = run()
+	if err == nil {
+		t.Fatalf("expected decimal-policy startup error")
+	}
+	if got := err.Error(); got == "" || !bytes.Contains([]byte(got), []byte("GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY")) || !bytes.Contains([]byte(got), []byte("exceeds maximum supported scale 64")) {
+		t.Fatalf("unexpected decimal-policy startup error: %v", err)
 	}
 }
 

@@ -134,8 +134,9 @@ Comparable output must include at least:
 - Accepted `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` values use the form `scale=<digits>,rounding=half_up`.
 - The required accepted value is `scale=16,rounding=half_up`, matching the production default.
 - The current committed fixtures all use `scale=16,rounding=half_up`.
-- Additional external-oracle-aligned accepted values may be added only when the selected external oracle cannot align with the production default, and each added value must be documented with the oracle name, pinned version or commit, and reason.
-- If the selected external oracle cannot be configured or normalized to match the default policy for every valid case, empirical tests must set `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` to the external-oracle-established policy before invoking project calculation.
+- `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` is an application-run-scoped override, not a test-only switch.
+- Additional external-oracle-aligned accepted values may be added only when the selected external oracle cannot align with the production default, and each added value must be documented with the oracle name, pinned version or commit, and reason. Practical custom scale values should stay at or below 64 for safety.
+- If the selected external oracle cannot be configured or normalized to match the default policy for every valid case, the relevant empirical test run must set `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` to the external-oracle-established policy before invoking project calculation.
 - Production behavior must keep the 16-decimal default when `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` is unset.
 - Financial value fields may use documented per-field tolerances only for residual external-oracle/project deviations after decimal-policy alignment.
 - Quantity tolerance is always zero.

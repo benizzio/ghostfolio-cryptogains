@@ -3,11 +3,13 @@ package bootstrap
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
+	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 )
 
 type fakeStore struct {
@@ -69,6 +71,107 @@ func TestParseOptionsAcceptsSupportedFlags(t *testing.T) {
 	}
 }
 
+func TestConfigureProcessDecimalPolicyUsesDefaultWhenUnset(t *testing.T) {
+	var previousLookupEnv = lookupEnv
+	defer func() {
+		lookupEnv = previousLookupEnv
+	}()
+
+	var customPolicy, err = supportmath.ParseDecimalPolicy("scale=4,rounding=half_up")
+	if err != nil {
+		t.Fatalf("parse custom decimal policy: %v", err)
+	}
+	if err = supportmath.SetActiveDecimalPolicy(customPolicy); err != nil {
+		t.Fatalf("set active decimal policy: %v", err)
+	}
+	t.Cleanup(func() {
+		if resetErr := supportmath.SetActiveDecimalPolicy(supportmath.DefaultDecimalPolicy()); resetErr != nil {
+			t.Fatalf("reset active decimal policy: %v", resetErr)
+		}
+	})
+
+	lookupEnv = func(string) (string, bool) {
+		return "", false
+	}
+
+	var policy supportmath.DecimalPolicy
+	policy, err = ConfigureProcessDecimalPolicy()
+	if err != nil {
+		t.Fatalf("configure process decimal policy: %v", err)
+	}
+	if got := policy.CanonicalString(); got != supportmath.DefaultDecimalPolicy().CanonicalString() {
+		t.Fatalf("unexpected configured policy: %q", got)
+	}
+	if got := supportmath.ActiveDecimalPolicy().CanonicalString(); got != supportmath.DefaultDecimalPolicy().CanonicalString() {
+		t.Fatalf("unexpected active decimal policy: %q", got)
+	}
+}
+
+func TestConfigureProcessDecimalPolicyAppliesEnvironmentOverride(t *testing.T) {
+	var previousLookupEnv = lookupEnv
+	defer func() {
+		lookupEnv = previousLookupEnv
+	}()
+	t.Cleanup(func() {
+		if resetErr := supportmath.SetActiveDecimalPolicy(supportmath.DefaultDecimalPolicy()); resetErr != nil {
+			t.Fatalf("reset active decimal policy: %v", resetErr)
+		}
+	})
+
+	lookupEnv = func(name string) (string, bool) {
+		if name != reportDecimalPolicyEnvironmentVariable {
+			t.Fatalf("unexpected environment-variable lookup: %q", name)
+		}
+		return "scale=4,rounding=half_up", true
+	}
+
+	var policy, err = ConfigureProcessDecimalPolicy()
+	if err != nil {
+		t.Fatalf("configure process decimal policy: %v", err)
+	}
+	if got := policy.CanonicalString(); got != "scale=4,rounding=half_up" {
+		t.Fatalf("unexpected configured policy: %q", got)
+	}
+	if got := supportmath.ActiveDecimalPolicy().CanonicalString(); got != "scale=4,rounding=half_up" {
+		t.Fatalf("unexpected active decimal policy: %q", got)
+	}
+}
+
+func TestConfigureProcessDecimalPolicyRejectsInvalidEnvironmentOverride(t *testing.T) {
+	var previousLookupEnv = lookupEnv
+	defer func() {
+		lookupEnv = previousLookupEnv
+	}()
+	t.Cleanup(func() {
+		if resetErr := supportmath.SetActiveDecimalPolicy(supportmath.DefaultDecimalPolicy()); resetErr != nil {
+			t.Fatalf("reset active decimal policy: %v", resetErr)
+		}
+	})
+
+	var customPolicy, err = supportmath.ParseDecimalPolicy("scale=4,rounding=half_up")
+	if err != nil {
+		t.Fatalf("parse custom decimal policy: %v", err)
+	}
+	if err = supportmath.SetActiveDecimalPolicy(customPolicy); err != nil {
+		t.Fatalf("set active decimal policy: %v", err)
+	}
+
+	lookupEnv = func(string) (string, bool) {
+		return "scale=65,rounding=half_up", true
+	}
+
+	_, err = ConfigureProcessDecimalPolicy()
+	if err == nil {
+		t.Fatalf("expected decimal-policy startup error")
+	}
+	if got := err.Error(); got == "" || !containsAll(got, reportDecimalPolicyEnvironmentVariable, "scale=65,rounding=half_up", "exceeds maximum supported scale 64") {
+		t.Fatalf("unexpected decimal-policy startup error: %v", err)
+	}
+	if got := supportmath.ActiveDecimalPolicy().CanonicalString(); got != "scale=4,rounding=half_up" {
+		t.Fatalf("expected active decimal policy to stay unchanged after failure, got %q", got)
+	}
+}
+
 func TestLoadStartupStateReturnsInvalidRememberedSetupMessage(t *testing.T) {
 	var config, err = configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, "http://localhost:8080", true, time.Now())
 	if err != nil {
@@ -127,4 +230,15 @@ func TestLoadStartupStateReturnsActiveConfigWhenValid(t *testing.T) {
 	if state.ActiveConfig == nil || state.ActiveConfig.ServerOrigin != config.ServerOrigin {
 		t.Fatalf("expected active config to be returned: %#v", state)
 	}
+}
+
+// containsAll reports whether one message contains every required fragment.
+func containsAll(message string, parts ...string) bool {
+	for _, part := range parts {
+		if !strings.Contains(message, part) {
+			return false
+		}
+	}
+
+	return true
 }

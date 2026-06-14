@@ -161,8 +161,9 @@ Every golden fixture must include:
 - The default selected policy is the project's production 16-decimal round-half-up policy.
 - Accepted `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` values use the form `scale=<digits>,rounding=half_up`.
 - The required accepted value is `scale=16,rounding=half_up`, matching the production default.
-- Additional external-oracle-aligned accepted values may be added only when the selected external oracle cannot align with the production default, and each added value must be documented with the oracle name, pinned version or commit, and reason.
-- If the selected external oracle cannot be configured or normalized to the production policy for every valid case, empirical tests must set `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` before project calculation runs and fixtures must record the external-oracle-aligned policy used.
+- `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` is an application-run-scoped override, not a test-only switch.
+- Additional external-oracle-aligned accepted values may be added only when the selected external oracle cannot align with the production default, and each added value must be documented with the oracle name, pinned version or commit, and reason. Practical custom scale values should stay at or below 64 for safety.
+- If the selected external oracle cannot be configured or normalized to the production policy for every valid case, the relevant empirical run must set `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` before project calculation runs and fixtures must record the external-oracle-aligned policy used.
 - Residual financial differences after decimal-policy alignment may use documented per-field tolerances. Quantity tolerance is always zero.
 - Non-zero financial tolerances must not exceed one unit at the selected decimal-policy scale. For the production 16-decimal policy, the maximum is `0.0000000000000001`.
 - Every non-zero financial tolerance must include a tolerance note explaining why exact equality is not achievable for that external-oracle-derived value.

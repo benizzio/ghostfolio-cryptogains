@@ -3,12 +3,12 @@ package empirical
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/empirical/fixture"
 )
 
@@ -79,9 +79,9 @@ func TestEmpiricalCalculationFixtures(t *testing.T) {
 			executedFixtureGroupCount++
 
 			if strings.TrimSpace(expected.Metadata.DecimalPolicy) != "" {
-				t.Setenv("GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY", expected.Metadata.DecimalPolicy)
-			} else {
-				_ = os.Unsetenv("GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY")
+				if _, policyErr := supportmath.ParseDecimalPolicy(expected.Metadata.DecimalPolicy); policyErr != nil {
+					t.Fatalf("select empirical decimal policy: %v", policyErr)
+				}
 			}
 
 			var report, runErr = fixture.RunProjectCalculation(translatedCache, expected.Year, expected.Method)

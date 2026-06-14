@@ -170,7 +170,7 @@ func omittedZeroPricedReductionSourceIDs(
 // Authored by: OpenCode
 func omittedZeroPricedReductionReason(empiricalCase fixture.EmpiricalCase, method reportmodel.CostBasisMethod, sourceIDs []string) string {
 	return "external-oracle generation omitted zero-priced reduction handling for " + strings.Join(sourceIDs, ", ") +
-		" because lot mode " + journalLotMode(method, empiricalCase.CaseID) + " does not support native zero-priced handling"
+		" because oracle method " + oracleMethodLabel(method, empiricalCase.CaseID) + " does not support native zero-priced handling"
 }
 
 // datasetActivitiesBySourceID builds one deterministic lookup map for dataset

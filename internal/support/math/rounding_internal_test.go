@@ -2,7 +2,6 @@ package math
 
 import (
 	"errors"
-	"os"
 	"strings"
 	"testing"
 
@@ -16,40 +15,27 @@ import (
 func TestDecimalPolicyConfiguration(t *testing.T) {
 	const expectedPolicy = "scale=16,rounding=half_up"
 
-	if got := defaultDecimalPolicy().canonicalString(); got != expectedPolicy {
+	if got := DefaultDecimalPolicy().CanonicalString(); got != expectedPolicy {
 		t.Fatalf("unexpected production default decimal policy: %q", got)
 	}
 
-	t.Run("unset uses production default", func(t *testing.T) {
-		var originalValue, wasSet = os.LookupEnv(reportDecimalPolicyEnvironmentVariable)
-		if err := os.Unsetenv(reportDecimalPolicyEnvironmentVariable); err != nil {
-			t.Fatalf("unset decimal policy environment variable: %v", err)
+	t.Run("default uses production policy", func(t *testing.T) {
+		if err := SetActiveDecimalPolicy(DefaultDecimalPolicy()); err != nil {
+			t.Fatalf("reset active decimal policy: %v", err)
 		}
-		t.Cleanup(func() {
-			var restoreErr error
-			if wasSet {
-				restoreErr = os.Setenv(reportDecimalPolicyEnvironmentVariable, originalValue)
-			} else {
-				restoreErr = os.Unsetenv(reportDecimalPolicyEnvironmentVariable)
-			}
-			if restoreErr != nil {
-				t.Fatalf("restore decimal policy environment variable: %v", restoreErr)
-			}
-		})
 
-		var policy, err = selectedDecimalPolicy()
-		if err != nil {
-			t.Fatalf("select default decimal policy: %v", err)
-		}
+		var policy = DefaultDecimalPolicy()
 		if policy.scale != InternalCalculationScale {
 			t.Fatalf("unexpected default decimal policy scale: %d", policy.scale)
 		}
-		if got := policy.canonicalString(); got != expectedPolicy {
+		if got := policy.CanonicalString(); got != expectedPolicy {
 			t.Fatalf("unexpected default decimal policy value: %q", got)
 		}
+		if got := ActiveDecimalPolicy().CanonicalString(); got != expectedPolicy {
+			t.Fatalf("unexpected active decimal policy value: %q", got)
+		}
 
-		var quotient apd.Decimal
-		quotient, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "1"), mustMathDecimal(t, "6"))
+		var quotient, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "1"), mustMathDecimal(t, "6"))
 		if err != nil {
 			t.Fatalf("divide decimals with default decimal policy: %v", err)
 		}
@@ -58,29 +44,45 @@ func TestDecimalPolicyConfiguration(t *testing.T) {
 		}
 	})
 
-	for _, acceptedValue := range []string{expectedPolicy} {
+	for _, acceptedValue := range []string{expectedPolicy, "scale=4,rounding=half_up", "scale=64,rounding=half_up"} {
 		var acceptedValue = acceptedValue
 		t.Run("accepts "+acceptedValue, func(t *testing.T) {
-			t.Setenv(reportDecimalPolicyEnvironmentVariable, acceptedValue)
-
-			var policy, err = selectedDecimalPolicy()
+			var policy, err = ParseDecimalPolicy(acceptedValue)
 			if err != nil {
 				t.Fatalf("select configured decimal policy %q: %v", acceptedValue, err)
 			}
-			if policy.scale != InternalCalculationScale {
-				t.Fatalf("unexpected configured decimal policy scale: %d", policy.scale)
-			}
-			if got := policy.canonicalString(); got != acceptedValue {
+			if got := policy.CanonicalString(); got != acceptedValue {
 				t.Fatalf("unexpected configured decimal policy value: %q", got)
 			}
 
+			if err = SetActiveDecimalPolicy(policy); err != nil {
+				t.Fatalf("set active decimal policy: %v", err)
+			}
+			defer func() {
+				if resetErr := SetActiveDecimalPolicy(DefaultDecimalPolicy()); resetErr != nil {
+					t.Fatalf("reset active decimal policy: %v", resetErr)
+				}
+			}()
+
+			if got := ActiveDecimalPolicy().CanonicalString(); got != acceptedValue {
+				t.Fatalf("unexpected active configured decimal policy value: %q", got)
+			}
+
 			var quotient apd.Decimal
-			quotient, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "1"), mustMathDecimal(t, "3"))
+			quotient, err = DivideFiniteRoundHalfUpWithPolicy(mustMathDecimal(t, "1"), mustMathDecimal(t, "3"), policy)
 			if err != nil {
 				t.Fatalf("divide decimals with configured decimal policy: %v", err)
 			}
-			if got, canonicalErr := decimalsupport.CanonicalString(quotient); canonicalErr != nil || got != "0.3333333333333333" {
+			if got, canonicalErr := decimalsupport.CanonicalString(quotient); canonicalErr != nil || got != quotientForPolicyScale(policy.scale) {
 				t.Fatalf("unexpected configured-policy quotient: %q err=%v", got, canonicalErr)
+			}
+
+			quotient, err = DivideFiniteRoundHalfUp(mustMathDecimal(t, "1"), mustMathDecimal(t, "6"))
+			if err != nil {
+				t.Fatalf("divide decimals with active decimal policy: %v", err)
+			}
+			if got, canonicalErr := decimalsupport.CanonicalString(quotient); canonicalErr != nil || got != quotientOneSixForPolicyScale(policy.scale) {
+				t.Fatalf("unexpected active-policy quotient: %q err=%v", got, canonicalErr)
 			}
 		})
 	}
@@ -116,22 +118,61 @@ func TestDecimalPolicyConfigurationErrors(t *testing.T) {
 			wantMessage: "parse decimal policy",
 		},
 		{
-			name:        "unsupported scale",
-			configured:  "scale=15,rounding=half_up",
-			wantMessage: "is not supported",
+			name:        "negative scale",
+			configured:  "scale=-1,rounding=half_up",
+			wantMessage: "must use the form",
+		},
+		{
+			name:        "scale exceeds maximum",
+			configured:  "scale=65,rounding=half_up",
+			wantMessage: "exceeds maximum supported scale 64",
 		},
 	} {
 		var fixture = fixture
 		t.Run(fixture.name, func(t *testing.T) {
-			t.Setenv(reportDecimalPolicyEnvironmentVariable, fixture.configured)
-
-			if _, err := selectedDecimalPolicy(); err == nil || !strings.Contains(err.Error(), fixture.wantMessage) {
+			if _, err := ParseDecimalPolicy(fixture.configured); err == nil || !strings.Contains(err.Error(), fixture.wantMessage) {
 				t.Fatalf("expected decimal policy %q to fail with %q, got %v", fixture.configured, fixture.wantMessage, err)
 			}
-			if _, err := DivideFiniteRoundHalfUp(mustMathDecimal(t, "1"), mustMathDecimal(t, "3")); err == nil || !strings.Contains(err.Error(), "select division decimal policy") {
-				t.Fatalf("expected wrapped division decimal policy failure for %q, got %v", fixture.configured, err)
-			}
 		})
+	}
+
+	if _, err := DivideFiniteRoundHalfUpWithPolicy(mustMathDecimal(t, "1"), mustMathDecimal(t, "2"), DecimalPolicy{scale: 65}); err == nil || !strings.Contains(err.Error(), "division decimal policy is invalid") {
+		t.Fatalf("expected invalid explicit division policy to fail, got %v", err)
+	}
+	if err := SetActiveDecimalPolicy(DecimalPolicy{scale: -1}); err == nil || !strings.Contains(err.Error(), "scale must not be negative") {
+		t.Fatalf("expected negative active decimal policy selection to fail, got %v", err)
+	}
+}
+
+// quotientForPolicyScale returns the expected 1/3 quotient for one supported
+// scale.
+// Authored by: OpenCode
+func quotientForPolicyScale(scale int32) string {
+	switch scale {
+	case 4:
+		return "0.3333"
+	case 16:
+		return "0.3333333333333333"
+	case 64:
+		return "0.3333333333333333333333333333333333333333333333333333333333333333"
+	default:
+		return ""
+	}
+}
+
+// quotientOneSixForPolicyScale returns the expected 1/6 quotient for one
+// supported scale.
+// Authored by: OpenCode
+func quotientOneSixForPolicyScale(scale int32) string {
+	switch scale {
+	case 4:
+		return "0.1667"
+	case 16:
+		return "0.1666666666666667"
+	case 64:
+		return "0.1666666666666666666666666666666666666666666666666666666666666667"
+	default:
+		return ""
 	}
 }
 

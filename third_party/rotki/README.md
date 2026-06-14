@@ -56,6 +56,39 @@ was executed here.
   untracked source cache, or invoke oracle generation while committed golden
   fixtures are present.
 
+## Authentication Model
+
+- The archive download uses an unauthenticated HTTPS `GET` request to the pinned
+  GitHub archive URL in `tools/empiricaloracle/rotki_source.go`.
+- Remote tag verification uses unauthenticated `git ls-remote --tags` against
+  the public upstream repository and checks both the signed tag object and the
+  peeled commit identity.
+- No GitHub token, application credential, SSH key, cookie, or developer-local
+  rotki login is required or read by the regeneration boundary.
+
+## Expected External Failure Modes
+
+- GitHub or network outage during archive download or `git ls-remote` tag
+  verification.
+- HTTP status other than `200 OK` for the pinned source archive.
+- Missing local `git`, `python3`, or `python` executable during explicit
+  regeneration.
+- Archive checksum, signed tag object, peeled commit, manifest, source root, or
+  adapter path mismatch.
+- Corrupt archive, invalid archive paths, or extraction failure under the
+  untracked `.cache/empiricaloracle/rotki-source/` directory.
+
+## Security Implications
+
+- Normal empirical tests consume committed golden fixtures and must not contact
+  GitHub or execute rotki source.
+- Explicit regeneration trusts only the pinned HTTPS archive after SHA-256
+  verification and independent `git ls-remote` tag identity checks.
+- The untracked source cache is regeneration-only. It must not be committed,
+  imported by runtime code, or used as a developer-global rotki installation.
+- Failure output should report boundary mismatches and setup errors without
+  including credentials because this boundary has no credential input.
+
 ## Adapter Constraints
 
 - Supported rotki-backed pure methods: `fifo`, `lifo`, `hifo`, `average_cost`.

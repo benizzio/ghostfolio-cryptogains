@@ -276,7 +276,7 @@ func selectRotkiOracleActivities(dataset fixture.EmpiricalDataset, empiricalCase
 		if activityYear(activity) != empiricalCase.Year {
 			continue
 		}
-		if latestSelectedYearActivity == nil || compareJournalActivities(activity, *latestSelectedYearActivity) > 0 {
+		if latestSelectedYearActivity == nil || compareOracleInputActivities(activity, *latestSelectedYearActivity) > 0 {
 			var copiedActivity = activity
 			latestSelectedYearActivity = &copiedActivity
 		}
@@ -297,7 +297,7 @@ func selectRotkiOracleActivities(dataset fixture.EmpiricalDataset, empiricalCase
 		if year > empiricalCase.Year || latestSelectedYearActivity == nil {
 			continue
 		}
-		if compareJournalActivities(activity, *latestSelectedYearActivity) <= 0 {
+		if compareOracleInputActivities(activity, *latestSelectedYearActivity) <= 0 {
 			selected = append(selected, activity)
 		}
 	}

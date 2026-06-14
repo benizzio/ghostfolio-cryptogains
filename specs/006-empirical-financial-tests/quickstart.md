@@ -56,10 +56,27 @@ Expected result:
 - dataset rows are translated into calculation-layer inputs
 - `calculate.Calculate` runs for every comparable method and year
 - normalized project output matches oracle output under the documented decimal-policy and financial-tolerance contract
-- the committed fixtures use `scale=16,rounding=half_up`, which matches the production default
+- the committed fixtures and current empirical runs use `scale=16,rounding=half_up`, which also matches the normal production default
 - quantity tolerance is zero, and the committed fixtures currently use zero financial tolerance for every compared financial field
 - failures, if any, identify case, method, year, asset, field, selected decimal policy, expected value, actual value, difference, tolerance, and source IDs
 - observed in this checkout on 2026-06-13: `go test ./tests/empirical -count=1 -v` completed in `0.105s` wall-clock (`ok ... 0.042s`), with no fixture-generation or rotki-download step
+
+## Decimal Policy Override
+
+If oracle alignment requires a different decimal policy for one application run, set `GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY` in the process environment before running `go test` or `go run ./tools/empiricaloracle`.
+
+Example:
+
+```bash
+GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY=scale=18,rounding=half_up go test ./tests/empirical -count=1 -v
+```
+
+Expected result:
+
+- when the variable is unset, normal production runs and current empirical runs keep `scale=16,rounding=half_up`
+- custom documented values are allowed when needed to align with an oracle
+- accepted values use `scale=<digits>,rounding=half_up`
+- practical custom scale values should stay at or below 64 for safety
 
 ## Run Full Repository Verification
 

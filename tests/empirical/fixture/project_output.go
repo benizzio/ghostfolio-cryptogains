@@ -37,6 +37,29 @@ func NormalizeProjectCalculationOutput(
 // NormalizeProjectCalculationOutputForCase converts one calculated capital-gains
 // report segment into the stable empirical comparison shape for one specific
 // empirical case source-id slice.
+//
+// Use this helper when a caller has already run project calculation for a wider
+// dataset slice but needs comparison values constrained to one empirical case.
+// The helper filters liquidation evidence to `empiricalCase.ActivitySourceIDs`,
+// preserves the report method and year, and derives closing quantity and basis
+// from the last relevant activity row for the selected asset. If no relevant
+// rows exist for the case and asset, it returns deterministic zero comparable
+// values so fixture-backed tests can compare reference-only or out-of-scope
+// assets without special-case branching.
+//
+// Example:
+//
+//	output, err := fixture.NormalizeProjectCalculationOutputForCase(
+//		"case-fifo-basic-2024",
+//		empiricalCase,
+//		report,
+//		"asset-alpha",
+//	)
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = output.Matches
+//
 // Authored by: OpenCode
 func NormalizeProjectCalculationOutputForCase(
 	caseID string,

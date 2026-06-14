@@ -116,7 +116,7 @@ Dataset content must not contain:
 - real account or wallet names
 - personally identifying names
 - proprietary financial records
-- copied upstream hledger, rotki, Ledger, Beancount, or other external-oracle fixture rows
+- copied upstream rotki, composite-oracle, Ledger, Beancount, or other external-oracle fixture rows
 
 ## Read-Only Rule
 

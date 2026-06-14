@@ -245,7 +245,7 @@ Fields:
 | `adapter_arguments` | string array | Exact adapter or command arguments used |
 | `dataset_input_hash` | string | Source dataset hash |
 | `external_oracle_input_hash` | string | Generated external-oracle input hash |
-| `decimal_policy` | string | Selected decimal policy used by oracle normalization and project comparison |
+| `decimal_policy` | string | Selected decimal policy used by oracle normalization and project comparison for that application run; default `scale=16,rounding=half_up`, with practical custom scale values capped at 64 |
 | `normalization_version` | string | Project-owned normalizer version |
 | `composite_rule_version` | string nullable | Project-owned composition rule version for Scope-Local Hybrid composite fixtures |
 | `oracle_output_hash` | string | Hash of normalized output |
@@ -397,7 +397,7 @@ Fields:
 | `expected_value` | decimal string | Oracle value |
 | `actual_value` | decimal string | Project value |
 | `difference` | decimal string | Absolute or signed difference according to field contract |
-| `decimal_policy` | string | Selected comparison policy, such as production 16-decimal round-half-up or selected-oracle-aligned empirical policy |
+| `decimal_policy` | string | Selected comparison policy for that application run, such as the default production 16-decimal round-half-up policy or a selected-oracle-aligned override |
 | `tolerance` | decimal string | Allowed residual difference, zero for quantity fields and at most one unit of selected decimal-policy scale for financial fields |
 | `passed` | boolean | Whether comparison passed |
 | `diagnostic_context` | string | Non-secret failure context |
@@ -410,7 +410,7 @@ Validation rules:
 
 - Quantities compare by exact decimal equality after normalization under `decimal_policy`.
 - Financial values compare after normalization under `decimal_policy` with the documented `tolerance` for residual external-oracle/project deviations.
-- If the selected external oracle cannot align with the production 16-decimal policy, empirical tests select the external-oracle-aligned policy through the test-scoped environment variable before project calculation runs.
+- If the selected external oracle cannot align with the production 16-decimal policy, empirical tests or helper commands may select an external-oracle-aligned policy through the application-run-scoped environment variable before project calculation runs.
 - Quantity `tolerance` is zero.
 - Financial `tolerance` is documented per field and must not exceed one unit at the selected decimal-policy scale.
 - A non-zero financial tolerance requires a note explaining why exact equality is not achievable for that external-oracle-derived value.

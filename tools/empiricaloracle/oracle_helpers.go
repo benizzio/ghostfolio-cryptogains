@@ -34,14 +34,14 @@ func caseHasMethod(empiricalCase fixture.EmpiricalCase, method reportmodel.CostB
 func zeroPricedReductionOmissionNote(activity fixture.EmpiricalActivity, empiricalCase fixture.EmpiricalCase, method reportmodel.CostBasisMethod) string {
 	return "omitted zero-priced reduction " + strings.TrimSpace(activity.SourceID) +
 		" from " + strings.TrimSpace(empiricalCase.CaseID) +
-		" because lot mode " + journalLotMode(method, empiricalCase.CaseID) +
+		" because oracle method " + oracleMethodLabel(method, empiricalCase.CaseID) +
 		" does not support native zero-priced handling"
 }
 
-// journalLotMode returns the lot-mode label used by external-oracle
+// oracleMethodLabel returns the rotki or composite-oracle method label used by
 // compatibility decisions.
 // Authored by: OpenCode
-func journalLotMode(method reportmodel.CostBasisMethod, caseID string) string {
+func oracleMethodLabel(method reportmodel.CostBasisMethod, caseID string) string {
 	switch method {
 	case reportmodel.CostBasisMethodFIFO:
 		return "FIFO"
@@ -76,10 +76,10 @@ func isZeroPricedReduction(activity fixture.EmpiricalActivity) bool {
 		strings.TrimSpace(activity.Currency) == ""
 }
 
-// compareJournalActivities returns the deterministic empirical activity ordering
-// shared by oracle-input selection.
+// compareOracleInputActivities returns the deterministic empirical activity
+// ordering shared by rotki and composite-oracle input selection.
 // Authored by: OpenCode
-func compareJournalActivities(left fixture.EmpiricalActivity, right fixture.EmpiricalActivity) int {
+func compareOracleInputActivities(left fixture.EmpiricalActivity, right fixture.EmpiricalActivity) int {
 	var leftOccurredAt = strings.TrimSpace(left.OccurredAt)
 	var rightOccurredAt = strings.TrimSpace(right.OccurredAt)
 	if leftOccurredAt < rightOccurredAt {

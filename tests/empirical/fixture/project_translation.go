@@ -7,6 +7,7 @@ import (
 	"time"
 
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -54,7 +55,7 @@ func BuildProjectActivityCache(dataset EmpiricalDataset) (syncmodel.ProtectedAct
 		RetrievedCount:       len(dataset.Activities),
 		ActivityCount:        len(activities),
 		AvailableReportYears: years,
-		ScopeReliability:     deriveProjectScopeReliability(activities),
+		ScopeReliability:     normalize.DeriveScopeReliability(activities),
 		Activities:           activities,
 	}, nil
 }
@@ -205,94 +206,6 @@ func compareTranslatedEmpiricalActivities(left translatedEmpiricalActivity, righ
 	}
 
 	return strings.Compare(left.Record.SourceID, right.Record.SourceID)
-}
-
-// deriveProjectScopeReliability mirrors the protected-cache summary rule used by
-// runtime normalization without importing the normalization package into the
-// empirical suite.
-// Authored by: OpenCode
-func deriveProjectScopeReliability(records []syncmodel.ActivityRecord) syncmodel.ScopeReliability {
-	if len(records) == 0 {
-		return syncmodel.ScopeReliabilityUnavailable
-	}
-
-	var timelinesByAsset = make(map[string][]syncmodel.ActivityRecord)
-	for _, record := range records {
-		timelinesByAsset[record.AssetSymbol] = append(timelinesByAsset[record.AssetSymbol], record)
-	}
-
-	var sawReliable = false
-	for _, timeline := range timelinesByAsset {
-		var reliability = deriveProjectTimelineScopeReliability(timeline)
-		if reliability == syncmodel.ScopeReliabilityPartial {
-			return syncmodel.ScopeReliabilityPartial
-		}
-		if reliability == syncmodel.ScopeReliabilityReliable {
-			sawReliable = true
-		}
-	}
-
-	if sawReliable {
-		return syncmodel.ScopeReliabilityReliable
-	}
-
-	return syncmodel.ScopeReliabilityUnavailable
-}
-
-// deriveProjectTimelineScopeReliability determines whether one translated asset
-// timeline keeps stable usable scope information.
-// Authored by: OpenCode
-func deriveProjectTimelineScopeReliability(records []syncmodel.ActivityRecord) syncmodel.ScopeReliability {
-	var sawUsableScope = false
-	var sawMissingScope = false
-	var expectedScopeID string
-	var expectedScopeKind syncmodel.SourceScopeKind
-
-	for _, record := range records {
-		var scopeID, scopeKind, usable = usableProjectSourceScope(record)
-		if !usable {
-			if sawUsableScope {
-				return syncmodel.ScopeReliabilityPartial
-			}
-			sawMissingScope = true
-			continue
-		}
-
-		if !sawUsableScope {
-			sawUsableScope = true
-			expectedScopeID = scopeID
-			expectedScopeKind = scopeKind
-			continue
-		}
-		if scopeID != expectedScopeID || scopeKind != expectedScopeKind {
-			return syncmodel.ScopeReliabilityPartial
-		}
-	}
-
-	if !sawUsableScope {
-		return syncmodel.ScopeReliabilityUnavailable
-	}
-	if sawMissingScope {
-		return syncmodel.ScopeReliabilityPartial
-	}
-
-	return syncmodel.ScopeReliabilityReliable
-}
-
-// usableProjectSourceScope returns the stable source-scope identity when the
-// translated record keeps a usable scope.
-// Authored by: OpenCode
-func usableProjectSourceScope(record syncmodel.ActivityRecord) (string, syncmodel.SourceScopeKind, bool) {
-	if record.SourceScope == nil {
-		return "", "", false
-	}
-
-	var scopeID = strings.TrimSpace(record.SourceScope.ID)
-	if scopeID == "" || record.SourceScope.Kind == "" {
-		return "", "", false
-	}
-
-	return scopeID, record.SourceScope.Kind, true
 }
 
 // firstNonNilDecimal returns the first available decimal pointer from the

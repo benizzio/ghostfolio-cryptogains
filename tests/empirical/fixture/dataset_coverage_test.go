@@ -198,18 +198,6 @@ func supportedMethodCoverageTags() []string {
 	return tags
 }
 
-// allRequiredCoverageTags returns the full explicit required coverage tag set
-// in stable order.
-// Authored by: OpenCode
-func allRequiredCoverageTags() []string {
-	var tags = make([]string, 0, len(requiredMethodCoverageTags)+len(requiredEdgeCaseCoverageTags))
-
-	tags = append(tags, requiredMethodCoverageTags...)
-	tags = append(tags, requiredEdgeCaseCoverageTags...)
-
-	return tags
-}
-
 // coverageCaseMethodsForTag selects one stable case method set for the given
 // coverage tag while keeping method coverage tags independent from `methods`
 // field coverage.

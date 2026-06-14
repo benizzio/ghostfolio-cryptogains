@@ -1,3 +1,7 @@
+// Package empirical contains fixture-backed integration tests for the synthetic
+// financial dataset and normalized oracle comparisons.
+//
+// Authored by: OpenCode
 package empirical
 
 import (
@@ -20,9 +24,8 @@ const (
 	empiricalDatasetRepositoryPath = "testdata/empirical/financial-dataset.yaml"
 )
 
-// empiricalDatasetValidationHooks defines the future fixture helper entry
-// points that this contract test expects once dataset parsing and validation are
-// implemented.
+// empiricalDatasetValidationHooks defines the fixture.LoadEmpiricalDataset and
+// fixture.ValidateEmpiricalDataset entry points used by this validation suite.
 // Authored by: OpenCode
 var empiricalDatasetValidationHooks = datasetValidationHooks{
 	load: fixture.LoadEmpiricalDataset,
@@ -34,8 +37,8 @@ var empiricalDatasetValidationHooks = datasetValidationHooks{
 // datasetValidationHooks stores the load and validate hooks used by this test
 // file.
 //
-// The zero value is intentional while `tests/empirical/fixture` is still
-// missing the parser and validator implementation promised by the active spec.
+// The zero value is guarded so failures remain actionable if a test overrides a
+// hook with nil.
 // Authored by: OpenCode
 type datasetValidationHooks struct {
 	load     func(path string) (fixture.EmpiricalDataset, string, error)
@@ -62,12 +65,11 @@ type structuralDatasetValidationTestCase struct {
 }
 
 // TestEmpiricalDatasetValidation captures the dataset validation contract for
-// inline synthetic fixtures now and for the repository-backed dataset loading
-// path later.
+// inline synthetic fixtures and the repository-backed dataset loaded through
+// fixture.LoadEmpiricalDataset.
 //
-// The structural subtests intentionally fail with actionable missing-
-// implementation errors until the dataset parser and validator helpers are wired
-// into `empiricalDatasetValidationHooks`.
+// The structural subtests validate mutated fixtures through
+// fixture.ValidateEmpiricalDataset and assert actionable validation failures.
 // Authored by: OpenCode
 func TestEmpiricalDatasetValidation(t *testing.T) {
 	t.Parallel()

@@ -14,8 +14,132 @@ import importlib.util
 import json
 import sys
 import types
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+
+@dataclass(frozen=True)
+class AdapterActivity:
+    """Parsed activity row from one generated adapter input.
+
+    Authored by: OpenCode
+    """
+
+    source_id: str
+    activity_type: str
+    quantity: str
+    fee_amount: str
+    gross_value: str
+
+
+@dataclass(frozen=True)
+class AdapterInput:
+    """Parsed adapter input consumed by the rotki boundary.
+
+    Authored by: OpenCode
+    """
+
+    asset_identity_key: str
+    comparison_activity_source_ids: set[str]
+    activities: list[AdapterActivity]
+
+
+@dataclass
+class AdapterMatchEvidence:
+    """Normalized match evidence returned to the Go oracle generator.
+
+    Authored by: OpenCode
+    """
+
+    disposed_source_id: str
+    acquisition_source_id: str
+    matched_quantity: str
+    matched_basis: str
+    matched_proceeds: str
+    matched_gain_or_loss: str
+    support_label: str = "rotki_backed"
+
+    def to_json(self) -> dict[str, str]:
+        """Return the persisted adapter JSON shape for this match.
+
+        Authored by: OpenCode
+        """
+
+        return {
+            "disposed_source_id": self.disposed_source_id,
+            "acquisition_source_id": self.acquisition_source_id,
+            "matched_quantity": self.matched_quantity,
+            "matched_basis": self.matched_basis,
+            "matched_proceeds": self.matched_proceeds,
+            "matched_gain_or_loss": self.matched_gain_or_loss,
+            "support_label": self.support_label,
+        }
+
+
+@dataclass
+class AdapterOutputValues:
+    """Aggregate oracle values returned to the Go oracle generator.
+
+    Authored by: OpenCode
+    """
+
+    realized_gain_or_loss: str
+    allocated_basis: str
+    closing_quantity: str
+    closing_basis: str
+
+    def to_json(self) -> dict[str, str]:
+        """Return the persisted adapter JSON shape for aggregate values.
+
+        Authored by: OpenCode
+        """
+
+        return {
+            "realized_gain_or_loss": self.realized_gain_or_loss,
+            "allocated_basis": self.allocated_basis,
+            "closing_quantity": self.closing_quantity,
+            "closing_basis": self.closing_basis,
+        }
+
+
+@dataclass
+class AdapterOutput:
+    """Complete adapter response returned on stdout.
+
+    Authored by: OpenCode
+    """
+
+    values: AdapterOutputValues
+    matches: list[AdapterMatchEvidence]
+
+    def to_json(self) -> dict[str, object]:
+        """Return the persisted adapter JSON response shape.
+
+        Authored by: OpenCode
+        """
+
+        return {
+            "values": self.values.to_json(),
+            "matches": [match.to_json() for match in self.matches],
+        }
+
+
+@dataclass
+class OracleExecutionState:
+    """Mutable state accumulated while rotki processes adapter activities.
+
+    Authored by: OpenCode
+    """
+
+    fval_class: type
+    realized: object
+    allocated: object
+    open_quantity: object
+    open_basis: object
+    last_relevant_closing_quantity: object | None = None
+    last_relevant_closing_basis: object | None = None
+    acquisition_source_ids: dict[int, str] = field(default_factory=dict)
+    matches: list[AdapterMatchEvidence] = field(default_factory=list)
 
 
 def main() -> int:
@@ -31,14 +155,64 @@ def main() -> int:
 
     source_root = Path(args.source_root).resolve()
     input_path = Path(args.input).resolve()
+
+    rotki = load_rotki_boundary(source_root)
+    adapter_input = load_adapter_input(input_path)
+    output = execute_rotki_boundary(rotki, adapter_input, args.rotki_method)
+    json.dump(output.to_json(), sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    return 0
+
+
+def load_adapter_input(input_path: Path) -> AdapterInput:
+    """Load and parse one generated adapter input file.
+
+    Authored by: OpenCode
+    """
+
     with input_path.open(encoding="utf-8") as handle:
         payload = json.load(handle)
 
-    rotki = load_rotki_boundary(source_root)
-    output = execute_rotki_boundary(rotki, payload, args.rotki_method)
-    json.dump(output, sys.stdout, indent=2)
-    sys.stdout.write("\n")
-    return 0
+    return parse_adapter_input(payload)
+
+
+def parse_adapter_input(payload: dict[str, object]) -> AdapterInput:
+    """Parse the explicit adapter input fields used by this boundary.
+
+    Authored by: OpenCode
+    """
+
+    raw_activities = payload.get("activities")
+    if not isinstance(raw_activities, list):
+        raise RuntimeError("Adapter input activities must be a list")
+
+    raw_comparison_source_ids = payload.get("comparison_activity_source_ids")
+    if not isinstance(raw_comparison_source_ids, list):
+        raise RuntimeError("Adapter input comparison_activity_source_ids must be a list")
+
+    return AdapterInput(
+        asset_identity_key=str(payload["asset_identity_key"]),
+        comparison_activity_source_ids={str(value) for value in raw_comparison_source_ids},
+        activities=[parse_adapter_activity(activity) for activity in raw_activities],
+    )
+
+
+def parse_adapter_activity(raw_activity: object) -> AdapterActivity:
+    """Parse one explicit adapter activity row.
+
+    Authored by: OpenCode
+    """
+
+    if not isinstance(raw_activity, dict):
+        raise RuntimeError("Adapter activity must be an object")
+
+    return AdapterActivity(
+        source_id=str(raw_activity["source_id"]),
+        activity_type=str(raw_activity["activity_type"]).upper(),
+        quantity=str(raw_activity["quantity"]),
+        fee_amount=str(raw_activity.get("fee_amount", "0") or "0"),
+        gross_value=str(raw_activity.get("gross_value", "0") or "0"),
+    )
 
 
 def load_rotki_boundary(source_root: Path) -> dict[str, object]:
@@ -407,124 +581,261 @@ def build_customizable_date_module() -> types.ModuleType:
     return module
 
 
-def execute_rotki_boundary(rotki: dict[str, object], payload: dict[str, object], method_name: str) -> dict[str, object]:
+def execute_rotki_boundary(rotki: dict[str, object], adapter_input: AdapterInput, method_name: str) -> AdapterOutput:
     """Execute one generated oracle input against the loaded rotki boundary.
 
     Authored by: OpenCode
     """
+
     cost_basis_method = resolve_cost_basis_method(rotki["CostBasisMethod"], method_name)
     events = rotki["CostBasisEvents"](cost_basis_method)
     manager = events.acquisitions_manager
     settings = rotki["DBSettings"](cost_basis_method=cost_basis_method)
-    fval_class = rotki["FVal"]
-    timestamp_class = rotki["Timestamp"]
-    asset_class = rotki["Asset"]
-    acquisition_event_class = rotki["AssetAcquisitionEvent"]
-    asset_identifier = str(payload["asset_identity_key"])
-    comparison_source_ids = set(str(value) for value in payload["comparison_activity_source_ids"])
-    acquisition_source_ids: dict[int, str] = {}
-    realized = fval_class(0)
-    allocated = fval_class(0)
-    open_quantity = fval_class(0)
-    open_basis = fval_class(0)
-    last_relevant_closing_quantity: object | None = None
-    last_relevant_closing_basis: object | None = None
-    matches: list[dict[str, str]] = []
+    state = new_oracle_execution_state(rotki["FVal"])
 
-    for index, activity in enumerate(payload["activities"], start=1):
-        activity_type = str(activity["activity_type"]).upper()
-        source_id = str(activity["source_id"])
-        quantity = fval_class(activity["quantity"])
-        fee_amount = fval_class(activity.get("fee_amount", "0") or "0")
-        gross_value = fval_class(activity.get("gross_value", "0") or "0")
-        timestamp = timestamp_class(index)
-
-        if activity_type == "BUY":
-            acquisition_source_ids[index] = source_id
-            acquisition_basis = gross_value + fee_amount
-            rate = acquisition_basis / quantity
-            manager.add_in_event(
-                acquisition_event_class(
-                    amount=quantity,
-                    timestamp=timestamp,
-                    rate=rate,
-                    index=index,
-                ),
-            )
-            open_quantity += quantity
-            open_basis += acquisition_basis
-            if source_id in comparison_source_ids:
-                last_relevant_closing_quantity = open_quantity
-                last_relevant_closing_basis = open_basis
-            continue
-
-        if activity_type != "SELL":
-            raise RuntimeError(f"Unsupported activity_type {activity_type}")
-
-        info = manager.calculate_spend_cost_basis(
-            quantity,
-            asset_class(asset_identifier),
-            timestamp,
-            [],
-            [],
-            settings,
-            str,
+    for index, activity in enumerate(adapter_input.activities, start=1):
+        apply_activity(
+            rotki=rotki,
+            adapter_input=adapter_input,
+            method_name=method_name,
+            manager=manager,
+            settings=settings,
+            state=state,
+            index=index,
+            activity=activity,
         )
-        net_proceeds = gross_value - fee_amount
-        total_basis = info.taxable_bought_cost + info.taxfree_bought_cost
-        open_quantity -= quantity
-        open_basis -= total_basis
 
-        if source_id in comparison_source_ids:
-            realized += net_proceeds - total_basis
-            allocated += total_basis
+    return build_adapter_response(state)
 
-            if method_name == "average_cost":
-                matches.append(
-                    {
-                        "disposed_source_id": source_id,
-                        "acquisition_source_id": asset_identifier,
-                        "matched_quantity": str(quantity),
-                        "matched_basis": str(total_basis),
-                        "matched_proceeds": str(net_proceeds),
-                        "matched_gain_or_loss": str(net_proceeds - total_basis),
-                        "support_label": "rotki_backed",
-                    },
-                )
-            else:
-                proceeds_per_unit = net_proceeds / quantity
-                for match in info.matched_acquisitions:
-                    if match.amount == fval_class(0):
-                        continue
-                    matched_basis = match.event.rate * match.amount
-                    matches.append(
-                        {
-                            "disposed_source_id": source_id,
-                            "acquisition_source_id": acquisition_source_ids.get(match.event.index, ""),
-                            "matched_quantity": str(match.amount),
-                            "matched_basis": str(matched_basis),
-                            "matched_proceeds": str(proceeds_per_unit * match.amount),
-                            "matched_gain_or_loss": str((proceeds_per_unit * match.amount) - matched_basis),
-                            "support_label": "rotki_backed",
-                        },
-                    )
 
-            last_relevant_closing_quantity = open_quantity
-            last_relevant_closing_basis = open_basis
+def new_oracle_execution_state(fval_class: type) -> OracleExecutionState:
+    """Create zero-valued oracle execution state.
 
-    if last_relevant_closing_quantity is None or last_relevant_closing_basis is None:
-        last_relevant_closing_quantity = open_quantity
-        last_relevant_closing_basis = open_basis
+    Authored by: OpenCode
+    """
 
-    return {
-        "values": {
-            "realized_gain_or_loss": str(realized),
-            "allocated_basis": str(allocated),
-            "closing_quantity": str(last_relevant_closing_quantity),
-            "closing_basis": str(last_relevant_closing_basis),
-        },
-        "matches": matches,
-    }
+    return OracleExecutionState(
+        fval_class=fval_class,
+        realized=fval_class(0),
+        allocated=fval_class(0),
+        open_quantity=fval_class(0),
+        open_basis=fval_class(0),
+    )
+
+
+def apply_activity(
+    rotki: dict[str, object],
+    adapter_input: AdapterInput,
+    method_name: str,
+    manager: object,
+    settings: object,
+    state: OracleExecutionState,
+    index: int,
+    activity: AdapterActivity,
+) -> None:
+    """Route one parsed adapter activity to the buy or sell handler.
+
+    Authored by: OpenCode
+    """
+
+    quantity = state.fval_class(activity.quantity)
+    fee_amount = state.fval_class(activity.fee_amount)
+    gross_value = state.fval_class(activity.gross_value)
+    timestamp = rotki["Timestamp"](index)
+
+    if activity.activity_type == "BUY":
+        record_buy(
+            rotki=rotki,
+            manager=manager,
+            state=state,
+            index=index,
+            activity=activity,
+            quantity=quantity,
+            fee_amount=fee_amount,
+            gross_value=gross_value,
+            timestamp=timestamp,
+            comparison_source_ids=adapter_input.comparison_activity_source_ids,
+        )
+        return
+
+    if activity.activity_type != "SELL":
+        raise RuntimeError(f"Unsupported activity_type {activity.activity_type}")
+
+    record_sell(
+        rotki=rotki,
+        adapter_input=adapter_input,
+        method_name=method_name,
+        manager=manager,
+        settings=settings,
+        state=state,
+        activity=activity,
+        quantity=quantity,
+        fee_amount=fee_amount,
+        gross_value=gross_value,
+        timestamp=timestamp,
+    )
+
+
+def record_buy(
+    rotki: dict[str, object],
+    manager: object,
+    state: OracleExecutionState,
+    index: int,
+    activity: AdapterActivity,
+    quantity: object,
+    fee_amount: object,
+    gross_value: object,
+    timestamp: object,
+    comparison_source_ids: set[str],
+) -> None:
+    """Apply one acquisition to the rotki manager and closing state.
+
+    Authored by: OpenCode
+    """
+
+    state.acquisition_source_ids[index] = activity.source_id
+    acquisition_basis = gross_value + fee_amount
+    rate = acquisition_basis / quantity
+    manager.add_in_event(
+        rotki["AssetAcquisitionEvent"](
+            amount=quantity,
+            timestamp=timestamp,
+            rate=rate,
+            index=index,
+        ),
+    )
+    state.open_quantity += quantity
+    state.open_basis += acquisition_basis
+    if activity.source_id in comparison_source_ids:
+        update_closing_state(state)
+
+
+def record_sell(
+    rotki: dict[str, object],
+    adapter_input: AdapterInput,
+    method_name: str,
+    manager: object,
+    settings: object,
+    state: OracleExecutionState,
+    activity: AdapterActivity,
+    quantity: object,
+    fee_amount: object,
+    gross_value: object,
+    timestamp: object,
+) -> None:
+    """Apply one disposal through rotki and normalize comparable evidence.
+
+    Authored by: OpenCode
+    """
+
+    info = manager.calculate_spend_cost_basis(
+        quantity,
+        rotki["Asset"](adapter_input.asset_identity_key),
+        timestamp,
+        [],
+        [],
+        settings,
+        str,
+    )
+    net_proceeds = gross_value - fee_amount
+    total_basis = info.taxable_bought_cost + info.taxfree_bought_cost
+    state.open_quantity -= quantity
+    state.open_basis -= total_basis
+
+    if activity.source_id not in adapter_input.comparison_activity_source_ids:
+        return
+
+    state.realized += net_proceeds - total_basis
+    state.allocated += total_basis
+    append_match_evidence(
+        state=state,
+        method_name=method_name,
+        asset_identifier=adapter_input.asset_identity_key,
+        source_id=activity.source_id,
+        quantity=quantity,
+        net_proceeds=net_proceeds,
+        total_basis=total_basis,
+        matched_acquisitions=info.matched_acquisitions,
+    )
+    update_closing_state(state)
+
+
+def append_match_evidence(
+    state: OracleExecutionState,
+    method_name: str,
+    asset_identifier: str,
+    source_id: str,
+    quantity: object,
+    net_proceeds: object,
+    total_basis: object,
+    matched_acquisitions: object,
+) -> None:
+    """Append normalized match evidence for one comparable disposal.
+
+    Authored by: OpenCode
+    """
+
+    if method_name == "average_cost":
+        state.matches.append(
+            AdapterMatchEvidence(
+                disposed_source_id=source_id,
+                acquisition_source_id=asset_identifier,
+                matched_quantity=str(quantity),
+                matched_basis=str(total_basis),
+                matched_proceeds=str(net_proceeds),
+                matched_gain_or_loss=str(net_proceeds - total_basis),
+            ),
+        )
+        return
+
+    proceeds_per_unit = net_proceeds / quantity
+    for match in matched_acquisitions:
+        if match.amount == state.fval_class(0):
+            continue
+        matched_basis = match.event.rate * match.amount
+        state.matches.append(
+            AdapterMatchEvidence(
+                disposed_source_id=source_id,
+                acquisition_source_id=state.acquisition_source_ids.get(match.event.index, ""),
+                matched_quantity=str(match.amount),
+                matched_basis=str(matched_basis),
+                matched_proceeds=str(proceeds_per_unit * match.amount),
+                matched_gain_or_loss=str((proceeds_per_unit * match.amount) - matched_basis),
+            ),
+        )
+
+
+def update_closing_state(state: OracleExecutionState) -> None:
+    """Capture the latest relevant closing quantity and basis.
+
+    Authored by: OpenCode
+    """
+
+    state.last_relevant_closing_quantity = state.open_quantity
+    state.last_relevant_closing_basis = state.open_basis
+
+
+def build_adapter_response(state: OracleExecutionState) -> AdapterOutput:
+    """Construct the explicit adapter response object.
+
+    Authored by: OpenCode
+    """
+
+    closing_quantity = state.last_relevant_closing_quantity
+    closing_basis = state.last_relevant_closing_basis
+    if closing_quantity is None or closing_basis is None:
+        closing_quantity = state.open_quantity
+        closing_basis = state.open_basis
+
+    return AdapterOutput(
+        values=AdapterOutputValues(
+            realized_gain_or_loss=str(state.realized),
+            allocated_basis=str(state.allocated),
+            closing_quantity=str(closing_quantity),
+            closing_basis=str(closing_basis),
+        ),
+        matches=state.matches,
+    )
 
 
 def resolve_cost_basis_method(cost_basis_method_enum: object, method_name: str) -> object:
@@ -541,19 +852,6 @@ def resolve_cost_basis_method(cost_basis_method_enum: object, method_name: str) 
     if method_name not in method_map:
         raise RuntimeError(f"Unsupported rotki method {method_name}")
     return method_map[method_name]
-
-
-def calculate_open_state(fval_class: type, manager: object) -> tuple[object, object]:
-    """Calculate the remaining open quantity and basis from the rotki manager.
-
-    Authored by: OpenCode
-    """
-    open_quantity = fval_class(0)
-    open_basis = fval_class(0)
-    for entry in manager.get_acquisitions():
-        open_quantity += entry.remaining_amount
-        open_basis += entry.remaining_amount * entry.rate
-    return open_quantity, open_basis
 
 
 if __name__ == "__main__":
