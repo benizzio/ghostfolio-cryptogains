@@ -230,6 +230,19 @@ description: "Task list for Empirical Solidified Financial Tests"
 
 ---
 
+## Phase 10: Test Coverage Drift Remediation
+
+**Purpose**: Remediate the test-coverage drift findings recorded in `specs/006-empirical-financial-tests/test-coverage-drift-report.md` after the normal implementation and coding-standards drift task lists are complete.
+
+**Dependencies**: All prior implementation, bugfix, hledger-removal, polish, and coding-standards drift remediation tasks must remain complete before starting this phase. T100 depends on T099.
+
+- [ ] T099 Remediate COV-DRIFT-001 (High) Coverage Gate Fails On Decimal Policy Startup Error Branch from `specs/006-empirical-financial-tests/test-coverage-drift-report.md#cov-drift-001-coverage-gate-fails-on-decimal-policy-startup-error-branch` by adding package-local bootstrap coverage for the `supportmath.SetActiveDecimalPolicy(policy)` failure path in `internal/app/bootstrap/decimal_policy.go` and `internal/app/bootstrap/bootstrap_internal_test.go`, preserving the maintained coverage gate instrumentation in `Makefile` and `tools/coveragegate/main.go`
+- [ ] T100 Verify COV-DRIFT-001 (High) Coverage Gate Fails On Decimal Policy Startup Error Branch from `specs/006-empirical-financial-tests/test-coverage-drift-report.md#cov-drift-001-coverage-gate-fails-on-decimal-policy-startup-error-branch` by running `make coverage` from the repository root and confirming the coverage gate no longer reports the uncovered statement, line, or branch recorded in `dist/coverage/coverage.xml`
+
+**Checkpoint**: Test-coverage drift findings are remediated and the maintained coverage gate passes after all implementation and prior drift-remediation tasks remain complete.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -243,11 +256,12 @@ description: "Task list for Empirical Solidified Financial Tests"
 - **BUG-003 hledger Removal (Phase 7)**: Depends on BUG-001/BUG-002 remediation because rotki and composite-oracle paths must remain after hledger cleanup; blocks polish acceptance, reopened T058, and reopened T063.
 - **Polish (Phase 8)**: Depends on all selected objective phases, BUG-001/BUG-002 remediation completion, and BUG-003 hledger removal completion.
 - **Coding Standards Drift Remediation (Phase 9)**: Depends on all prior implementation, bugfix, hledger-removal, and polish tasks being complete.
+- **Test Coverage Drift Remediation (Phase 10)**: Depends on all prior implementation, bugfix, hledger-removal, polish, and coding-standards drift remediation tasks being complete.
 
 ### Objective Dependency Graph
 
 ```text
-Setup -> Foundational -> US1 Dataset -> US2 Oracle -> US3 Empirical Tests -> BUG-001/BUG-002 Remediation -> BUG-003 hledger Removal -> Polish -> Coding Standards Drift Remediation
+Setup -> Foundational -> US1 Dataset -> US2 Oracle -> US3 Empirical Tests -> BUG-001/BUG-002 Remediation -> BUG-003 hledger Removal -> Polish -> Coding Standards Drift Remediation -> Test Coverage Drift Remediation
 ```
 
 ### Parallel Opportunities
@@ -311,6 +325,7 @@ Task: "Add isolation boundary tests that reject Ghostfolio, TUI, snapshot, Markd
 4. Complete BUG-003 hledger removal.
 5. Run Polish verification with `go test ./tests/empirical -count=1 -v`, `make test`, and `make coverage`.
 6. Complete coding-standards drift remediation after all normal implementation tasks are complete.
+7. Complete test-coverage drift remediation and verify with `make coverage`.
 
 ### Parallel Team Strategy
 
