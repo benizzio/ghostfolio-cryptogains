@@ -172,6 +172,34 @@ func TestConfigureProcessDecimalPolicyRejectsInvalidEnvironmentOverride(t *testi
 	}
 }
 
+func TestConfigureProcessDecimalPolicyPropagatesActivationError(t *testing.T) {
+	var previousLookupEnv = lookupEnv
+	var previousSetActiveDecimalPolicy = setActiveDecimalPolicy
+	defer func() {
+		lookupEnv = previousLookupEnv
+		setActiveDecimalPolicy = previousSetActiveDecimalPolicy
+	}()
+
+	lookupEnv = func(string) (string, bool) {
+		return "", false
+	}
+	setActiveDecimalPolicy = func(policy supportmath.DecimalPolicy) error {
+		if got := policy.CanonicalString(); got != supportmath.DefaultDecimalPolicy().CanonicalString() {
+			t.Fatalf("unexpected activation policy: %q", got)
+		}
+
+		return errors.New("activation failed")
+	}
+
+	_, err := ConfigureProcessDecimalPolicy()
+	if err == nil {
+		t.Fatalf("expected decimal-policy activation error")
+	}
+	if got := err.Error(); got == "" || !containsAll(got, reportDecimalPolicyEnvironmentVariable, "activation failed") {
+		t.Fatalf("unexpected decimal-policy activation error: %v", err)
+	}
+}
+
 func TestLoadStartupStateReturnsInvalidRememberedSetupMessage(t *testing.T) {
 	var config, err = configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, "http://localhost:8080", true, time.Now())
 	if err != nil {

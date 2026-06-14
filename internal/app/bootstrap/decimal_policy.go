@@ -10,6 +10,7 @@ import (
 const reportDecimalPolicyEnvironmentVariable = "GHOSTFOLIO_CRYPTOGAINS_REPORT_DECIMAL_POLICY"
 
 var lookupEnv = os.LookupEnv
+var setActiveDecimalPolicy = supportmath.SetActiveDecimalPolicy
 
 // ConfigureProcessDecimalPolicy reads the process decimal-policy override once
 // from startup configuration and applies it to the shared math helpers.
@@ -39,7 +40,7 @@ func ConfigureProcessDecimalPolicy() (supportmath.DecimalPolicy, error) {
 		}
 	}
 
-	if err := supportmath.SetActiveDecimalPolicy(policy); err != nil {
+	if err := setActiveDecimalPolicy(policy); err != nil {
 		return supportmath.DecimalPolicy{}, fmt.Errorf("configure %s: %w", reportDecimalPolicyEnvironmentVariable, err)
 	}
 
