@@ -3,13 +3,13 @@ package bootstrap
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
+	supporttext "github.com/benizzio/ghostfolio-cryptogains/internal/support/text"
 )
 
 type fakeStore struct {
@@ -164,7 +164,7 @@ func TestConfigureProcessDecimalPolicyRejectsInvalidEnvironmentOverride(t *testi
 	if err == nil {
 		t.Fatalf("expected decimal-policy startup error")
 	}
-	if got := err.Error(); got == "" || !containsAll(got, reportDecimalPolicyEnvironmentVariable, "scale=65,rounding=half_up", "exceeds maximum supported scale 64") {
+	if got := err.Error(); got == "" || !supporttext.ContainsAll(got, reportDecimalPolicyEnvironmentVariable, "scale=65,rounding=half_up", "exceeds maximum supported scale 64") {
 		t.Fatalf("unexpected decimal-policy startup error: %v", err)
 	}
 	if got := supportmath.ActiveDecimalPolicy().CanonicalString(); got != "scale=4,rounding=half_up" {
@@ -195,7 +195,7 @@ func TestConfigureProcessDecimalPolicyPropagatesActivationError(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected decimal-policy activation error")
 	}
-	if got := err.Error(); got == "" || !containsAll(got, reportDecimalPolicyEnvironmentVariable, "activation failed") {
+	if got := err.Error(); got == "" || !supporttext.ContainsAll(got, reportDecimalPolicyEnvironmentVariable, "activation failed") {
 		t.Fatalf("unexpected decimal-policy activation error: %v", err)
 	}
 }
@@ -258,15 +258,4 @@ func TestLoadStartupStateReturnsActiveConfigWhenValid(t *testing.T) {
 	if state.ActiveConfig == nil || state.ActiveConfig.ServerOrigin != config.ServerOrigin {
 		t.Fatalf("expected active config to be returned: %#v", state)
 	}
-}
-
-// containsAll reports whether one message contains every required fragment.
-func containsAll(message string, parts ...string) bool {
-	for _, part := range parts {
-		if !strings.Contains(message, part) {
-			return false
-		}
-	}
-
-	return true
 }
