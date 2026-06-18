@@ -97,6 +97,45 @@ func TestEnsureGoldenFixturesDoesNotGenerateWhenFixturesExist(t *testing.T) {
 	}
 }
 
+// TestEnsureGoldenFixturesTreatsDirectoryAsMissing verifies a directory at the
+// expected golden fixture path is not treated as a usable fixture file.
+// Authored by: OpenCode
+func TestEnsureGoldenFixturesTreatsDirectoryAsMissing(t *testing.T) {
+	t.Setenv(MissingOracleFixtureGenerationEnvVar, "")
+
+	var repositoryRoot = t.TempDir()
+	var dataset = EmpiricalDataset{
+		Cases: []EmpiricalCase{{
+			CaseID:            "case-supported-2024",
+			Methods:           []reportmodel.CostBasisMethod{reportmodel.CostBasisMethodFIFO},
+			AssetIdentityKeys: []string{"asset-alpha"},
+			OracleSupport:     OracleSupportSupported,
+		}},
+	}
+	var expectedPath = expectedGoldenFixturePath(DefaultEmpiricalArtifactRootRepositoryPath, dataset.Cases[0], reportmodel.CostBasisMethodFIFO, "asset-alpha")
+	var fixturePath = filepath.Join(repositoryRoot, filepath.FromSlash(expectedPath))
+	var err = os.MkdirAll(fixturePath, 0o755)
+	if err != nil {
+		t.Fatalf("create fixture directory: %v", err)
+	}
+
+	var result OracleFixturePolicyResult
+	result, err = EnsureGoldenFixtures(context.Background(), repositoryRoot, DefaultEmpiricalArtifactRootRepositoryPath, dataset)
+	if err == nil {
+		t.Fatal("expected missing fixture setup error for fixture directory")
+	}
+	var missingErr missingOracleFixturesError
+	if !errors.As(err, &missingErr) {
+		t.Fatalf("expected missingOracleFixturesError, got %T: %v", err, err)
+	}
+	if !reflect.DeepEqual(result.MissingPaths, []string{expectedPath}) {
+		t.Fatalf("unexpected result missing paths: got %v want %v", result.MissingPaths, []string{expectedPath})
+	}
+	if !reflect.DeepEqual(missingErr.MissingPaths, []string{expectedPath}) {
+		t.Fatalf("unexpected error missing paths: got %v want %v", missingErr.MissingPaths, []string{expectedPath})
+	}
+}
+
 // TestEnsureGoldenFixturesGeneratesOnlyWhenExplicitlyEnabled verifies the
 // missing-fixture path stays opt-in and delegates to the repository-owned
 // regeneration command seam only when explicitly allowed.

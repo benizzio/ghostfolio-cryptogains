@@ -243,8 +243,11 @@ func collectMissingGoldenFixturePaths(repositoryRoot string, expectedPaths []str
 
 	for index = range expectedPaths {
 		var filesystemPath = filepath.Join(repositoryRoot, filepath.FromSlash(expectedPaths[index]))
-		var _, err = os.Stat(filesystemPath)
+		var fileInfo, err = os.Stat(filesystemPath)
 		if err == nil {
+			if fileInfo.IsDir() {
+				missingPaths = append(missingPaths, expectedPaths[index])
+			}
 			continue
 		}
 		if os.IsNotExist(err) {
