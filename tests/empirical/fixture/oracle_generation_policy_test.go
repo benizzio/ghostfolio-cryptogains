@@ -2,6 +2,7 @@ package fixture
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path"
 	"path/filepath"
@@ -115,7 +116,8 @@ func TestEnsureGoldenFixturesGeneratesOnlyWhenExplicitlyEnabled(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected missing fixture setup error without explicit opt-in")
 	}
-	if _, ok := err.(missingOracleFixturesError); !ok {
+	var missingErr missingOracleFixturesError
+	if !errors.As(err, &missingErr) {
 		t.Fatalf("expected missingOracleFixturesError, got %T: %v", err, err)
 	}
 	if len(result.MissingPaths) != 1 {
