@@ -8,14 +8,11 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
-	"path"
-	"path/filepath"
 	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
@@ -291,9 +288,14 @@ func (generation *empiricalOracleGeneration) ensureRotkiSourceRuntime() error {
 // generateAssetArtifact builds, validates, and writes one golden fixture.
 // Authored by: OpenCode
 func (generation *empiricalOracleGeneration) generateAssetArtifact(empiricalCase fixture.EmpiricalCase, method reportmodel.CostBasisMethod, assetIdentityKey string) (bool, error) {
-	var goldenRelativePath = goldenFixtureRelativePath(generation.paths.OutputRootRelativePath, empiricalCase, method, assetIdentityKey)
+	var goldenRelativePath, err = goldenFixtureRelativePath(generation.paths.OutputRootRelativePath, empiricalCase, method, assetIdentityKey)
+	if err != nil {
+		return false, fmt.Errorf("empiricaloracle: build golden fixture path for case %s method %s asset %s: %w", empiricalCase.CaseID, method, assetIdentityKey, err)
+	}
+
 	if !generation.regenerate {
-		var exists, err = artifactExists(generation.paths.RepositoryRoot, goldenRelativePath)
+		var exists bool
+		exists, err = artifactExists(generation.paths.RepositoryRoot, goldenRelativePath)
 		if err != nil {
 			return false, fmt.Errorf("empiricaloracle: stat golden fixture %s: %w", goldenRelativePath, err)
 		}
@@ -302,7 +304,8 @@ func (generation *empiricalOracleGeneration) generateAssetArtifact(empiricalCase
 		}
 	}
 
-	var output, err = generation.buildOracleOutput(empiricalCase, method, assetIdentityKey)
+	var output fixture.OracleOutput
+	output, err = generation.buildOracleOutput(empiricalCase, method, assetIdentityKey)
 	if err != nil {
 		return false, fmt.Errorf("empiricaloracle: build rotki-backed oracle output for case %s method %s asset %s: %w", empiricalCase.CaseID, method, assetIdentityKey, err)
 	}
@@ -337,204 +340,4 @@ func (generation *empiricalOracleGeneration) buildOracleOutput(empiricalCase fix
 // Authored by: OpenCode
 func reportGoldenWrites(stdout io.Writer, goldenWriteCount int) {
 	_, _ = fmt.Fprintf(stdout, "wrote %d golden fixture(s)\n", goldenWriteCount)
-}
-
-// resolveRepositoryPath resolves one repository-local input path and returns its
-// absolute and repository-relative forms.
-// Authored by: OpenCode
-func resolveRepositoryPath(repositoryRoot string, rawPath string) (string, string, error) {
-	var trimmedPath = strings.TrimSpace(rawPath)
-	if trimmedPath == "" {
-		return "", "", fmt.Errorf("repository path is required")
-	}
-
-	var absolutePath string
-	if filepath.IsAbs(trimmedPath) {
-		absolutePath = filepath.Clean(trimmedPath)
-	} else {
-		absolutePath = filepath.Join(repositoryRoot, filepath.FromSlash(path.Clean(trimmedPath)))
-	}
-
-	var relativePath, err = filepath.Rel(repositoryRoot, absolutePath)
-	if err != nil {
-		return "", "", fmt.Errorf("resolve repository-relative path for %s: %w", trimmedPath, err)
-	}
-
-	relativePath = filepath.ToSlash(relativePath)
-	if relativePath == "." {
-		return absolutePath, relativePath, nil
-	}
-	if relativePath == ".." || strings.HasPrefix(relativePath, "../") {
-		return "", "", fmt.Errorf("path %s escapes the repository root", trimmedPath)
-	}
-
-	return absolutePath, relativePath, nil
-}
-
-// findEmpiricalCase returns the unique empirical case for one case and method.
-// Authored by: OpenCode
-func findEmpiricalCase(dataset fixture.EmpiricalDataset, caseID string, method reportmodel.CostBasisMethod) (fixture.EmpiricalCase, error) {
-	var caseIndex int
-	for caseIndex = range dataset.Cases {
-		if strings.TrimSpace(dataset.Cases[caseIndex].CaseID) != strings.TrimSpace(caseID) {
-			continue
-		}
-		if !caseHasMethod(dataset.Cases[caseIndex], method) {
-			continue
-		}
-
-		return dataset.Cases[caseIndex], nil
-	}
-
-	return fixture.EmpiricalCase{}, fmt.Errorf("empirical case %q for method %q was not found in the dataset", strings.TrimSpace(caseID), strings.TrimSpace(string(method)))
-}
-
-// remapOutputRelativePath rewrites one default empirical artifact path under the
-// selected repository-relative output root.
-// Authored by: OpenCode
-func remapOutputRelativePath(outputRoot string, defaultRelativePath string) (string, error) {
-	var cleanedOutputRoot = path.Clean(strings.TrimSpace(outputRoot))
-	var cleanedDefaultPath = path.Clean(strings.TrimSpace(defaultRelativePath))
-	if cleanedOutputRoot == "." || cleanedOutputRoot == "" {
-		return "", fmt.Errorf("output root must be non-empty")
-	}
-
-	if cleanedDefaultPath == defaultEmpiricalOutputRoot {
-		return cleanedOutputRoot, nil
-	}
-	if !strings.HasPrefix(cleanedDefaultPath, defaultEmpiricalOutputRoot+"/") {
-		return "", fmt.Errorf("default empirical artifact path %s does not stay under %s", cleanedDefaultPath, defaultEmpiricalOutputRoot)
-	}
-
-	var suffix = strings.TrimPrefix(cleanedDefaultPath, defaultEmpiricalOutputRoot+"/")
-	if suffix == "" {
-		return cleanedOutputRoot, nil
-	}
-
-	return path.Join(cleanedOutputRoot, suffix), nil
-}
-
-// goldenFixtureRelativePath returns the repository-relative path for one golden
-// fixture below the selected output root.
-// Authored by: OpenCode
-func goldenFixtureRelativePath(outputRoot string, empiricalCase fixture.EmpiricalCase, method reportmodel.CostBasisMethod, assetIdentityKey string) string {
-	var baseName = strings.TrimSpace(empiricalCase.CaseID)
-	if len(empiricalCase.AssetIdentityKeys) > 1 {
-		baseName += "--" + strings.TrimSpace(assetIdentityKey)
-	}
-
-	return path.Join(outputRoot, "golden", method.FilenameSlug(), baseName+".json")
-}
-
-// collectMissingGoldenPaths reports whether one case or method still needs any
-// golden fixture writes under the selected output root.
-// Authored by: OpenCode
-func collectMissingGoldenPaths(
-	outputRoot string,
-	empiricalCase fixture.EmpiricalCase,
-	method reportmodel.CostBasisMethod,
-	repositoryRoot string,
-	regenerate bool,
-) ([]string, error) {
-	if regenerate {
-		var allPaths = make([]string, 0, len(empiricalCase.AssetIdentityKeys))
-		var assetIndex int
-		for assetIndex = range empiricalCase.AssetIdentityKeys {
-			allPaths = append(allPaths, goldenFixtureRelativePath(outputRoot, empiricalCase, method, empiricalCase.AssetIdentityKeys[assetIndex]))
-		}
-
-		return allPaths, nil
-	}
-
-	var missingPaths = make([]string, 0)
-	var assetIndex int
-	for assetIndex = range empiricalCase.AssetIdentityKeys {
-		var relativePath = goldenFixtureRelativePath(outputRoot, empiricalCase, method, empiricalCase.AssetIdentityKeys[assetIndex])
-		var exists, err = artifactExists(repositoryRoot, relativePath)
-		if err != nil {
-			return nil, err
-		}
-		if exists {
-			continue
-		}
-
-		missingPaths = append(missingPaths, relativePath)
-	}
-
-	return missingPaths, nil
-}
-
-// artifactExists reports whether one repository-relative artifact file already
-// exists.
-// Authored by: OpenCode
-func artifactExists(repositoryRoot string, relativePath string) (bool, error) {
-	var absolutePath = filepath.Join(repositoryRoot, filepath.FromSlash(relativePath))
-	var info, err = os.Stat(absolutePath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return false, nil
-		}
-
-		return false, err
-	}
-	if info.IsDir() {
-		return false, fmt.Errorf("artifact path %s points to a directory", relativePath)
-	}
-
-	return true, nil
-}
-
-// ensureArtifactContentMatches verifies that one existing repository artifact
-// already contains the expected deterministic content.
-// Authored by: OpenCode
-func ensureArtifactContentMatches(repositoryRoot string, relativePath string, expectedContent string) error {
-	var absolutePath = filepath.Join(repositoryRoot, filepath.FromSlash(relativePath))
-	var actualContent, err = os.ReadFile(absolutePath)
-	if err != nil {
-		return fmt.Errorf("read existing artifact %s: %w", relativePath, err)
-	}
-	if string(actualContent) == expectedContent {
-		return nil
-	}
-
-	return fmt.Errorf("existing artifact %s differs from the current deterministic render; rerun with --regenerate to refresh it", relativePath)
-}
-
-// writeArtifact persists one repository-relative artifact unless reuse without
-// regeneration was requested and the file already exists.
-// Authored by: OpenCode
-func writeArtifact(repositoryRoot string, relativePath string, content []byte, regenerate bool) (bool, error) {
-	var absolutePath = filepath.Join(repositoryRoot, filepath.FromSlash(relativePath))
-	var exists, err = artifactExists(repositoryRoot, relativePath)
-	if err != nil {
-		return false, err
-	}
-	if exists && !regenerate {
-		return false, nil
-	}
-
-	var parentDirectory = filepath.Dir(absolutePath)
-	if err = os.MkdirAll(parentDirectory, 0o755); err != nil {
-		return false, fmt.Errorf("create parent directory %s: %w", filepath.ToSlash(parentDirectory), err)
-	}
-	if err = os.WriteFile(absolutePath, content, 0o644); err != nil {
-		return false, fmt.Errorf("write artifact %s: %w", relativePath, err)
-	}
-
-	return true, nil
-}
-
-// marshalValidatedOracleOutput indents one normalized oracle fixture and
-// validates the persisted JSON payload before it is written.
-// Authored by: OpenCode
-func marshalValidatedOracleOutput(path string, output fixture.OracleOutput) ([]byte, error) {
-	var rawContent, err = json.MarshalIndent(output, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("marshal oracle output JSON: %w", err)
-	}
-	if err = fixture.ValidateOracleOutput(path, string(rawContent), output); err != nil {
-		return nil, fmt.Errorf("validate oracle output JSON: %w", err)
-	}
-
-	return append(rawContent, '\n'), nil
 }
