@@ -83,6 +83,17 @@ func TestParseEmpiricalDatasetParsesTopLevelActivityAndCaseFields(t *testing.T) 
 
 	var dataset = mustParseEmpiricalDataset(t, empiricalDatasetPath, yamlFixture)
 
+	assertParsedTopLevelDatasetFields(t, dataset)
+	assertParsedSupportedDatasetLists(t, dataset)
+	assertParsedActivities(t, dataset)
+	assertParsedCases(t, dataset)
+}
+
+// assertParsedTopLevelDatasetFields verifies scalar top-level dataset fields.
+// Authored by: OpenCode
+func assertParsedTopLevelDatasetFields(t *testing.T, dataset EmpiricalDataset) {
+	t.Helper()
+
 	if dataset.DatasetVersion != "1" {
 		t.Fatalf("unexpected dataset version: got %q want %q", dataset.DatasetVersion, "1")
 	}
@@ -92,6 +103,13 @@ func TestParseEmpiricalDatasetParsesTopLevelActivityAndCaseFields(t *testing.T) 
 	if dataset.Currency != "USD" {
 		t.Fatalf("unexpected dataset currency: got %q want %q", dataset.Currency, "USD")
 	}
+}
+
+// assertParsedSupportedDatasetLists verifies top-level dataset list fields.
+// Authored by: OpenCode
+func assertParsedSupportedDatasetLists(t *testing.T, dataset EmpiricalDataset) {
+	t.Helper()
+
 	if len(dataset.SupportedYears) != 3 || dataset.SupportedYears[0] != 2023 || dataset.SupportedYears[1] != 2024 || dataset.SupportedYears[2] != 2025 {
 		t.Fatalf("unexpected supported years: %#v", dataset.SupportedYears)
 	}
@@ -106,12 +124,29 @@ func TestParseEmpiricalDatasetParsesTopLevelActivityAndCaseFields(t *testing.T) 
 	if len(dataset.CoverageTags) != 2 || dataset.CoverageTags[0] != "multi_year_opening_history" || dataset.CoverageTags[1] != "zero_priced_reduction" {
 		t.Fatalf("unexpected dataset coverage tags: %#v", dataset.CoverageTags)
 	}
+}
+
+// assertParsedActivities verifies the activity collection and delegates field checks.
+// Authored by: OpenCode
+func assertParsedActivities(t *testing.T, dataset EmpiricalDataset) {
+	t.Helper()
 
 	if len(dataset.Activities) != 2 {
 		t.Fatalf("unexpected activity count: got %d want %d", len(dataset.Activities), 2)
 	}
 
 	var firstActivity = dataset.Activities[0]
+	assertParsedFirstActivity(t, firstActivity)
+
+	var secondActivity = dataset.Activities[1]
+	assertParsedSecondActivity(t, secondActivity)
+}
+
+// assertParsedFirstActivity verifies the first standard parser fixture activity.
+// Authored by: OpenCode
+func assertParsedFirstActivity(t *testing.T, firstActivity EmpiricalActivity) {
+	t.Helper()
+
 	if firstActivity.SourceID != "emp-act-000001" {
 		t.Fatalf("unexpected first activity source id: got %q", firstActivity.SourceID)
 	}
@@ -136,8 +171,13 @@ func TestParseEmpiricalDatasetParsesTopLevelActivityAndCaseFields(t *testing.T) 
 	if len(firstActivity.CoverageTags) != 2 || firstActivity.CoverageTags[0] != "fifo" || firstActivity.CoverageTags[1] != "gain_case" {
 		t.Fatalf("unexpected first activity coverage tags: %#v", firstActivity.CoverageTags)
 	}
+}
 
-	var secondActivity = dataset.Activities[1]
+// assertParsedSecondActivity verifies the second standard parser fixture activity.
+// Authored by: OpenCode
+func assertParsedSecondActivity(t *testing.T, secondActivity EmpiricalActivity) {
+	t.Helper()
+
 	if secondActivity.SourceID != "emp-act-000002" {
 		t.Fatalf("unexpected second activity source id: got %q", secondActivity.SourceID)
 	}
@@ -147,23 +187,51 @@ func TestParseEmpiricalDatasetParsesTopLevelActivityAndCaseFields(t *testing.T) 
 	if secondActivity.Quantity != "0.5" || secondActivity.GrossValue != "7.5" || secondActivity.UnitPrice != "15" || secondActivity.FeeAmount != "0.25" || secondActivity.Currency != "USD" {
 		t.Fatalf("unexpected second activity financial fields: %#v", secondActivity)
 	}
+}
+
+// assertParsedCases verifies the case collection and delegates field checks.
+// Authored by: OpenCode
+func assertParsedCases(t *testing.T, dataset EmpiricalDataset) {
+	t.Helper()
 
 	if len(dataset.Cases) != 1 {
 		t.Fatalf("unexpected case count: got %d want %d", len(dataset.Cases), 1)
 	}
 
 	var parsedCase = dataset.Cases[0]
+	assertParsedCaseScalars(t, parsedCase)
+	assertParsedCaseLists(t, parsedCase)
+}
+
+// assertParsedCaseScalars verifies scalar fields on the standard parser case.
+// Authored by: OpenCode
+func assertParsedCaseScalars(t *testing.T, parsedCase EmpiricalCase) {
+	t.Helper()
+
 	if parsedCase.CaseID != "case-alpha-disposal-2024" {
 		t.Fatalf("unexpected case id: got %q", parsedCase.CaseID)
 	}
 	if parsedCase.Description != "Synthetic disposal case" {
 		t.Fatalf("unexpected case description: got %q", parsedCase.Description)
 	}
-	if len(parsedCase.Methods) != 2 || parsedCase.Methods[0] != reportmodel.CostBasisMethodFIFO || parsedCase.Methods[1] != reportmodel.CostBasisMethodScopeLocalHybrid {
-		t.Fatalf("unexpected case methods: %#v", parsedCase.Methods)
-	}
 	if parsedCase.Year != 2024 {
 		t.Fatalf("unexpected case year: got %d want %d", parsedCase.Year, 2024)
+	}
+	if parsedCase.OracleSupport != OracleSupportPartiallySupported {
+		t.Fatalf("unexpected case oracle support: got %q want %q", parsedCase.OracleSupport, OracleSupportPartiallySupported)
+	}
+	if parsedCase.UnsupportedReason != "Scope-local composition remains project-owned" {
+		t.Fatalf("unexpected case unsupported reason: got %q", parsedCase.UnsupportedReason)
+	}
+}
+
+// assertParsedCaseLists verifies list fields on the standard parser case.
+// Authored by: OpenCode
+func assertParsedCaseLists(t *testing.T, parsedCase EmpiricalCase) {
+	t.Helper()
+
+	if len(parsedCase.Methods) != 2 || parsedCase.Methods[0] != reportmodel.CostBasisMethodFIFO || parsedCase.Methods[1] != reportmodel.CostBasisMethodScopeLocalHybrid {
+		t.Fatalf("unexpected case methods: %#v", parsedCase.Methods)
 	}
 	if len(parsedCase.AssetIdentityKeys) != 1 || parsedCase.AssetIdentityKeys[0] != "asset-alpha" {
 		t.Fatalf("unexpected case asset identity keys: %#v", parsedCase.AssetIdentityKeys)
@@ -173,12 +241,6 @@ func TestParseEmpiricalDatasetParsesTopLevelActivityAndCaseFields(t *testing.T) 
 	}
 	if len(parsedCase.CoverageTags) != 2 || parsedCase.CoverageTags[0] != "fifo" || parsedCase.CoverageTags[1] != "gain_case" {
 		t.Fatalf("unexpected case coverage tags: %#v", parsedCase.CoverageTags)
-	}
-	if parsedCase.OracleSupport != OracleSupportPartiallySupported {
-		t.Fatalf("unexpected case oracle support: got %q want %q", parsedCase.OracleSupport, OracleSupportPartiallySupported)
-	}
-	if parsedCase.UnsupportedReason != "Scope-local composition remains project-owned" {
-		t.Fatalf("unexpected case unsupported reason: got %q", parsedCase.UnsupportedReason)
 	}
 }
 
