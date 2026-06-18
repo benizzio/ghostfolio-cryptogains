@@ -347,8 +347,10 @@ func generatedRotkiOracleInputRelativePath(empiricalCaseMethod reportmodel.CostB
 	return path.Join(rotkiOracleInputRootRepositoryPath, empiricalCaseMethod.FilenameSlug(), baseName+".json")
 }
 
-// buildRotkiAdapterArguments records the deterministic adapter arguments used by
-// one fixture regeneration run.
+// buildRotkiAdapterArguments builds deterministic fixture provenance metadata.
+// AdapterArguments are serialized as fixture context, not replayed as an exact
+// CLI command. --method records the project method; adapter execution uses the
+// rotki method selector.
 // Authored by: OpenCode
 func buildRotkiAdapterArguments(inputRelativePath string, method reportmodel.CostBasisMethod, sourceRootRelativePath string) []string {
 	var rotkiMethod = string(rotkiMethodForCase(method))
