@@ -11,8 +11,6 @@ import (
 //
 // Authored by: OpenCode
 func TestRunDoesNotRequireRotkiGenerationWhenGoldenFixturesExist(t *testing.T) {
-	t.Parallel()
-
 	var priorResolveRotkiSourceRuntime = resolveRotkiSourceRuntime
 	t.Cleanup(func() {
 		resolveRotkiSourceRuntime = priorResolveRotkiSourceRuntime
