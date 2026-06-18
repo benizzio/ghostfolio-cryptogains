@@ -1,6 +1,7 @@
 package fixture
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -82,7 +83,7 @@ func TestCompareProjectCalculationOutputComparesMatchEvidence(t *testing.T) {
 	if result.Passed {
 		t.Fatalf("expected match basis comparison to fail, got %+v", result)
 	}
-	if !equalStringSlices(result.RelevantSourceIDs, []string{"buy-1", "sell-1"}) {
+	if !slices.Equal(result.RelevantSourceIDs, []string{"buy-1", "sell-1"}) {
 		t.Fatalf("unexpected relevant source ids: got %v want %v", result.RelevantSourceIDs, []string{"buy-1", "sell-1"})
 	}
 	if !strings.Contains(result.DiagnosticContext, "field=matches[0].matched_basis") || !strings.Contains(result.DiagnosticContext, "source_ids=buy-1,sell-1") {
@@ -123,11 +124,11 @@ func TestCompareProjectCalculationOutputRecordsUnsupportedSegmentSkips(t *testin
 		t.Fatalf("unexpected skip count: got %d want %d", len(outcome.Skips), 2)
 	}
 	var skipExternal = comparisonSkipByPolicy(t, outcome.Skips, ComparisonPolicySkipExternalOracle)
-	if !equalStringSlices(skipExternal.RelevantSourceIDs, []string{"buy-2", "sell-2"}) {
+	if !slices.Equal(skipExternal.RelevantSourceIDs, []string{"buy-2", "sell-2"}) {
 		t.Fatalf("unexpected skip_external_oracle skip: %+v", skipExternal)
 	}
 	var compositionOnly = comparisonSkipByPolicy(t, outcome.Skips, ComparisonPolicyProjectCompositionOnly)
-	if !equalStringSlices(compositionOnly.RelevantSourceIDs, []string{"sell-3"}) {
+	if !slices.Equal(compositionOnly.RelevantSourceIDs, []string{"sell-3"}) {
 		t.Fatalf("unexpected project_composition_only skip: %+v", compositionOnly)
 	}
 }
@@ -197,7 +198,7 @@ func TestFormatEmpiricalComparisonFailuresSortsDeterministically(t *testing.T) {
 			Tolerance:         "0",
 			DecimalPolicy:     "scale=16,rounding=half_up",
 			Passed:            false,
-			RelevantSourceIDs: []string{"sell-1", "buy-1"},
+			RelevantSourceIDs: []string{"buy-1", "sell-1"},
 			DiagnosticContext: "case=a",
 		},
 	})
@@ -209,7 +210,7 @@ func TestFormatEmpiricalComparisonFailuresSortsDeterministically(t *testing.T) {
 	if !strings.HasPrefix(lines[0], "case=case-a") {
 		t.Fatalf("expected lexical first failure line, got %q", lines[0])
 	}
-	if !strings.Contains(lines[0], "source_ids=sell-1,buy-1") && !strings.Contains(lines[0], "source_ids=buy-1,sell-1") {
+	if !strings.Contains(lines[0], "source_ids=buy-1,sell-1") {
 		t.Fatalf("expected formatted output to include source ids, got %q", lines[0])
 	}
 	if !strings.HasPrefix(lines[1], "case=case-b") {
@@ -308,22 +309,4 @@ func comparisonSkipByPolicy(t *testing.T, skips []EmpiricalComparisonSkip, polic
 
 	t.Fatalf("comparison skip %q not found", policy)
 	return EmpiricalComparisonSkip{}
-}
-
-// equalStringSlices reports whether two string slices contain the same values in
-// the same order.
-// Authored by: OpenCode
-func equalStringSlices(left []string, right []string) bool {
-	if len(left) != len(right) {
-		return false
-	}
-
-	var index int
-	for index = range left {
-		if left[index] != right[index] {
-			return false
-		}
-	}
-
-	return true
 }
