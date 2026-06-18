@@ -3,6 +3,7 @@ package decimal
 import (
 	"encoding/json"
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/cockroachdb/apd/v3"
@@ -115,6 +116,35 @@ func TestExactServiceAndPackageHelpersCoverSuccessAndErrorBranches(t *testing.T)
 	}
 	if _, err := CanonicalStringPointer(&invalid); err == nil {
 		t.Fatalf("expected non-finite decimal pointer canonicalization to fail")
+	}
+}
+
+// TestParseCanonicalStringVerifiesStoredText verifies canonical-only parsing
+// accepts already-canonical text and rejects equivalent alternate spellings.
+// Authored by: OpenCode
+func TestParseCanonicalStringVerifiesStoredText(t *testing.T) {
+	t.Parallel()
+
+	var value, canonical, err = ParseCanonicalString("10.5")
+	if err != nil {
+		t.Fatalf("parse canonical decimal string: %v", err)
+	}
+	if canonical != "10.5" {
+		t.Fatalf("unexpected canonical decimal string: got %q want %q", canonical, "10.5")
+	}
+	if value.Text('f') != "10.5" {
+		t.Fatalf("unexpected parsed decimal value: got %q want %q", value.Text('f'), "10.5")
+	}
+
+	_, _, err = ParseCanonicalString("10.50")
+	if err == nil {
+		t.Fatalf("expected non-canonical decimal string to fail")
+	}
+	if !strings.Contains(err.Error(), "canonical fixed-point representation") {
+		t.Fatalf("expected canonicalization error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "10.5") {
+		t.Fatalf("expected canonicalization error to mention canonical form, got %v", err)
 	}
 }
 

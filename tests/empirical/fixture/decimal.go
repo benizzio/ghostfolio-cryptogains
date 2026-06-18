@@ -27,13 +27,9 @@ import (
 // required by the empirical dataset and oracle fixture contracts.
 // Authored by: OpenCode
 func ParseDecimalString(raw string) (apd.Decimal, string, error) {
-	var value, canonical, err = decimalsupport.ParseString(raw)
+	var value, canonical, err = decimalsupport.ParseCanonicalString(raw)
 	if err != nil {
 		return apd.Decimal{}, "", fmt.Errorf("parse fixture decimal string: %w", err)
-	}
-
-	if err := rejectNonCanonicalDecimalString(raw, canonical); err != nil {
-		return apd.Decimal{}, "", err
 	}
 
 	return value, canonical, nil
@@ -62,16 +58,4 @@ func CanonicalDecimalString(value apd.Decimal) (string, error) {
 	}
 
 	return canonical, nil
-}
-
-// rejectNonCanonicalDecimalString rejects persisted decimal strings that do not
-// already match the canonical fixed-point form required by the fixture
-// contracts.
-// Authored by: OpenCode
-func rejectNonCanonicalDecimalString(raw string, canonical string) error {
-	if raw != canonical {
-		return fmt.Errorf("decimal string must use canonical fixed-point representation %q", canonical)
-	}
-
-	return nil
 }

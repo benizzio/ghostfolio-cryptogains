@@ -107,6 +107,33 @@ func ParseString(raw string) (apd.Decimal, string, error) {
 	return canonicalValue, canonical, nil
 }
 
+// ParseCanonicalString parses one decimal string and verifies that the source
+// text already matches the canonical fixed-point representation returned by
+// ParseString. Use this helper for persisted or fixture-controlled decimal text
+// where accepting alternate decimal spellings would hide unintended
+// normalization. Use ParseString instead for input that may be normalized.
+//
+// Example:
+//
+//	decimalValue, canonical, err := decimal.ParseCanonicalString("10.5")
+//	if err != nil {
+//		panic(err)
+//	}
+//	_, _ = decimalValue, canonical
+//
+// Authored by: OpenCode
+func ParseCanonicalString(raw string) (apd.Decimal, string, error) {
+	var value, canonical, err = ParseString(raw)
+	if err != nil {
+		return apd.Decimal{}, "", err
+	}
+	if raw != canonical {
+		return apd.Decimal{}, "", fmt.Errorf("decimal string must use canonical fixed-point representation %q", canonical)
+	}
+
+	return value, canonical, nil
+}
+
 // ParseNumber parses one JSON number and returns both the canonical decimal
 // value and its canonical persisted representation.
 //
