@@ -20,7 +20,7 @@ Top-level fields:
 - `supported_methods`: `fifo`, `lifo`, `hifo`, `average_cost`, and `scope_local_hybrid`.
 - `coverage_tags`: stable coverage-tag index for required methods and edge-case categories.
 - `activities`: synthetic normalized activity rows.
-- `cases`: named validation slices used by later oracle and comparison phases.
+- `cases`: named validation slices used by oracle generation and comparison tests.
 
 Activity fields:
 
@@ -109,15 +109,14 @@ Edge-case coverage tags:
 ## Operating Notes
 
 - Keep all content synthetic. Do not add real user activity, account names, wallet names, tokens, JWTs, proprietary financial records, snapshot payloads, Markdown reports, TUI text, or copied upstream fixture rows.
-- `financial-dataset.yaml` is the canonical empirical source dataset. After the dataset-maintenance feature lands, treat it as read-only outside later dataset-maintenance specs.
+- `financial-dataset.yaml` is the canonical empirical source dataset.
 - `golden/` stores normalized oracle JSON fixtures generated from the dataset.
 - Generated rotki adapter inputs are written only under `.cache/empiricaloracle/oracle-inputs/` during explicit regeneration and must not be committed.
 - Cases marked `oracle_support: unsupported` stay in the dataset for structural and non-oracle coverage, but do not require committed `golden/` fixtures.
-- Generate or refresh derived artifacts only through `tools/empiricaloracle` once later phases implement the command behavior. Do not hand-edit generated fixtures.
-- BUG-002 regeneration must obtain rotki data only by verifying and executing pinned rotki source from the untracked project-local cache path `.cache/empiricaloracle/rotki-source/`.
+- Generate or refresh derived artifacts only through `tools/empiricaloracle`. Do not hand-edit generated fixtures.
+- Regeneration obtains rotki data only by verifying and executing pinned rotki source from the untracked project-local cache path `.cache/empiricaloracle/rotki-source/`.
 - Normal fixture-backed empirical test runs must not download rotki, require the untracked source cache, or invoke oracle generation while committed golden fixtures are present.
 - Explicit regeneration may download or reuse the pinned source archive only under `.cache/empiricaloracle/rotki-source/`. Clean up that cache by removing the directory when you need to force a fresh verification pass.
-- `testdata/empirical/rotki/` is README-only deprecation metadata. Do not reintroduce committed raw rotki payloads, bootstrap manifests, or hand-authored adapter inputs there.
 - Runtime application code must not read or write empirical fixture artifacts.
 
 ## Synthetic-Only Policy
@@ -126,15 +125,8 @@ Edge-case coverage tags:
 - Do not add bearer tokens, JWTs, real account or wallet names, personally identifying names, proprietary financial records, or copied upstream ledger fixture text.
 - Validation failures must stay non-secret and actionable.
 
-## Read-Only Policy
-
-- This feature is an isolated dataset-maintenance change and may create `financial-dataset.yaml`.
-- After this feature lands, ordinary feature work must treat `financial-dataset.yaml` as read-only.
-- Future dataset corrections or expansions require a later isolated dataset-maintenance spec.
-
 ## Current State
 
-- `financial-dataset.yaml` is the repository-backed synthetic empirical dataset baseline for phase 3 validation.
+- `financial-dataset.yaml` is the repository-backed synthetic empirical dataset baseline used by empirical validation.
 - `golden/` contains the current normalized oracle fixture baseline for the supported empirical fixture groups.
 - `.cache/empiricaloracle/oracle-inputs/` is the untracked regeneration-only location for generated rotki adapter inputs.
-- `rotki/` contains only README deprecation metadata for the removed BUG-001 bootstrap shortcut. BUG-002 supersedes it as oracle evidence for regeneration.

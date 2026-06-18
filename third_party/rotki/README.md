@@ -1,26 +1,23 @@
 # Repository-Controlled rotki Boundary
 
-This directory records the repository-controlled rotki provenance required by
-BUG-001 and the BUG-002 source-acquisition supersession. It does not vendor a
-rotki source checkout, built artifact, or executable. This checkout therefore
-does not rely on a developer-local rotki installation and does not claim rotki
-was executed here.
+This directory records the pinned rotki provenance used by empirical fixture
+regeneration. It does not vendor a rotki source checkout, built artifact, or
+executable. Normal empirical tests use committed golden fixtures and do not
+execute rotki.
 
-## Why This Exists
+## Purpose
 
-- BUG-001 supersedes the previous single-oracle acceptance assumption.
-- rotki is the planned pure-method external oracle boundary for `fifo`, `lifo`,
-  `hifo`, and `average_cost` aggregate comparisons.
+- rotki is the pure-method external oracle boundary for `fifo`, `lifo`, `hifo`,
+  and `average_cost` aggregate comparisons.
 - `scope_local_hybrid` remains a composite oracle and is not documented here as a
   native rotki method.
-- BUG-002 rejects committed raw rotki captures, hand-authored rotki datasets,
-  developer-global installations, and vendored rotki source as oracle evidence.
 - Explicit golden-fixture regeneration must download or reuse the verified
   pinned rotki source under `.cache/empiricaloracle/rotki-source/`, which is an
   untracked project-local cache path.
-- `testdata/empirical/rotki/` now carries only a README tombstone that records
-  BUG-001 deprecation. No committed raw rotki payload, bootstrap manifest, or
-  hand-authored adapter input under that path is authoritative regeneration
+- Regeneration must execute only through the project-owned adapter boundary in
+  `tools/empiricaloracle`.
+- Regeneration must not use committed raw rotki captures, hand-authored rotki
+  datasets, developer-global installations, or vendored rotki source as oracle
   evidence.
 
 ## Upstream Pin And Verifiable Sources
@@ -37,7 +34,7 @@ was executed here.
 ## Included Materials
 
 - `LICENSE.md`: exact AGPLv3 license text copied from the pinned upstream license URL.
-- `README.md`: pinned provenance, adapter constraints, and bootstrap boundary policy.
+- `README.md`: pinned provenance, adapter constraints, and regeneration boundary policy.
 
 ## Platform Support And Boundary Scope
 
@@ -49,9 +46,8 @@ was executed here.
 - Explicit regeneration may only use the verified untracked source cache path
   documented above and must fail when provenance, checksum, commit or tag, or
   adapter constraints do not match.
-- Regeneration must not read committed raw rotki payloads from
-  `testdata/empirical/rotki/` and must not depend on any vendored
-  `third_party/rotki/source/` checkout.
+- Regeneration must not read committed raw rotki payloads, hand-authored adapter
+  inputs, or any vendored `third_party/rotki/source/` checkout.
 - Normal fixture-backed empirical tests must not download rotki, require the
   untracked source cache, or invoke oracle generation while committed golden
   fixtures are present.

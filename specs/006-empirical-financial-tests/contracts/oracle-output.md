@@ -24,7 +24,6 @@ External oracle materials:
 
 ```text
 third_party/rotki/
-testdata/empirical/rotki/  # README-only deprecation metadata, not oracle evidence
 ```
 
 Oracle helper code:
@@ -242,7 +241,6 @@ Rules:
 
 Superseded materials:
 
-- `testdata/empirical/rotki/` must remain README-only deprecation metadata.
 - Committed raw rotki outputs, hand-authored rotki datasets, and `third_party/rotki/source/` are invalid oracle evidence.
 
 Binary-only vendoring is invalid unless the applicable license and source-distribution obligations are satisfied and documented.

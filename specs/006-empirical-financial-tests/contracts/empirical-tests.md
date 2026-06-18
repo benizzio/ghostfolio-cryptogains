@@ -78,7 +78,7 @@ Empirical tests must not call or assert:
 - The automatic generation path used by the tests is `go run ./tools/empiricaloracle`.
 - Explicit full regeneration is `go run ./tools/empiricaloracle --regenerate`.
 - Regeneration must execute the project-owned Python adapter against verified pinned rotki source in `.cache/empiricaloracle/rotki-source/`.
-- Regeneration must not depend on a global `rotki` executable, a vendored `third_party/rotki/source/` checkout, or committed raw payloads under `testdata/empirical/rotki/`.
+- Regeneration must not depend on a global `rotki` executable, a vendored `third_party/rotki/source/` checkout, or committed raw rotki payloads.
 
 ## Comparison Flow
 

@@ -59,7 +59,7 @@ BUG-002 supersedes the BUG-001 bootstrap shortcut that accepted committed raw ro
 
 The implemented verification method is `archive_sha256+git_ls_remote_tag`. The regeneration boundary shells out to local `git` for `ls-remote` tag verification and to local `python3` or `python` to execute `tools/empiricaloracle/rotki_adapter.py`. The adapter loads `rotkehlchen/fval.py` and `rotkehlchen/accounting/cost_basis/base.py` directly from the verified source tree and uses project-owned support stubs instead of a developer-global rotki installation.
 
-`testdata/empirical/rotki/` is reduced to README-only deprecation metadata. Committed raw rotki payloads, bootstrap manifests, and hand-authored adapter inputs are not authoritative regeneration evidence and must not be used as the source of regenerated oracle data.
+Committed raw rotki payloads, bootstrap manifests, and hand-authored adapter inputs are not authoritative regeneration evidence and must not be used as the source of regenerated oracle data.
 
 **Rationale**: BUG-002 requires regenerated fixtures to derive from executed pinned rotki source while avoiding vendored rotki code and developer-global installations. A verified untracked source cache keeps the repository free of rotki source while still making the regeneration boundary reproducible from documented provenance and checksums.
 

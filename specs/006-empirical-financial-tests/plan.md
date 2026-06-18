@@ -109,7 +109,6 @@ testdata/
 └── empirical/
     ├── financial-dataset.yaml
     ├── golden/
-    ├── rotki/
     └── README.md
 
 tools/
@@ -126,7 +125,7 @@ third_party/
     └── README.md
 ```
 
-BUG-002 supersedes `third_party/rotki/source/`: rotki source must be downloaded or reused in an untracked project-local folder during explicit regeneration, and that folder must be covered by `.gitignore`.
+BUG-002 supersedes `third_party/rotki/source/` and committed raw rotki fixture paths: rotki source must be downloaded or reused in an untracked project-local folder during explicit regeneration, and that folder must be covered by `.gitignore`.
 
 BUG-003 supersedes `testdata/empirical/hledger/` and `third_party/hledger/`: hledger fixtures, source, executables, metadata, and command or journal tooling are removal targets, not retained historical scope.
 

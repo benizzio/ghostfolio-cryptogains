@@ -97,19 +97,19 @@ Expected result:
 ## Missing Golden Fixture Path
 
 1. Remove or withhold one golden fixture in a controlled development branch.
-2. Generate only the missing fixture with:
+1. Generate only the missing fixture with:
 
 ```bash
 go run ./tools/empiricaloracle
 ```
 
-3. If you want the test run itself to opt in to missing-fixture generation instead of failing with setup guidance, run:
+1. If you want the test run itself to opt in to missing-fixture generation instead of failing with setup guidance, run:
 
 ```bash
 GHOSTFOLIO_CRYPTOGAINS_GENERATE_MISSING_FIXTURES=true go test ./tests/empirical -count=1 -v
 ```
 
-4. For an explicit full refresh of committed oracle artifacts, run:
+1. For an explicit full refresh of committed oracle artifacts, run:
 
 ```bash
 go run ./tools/empiricaloracle --regenerate
@@ -153,7 +153,6 @@ Inspect:
 ```text
 testdata/empirical/financial-dataset.yaml
 testdata/empirical/golden/
-testdata/empirical/rotki/        # README-only deprecation metadata
 ```
 
 Expected result:

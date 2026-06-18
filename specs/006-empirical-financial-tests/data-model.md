@@ -277,10 +277,7 @@ Fields:
 | `method` | string | Cost-basis method |
 | `year` | integer | Report year |
 | `asset_identity_key` | string | Synthetic asset identity |
-| `realized_gain_or_loss` | decimal string | Expected yearly realized result |
-| `allocated_basis` | decimal string | Expected basis allocated to disposals |
-| `closing_quantity` | decimal string | Expected remaining quantity |
-| `closing_basis` | decimal string | Expected remaining basis |
+| `values` | `ComparableOutputValues` | Expected comparable yearly result, basis, and closing position values |
 | `matches` | `OracleMatchEvidence[]` | Method-specific lot or pool evidence when the fixture records source IDs, evidence type, and expected values |
 | `unsupported_segments` | `UnsupportedOracleSegment[]` | Explicit unsupported evidence when needed |
 | `metadata` | `OracleGenerationRun` | Generation metadata and hashes |
@@ -292,10 +289,32 @@ Relationships:
 
 Validation rules:
 
-- Decimal fields are canonical decimal strings.
+- Nested `values` fields are canonical decimal strings.
 - Quantity fields must be exact.
 - Unsupported segments are not included in external-oracle assertions unless a project-owned composition rule explicitly covers them.
 - Metadata hashes and selected external-oracle identity are mandatory.
+
+## ComparableOutputValues
+
+Purpose: Canonical decimal-string values compared between oracle fixtures and normalized project calculation output.
+
+Fields:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `realized_gain_or_loss` | decimal string | Expected yearly realized result |
+| `allocated_basis` | decimal string | Expected basis allocated to disposals |
+| `closing_quantity` | decimal string | Expected remaining quantity |
+| `closing_basis` | decimal string | Expected remaining basis |
+
+Relationships:
+
+- Belongs to one `OracleOutput` or one `ProjectCalculationOutput`.
+
+Validation rules:
+
+- Decimal fields are canonical decimal strings.
+- Quantity fields must be exact.
 
 ## OracleMatchEvidence
 
@@ -364,10 +383,7 @@ Fields:
 | `method` | string | Cost-basis method |
 | `year` | integer | Report year |
 | `asset_identity_key` | string | Synthetic asset identity |
-| `realized_gain_or_loss` | decimal string | Normalized from `CapitalGainsReport` |
-| `allocated_basis` | decimal string | Normalized from liquidation summaries |
-| `closing_quantity` | decimal string | Normalized from detail sections |
-| `closing_basis` | decimal string | Normalized from detail sections |
+| `values` | `ComparableOutputValues` | Normalized comparable yearly result, basis, and closing position values |
 | `matches` | `ProjectMatchEvidence[]` | Project basis-match evidence |
 
 Relationships:
@@ -380,6 +396,7 @@ Validation rules:
 - Uses calculation output only, not Markdown or TUI text.
 - Contains no report document structure, saved path, token, JWT, or protected snapshot payload.
 - Uses the same method and year as the oracle segment.
+- Uses the same nested comparable value shape as `OracleOutput`.
 
 ## EmpiricalComparisonResult
 
