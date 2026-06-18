@@ -1,3 +1,7 @@
+// Package main contains normalization and hashing helpers for empirical oracle
+// outputs.
+//
+// Authored by: OpenCode
 package main
 
 import (

@@ -1,3 +1,7 @@
+// Package main contains unsupported-segment derivation helpers for empirical
+// oracle fixtures.
+//
+// Authored by: OpenCode
 package main
 
 import (

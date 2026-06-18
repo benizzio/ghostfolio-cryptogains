@@ -1,3 +1,7 @@
+// Package main contains shared empirical oracle method, activity, and ordering
+// helpers.
+//
+// Authored by: OpenCode
 package main
 
 import (

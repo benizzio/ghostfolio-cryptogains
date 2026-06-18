@@ -1,3 +1,7 @@
+// Package main contains the rotki-backed oracle boundary used to generate
+// normalized empirical fixtures.
+//
+// Authored by: OpenCode
 package main
 
 import (

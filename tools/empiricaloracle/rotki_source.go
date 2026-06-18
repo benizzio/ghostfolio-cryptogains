@@ -1,3 +1,7 @@
+// Package main contains verified rotki source acquisition and adapter execution
+// support for empirical fixture regeneration.
+//
+// Authored by: OpenCode
 package main
 
 import (

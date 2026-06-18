@@ -1,3 +1,7 @@
+// Package main contains repository path resolution and empirical golden fixture
+// path helpers.
+//
+// Authored by: OpenCode
 package main
 
 import (

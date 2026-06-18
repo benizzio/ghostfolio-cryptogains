@@ -1,3 +1,7 @@
+// Package main contains scope-local hybrid composite oracle entry points built
+// on the rotki boundary.
+//
+// Authored by: OpenCode
 package main
 
 import (

@@ -1,3 +1,7 @@
+// Package main contains artifact persistence helpers for empirical oracle
+// fixture regeneration.
+//
+// Authored by: OpenCode
 package main
 
 import (

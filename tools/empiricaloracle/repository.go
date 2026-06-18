@@ -1,3 +1,7 @@
+// Package main contains repository-root discovery and command execution helpers
+// for empirical oracle tooling.
+//
+// Authored by: OpenCode
 package main
 
 import (
