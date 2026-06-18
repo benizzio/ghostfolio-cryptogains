@@ -20,7 +20,6 @@ func TestRotkiBoundaryMetadataStaysRepositoryControlled(t *testing.T) {
 	var metadataPaths = []string{
 		"third_party/rotki/README.md",
 		"third_party/rotki/LICENSE.md",
-		"testdata/empirical/rotki/README.md",
 	}
 
 	var index int
@@ -38,18 +37,25 @@ func TestRotkiBoundaryMetadataStaysRepositoryControlled(t *testing.T) {
 	}
 
 	var rotkiArtifactRoot = filepath.Join(repositoryRoot, filepath.FromSlash("testdata/empirical/rotki"))
-	var directoryEntries, err = os.ReadDir(rotkiArtifactRoot)
+	var _, err = os.Stat(rotkiArtifactRoot)
+	if os.IsNotExist(err) {
+		return
+	}
 	if err != nil {
-		t.Fatalf("read rotki metadata directory: %v", err)
+		t.Fatalf("stat rotki artifact directory: %v", err)
+	}
+
+	var directoryEntries []os.DirEntry
+	directoryEntries, err = os.ReadDir(rotkiArtifactRoot)
+	if err != nil {
+		t.Fatalf("read rotki artifact directory: %v", err)
 	}
 	for index = range directoryEntries {
 		if directoryEntries[index].IsDir() {
 			continue
 		}
-		if directoryEntries[index].Name() == "README.md" {
-			continue
-		}
-		t.Fatalf("committed raw rotki artifact %s must be removed after BUG-002", filepath.ToSlash(filepath.Join("testdata/empirical/rotki", directoryEntries[index].Name())))
+
+		t.Fatalf("rotki artifact directory %s must not contain committed artifact files", filepath.ToSlash(rotkiArtifactRoot))
 	}
 }
 

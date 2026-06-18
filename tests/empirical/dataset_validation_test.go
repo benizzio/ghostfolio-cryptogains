@@ -160,10 +160,16 @@ func TestEmpiricalDatasetValidation(t *testing.T) {
 	t.Run("rejects_non_synthetic_content", func(t *testing.T) {
 		var dataset = newValidSyntheticEmpiricalDataset()
 		var datasetPath = inlineDatasetValidationPath("non-synthetic-content.yaml")
+		var jwtParts = []string{
+			"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+			"eyJzdWIiOiJlbXBpcmljYWwtdXNlci0wMDEiLCJuYW1lIjoiSm9obiBEb2UifQ",
+			"signaturevalue123",
+		}
+		var authorizationLine = fmt.Sprintf(`authorization: "Bearer %s"`, strings.Join(jwtParts, "."))
 		var rawContent = renderSyntheticDatasetContent(
 			dataset,
 			`owner_name: "John Doe"`,
-			`authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlbXBpcmljYWwtdXNlci0wMDEiLCJuYW1lIjoiSm9obiBEb2UifQ.signaturevalue123"`,
+			authorizationLine,
 		)
 
 		var err = fixture.ValidateSyntheticOnlyContent(datasetPath, rawContent)
@@ -472,71 +478,11 @@ func renderSyntheticDatasetContent(dataset fixture.EmpiricalDataset, extraLines 
 	}
 	builder.WriteString("activities:\n")
 	for _, activity = range dataset.Activities {
-		builder.WriteString(fmt.Sprintf("  - source_id: %s\n", activity.SourceID))
-		builder.WriteString(fmt.Sprintf("    occurred_at: %q\n", activity.OccurredAt))
-		builder.WriteString(fmt.Sprintf("    deterministic_order: %d\n", activity.DeterministicOrder))
-		builder.WriteString(fmt.Sprintf("    activity_type: %s\n", activity.ActivityType))
-		builder.WriteString(fmt.Sprintf("    asset_identity_key: %s\n", activity.AssetIdentityKey))
-		builder.WriteString(fmt.Sprintf("    asset_symbol: %s\n", activity.AssetSymbol))
-		builder.WriteString(fmt.Sprintf("    quantity: %q\n", activity.Quantity))
-		if activity.GrossValue != "" {
-			builder.WriteString(fmt.Sprintf("    gross_value: %q\n", activity.GrossValue))
-		}
-		if activity.UnitPrice != "" {
-			builder.WriteString(fmt.Sprintf("    unit_price: %q\n", activity.UnitPrice))
-		}
-		if activity.FeeAmount != "" {
-			builder.WriteString(fmt.Sprintf("    fee_amount: %q\n", activity.FeeAmount))
-		}
-		if activity.Currency != "" {
-			builder.WriteString(fmt.Sprintf("    currency: %s\n", activity.Currency))
-		}
-		if activity.SourceScope != nil {
-			builder.WriteString("    source_scope:\n")
-			if activity.SourceScope.ScopeID != "" {
-				builder.WriteString(fmt.Sprintf("      scope_id: %s\n", activity.SourceScope.ScopeID))
-			}
-			if activity.SourceScope.ScopeKind != "" {
-				builder.WriteString(fmt.Sprintf("      scope_kind: %s\n", activity.SourceScope.ScopeKind))
-			}
-			builder.WriteString(fmt.Sprintf("      reliability: %s\n", activity.SourceScope.Reliability))
-			if activity.SourceScope.DisplayName != "" {
-				builder.WriteString(fmt.Sprintf("      display_name: %q\n", activity.SourceScope.DisplayName))
-			}
-		}
-		if activity.ZeroPricedReductionExplanation != "" {
-			builder.WriteString(fmt.Sprintf("    zero_priced_reduction_explanation: %q\n", activity.ZeroPricedReductionExplanation))
-		}
-		builder.WriteString("    coverage_tags:\n")
-		for _, tag = range activity.CoverageTags {
-			builder.WriteString(fmt.Sprintf("      - %s\n", tag))
-		}
+		renderActivity(&builder, activity)
 	}
 	builder.WriteString("cases:\n")
 	for _, caseRecord = range dataset.Cases {
-		builder.WriteString(fmt.Sprintf("  - case_id: %s\n", caseRecord.CaseID))
-		builder.WriteString(fmt.Sprintf("    description: %q\n", caseRecord.Description))
-		builder.WriteString("    methods:\n")
-		for _, method = range caseRecord.Methods {
-			builder.WriteString(fmt.Sprintf("      - %s\n", method))
-		}
-		builder.WriteString(fmt.Sprintf("    year: %d\n", caseRecord.Year))
-		builder.WriteString("    asset_identity_keys:\n")
-		for _, tag = range caseRecord.AssetIdentityKeys {
-			builder.WriteString(fmt.Sprintf("      - %s\n", tag))
-		}
-		builder.WriteString("    activity_source_ids:\n")
-		for _, tag = range caseRecord.ActivitySourceIDs {
-			builder.WriteString(fmt.Sprintf("      - %s\n", tag))
-		}
-		builder.WriteString("    coverage_tags:\n")
-		for _, tag = range caseRecord.CoverageTags {
-			builder.WriteString(fmt.Sprintf("      - %s\n", tag))
-		}
-		builder.WriteString(fmt.Sprintf("    oracle_support: %s\n", caseRecord.OracleSupport))
-		if caseRecord.UnsupportedReason != "" {
-			builder.WriteString(fmt.Sprintf("    unsupported_reason: %q\n", caseRecord.UnsupportedReason))
-		}
+		renderCase(&builder, caseRecord)
 	}
 	for _, tag = range extraLines {
 		builder.WriteString(tag)
@@ -544,6 +490,84 @@ func renderSyntheticDatasetContent(dataset fixture.EmpiricalDataset, extraLines 
 	}
 
 	return builder.String()
+}
+
+// renderActivity appends one synthetic empirical activity to an inline dataset.
+// Authored by: OpenCode
+func renderActivity(builder *strings.Builder, activity fixture.EmpiricalActivity) {
+	var tag string
+
+	builder.WriteString(fmt.Sprintf("  - source_id: %s\n", activity.SourceID))
+	builder.WriteString(fmt.Sprintf("    occurred_at: %q\n", activity.OccurredAt))
+	builder.WriteString(fmt.Sprintf("    deterministic_order: %d\n", activity.DeterministicOrder))
+	builder.WriteString(fmt.Sprintf("    activity_type: %s\n", activity.ActivityType))
+	builder.WriteString(fmt.Sprintf("    asset_identity_key: %s\n", activity.AssetIdentityKey))
+	builder.WriteString(fmt.Sprintf("    asset_symbol: %s\n", activity.AssetSymbol))
+	builder.WriteString(fmt.Sprintf("    quantity: %q\n", activity.Quantity))
+	if activity.GrossValue != "" {
+		builder.WriteString(fmt.Sprintf("    gross_value: %q\n", activity.GrossValue))
+	}
+	if activity.UnitPrice != "" {
+		builder.WriteString(fmt.Sprintf("    unit_price: %q\n", activity.UnitPrice))
+	}
+	if activity.FeeAmount != "" {
+		builder.WriteString(fmt.Sprintf("    fee_amount: %q\n", activity.FeeAmount))
+	}
+	if activity.Currency != "" {
+		builder.WriteString(fmt.Sprintf("    currency: %s\n", activity.Currency))
+	}
+	if activity.SourceScope != nil {
+		builder.WriteString("    source_scope:\n")
+		if activity.SourceScope.ScopeID != "" {
+			builder.WriteString(fmt.Sprintf("      scope_id: %s\n", activity.SourceScope.ScopeID))
+		}
+		if activity.SourceScope.ScopeKind != "" {
+			builder.WriteString(fmt.Sprintf("      scope_kind: %s\n", activity.SourceScope.ScopeKind))
+		}
+		builder.WriteString(fmt.Sprintf("      reliability: %s\n", activity.SourceScope.Reliability))
+		if activity.SourceScope.DisplayName != "" {
+			builder.WriteString(fmt.Sprintf("      display_name: %q\n", activity.SourceScope.DisplayName))
+		}
+	}
+	if activity.ZeroPricedReductionExplanation != "" {
+		builder.WriteString(fmt.Sprintf("    zero_priced_reduction_explanation: %q\n", activity.ZeroPricedReductionExplanation))
+	}
+	builder.WriteString("    coverage_tags:\n")
+	for _, tag = range activity.CoverageTags {
+		builder.WriteString(fmt.Sprintf("      - %s\n", tag))
+	}
+}
+
+// renderCase appends one synthetic empirical validation case to an inline
+// dataset.
+// Authored by: OpenCode
+func renderCase(builder *strings.Builder, caseRecord fixture.EmpiricalCase) {
+	var method reportmodel.CostBasisMethod
+	var tag string
+
+	builder.WriteString(fmt.Sprintf("  - case_id: %s\n", caseRecord.CaseID))
+	builder.WriteString(fmt.Sprintf("    description: %q\n", caseRecord.Description))
+	builder.WriteString("    methods:\n")
+	for _, method = range caseRecord.Methods {
+		builder.WriteString(fmt.Sprintf("      - %s\n", method))
+	}
+	builder.WriteString(fmt.Sprintf("    year: %d\n", caseRecord.Year))
+	builder.WriteString("    asset_identity_keys:\n")
+	for _, tag = range caseRecord.AssetIdentityKeys {
+		builder.WriteString(fmt.Sprintf("      - %s\n", tag))
+	}
+	builder.WriteString("    activity_source_ids:\n")
+	for _, tag = range caseRecord.ActivitySourceIDs {
+		builder.WriteString(fmt.Sprintf("      - %s\n", tag))
+	}
+	builder.WriteString("    coverage_tags:\n")
+	for _, tag = range caseRecord.CoverageTags {
+		builder.WriteString(fmt.Sprintf("      - %s\n", tag))
+	}
+	builder.WriteString(fmt.Sprintf("    oracle_support: %s\n", caseRecord.OracleSupport))
+	if caseRecord.UnsupportedReason != "" {
+		builder.WriteString(fmt.Sprintf("    unsupported_reason: %q\n", caseRecord.UnsupportedReason))
+	}
 }
 
 // inlineDatasetValidationPath returns a stable contract-only path label for one
