@@ -79,91 +79,191 @@ func normalizeProjectCalculationOutput(
 	report reportmodel.CapitalGainsReport,
 	assetIdentityKey string,
 ) (ProjectCalculationOutput, error) {
+	var normalizedCaseID string
+	var normalizedAssetIdentityKey string
+	var err error
+	normalizedCaseID, normalizedAssetIdentityKey, err = normalizeProjectOutputInputs(caseID, assetIdentityKey)
+	if err != nil {
+		return ProjectCalculationOutput{}, err
+	}
+
+	var detailSection reportmodel.AssetDetailSection
+	var hasDetailSection bool
+	detailSection, hasDetailSection, err = findValidatedProjectDetailSection(report, normalizedCaseID, normalizedAssetIdentityKey)
+	if err != nil {
+		return ProjectCalculationOutput{}, err
+	}
+
+	var output = newProjectCalculationOutput(normalizedCaseID, report, normalizedAssetIdentityKey)
+
+	if !hasDetailSection {
+		output.Values = zeroProjectComparableOutputValues()
+		return output, nil
+	}
+
+	var relevantRows = projectRelevantActivityRows(empiricalCase, detailSection.ActivityRows)
+	if empiricalCase != nil && len(relevantRows) == 0 {
+		output.Values = zeroProjectComparableOutputValues()
+		return output, nil
+	}
+
+	var liquidations = projectLiquidationsForOutput(empiricalCase, detailSection, relevantRows)
+	var realizedGainOrLoss apd.Decimal
+	var allocatedBasis apd.Decimal
+	realizedGainOrLoss, allocatedBasis, output.Matches, err = aggregateProjectLiquidations(
+		normalizedCaseID,
+		normalizedAssetIdentityKey,
+		liquidations,
+	)
+	if err != nil {
+		return ProjectCalculationOutput{}, err
+	}
+
+	var closingQuantity apd.Decimal
+	var closingBasis apd.Decimal
+	closingQuantity, closingBasis = projectClosingValues(empiricalCase, detailSection, relevantRows)
+	output.Values, err = canonicalProjectComparableOutputValues(realizedGainOrLoss, allocatedBasis, closingQuantity, closingBasis)
+	if err != nil {
+		return ProjectCalculationOutput{}, err
+	}
+	output.Matches = normalizeProjectMatchesForMethod(report.CostBasisMethod, output.Matches)
+
+	return output, nil
+}
+
+// normalizeProjectOutputInputs trims and validates the output lookup identity.
+// Authored by: OpenCode
+func normalizeProjectOutputInputs(caseID string, assetIdentityKey string) (string, string, error) {
 	var normalizedCaseID = strings.TrimSpace(caseID)
 	if normalizedCaseID == "" {
-		return ProjectCalculationOutput{}, fmt.Errorf("project output case_id is required")
+		return "", "", fmt.Errorf("project output case_id is required")
 	}
 
 	var normalizedAssetIdentityKey = strings.TrimSpace(assetIdentityKey)
 	if normalizedAssetIdentityKey == "" {
-		return ProjectCalculationOutput{}, fmt.Errorf("project output asset identity key is required")
+		return "", "", fmt.Errorf("project output asset identity key is required")
 	}
 
+	return normalizedCaseID, normalizedAssetIdentityKey, nil
+}
+
+// findValidatedProjectDetailSection returns a matching detail section after
+// validating the detail/reference consistency rules.
+// Authored by: OpenCode
+func findValidatedProjectDetailSection(
+	report reportmodel.CapitalGainsReport,
+	normalizedCaseID string,
+	normalizedAssetIdentityKey string,
+) (reportmodel.AssetDetailSection, bool, error) {
 	var detailSection, hasDetailSection = findProjectDetailSection(report, normalizedAssetIdentityKey)
 	var referenceEntry, hasReferenceEntry = findProjectReferenceEntry(report, normalizedAssetIdentityKey)
 
 	if !hasDetailSection && !hasReferenceEntry {
-		return ProjectCalculationOutput{}, fmt.Errorf(
+		return reportmodel.AssetDetailSection{}, false, fmt.Errorf(
 			"normalize project output %s %s: asset not found in report detail sections or reference entries",
 			normalizedCaseID,
 			normalizedAssetIdentityKey,
 		)
 	}
 	if !hasDetailSection && hasReferenceEntry && referenceEntry.MainSectionStatus != reportmodel.ReferenceSectionStatusReferenceOnly {
-		return ProjectCalculationOutput{}, fmt.Errorf(
+		return reportmodel.AssetDetailSection{}, false, fmt.Errorf(
 			"normalize project output %s %s: reference entry without detail section must be reference only",
 			normalizedCaseID,
 			normalizedAssetIdentityKey,
 		)
 	}
 
-	var output = ProjectCalculationOutput{
+	return detailSection, hasDetailSection, nil
+}
+
+// newProjectCalculationOutput creates the stable output shell shared by all
+// normalization paths.
+// Authored by: OpenCode
+func newProjectCalculationOutput(
+	normalizedCaseID string,
+	report reportmodel.CapitalGainsReport,
+	normalizedAssetIdentityKey string,
+) ProjectCalculationOutput {
+	return ProjectCalculationOutput{
 		CaseID:           normalizedCaseID,
 		Method:           report.CostBasisMethod,
 		Year:             report.Year,
 		AssetIdentityKey: normalizedAssetIdentityKey,
 		Matches:          make([]ProjectMatchEvidence, 0),
 	}
+}
 
-	if !hasDetailSection {
-		output.Values = ComparableOutputValues{
-			RealizedGainOrLoss: "0",
-			AllocatedBasis:     "0",
-			ClosingQuantity:    "0",
-			ClosingBasis:       "0",
+// zeroProjectComparableOutputValues returns the deterministic zero value set for
+// reference-only or case-filtered empty results.
+// Authored by: OpenCode
+func zeroProjectComparableOutputValues() ComparableOutputValues {
+	return ComparableOutputValues{
+		RealizedGainOrLoss: "0",
+		AllocatedBasis:     "0",
+		ClosingQuantity:    "0",
+		ClosingBasis:       "0",
+	}
+}
+
+// projectRelevantActivityRows returns report activity rows constrained to the
+// selected empirical case when one is provided.
+// Authored by: OpenCode
+func projectRelevantActivityRows(
+	empiricalCase *EmpiricalCase,
+	rows []reportmodel.AssetActivityRow,
+) []reportmodel.AssetActivityRow {
+	if empiricalCase == nil {
+		return filterRelevantActivityRows(rows, nil)
+	}
+
+	var caseSourceIDs = empiricalCaseSourceIDSet(*empiricalCase)
+	return filterRelevantActivityRows(rows, caseSourceIDs)
+}
+
+// projectLiquidationsForOutput selects aggregate liquidation summaries or
+// case-filtered row liquidations for comparison normalization.
+// Authored by: OpenCode
+func projectLiquidationsForOutput(
+	empiricalCase *EmpiricalCase,
+	detailSection reportmodel.AssetDetailSection,
+	relevantRows []reportmodel.AssetActivityRow,
+) []reportmodel.LiquidationCalculation {
+	if empiricalCase == nil {
+		return append([]reportmodel.LiquidationCalculation(nil), detailSection.LiquidationSummaries...)
+	}
+
+	var liquidations = make([]reportmodel.LiquidationCalculation, 0, len(relevantRows))
+	var rowIndex int
+	for rowIndex = range relevantRows {
+		if relevantRows[rowIndex].LiquidationCalculation == nil {
+			continue
 		}
-		return output, nil
+		liquidations = append(liquidations, *relevantRows[rowIndex].LiquidationCalculation)
 	}
 
-	var caseSourceIDs map[string]struct{}
-	if empiricalCase != nil {
-		caseSourceIDs = empiricalCaseSourceIDSet(*empiricalCase)
-	}
+	return liquidations
+}
 
-	var relevantRows = filterRelevantActivityRows(detailSection.ActivityRows, caseSourceIDs)
-	if empiricalCase != nil && len(relevantRows) == 0 {
-		output.Values = ComparableOutputValues{
-			RealizedGainOrLoss: "0",
-			AllocatedBasis:     "0",
-			ClosingQuantity:    "0",
-			ClosingBasis:       "0",
-		}
-		return output, nil
-	}
-
+// aggregateProjectLiquidations sums liquidation values and normalizes match
+// evidence for comparison.
+// Authored by: OpenCode
+func aggregateProjectLiquidations(
+	normalizedCaseID string,
+	normalizedAssetIdentityKey string,
+	liquidations []reportmodel.LiquidationCalculation,
+) (apd.Decimal, apd.Decimal, []ProjectMatchEvidence, error) {
 	var realizedGainOrLoss = apd.Decimal{}
 	var allocatedBasis = apd.Decimal{}
-	var rowIndex int
-	var liquidations []reportmodel.LiquidationCalculation
-	if empiricalCase == nil {
-		liquidations = append([]reportmodel.LiquidationCalculation(nil), detailSection.LiquidationSummaries...)
-	} else {
-		liquidations = make([]reportmodel.LiquidationCalculation, 0, len(relevantRows))
-		for rowIndex = range relevantRows {
-			if relevantRows[rowIndex].LiquidationCalculation == nil {
-				continue
-			}
-			liquidations = append(liquidations, *relevantRows[rowIndex].LiquidationCalculation)
-		}
-	}
+	var matches = make([]ProjectMatchEvidence, 0)
+	var liquidationIndex int
 
-	for rowIndex = range liquidations {
-		var liquidation = liquidations[rowIndex]
+	for liquidationIndex = range liquidations {
+		var liquidation = liquidations[liquidationIndex]
 		var err error
 
 		realizedGainOrLoss, err = supportmath.Add(realizedGainOrLoss, liquidation.GainOrLoss)
 		if err != nil {
-			return ProjectCalculationOutput{}, fmt.Errorf(
+			return apd.Decimal{}, apd.Decimal{}, nil, fmt.Errorf(
 				"normalize project output %s %s realized gain or loss: %w",
 				normalizedCaseID,
 				normalizedAssetIdentityKey,
@@ -173,7 +273,7 @@ func normalizeProjectCalculationOutput(
 
 		allocatedBasis, err = supportmath.Add(allocatedBasis, liquidation.AllocatedBasis)
 		if err != nil {
-			return ProjectCalculationOutput{}, fmt.Errorf(
+			return apd.Decimal{}, apd.Decimal{}, nil, fmt.Errorf(
 				"normalize project output %s %s allocated basis: %w",
 				normalizedCaseID,
 				normalizedAssetIdentityKey,
@@ -184,7 +284,7 @@ func normalizeProjectCalculationOutput(
 		var normalizedMatches []ProjectMatchEvidence
 		normalizedMatches, err = normalizeProjectLiquidationMatches(liquidation)
 		if err != nil {
-			return ProjectCalculationOutput{}, fmt.Errorf(
+			return apd.Decimal{}, apd.Decimal{}, nil, fmt.Errorf(
 				"normalize project output %s %s liquidation %s matches: %w",
 				normalizedCaseID,
 				normalizedAssetIdentityKey,
@@ -193,42 +293,73 @@ func normalizeProjectCalculationOutput(
 			)
 		}
 
-		output.Matches = append(output.Matches, normalizedMatches...)
+		matches = append(matches, normalizedMatches...)
 	}
 
-	var closingQuantity = detailSection.ClosingQuantity
-	var closingBasis = detailSection.ClosingCostBasis
+	return realizedGainOrLoss, allocatedBasis, matches, nil
+}
+
+// projectClosingValues chooses the report-level or case-filtered closing values.
+// Authored by: OpenCode
+func projectClosingValues(
+	empiricalCase *EmpiricalCase,
+	detailSection reportmodel.AssetDetailSection,
+	relevantRows []reportmodel.AssetActivityRow,
+) (apd.Decimal, apd.Decimal) {
 	if empiricalCase != nil && len(relevantRows) != 0 {
-		closingQuantity = relevantRows[len(relevantRows)-1].QuantityAfterRow
-		closingBasis = relevantRows[len(relevantRows)-1].BasisAfterRow
+		var lastRelevantRow = relevantRows[len(relevantRows)-1]
+		return lastRelevantRow.QuantityAfterRow, lastRelevantRow.BasisAfterRow
 	}
 
+	return detailSection.ClosingQuantity, detailSection.ClosingCostBasis
+}
+
+// canonicalProjectComparableOutputValues canonicalizes all comparable decimal
+// fields for persisted fixture comparison.
+// Authored by: OpenCode
+func canonicalProjectComparableOutputValues(
+	realizedGainOrLoss apd.Decimal,
+	allocatedBasis apd.Decimal,
+	closingQuantity apd.Decimal,
+	closingBasis apd.Decimal,
+) (ComparableOutputValues, error) {
+	var values ComparableOutputValues
 	var err error
-	output.Values.RealizedGainOrLoss, err = CanonicalDecimalString(realizedGainOrLoss)
+	values.RealizedGainOrLoss, err = CanonicalDecimalString(realizedGainOrLoss)
 	if err != nil {
-		return ProjectCalculationOutput{}, fmt.Errorf("normalize project output realized_gain_or_loss: %w", err)
+		return ComparableOutputValues{}, fmt.Errorf("normalize project output realized_gain_or_loss: %w", err)
 	}
-	output.Values.AllocatedBasis, err = CanonicalDecimalString(allocatedBasis)
+	values.AllocatedBasis, err = CanonicalDecimalString(allocatedBasis)
 	if err != nil {
-		return ProjectCalculationOutput{}, fmt.Errorf("normalize project output allocated_basis: %w", err)
+		return ComparableOutputValues{}, fmt.Errorf("normalize project output allocated_basis: %w", err)
 	}
-	output.Values.ClosingQuantity, err = CanonicalDecimalString(closingQuantity)
+	values.ClosingQuantity, err = CanonicalDecimalString(closingQuantity)
 	if err != nil {
-		return ProjectCalculationOutput{}, fmt.Errorf("normalize project output closing_quantity: %w", err)
+		return ComparableOutputValues{}, fmt.Errorf("normalize project output closing_quantity: %w", err)
 	}
-	output.Values.ClosingBasis, err = CanonicalDecimalString(closingBasis)
+	values.ClosingBasis, err = CanonicalDecimalString(closingBasis)
 	if err != nil {
-		return ProjectCalculationOutput{}, fmt.Errorf("normalize project output closing_basis: %w", err)
+		return ComparableOutputValues{}, fmt.Errorf("normalize project output closing_basis: %w", err)
 	}
 
-	sort.Slice(output.Matches, func(left int, right int) bool {
-		return projectMatchSortKey(output.Matches[left]) < projectMatchSortKey(output.Matches[right])
+	return values, nil
+}
+
+// normalizeProjectMatchesForMethod sorts match evidence and suppresses matches
+// for Average Cost, which has no per-acquisition match comparison contract.
+// Authored by: OpenCode
+func normalizeProjectMatchesForMethod(
+	method reportmodel.CostBasisMethod,
+	matches []ProjectMatchEvidence,
+) []ProjectMatchEvidence {
+	sort.Slice(matches, func(left int, right int) bool {
+		return projectMatchSortKey(matches[left]) < projectMatchSortKey(matches[right])
 	})
-	if report.CostBasisMethod == reportmodel.CostBasisMethodAverageCost {
-		output.Matches = nil
+	if method == reportmodel.CostBasisMethodAverageCost {
+		return nil
 	}
 
-	return output, nil
+	return matches
 }
 
 // findProjectDetailSection returns one matching detail section when present.
