@@ -46,3 +46,90 @@ func TestContainsAll(t *testing.T) {
 		})
 	}
 }
+
+// TestContainsASCIILetter verifies positive, negative, and non-ASCII-only
+// inputs for the shared ASCII letter predicate.
+// Authored by: OpenCode
+func TestContainsASCIILetter(t *testing.T) {
+	t.Parallel()
+
+	var tests = []struct {
+		name  string
+		value string
+		want  bool
+	}{
+		{
+			name:  "uppercase ASCII letter",
+			value: "123A",
+			want:  true,
+		},
+		{
+			name:  "lowercase ASCII letter",
+			value: "123a",
+			want:  true,
+		},
+		{
+			name:  "no ASCII letter",
+			value: "123-_=",
+			want:  false,
+		},
+		{
+			name:  "non ASCII letter only",
+			value: "\u00e9",
+			want:  false,
+		},
+	}
+
+	for _, test := range tests {
+		var test = test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			var got = ContainsASCIILetter(test.value)
+			if got != test.want {
+				t.Fatalf("ContainsASCIILetter() = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+// TestContainsASCIIDigit verifies positive, negative, and non-ASCII-only
+// inputs for the shared ASCII digit predicate.
+// Authored by: OpenCode
+func TestContainsASCIIDigit(t *testing.T) {
+	t.Parallel()
+
+	var tests = []struct {
+		name  string
+		value string
+		want  bool
+	}{
+		{
+			name:  "ASCII digit",
+			value: "abc1",
+			want:  true,
+		},
+		{
+			name:  "no ASCII digit",
+			value: "abc-_=",
+			want:  false,
+		},
+		{
+			name:  "non ASCII digit only",
+			value: "\u0663",
+			want:  false,
+		},
+	}
+
+	for _, test := range tests {
+		var test = test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			var got = ContainsASCIIDigit(test.value)
+			if got != test.want {
+				t.Fatalf("ContainsASCIIDigit() = %v, want %v", got, test.want)
+			}
+		})
+	}
+}

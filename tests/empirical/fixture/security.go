@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	supporttext "github.com/benizzio/ghostfolio-cryptogains/internal/support/text"
 )
 
 const (
@@ -375,7 +377,7 @@ func looksLikeGenericFreeTextToken(field string, value string) bool {
 		if containsSyntheticMarker(match) {
 			continue
 		}
-		if containsLetter(match) && containsDigit(match) {
+		if supporttext.ContainsASCIILetter(match) && supporttext.ContainsASCIIDigit(match) {
 			return true
 		}
 	}
@@ -439,22 +441,4 @@ func containsSyntheticMarker(value string) bool {
 	}
 
 	return false
-}
-
-// containsLetter reports whether one candidate includes an ASCII letter.
-//
-// Authored by: OpenCode
-func containsLetter(value string) bool {
-	return strings.IndexFunc(value, func(character rune) bool {
-		return character >= 'A' && character <= 'Z' || character >= 'a' && character <= 'z'
-	}) >= 0
-}
-
-// containsDigit reports whether one candidate includes an ASCII digit.
-//
-// Authored by: OpenCode
-func containsDigit(value string) bool {
-	return strings.IndexFunc(value, func(character rune) bool {
-		return character >= '0' && character <= '9'
-	}) >= 0
 }

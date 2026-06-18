@@ -22,3 +22,33 @@ func ContainsAll(value string, parts ...string) bool {
 
 	return true
 }
+
+// ContainsASCIILetter reports whether value contains at least one ASCII letter.
+// Non-ASCII letters are ignored.
+//
+// Example:
+//
+//	matched := text.ContainsASCIILetter("token-abc123")
+//	_ = matched
+//
+// Authored by: OpenCode
+func ContainsASCIILetter(value string) bool {
+	return strings.IndexFunc(value, func(character rune) bool {
+		return character >= 'A' && character <= 'Z' || character >= 'a' && character <= 'z'
+	}) >= 0
+}
+
+// ContainsASCIIDigit reports whether value contains at least one ASCII digit.
+// Non-ASCII digits are ignored.
+//
+// Example:
+//
+//	matched := text.ContainsASCIIDigit("token-abc123")
+//	_ = matched
+//
+// Authored by: OpenCode
+func ContainsASCIIDigit(value string) bool {
+	return strings.IndexFunc(value, func(character rune) bool {
+		return character >= '0' && character <= '9'
+	}) >= 0
+}
