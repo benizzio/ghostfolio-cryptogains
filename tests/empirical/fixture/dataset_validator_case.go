@@ -7,9 +7,21 @@ import (
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 )
 
+// empiricalDatasetCaseValidator owns case-specific empirical dataset validation.
+// Authored by: OpenCode
+type empiricalDatasetCaseValidator struct {
+	*empiricalDatasetValidator
+}
+
+// newEmpiricalDatasetCaseValidator builds a case validator backed by the parent dataset validator state.
+// Authored by: OpenCode
+func newEmpiricalDatasetCaseValidator(validator *empiricalDatasetValidator) empiricalDatasetCaseValidator {
+	return empiricalDatasetCaseValidator{empiricalDatasetValidator: validator}
+}
+
 // validateCases enforces basic case identifier and reference integrity.
 // Authored by: OpenCode
-func (validator *empiricalDatasetValidator) validateCases() {
+func (validator empiricalDatasetCaseValidator) validateCases() {
 	var index int
 
 	for index = range validator.dataset.Cases {
@@ -19,7 +31,7 @@ func (validator *empiricalDatasetValidator) validateCases() {
 
 // validateCase enforces one empirical case row.
 // Authored by: OpenCode
-func (validator *empiricalDatasetValidator) validateCase(caseRecord *EmpiricalCase) {
+func (validator empiricalDatasetCaseValidator) validateCase(caseRecord *EmpiricalCase) {
 	var caseID = validator.validateAndRegisterCaseID(caseRecord)
 
 	validator.validateCaseMethods(caseRecord, caseID)
@@ -31,7 +43,7 @@ func (validator *empiricalDatasetValidator) validateCase(caseRecord *EmpiricalCa
 
 // validateAndRegisterCaseID validates one case identifier and records it for uniqueness checks.
 // Authored by: OpenCode
-func (validator *empiricalDatasetValidator) validateAndRegisterCaseID(caseRecord *EmpiricalCase) string {
+func (validator empiricalDatasetCaseValidator) validateAndRegisterCaseID(caseRecord *EmpiricalCase) string {
 	var caseID = strings.TrimSpace(caseRecord.CaseID)
 	if caseID == "" {
 		validator.addIssue("", "", "case_id", "case_id", "case_id must be non-empty")
@@ -48,7 +60,7 @@ func (validator *empiricalDatasetValidator) validateAndRegisterCaseID(caseRecord
 
 // validateCaseMethods validates one case's method declarations against supported methods.
 // Authored by: OpenCode
-func (validator *empiricalDatasetValidator) validateCaseMethods(caseRecord *EmpiricalCase, caseID string) {
+func (validator empiricalDatasetCaseValidator) validateCaseMethods(caseRecord *EmpiricalCase, caseID string) {
 	var seenCaseMethods = make(map[reportmodel.CostBasisMethod]struct{}, len(caseRecord.Methods))
 	var method reportmodel.CostBasisMethod
 
@@ -73,7 +85,7 @@ func (validator *empiricalDatasetValidator) validateCaseMethods(caseRecord *Empi
 
 // validateCaseAssets validates one case's declared asset identity keys.
 // Authored by: OpenCode
-func (validator *empiricalDatasetValidator) validateCaseAssets(caseRecord *EmpiricalCase, caseID string) map[string]struct{} {
+func (validator empiricalDatasetCaseValidator) validateCaseAssets(caseRecord *EmpiricalCase, caseID string) map[string]struct{} {
 	var declaredAssets = make(map[string]struct{}, len(caseRecord.AssetIdentityKeys))
 
 	if len(caseRecord.AssetIdentityKeys) == 0 {
@@ -98,7 +110,7 @@ func (validator *empiricalDatasetValidator) validateCaseAssets(caseRecord *Empir
 
 // validateCaseActivityReferences validates case source references and activity asset linkage.
 // Authored by: OpenCode
-func (validator *empiricalDatasetValidator) validateCaseActivityReferences(caseRecord *EmpiricalCase, caseID string, declaredAssets map[string]struct{}) (map[string]struct{}, bool) {
+func (validator empiricalDatasetCaseValidator) validateCaseActivityReferences(caseRecord *EmpiricalCase, caseID string, declaredAssets map[string]struct{}) (map[string]struct{}, bool) {
 	var referencedAssets = make(map[string]struct{}, len(caseRecord.AssetIdentityKeys))
 	var seenCaseSourceIDs = make(map[string]struct{}, len(caseRecord.ActivitySourceIDs))
 	var hasSelectedYearActivity bool
@@ -125,7 +137,7 @@ func (validator *empiricalDatasetValidator) validateCaseActivityReferences(caseR
 
 // validateCaseActivityReference validates one source ID reference and returns its activity when valid.
 // Authored by: OpenCode
-func (validator *empiricalDatasetValidator) validateCaseActivityReference(caseID string, sourceID string, seenCaseSourceIDs map[string]struct{}) (EmpiricalActivity, bool) {
+func (validator empiricalDatasetCaseValidator) validateCaseActivityReference(caseID string, sourceID string, seenCaseSourceIDs map[string]struct{}) (EmpiricalActivity, bool) {
 	if sourceID == "" {
 		validator.addIssue("case_id", caseID, "activity_source_ids", "activity_source_ids", "case activity_source_ids must not contain blank values")
 		return EmpiricalActivity{}, false
@@ -147,7 +159,7 @@ func (validator *empiricalDatasetValidator) validateCaseActivityReference(caseID
 
 // validateCaseActivityAssetReference validates one referenced activity against the declared case assets.
 // Authored by: OpenCode
-func (validator *empiricalDatasetValidator) validateCaseActivityAssetReference(caseID string, sourceID string, activity EmpiricalActivity, declaredAssets map[string]struct{}, referencedAssets map[string]struct{}) {
+func (validator empiricalDatasetCaseValidator) validateCaseActivityAssetReference(caseID string, sourceID string, activity EmpiricalActivity, declaredAssets map[string]struct{}, referencedAssets map[string]struct{}) {
 	if len(declaredAssets) == 0 {
 		return
 	}
@@ -174,7 +186,7 @@ func caseActivityOccursInYear(activity EmpiricalActivity, year int) bool {
 
 // validateCaseYearCoverage validates declared case year and selected-year activity coverage.
 // Authored by: OpenCode
-func (validator *empiricalDatasetValidator) validateCaseYearCoverage(caseRecord *EmpiricalCase, caseID string, declaredAssets map[string]struct{}, referencedAssets map[string]struct{}, hasSelectedYearActivity bool) {
+func (validator empiricalDatasetCaseValidator) validateCaseYearCoverage(caseRecord *EmpiricalCase, caseID string, declaredAssets map[string]struct{}, referencedAssets map[string]struct{}, hasSelectedYearActivity bool) {
 	if _, exists := validator.supportedYearsFromDatasetDeclaration[caseRecord.Year]; !exists {
 		validator.addIssue("case_id", caseID, "year", "supported_years", fmt.Sprintf("case year %d is not declared in supported_years", caseRecord.Year))
 	}
@@ -192,7 +204,7 @@ func (validator *empiricalDatasetValidator) validateCaseYearCoverage(caseRecord 
 
 // validateCaseOracleSupport enforces basic oracle support metadata consistency.
 // Authored by: OpenCode
-func (validator *empiricalDatasetValidator) validateCaseOracleSupport(caseRecord *EmpiricalCase, caseID string) {
+func (validator empiricalDatasetCaseValidator) validateCaseOracleSupport(caseRecord *EmpiricalCase, caseID string) {
 	switch caseRecord.OracleSupport {
 	case OracleSupportSupported:
 		if strings.TrimSpace(caseRecord.UnsupportedReason) != "" {

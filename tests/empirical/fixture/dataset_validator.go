@@ -154,6 +154,12 @@ func (validator *empiricalDatasetValidator) validate() {
 	validator.validateScopePresence()
 }
 
+// validateCases delegates case-specific integrity checks to the case validator.
+// Authored by: OpenCode
+func (validator *empiricalDatasetValidator) validateCases() {
+	newEmpiricalDatasetCaseValidator(validator).validateCases()
+}
+
 // validateDatasetVersion enforces the required dataset schema version marker.
 // Authored by: OpenCode
 func (validator *empiricalDatasetValidator) validateDatasetVersion() {

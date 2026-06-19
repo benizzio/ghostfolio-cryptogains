@@ -67,7 +67,7 @@ func TestEmpiricalDatasetValidatorRejectsCaseInconsistentMethodsAssetsAndYears(t
 	validator.activitiesBySourceID["alpha-future"] = dataset.Activities[0]
 	validator.seenActivitySourceIDs["alpha-future"] = struct{}{}
 
-	validator.validateCase(&EmpiricalCase{
+	newEmpiricalDatasetCaseValidator(&validator).validateCase(&EmpiricalCase{
 		CaseID:            "case-alpha-2024",
 		Methods:           []reportmodel.CostBasisMethod{reportmodel.CostBasisMethodFIFO, reportmodel.CostBasisMethodFIFO},
 		Year:              2024,
