@@ -10,38 +10,45 @@ import (
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
 
+// datasetYAMLActivityParser owns activity and source-scope parsing while sharing
+// the parent parser cursor.
+// Authored by: OpenCode
+type datasetYAMLActivityParser struct {
+	cursor *datasetYAMLParser
+}
+
 // parseActivities parses the top-level empirical activity list.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseActivities(parentLine datasetYAMLLine, rawValue string) ([]EmpiricalActivity, error) {
+func (activityParser *datasetYAMLActivityParser) parseActivities(parentLine datasetYAMLLine, rawValue string) ([]EmpiricalActivity, error) {
 	var trimmedValue = strings.TrimSpace(rawValue)
 	if trimmedValue == "[]" {
-		parser.index++
+		activityParser.cursor.index++
 		return []EmpiricalActivity{}, nil
 	}
 	if trimmedValue != "" {
-		return nil, parser.newError(parentLine, "", "", "activities", "expected block list or []")
+		return nil, activityParser.cursor.newError(parentLine, "", "", "activities", "expected block list or []")
 	}
 
-	parser.index++
-	return parser.parseActivityItems(parentLine)
+	activityParser.cursor.index++
+	return activityParser.parseActivityItems(parentLine)
 }
 
 // parseActivityItems parses all block activity items under a parent list field.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseActivityItems(parentLine datasetYAMLLine) ([]EmpiricalActivity, error) {
+func (activityParser *datasetYAMLActivityParser) parseActivityItems(parentLine datasetYAMLLine) ([]EmpiricalActivity, error) {
 	var activities = make([]EmpiricalActivity, 0)
 
-	for parser.index < len(parser.lines) {
-		var line = parser.lines[parser.index]
+	for activityParser.cursor.index < len(activityParser.cursor.lines) {
+		var line = activityParser.cursor.lines[activityParser.cursor.index]
 		if line.Indent < parentLine.Indent+2 {
 			break
 		}
 		if line.Indent != parentLine.Indent+2 || !strings.HasPrefix(line.Text, "- ") {
-			return nil, parser.newError(line, "", "", "activities", "expected activity list item")
+			return nil, activityParser.cursor.newError(line, "", "", "activities", "expected activity list item")
 		}
 
 		var activity EmpiricalActivity
-		var err = parser.parseActivity(line, &activity)
+		var err = activityParser.parseActivity(line, &activity)
 		if err != nil {
 			return nil, err
 		}
@@ -53,38 +60,38 @@ func (parser *datasetYAMLParser) parseActivityItems(parentLine datasetYAMLLine) 
 
 // parseActivity parses one empirical activity item.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseActivity(startLine datasetYAMLLine, activity *EmpiricalActivity) error {
-	var err = parser.parseActivityFirstField(startLine, activity)
+func (activityParser *datasetYAMLActivityParser) parseActivity(startLine datasetYAMLLine, activity *EmpiricalActivity) error {
+	var err = activityParser.parseActivityFirstField(startLine, activity)
 	if err != nil {
 		return err
 	}
 
-	parser.index++
-	return parser.parseActivityFields(startLine, activity)
+	activityParser.cursor.index++
+	return activityParser.parseActivityFields(startLine, activity)
 }
 
 // parseActivityFirstField decodes the activity field embedded in the list marker.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseActivityFirstField(startLine datasetYAMLLine, activity *EmpiricalActivity) error {
+func (activityParser *datasetYAMLActivityParser) parseActivityFirstField(startLine datasetYAMLLine, activity *EmpiricalActivity) error {
 	var firstField = strings.TrimSpace(strings.TrimPrefix(startLine.Text, "- "))
 	var field, rawValue, ok = splitYAMLField(firstField)
 	if !ok {
-		return parser.newError(startLine, "", "", "activities", "expected activity field")
+		return activityParser.cursor.newError(startLine, "", "", "activities", "expected activity field")
 	}
 
-	return parser.applyActivityField(startLine, activity, field, rawValue)
+	return activityParser.applyActivityField(startLine, activity, field, rawValue)
 }
 
 // parseActivityFields parses all indented fields that belong to one activity.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseActivityFields(startLine datasetYAMLLine, activity *EmpiricalActivity) error {
-	for parser.index < len(parser.lines) {
-		var line = parser.lines[parser.index]
+func (activityParser *datasetYAMLActivityParser) parseActivityFields(startLine datasetYAMLLine, activity *EmpiricalActivity) error {
+	for activityParser.cursor.index < len(activityParser.cursor.lines) {
+		var line = activityParser.cursor.lines[activityParser.cursor.index]
 		if line.Indent < startLine.Indent+2 {
 			break
 		}
 
-		var err = parser.parseActivityFieldLine(startLine, line, activity)
+		var err = activityParser.parseActivityFieldLine(startLine, line, activity)
 		if err != nil {
 			return err
 		}
@@ -95,30 +102,30 @@ func (parser *datasetYAMLParser) parseActivityFields(startLine datasetYAMLLine, 
 
 // parseActivityFieldLine decodes one nested activity field line.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseActivityFieldLine(startLine datasetYAMLLine, line datasetYAMLLine, activity *EmpiricalActivity) error {
+func (activityParser *datasetYAMLActivityParser) parseActivityFieldLine(startLine datasetYAMLLine, line datasetYAMLLine, activity *EmpiricalActivity) error {
 	if line.Indent != startLine.Indent+2 {
-		return parser.newError(line, "source_id", activity.SourceID, "activities", "unexpected nested indentation")
+		return activityParser.cursor.newError(line, "source_id", activity.SourceID, "activities", "unexpected nested indentation")
 	}
 
 	var field, rawValue, ok = splitYAMLField(line.Text)
 	if !ok {
-		return parser.newError(line, "source_id", activity.SourceID, "activities", "expected activity field")
+		return activityParser.cursor.newError(line, "source_id", activity.SourceID, "activities", "expected activity field")
 	}
 
 	switch field {
 	case "source_scope":
-		return parser.parseActivityScopeField(line, activity, rawValue)
+		return activityParser.parseActivityScopeField(line, activity, rawValue)
 	case "coverage_tags":
-		return parser.parseActivityCoverageTagsField(line, activity, field, rawValue)
+		return activityParser.parseActivityCoverageTagsField(line, activity, field, rawValue)
 	default:
-		return parser.parseActivityScalarField(line, activity, field, rawValue)
+		return activityParser.parseActivityScalarField(line, activity, field, rawValue)
 	}
 }
 
 // parseActivityScopeField decodes one nested source_scope activity field.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseActivityScopeField(line datasetYAMLLine, activity *EmpiricalActivity, rawValue string) error {
-	var scope, err = parser.parseScope(line, rawValue, activity.SourceID)
+func (activityParser *datasetYAMLActivityParser) parseActivityScopeField(line datasetYAMLLine, activity *EmpiricalActivity, rawValue string) error {
+	var scope, err = activityParser.parseScope(line, rawValue, activity.SourceID)
 	if err != nil {
 		return err
 	}
@@ -129,8 +136,9 @@ func (parser *datasetYAMLParser) parseActivityScopeField(line datasetYAMLLine, a
 
 // parseActivityCoverageTagsField decodes one activity coverage_tags list field.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseActivityCoverageTagsField(line datasetYAMLLine, activity *EmpiricalActivity, field string, rawValue string) error {
-	var values, err = parser.parseStringList(line, rawValue, field, "source_id", activity.SourceID, false)
+func (activityParser *datasetYAMLActivityParser) parseActivityCoverageTagsField(line datasetYAMLLine, activity *EmpiricalActivity, field string, rawValue string) error {
+	var listParser = datasetYAMLListParser{cursor: activityParser.cursor}
+	var values, err = listParser.parseStringList(line, rawValue, field, "source_id", activity.SourceID, false)
 	if err != nil {
 		return err
 	}
@@ -141,19 +149,19 @@ func (parser *datasetYAMLParser) parseActivityCoverageTagsField(line datasetYAML
 
 // parseActivityScalarField decodes one scalar activity field and advances the cursor.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseActivityScalarField(line datasetYAMLLine, activity *EmpiricalActivity, field string, rawValue string) error {
-	var err = parser.applyActivityField(line, activity, field, rawValue)
+func (activityParser *datasetYAMLActivityParser) parseActivityScalarField(line datasetYAMLLine, activity *EmpiricalActivity, field string, rawValue string) error {
+	var err = activityParser.applyActivityField(line, activity, field, rawValue)
 	if err != nil {
 		return err
 	}
 
-	parser.index++
+	activityParser.cursor.index++
 	return nil
 }
 
 // applyActivityField decodes one scalar empirical activity field.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) applyActivityField(line datasetYAMLLine, activity *EmpiricalActivity, field string, rawValue string) error {
+func (activityParser *datasetYAMLActivityParser) applyActivityField(line datasetYAMLLine, activity *EmpiricalActivity, field string, rawValue string) error {
 	var err error
 
 	switch field {
@@ -164,7 +172,7 @@ func (parser *datasetYAMLParser) applyActivityField(line datasetYAMLLine, activi
 	case "deterministic_order":
 		activity.DeterministicOrder, err = parseYAMLInteger(rawValue)
 		if err != nil {
-			return parser.newError(line, "source_id", activity.SourceID, field, err.Error())
+			return activityParser.cursor.newError(line, "source_id", activity.SourceID, field, err.Error())
 		}
 		return nil
 	case "activity_type":
@@ -188,11 +196,11 @@ func (parser *datasetYAMLParser) applyActivityField(line datasetYAMLLine, activi
 	case "zero_priced_reduction_explanation":
 		activity.ZeroPricedReductionExplanation, err = parseYAMLScalarText(rawValue)
 	default:
-		return parser.newError(line, "source_id", activity.SourceID, field, "unknown activity field")
+		return activityParser.cursor.newError(line, "source_id", activity.SourceID, field, "unknown activity field")
 	}
 
 	if err != nil {
-		return parser.newError(line, "source_id", activity.SourceID, field, err.Error())
+		return activityParser.cursor.newError(line, "source_id", activity.SourceID, field, err.Error())
 	}
 
 	return nil
@@ -200,36 +208,36 @@ func (parser *datasetYAMLParser) applyActivityField(line datasetYAMLLine, activi
 
 // parseScope parses one nested empirical source scope map.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseScope(parentLine datasetYAMLLine, rawValue string, sourceID string) (*EmpiricalScope, error) {
+func (activityParser *datasetYAMLActivityParser) parseScope(parentLine datasetYAMLLine, rawValue string, sourceID string) (*EmpiricalScope, error) {
 	var trimmedValue = strings.TrimSpace(rawValue)
 	if trimmedValue == "{}" {
-		parser.index++
+		activityParser.cursor.index++
 		return &EmpiricalScope{}, nil
 	}
 	if trimmedValue != "" {
-		return nil, parser.newError(parentLine, "source_id", sourceID, "source_scope", "expected nested mapping or {}")
+		return nil, activityParser.cursor.newError(parentLine, "source_id", sourceID, "source_scope", "expected nested mapping or {}")
 	}
 
-	parser.index++
-	return parser.parseScopeFields(parentLine, sourceID)
+	activityParser.cursor.index++
+	return activityParser.parseScopeFields(parentLine, sourceID)
 }
 
 // parseScopeFields parses all fields under one source_scope mapping.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseScopeFields(parentLine datasetYAMLLine, sourceID string) (*EmpiricalScope, error) {
+func (activityParser *datasetYAMLActivityParser) parseScopeFields(parentLine datasetYAMLLine, sourceID string) (*EmpiricalScope, error) {
 	var scope EmpiricalScope
 
-	for parser.index < len(parser.lines) {
-		var line = parser.lines[parser.index]
+	for activityParser.cursor.index < len(activityParser.cursor.lines) {
+		var line = activityParser.cursor.lines[activityParser.cursor.index]
 		if line.Indent < parentLine.Indent+2 {
 			break
 		}
 
-		var err = parser.parseScopeFieldLine(line, parentLine, &scope, sourceID)
+		var err = activityParser.parseScopeFieldLine(line, parentLine, &scope, sourceID)
 		if err != nil {
 			return nil, err
 		}
-		parser.index++
+		activityParser.cursor.index++
 	}
 
 	return &scope, nil
@@ -237,22 +245,22 @@ func (parser *datasetYAMLParser) parseScopeFields(parentLine datasetYAMLLine, so
 
 // parseScopeFieldLine decodes one source_scope field line.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseScopeFieldLine(line datasetYAMLLine, parentLine datasetYAMLLine, scope *EmpiricalScope, sourceID string) error {
+func (activityParser *datasetYAMLActivityParser) parseScopeFieldLine(line datasetYAMLLine, parentLine datasetYAMLLine, scope *EmpiricalScope, sourceID string) error {
 	if line.Indent != parentLine.Indent+2 {
-		return parser.newError(line, "source_id", sourceID, "source_scope", "unexpected nested indentation")
+		return activityParser.cursor.newError(line, "source_id", sourceID, "source_scope", "unexpected nested indentation")
 	}
 
 	var field, nestedRawValue, ok = splitYAMLField(line.Text)
 	if !ok {
-		return parser.newError(line, "source_id", sourceID, "source_scope", "expected scope field")
+		return activityParser.cursor.newError(line, "source_id", sourceID, "source_scope", "expected scope field")
 	}
 
-	return parser.applyScopeField(line, scope, field, nestedRawValue, sourceID)
+	return activityParser.applyScopeField(line, scope, field, nestedRawValue, sourceID)
 }
 
 // applyScopeField decodes one scalar empirical source scope field.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) applyScopeField(line datasetYAMLLine, scope *EmpiricalScope, field string, rawValue string, sourceID string) error {
+func (activityParser *datasetYAMLActivityParser) applyScopeField(line datasetYAMLLine, scope *EmpiricalScope, field string, rawValue string, sourceID string) error {
 	var err error
 
 	switch field {
@@ -269,11 +277,11 @@ func (parser *datasetYAMLParser) applyScopeField(line datasetYAMLLine, scope *Em
 	case "display_name":
 		scope.DisplayName, err = parseYAMLScalarText(rawValue)
 	default:
-		return parser.newError(line, "source_id", sourceID, field, "unknown source_scope field")
+		return activityParser.cursor.newError(line, "source_id", sourceID, field, "unknown source_scope field")
 	}
 
 	if err != nil {
-		return parser.newError(line, "source_id", sourceID, field, err.Error())
+		return activityParser.cursor.newError(line, "source_id", sourceID, field, err.Error())
 	}
 
 	return nil

@@ -10,38 +10,45 @@ import (
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 )
 
+// datasetYAMLCaseParser owns empirical case parsing while sharing the parent
+// parser cursor.
+// Authored by: OpenCode
+type datasetYAMLCaseParser struct {
+	cursor *datasetYAMLParser
+}
+
 // parseCases parses the top-level empirical case list.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseCases(parentLine datasetYAMLLine, rawValue string) ([]EmpiricalCase, error) {
+func (caseParser *datasetYAMLCaseParser) parseCases(parentLine datasetYAMLLine, rawValue string) ([]EmpiricalCase, error) {
 	var trimmedValue = strings.TrimSpace(rawValue)
 	if trimmedValue == "[]" {
-		parser.index++
+		caseParser.cursor.index++
 		return []EmpiricalCase{}, nil
 	}
 	if trimmedValue != "" {
-		return nil, parser.newError(parentLine, "", "", "cases", "expected block list or []")
+		return nil, caseParser.cursor.newError(parentLine, "", "", "cases", "expected block list or []")
 	}
 
-	parser.index++
-	return parser.parseCaseItems(parentLine)
+	caseParser.cursor.index++
+	return caseParser.parseCaseItems(parentLine)
 }
 
 // parseCaseItems parses all block case items under a parent list field.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseCaseItems(parentLine datasetYAMLLine) ([]EmpiricalCase, error) {
+func (caseParser *datasetYAMLCaseParser) parseCaseItems(parentLine datasetYAMLLine) ([]EmpiricalCase, error) {
 	var cases = make([]EmpiricalCase, 0)
 
-	for parser.index < len(parser.lines) {
-		var line = parser.lines[parser.index]
+	for caseParser.cursor.index < len(caseParser.cursor.lines) {
+		var line = caseParser.cursor.lines[caseParser.cursor.index]
 		if line.Indent < parentLine.Indent+2 {
 			break
 		}
 		if line.Indent != parentLine.Indent+2 || !strings.HasPrefix(line.Text, "- ") {
-			return nil, parser.newError(line, "", "", "cases", "expected case list item")
+			return nil, caseParser.cursor.newError(line, "", "", "cases", "expected case list item")
 		}
 
 		var caseRecord EmpiricalCase
-		var err = parser.parseCase(line, &caseRecord)
+		var err = caseParser.parseCase(line, &caseRecord)
 		if err != nil {
 			return nil, err
 		}
@@ -53,38 +60,38 @@ func (parser *datasetYAMLParser) parseCaseItems(parentLine datasetYAMLLine) ([]E
 
 // parseCase parses one empirical case item.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseCase(startLine datasetYAMLLine, caseRecord *EmpiricalCase) error {
-	var err = parser.parseCaseFirstField(startLine, caseRecord)
+func (caseParser *datasetYAMLCaseParser) parseCase(startLine datasetYAMLLine, caseRecord *EmpiricalCase) error {
+	var err = caseParser.parseCaseFirstField(startLine, caseRecord)
 	if err != nil {
 		return err
 	}
 
-	parser.index++
-	return parser.parseCaseFields(startLine, caseRecord)
+	caseParser.cursor.index++
+	return caseParser.parseCaseFields(startLine, caseRecord)
 }
 
 // parseCaseFirstField decodes the case field embedded in the list marker.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseCaseFirstField(startLine datasetYAMLLine, caseRecord *EmpiricalCase) error {
+func (caseParser *datasetYAMLCaseParser) parseCaseFirstField(startLine datasetYAMLLine, caseRecord *EmpiricalCase) error {
 	var firstField = strings.TrimSpace(strings.TrimPrefix(startLine.Text, "- "))
 	var field, rawValue, ok = splitYAMLField(firstField)
 	if !ok {
-		return parser.newError(startLine, "", "", "cases", "expected case field")
+		return caseParser.cursor.newError(startLine, "", "", "cases", "expected case field")
 	}
 
-	return parser.applyCaseField(startLine, caseRecord, field, rawValue)
+	return caseParser.applyCaseField(startLine, caseRecord, field, rawValue)
 }
 
 // parseCaseFields parses all indented fields that belong to one case.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseCaseFields(startLine datasetYAMLLine, caseRecord *EmpiricalCase) error {
-	for parser.index < len(parser.lines) {
-		var line = parser.lines[parser.index]
+func (caseParser *datasetYAMLCaseParser) parseCaseFields(startLine datasetYAMLLine, caseRecord *EmpiricalCase) error {
+	for caseParser.cursor.index < len(caseParser.cursor.lines) {
+		var line = caseParser.cursor.lines[caseParser.cursor.index]
 		if line.Indent < startLine.Indent+2 {
 			break
 		}
 
-		var err = parser.parseCaseFieldLine(startLine, line, caseRecord)
+		var err = caseParser.parseCaseFieldLine(startLine, line, caseRecord)
 		if err != nil {
 			return err
 		}
@@ -95,34 +102,35 @@ func (parser *datasetYAMLParser) parseCaseFields(startLine datasetYAMLLine, case
 
 // parseCaseFieldLine decodes one nested case field line.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseCaseFieldLine(startLine datasetYAMLLine, line datasetYAMLLine, caseRecord *EmpiricalCase) error {
+func (caseParser *datasetYAMLCaseParser) parseCaseFieldLine(startLine datasetYAMLLine, line datasetYAMLLine, caseRecord *EmpiricalCase) error {
 	if line.Indent != startLine.Indent+2 {
-		return parser.newError(line, "case_id", caseRecord.CaseID, "cases", "unexpected nested indentation")
+		return caseParser.cursor.newError(line, "case_id", caseRecord.CaseID, "cases", "unexpected nested indentation")
 	}
 
 	var field, rawValue, ok = splitYAMLField(line.Text)
 	if !ok {
-		return parser.newError(line, "case_id", caseRecord.CaseID, "cases", "expected case field")
+		return caseParser.cursor.newError(line, "case_id", caseRecord.CaseID, "cases", "expected case field")
 	}
 
 	switch field {
 	case "methods":
-		return parser.parseCaseMethodsField(line, caseRecord, field, rawValue)
+		return caseParser.parseCaseMethodsField(line, caseRecord, field, rawValue)
 	case "asset_identity_keys":
-		return parser.parseCaseStringListField(line, caseRecord, field, rawValue, &caseRecord.AssetIdentityKeys)
+		return caseParser.parseCaseStringListField(line, caseRecord, field, rawValue, &caseRecord.AssetIdentityKeys)
 	case "activity_source_ids":
-		return parser.parseCaseStringListField(line, caseRecord, field, rawValue, &caseRecord.ActivitySourceIDs)
+		return caseParser.parseCaseStringListField(line, caseRecord, field, rawValue, &caseRecord.ActivitySourceIDs)
 	case "coverage_tags":
-		return parser.parseCaseStringListField(line, caseRecord, field, rawValue, &caseRecord.CoverageTags)
+		return caseParser.parseCaseStringListField(line, caseRecord, field, rawValue, &caseRecord.CoverageTags)
 	default:
-		return parser.parseCaseScalarField(line, caseRecord, field, rawValue)
+		return caseParser.parseCaseScalarField(line, caseRecord, field, rawValue)
 	}
 }
 
 // parseCaseMethodsField decodes one case methods list field.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseCaseMethodsField(line datasetYAMLLine, caseRecord *EmpiricalCase, field string, rawValue string) error {
-	var values, err = parser.parseStringList(line, rawValue, field, "case_id", caseRecord.CaseID, false)
+func (caseParser *datasetYAMLCaseParser) parseCaseMethodsField(line datasetYAMLLine, caseRecord *EmpiricalCase, field string, rawValue string) error {
+	var listParser = datasetYAMLListParser{cursor: caseParser.cursor}
+	var values, err = listParser.parseStringList(line, rawValue, field, "case_id", caseRecord.CaseID, false)
 	if err != nil {
 		return err
 	}
@@ -146,8 +154,9 @@ func caseCostBasisMethodsFromStrings(values []string) []reportmodel.CostBasisMet
 
 // parseCaseStringListField decodes one case string-list field.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseCaseStringListField(line datasetYAMLLine, caseRecord *EmpiricalCase, field string, rawValue string, destination *[]string) error {
-	var values, err = parser.parseStringList(line, rawValue, field, "case_id", caseRecord.CaseID, false)
+func (caseParser *datasetYAMLCaseParser) parseCaseStringListField(line datasetYAMLLine, caseRecord *EmpiricalCase, field string, rawValue string, destination *[]string) error {
+	var listParser = datasetYAMLListParser{cursor: caseParser.cursor}
+	var values, err = listParser.parseStringList(line, rawValue, field, "case_id", caseRecord.CaseID, false)
 	if err != nil {
 		return err
 	}
@@ -158,19 +167,19 @@ func (parser *datasetYAMLParser) parseCaseStringListField(line datasetYAMLLine, 
 
 // parseCaseScalarField decodes one scalar case field and advances the cursor.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseCaseScalarField(line datasetYAMLLine, caseRecord *EmpiricalCase, field string, rawValue string) error {
-	var err = parser.applyCaseField(line, caseRecord, field, rawValue)
+func (caseParser *datasetYAMLCaseParser) parseCaseScalarField(line datasetYAMLLine, caseRecord *EmpiricalCase, field string, rawValue string) error {
+	var err = caseParser.applyCaseField(line, caseRecord, field, rawValue)
 	if err != nil {
 		return err
 	}
 
-	parser.index++
+	caseParser.cursor.index++
 	return nil
 }
 
 // applyCaseField decodes one scalar empirical case field.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) applyCaseField(line datasetYAMLLine, caseRecord *EmpiricalCase, field string, rawValue string) error {
+func (caseParser *datasetYAMLCaseParser) applyCaseField(line datasetYAMLLine, caseRecord *EmpiricalCase, field string, rawValue string) error {
 	var err error
 
 	switch field {
@@ -181,7 +190,7 @@ func (parser *datasetYAMLParser) applyCaseField(line datasetYAMLLine, caseRecord
 	case "year":
 		caseRecord.Year, err = parseYAMLInteger(rawValue)
 		if err != nil {
-			return parser.newError(line, "case_id", caseRecord.CaseID, field, err.Error())
+			return caseParser.cursor.newError(line, "case_id", caseRecord.CaseID, field, err.Error())
 		}
 		return nil
 	case "oracle_support":
@@ -191,11 +200,11 @@ func (parser *datasetYAMLParser) applyCaseField(line datasetYAMLLine, caseRecord
 	case "unsupported_reason":
 		caseRecord.UnsupportedReason, err = parseYAMLScalarText(rawValue)
 	default:
-		return parser.newError(line, "case_id", caseRecord.CaseID, field, "unknown case field")
+		return caseParser.cursor.newError(line, "case_id", caseRecord.CaseID, field, "unknown case field")
 	}
 
 	if err != nil {
-		return parser.newError(line, "case_id", caseRecord.CaseID, field, err.Error())
+		return caseParser.cursor.newError(line, "case_id", caseRecord.CaseID, field, err.Error())
 	}
 
 	return nil

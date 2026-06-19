@@ -9,13 +9,20 @@ import (
 	"strings"
 )
 
+// datasetYAMLListParser owns constrained scalar list parsing while sharing the
+// parent parser cursor.
+// Authored by: OpenCode
+type datasetYAMLListParser struct {
+	cursor *datasetYAMLParser
+}
+
 // parseIntegerList parses one block or inline-empty YAML list of integer values.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseIntegerList(parentLine datasetYAMLLine, rawValue string, field string, referenceKind string, referenceValue string) ([]int, error) {
+func (listParser *datasetYAMLListParser) parseIntegerList(parentLine datasetYAMLLine, rawValue string, field string, referenceKind string, referenceValue string) ([]int, error) {
 	var rawItems []string
 	var err error
 
-	rawItems, err = parser.parseStringList(parentLine, rawValue, field, referenceKind, referenceValue, false)
+	rawItems, err = listParser.parseStringList(parentLine, rawValue, field, referenceKind, referenceValue, false)
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +34,7 @@ func (parser *datasetYAMLParser) parseIntegerList(parentLine datasetYAMLLine, ra
 		var value int
 		value, err = strconv.Atoi(rawItems[index])
 		if err != nil {
-			return nil, parser.newError(parentLine, referenceKind, referenceValue, field, "expected integer list value")
+			return nil, listParser.cursor.newError(parentLine, referenceKind, referenceValue, field, "expected integer list value")
 		}
 		values = append(values, value)
 	}
@@ -37,38 +44,38 @@ func (parser *datasetYAMLParser) parseIntegerList(parentLine datasetYAMLLine, ra
 
 // parseStringList parses one block or inline-empty YAML list of string scalars.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseStringList(parentLine datasetYAMLLine, rawValue string, field string, referenceKind string, referenceValue string, requireQuoted bool) ([]string, error) {
+func (listParser *datasetYAMLListParser) parseStringList(parentLine datasetYAMLLine, rawValue string, field string, referenceKind string, referenceValue string, requireQuoted bool) ([]string, error) {
 	var trimmedValue = strings.TrimSpace(rawValue)
 	if trimmedValue == "[]" {
-		parser.index++
+		listParser.cursor.index++
 		return []string{}, nil
 	}
 	if trimmedValue != "" {
-		return nil, parser.newError(parentLine, referenceKind, referenceValue, field, "expected block list or []")
+		return nil, listParser.cursor.newError(parentLine, referenceKind, referenceValue, field, "expected block list or []")
 	}
 
-	parser.index++
-	return parser.parseStringListItems(parentLine, field, referenceKind, referenceValue, requireQuoted)
+	listParser.cursor.index++
+	return listParser.parseStringListItems(parentLine, field, referenceKind, referenceValue, requireQuoted)
 }
 
 // parseStringListItems parses block list items until indentation leaves the list.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseStringListItems(parentLine datasetYAMLLine, field string, referenceKind string, referenceValue string, requireQuoted bool) ([]string, error) {
+func (listParser *datasetYAMLListParser) parseStringListItems(parentLine datasetYAMLLine, field string, referenceKind string, referenceValue string, requireQuoted bool) ([]string, error) {
 	var values = make([]string, 0)
 
-	for parser.index < len(parser.lines) {
-		var line = parser.lines[parser.index]
+	for listParser.cursor.index < len(listParser.cursor.lines) {
+		var line = listParser.cursor.lines[listParser.cursor.index]
 		if line.Indent < parentLine.Indent+2 {
 			break
 		}
 
-		var value, err = parser.parseStringListItem(line, parentLine, field, referenceKind, referenceValue, requireQuoted)
+		var value, err = listParser.parseStringListItem(line, parentLine, field, referenceKind, referenceValue, requireQuoted)
 		if err != nil {
 			return nil, err
 		}
 
 		values = append(values, value)
-		parser.index++
+		listParser.cursor.index++
 	}
 
 	return values, nil
@@ -76,22 +83,22 @@ func (parser *datasetYAMLParser) parseStringListItems(parentLine datasetYAMLLine
 
 // parseStringListItem parses one block list item line.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseStringListItem(line datasetYAMLLine, parentLine datasetYAMLLine, field string, referenceKind string, referenceValue string, requireQuoted bool) (string, error) {
+func (listParser *datasetYAMLListParser) parseStringListItem(line datasetYAMLLine, parentLine datasetYAMLLine, field string, referenceKind string, referenceValue string, requireQuoted bool) (string, error) {
 	if line.Indent != parentLine.Indent+2 || !strings.HasPrefix(line.Text, "- ") {
-		return "", parser.newError(line, referenceKind, referenceValue, field, "expected list item")
+		return "", listParser.cursor.newError(line, referenceKind, referenceValue, field, "expected list item")
 	}
 
 	var rawItem = strings.TrimSpace(strings.TrimPrefix(line.Text, "- "))
-	return parser.parseStringListItemValue(line, rawItem, field, referenceKind, referenceValue, requireQuoted)
+	return listParser.parseStringListItemValue(line, rawItem, field, referenceKind, referenceValue, requireQuoted)
 }
 
 // parseStringListItemValue decodes one raw string list item value.
 // Authored by: OpenCode
-func (parser *datasetYAMLParser) parseStringListItemValue(line datasetYAMLLine, rawItem string, field string, referenceKind string, referenceValue string, requireQuoted bool) (string, error) {
+func (listParser *datasetYAMLListParser) parseStringListItemValue(line datasetYAMLLine, rawItem string, field string, referenceKind string, referenceValue string, requireQuoted bool) (string, error) {
 	if requireQuoted {
 		var value, err = parseQuotedYAMLString(rawItem)
 		if err != nil {
-			return "", parser.newError(line, referenceKind, referenceValue, field, err.Error())
+			return "", listParser.cursor.newError(line, referenceKind, referenceValue, field, err.Error())
 		}
 
 		return value, nil
@@ -99,7 +106,7 @@ func (parser *datasetYAMLParser) parseStringListItemValue(line datasetYAMLLine, 
 
 	var value, err = parseYAMLScalarText(rawItem)
 	if err != nil {
-		return "", parser.newError(line, referenceKind, referenceValue, field, err.Error())
+		return "", listParser.cursor.newError(line, referenceKind, referenceValue, field, err.Error())
 	}
 
 	return value, nil
