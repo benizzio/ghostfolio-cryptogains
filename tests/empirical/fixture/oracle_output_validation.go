@@ -147,6 +147,28 @@ func (validator *oracleOutputValidator) validateComparableValues() {
 	validator.validateRequiredCanonicalDecimal("case_id", validator.output.CaseID, "values.closing_basis", validator.output.Values.ClosingBasis)
 }
 
+// validateMatches delegates match-evidence validation to the focused evidence validator.
+// Authored by: OpenCode
+func (validator *oracleOutputValidator) validateMatches() {
+	var evidenceValidator = newOracleOutputEvidenceValidator(validator)
+	evidenceValidator.validateMatches()
+}
+
+// validateUnsupportedSegments delegates unsupported-segment validation to the
+// focused evidence validator.
+// Authored by: OpenCode
+func (validator *oracleOutputValidator) validateUnsupportedSegments() {
+	var evidenceValidator = newOracleOutputEvidenceValidator(validator)
+	evidenceValidator.validateUnsupportedSegments()
+}
+
+// validateMetadata delegates metadata validation to the focused metadata validator.
+// Authored by: OpenCode
+func (validator *oracleOutputValidator) validateMetadata() {
+	var metadataValidator = newOracleOutputMetadataValidator(validator)
+	metadataValidator.validateMetadata()
+}
+
 // validateStoredHash recomputes the stable hash and verifies that the persisted
 // `oracle_output_hash` matches it exactly.
 // Authored by: OpenCode

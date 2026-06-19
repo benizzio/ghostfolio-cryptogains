@@ -25,21 +25,35 @@ type oracleDecimalPolicy struct {
 	Scale int
 }
 
+// oracleOutputMetadataValidator validates generation metadata for one parent
+// oracle output validator.
+// Authored by: OpenCode
+type oracleOutputMetadataValidator struct {
+	parent *oracleOutputValidator
+}
+
+// newOracleOutputMetadataValidator builds the focused metadata validator for
+// one oracle-output validation pass.
+// Authored by: OpenCode
+func newOracleOutputMetadataValidator(parent *oracleOutputValidator) oracleOutputMetadataValidator {
+	return oracleOutputMetadataValidator{parent: parent}
+}
+
 // validateMetadata enforces required metadata presence, hash format, and
 // tolerance metadata rules.
 // Authored by: OpenCode
-func (validator *oracleOutputValidator) validateMetadata() {
-	var metadata = validator.output.Metadata
-	validator.validateRequiredTextField("metadata.oracle_name", metadata.OracleName)
-	validator.validateRequiredTextField("metadata.source_url", metadata.SourceURL)
-	validator.validateRequiredTextField("metadata.version_or_commit", metadata.VersionOrCommit)
-	validator.validateRequiredTextField("metadata.decimal_policy", metadata.DecimalPolicy)
-	validator.validateRequiredTextField("metadata.normalization_version", metadata.NormalizationVersion)
+func (validator oracleOutputMetadataValidator) validateMetadata() {
+	var metadata = validator.parent.output.Metadata
+	validator.parent.validateRequiredTextField("metadata.oracle_name", metadata.OracleName)
+	validator.parent.validateRequiredTextField("metadata.source_url", metadata.SourceURL)
+	validator.parent.validateRequiredTextField("metadata.version_or_commit", metadata.VersionOrCommit)
+	validator.parent.validateRequiredTextField("metadata.decimal_policy", metadata.DecimalPolicy)
+	validator.parent.validateRequiredTextField("metadata.normalization_version", metadata.NormalizationVersion)
 	validator.validateSHA256Field("metadata.source_checksum", metadata.SourceChecksum)
 
 	validator.validateAdapterArguments(metadata.AdapterArguments)
 	if metadata.AdapterConstraints == nil {
-		validator.addIssue("case_id", validator.output.CaseID, "metadata.adapter_constraints", "schema", "adapter_constraints must be present as a JSON array")
+		validator.parent.addIssue("case_id", validator.parent.output.CaseID, "metadata.adapter_constraints", "schema", "adapter_constraints must be present as a JSON array")
 	}
 
 	validator.validateSHA256Field("metadata.dataset_input_hash", metadata.DatasetInputHash)
@@ -52,13 +66,13 @@ func (validator *oracleOutputValidator) validateMetadata() {
 
 // validateAdapterArguments enforces non-empty adapter argument metadata.
 // Authored by: OpenCode
-func (validator *oracleOutputValidator) validateAdapterArguments(adapterArguments []string) {
+func (validator oracleOutputMetadataValidator) validateAdapterArguments(adapterArguments []string) {
 	if adapterArguments == nil {
-		validator.addIssue("case_id", validator.output.CaseID, "metadata.adapter_arguments", "schema", "adapter_arguments must be present as a JSON array")
+		validator.parent.addIssue("case_id", validator.parent.output.CaseID, "metadata.adapter_arguments", "schema", "adapter_arguments must be present as a JSON array")
 		return
 	}
 	if len(adapterArguments) == 0 {
-		validator.addIssue("case_id", validator.output.CaseID, "metadata.adapter_arguments", "required_field", "adapter_arguments must contain at least one argument")
+		validator.parent.addIssue("case_id", validator.parent.output.CaseID, "metadata.adapter_arguments", "required_field", "adapter_arguments must contain at least one argument")
 		return
 	}
 
@@ -68,21 +82,21 @@ func (validator *oracleOutputValidator) validateAdapterArguments(adapterArgument
 			continue
 		}
 
-		validator.addIssue("case_id", validator.output.CaseID, "metadata.adapter_arguments", "adapter_arguments", "adapter_arguments must not contain blank values")
+		validator.parent.addIssue("case_id", validator.parent.output.CaseID, "metadata.adapter_arguments", "adapter_arguments", "adapter_arguments must not contain blank values")
 		break
 	}
 }
 
 // validateDecimalPolicy parses decimal policy metadata when it is present.
 // Authored by: OpenCode
-func (validator *oracleOutputValidator) validateDecimalPolicy(raw string) (oracleDecimalPolicy, bool) {
+func (validator oracleOutputMetadataValidator) validateDecimalPolicy(raw string) (oracleDecimalPolicy, bool) {
 	if strings.TrimSpace(raw) == "" {
 		return oracleDecimalPolicy{}, false
 	}
 
 	var policy, err = parseOracleDecimalPolicy(raw)
 	if err != nil {
-		validator.addIssue("case_id", validator.output.CaseID, "metadata.decimal_policy", "decimal_policy", err.Error())
+		validator.parent.addIssue("case_id", validator.parent.output.CaseID, "metadata.decimal_policy", "decimal_policy", err.Error())
 		return oracleDecimalPolicy{}, false
 	}
 
@@ -91,16 +105,16 @@ func (validator *oracleOutputValidator) validateDecimalPolicy(raw string) (oracl
 
 // validateToleranceMetadata enforces tolerance object and note metadata rules.
 // Authored by: OpenCode
-func (validator *oracleOutputValidator) validateToleranceMetadata(policy oracleDecimalPolicy, policyValid bool, tolerances map[string]string, notes map[string]string) {
+func (validator oracleOutputMetadataValidator) validateToleranceMetadata(policy oracleDecimalPolicy, policyValid bool, tolerances map[string]string, notes map[string]string) {
 	if tolerances == nil {
-		validator.addIssue("case_id", validator.output.CaseID, "metadata.financial_tolerances", "schema", "financial_tolerances must be present as a JSON object")
+		validator.parent.addIssue("case_id", validator.parent.output.CaseID, "metadata.financial_tolerances", "schema", "financial_tolerances must be present as a JSON object")
 	} else {
 		validator.validateRequiredToleranceKeys(tolerances)
 		validator.validateFinancialTolerances(policy, policyValid, tolerances, notes)
 	}
 
 	if notes == nil {
-		validator.addIssue("case_id", validator.output.CaseID, "metadata.tolerance_notes", "schema", "tolerance_notes must be present as a JSON object")
+		validator.parent.addIssue("case_id", validator.parent.output.CaseID, "metadata.tolerance_notes", "schema", "tolerance_notes must be present as a JSON object")
 	} else {
 		validator.validateToleranceNotes(tolerances, notes)
 	}
@@ -108,7 +122,7 @@ func (validator *oracleOutputValidator) validateToleranceMetadata(policy oracleD
 
 // validateRequiredToleranceKeys enforces the core comparable financial tolerance keys.
 // Authored by: OpenCode
-func (validator *oracleOutputValidator) validateRequiredToleranceKeys(tolerances map[string]string) {
+func (validator oracleOutputMetadataValidator) validateRequiredToleranceKeys(tolerances map[string]string) {
 	var field string
 
 	for _, field = range requiredOracleFinancialToleranceFields {
@@ -116,14 +130,14 @@ func (validator *oracleOutputValidator) validateRequiredToleranceKeys(tolerances
 			continue
 		}
 
-		validator.addIssue("case_id", validator.output.CaseID, "metadata.financial_tolerances."+field, "required_field", fmt.Sprintf("financial_tolerances must include %s", field))
+		validator.parent.addIssue("case_id", validator.parent.output.CaseID, "metadata.financial_tolerances."+field, "required_field", fmt.Sprintf("financial_tolerances must include %s", field))
 	}
 }
 
 // validateFinancialTolerances enforces canonical tolerance decimals, the
 // decimal-policy maximum, and the required note for every non-zero tolerance.
 // Authored by: OpenCode
-func (validator *oracleOutputValidator) validateFinancialTolerances(policy oracleDecimalPolicy, policyValid bool, tolerances map[string]string, notes map[string]string) {
+func (validator oracleOutputMetadataValidator) validateFinancialTolerances(policy oracleDecimalPolicy, policyValid bool, tolerances map[string]string, notes map[string]string) {
 	var maximumTolerance, maximumValid = validator.maximumFinancialTolerance(policy, policyValid)
 
 	for field, rawValue := range tolerances {
@@ -133,14 +147,14 @@ func (validator *oracleOutputValidator) validateFinancialTolerances(policy oracl
 
 // maximumFinancialTolerance returns the parsed maximum tolerance when policy validation succeeded.
 // Authored by: OpenCode
-func (validator *oracleOutputValidator) maximumFinancialTolerance(policy oracleDecimalPolicy, policyValid bool) (apd.Decimal, bool) {
+func (validator oracleOutputMetadataValidator) maximumFinancialTolerance(policy oracleDecimalPolicy, policyValid bool) (apd.Decimal, bool) {
 	if !policyValid {
 		return apd.Decimal{}, false
 	}
 
 	var maximumTolerance, _, err = maximumToleranceForScale(policy.Scale)
 	if err != nil {
-		validator.addIssue("case_id", validator.output.CaseID, "metadata.decimal_policy", "decimal_policy", err.Error())
+		validator.parent.addIssue("case_id", validator.parent.output.CaseID, "metadata.decimal_policy", "decimal_policy", err.Error())
 		return apd.Decimal{}, false
 	}
 
@@ -149,43 +163,43 @@ func (validator *oracleOutputValidator) maximumFinancialTolerance(policy oracleD
 
 // validateFinancialTolerance enforces one financial tolerance value and its note.
 // Authored by: OpenCode
-func (validator *oracleOutputValidator) validateFinancialTolerance(field string, rawValue string, notes map[string]string, maximumTolerance apd.Decimal, maximumValid bool) {
+func (validator oracleOutputMetadataValidator) validateFinancialTolerance(field string, rawValue string, notes map[string]string, maximumTolerance apd.Decimal, maximumValid bool) {
 	if strings.TrimSpace(field) == "" {
-		validator.addIssue("case_id", validator.output.CaseID, "metadata.financial_tolerances", "financial_tolerances", "financial_tolerances must not contain blank field keys")
+		validator.parent.addIssue("case_id", validator.parent.output.CaseID, "metadata.financial_tolerances", "financial_tolerances", "financial_tolerances must not contain blank field keys")
 		return
 	}
 
 	var value, _, err = ParseDecimalString(rawValue)
 	if err != nil {
-		validator.addIssue("case_id", validator.output.CaseID, "metadata.financial_tolerances."+field, "canonical_decimal", err.Error())
+		validator.parent.addIssue("case_id", validator.parent.output.CaseID, "metadata.financial_tolerances."+field, "canonical_decimal", err.Error())
 		return
 	}
 	if value.Sign() < 0 {
-		validator.addIssue("case_id", validator.output.CaseID, "metadata.financial_tolerances."+field, "financial_tolerances", "financial tolerances must not be negative")
+		validator.parent.addIssue("case_id", validator.parent.output.CaseID, "metadata.financial_tolerances."+field, "financial_tolerances", "financial tolerances must not be negative")
 		return
 	}
 	if maximumValid && value.Cmp(&maximumTolerance) > 0 {
-		validator.addIssue("case_id", validator.output.CaseID, "metadata.financial_tolerances."+field, "financial_tolerances", fmt.Sprintf("financial tolerance exceeds the maximum %s allowed by %s", maximumTolerance.Text('f'), validator.output.Metadata.DecimalPolicy))
+		validator.parent.addIssue("case_id", validator.parent.output.CaseID, "metadata.financial_tolerances."+field, "financial_tolerances", fmt.Sprintf("financial tolerance exceeds the maximum %s allowed by %s", maximumTolerance.Text('f'), validator.parent.output.Metadata.DecimalPolicy))
 	}
 	if strings.Contains(strings.ToLower(field), "quantity") && value.Sign() != 0 {
-		validator.addIssue("case_id", validator.output.CaseID, "metadata.financial_tolerances."+field, "financial_tolerances", "quantity tolerances must be 0")
+		validator.parent.addIssue("case_id", validator.parent.output.CaseID, "metadata.financial_tolerances."+field, "financial_tolerances", "quantity tolerances must be 0")
 	}
 	if value.Sign() != 0 && strings.TrimSpace(notes[field]) == "" {
-		validator.addIssue("case_id", validator.output.CaseID, "metadata.tolerance_notes."+field, "tolerance_notes", "non-zero financial tolerance requires a tolerance note")
+		validator.parent.addIssue("case_id", validator.parent.output.CaseID, "metadata.tolerance_notes."+field, "tolerance_notes", "non-zero financial tolerance requires a tolerance note")
 	}
 }
 
 // validateToleranceNotes enforces non-empty tolerance-note entries and rejects
 // orphan note keys.
 // Authored by: OpenCode
-func (validator *oracleOutputValidator) validateToleranceNotes(tolerances map[string]string, notes map[string]string) {
+func (validator oracleOutputMetadataValidator) validateToleranceNotes(tolerances map[string]string, notes map[string]string) {
 	for field, note := range notes {
 		if strings.TrimSpace(field) == "" {
-			validator.addIssue("case_id", validator.output.CaseID, "metadata.tolerance_notes", "tolerance_notes", "tolerance_notes must not contain blank field keys")
+			validator.parent.addIssue("case_id", validator.parent.output.CaseID, "metadata.tolerance_notes", "tolerance_notes", "tolerance_notes must not contain blank field keys")
 			continue
 		}
 		if strings.TrimSpace(note) == "" {
-			validator.addIssue("case_id", validator.output.CaseID, "metadata.tolerance_notes."+field, "tolerance_notes", "tolerance note must be non-empty")
+			validator.parent.addIssue("case_id", validator.parent.output.CaseID, "metadata.tolerance_notes."+field, "tolerance_notes", "tolerance note must be non-empty")
 		}
 		if tolerances != nil {
 			if _, ok := tolerances[field]; ok {
@@ -193,15 +207,15 @@ func (validator *oracleOutputValidator) validateToleranceNotes(tolerances map[st
 			}
 		}
 
-		validator.addIssue("case_id", validator.output.CaseID, "metadata.tolerance_notes."+field, "tolerance_notes", "tolerance note key must match a financial_tolerances key")
+		validator.parent.addIssue("case_id", validator.parent.output.CaseID, "metadata.tolerance_notes."+field, "tolerance_notes", "tolerance note key must match a financial_tolerances key")
 	}
 }
 
 // validateSHA256Field enforces the canonical `sha256:`-prefixed hash format.
 // Authored by: OpenCode
-func (validator *oracleOutputValidator) validateSHA256Field(field string, value string) {
+func (validator oracleOutputMetadataValidator) validateSHA256Field(field string, value string) {
 	if err := validateSHA256PrefixedHash(value); err != nil {
-		validator.addIssue("case_id", validator.output.CaseID, field, "hash", err.Error())
+		validator.parent.addIssue("case_id", validator.parent.output.CaseID, field, "hash", err.Error())
 	}
 }
 
