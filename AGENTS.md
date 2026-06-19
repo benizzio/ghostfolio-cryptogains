@@ -1,6 +1,7 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+shell commands, and other important information, read the current plan:
+`specs/006-empirical-financial-tests/plan.md`
 <!-- SPECKIT END -->
 
 <!--suppress HtmlUnknownTag -->
@@ -108,6 +109,9 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
   - `tests/unit/` targets isolated domain and storage behavior.
   - `tests/testutil/` contains shared test fixtures and helpers.
   - Many packages also keep package-local `_internal_test.go` files for narrower behavior checks.
+  - Optional empirical financial validation suites must stay as integration tests,
+    and any backing empirical external dataset must remain read-only unless the
+    active spec is explicitly dedicated to dataset maintenance.
 
 - Tools and operational files:
   - `tools/coverpkg/` computes the production package set used by coverage runs.

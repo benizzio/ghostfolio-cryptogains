@@ -1,0 +1,84 @@
+{
+  "fixture_version": "1",
+  "dataset_version": "1",
+  "case_id": "case-lifo-beta-2024",
+  "method": "lifo",
+  "year": 2024,
+  "asset_identity_key": "asset-beta",
+  "values": {
+    "realized_gain_or_loss": "31.3333333333333333",
+    "allocated_basis": "52.6666666666666667",
+    "closing_quantity": "7",
+    "closing_basis": "92.6666666666666667"
+  },
+  "matches": [
+    {
+      "disposed_source_id": "emp-act-000063",
+      "acquisition_source_id": "emp-act-000062",
+      "matched_quantity": "1",
+      "matched_basis": "22",
+      "matched_proceeds": "24",
+      "matched_gain_or_loss": "2",
+      "support_label": "rotki_backed"
+    },
+    {
+      "disposed_source_id": "emp-act-000065",
+      "acquisition_source_id": "emp-act-000064",
+      "matched_quantity": "1",
+      "matched_basis": "3.3333333333333333",
+      "matched_proceeds": "19",
+      "matched_gain_or_loss": "15.6666666666666667",
+      "support_label": "rotki_backed"
+    },
+    {
+      "disposed_source_id": "emp-act-000067",
+      "acquisition_source_id": "emp-act-000064",
+      "matched_quantity": "1",
+      "matched_basis": "3.3333333333333333",
+      "matched_proceeds": "20.5",
+      "matched_gain_or_loss": "17.1666666666666667",
+      "support_label": "rotki_backed"
+    },
+    {
+      "disposed_source_id": "emp-act-000067",
+      "acquisition_source_id": "emp-act-000066",
+      "matched_quantity": "1",
+      "matched_basis": "24",
+      "matched_proceeds": "20.5",
+      "matched_gain_or_loss": "-3.5",
+      "support_label": "rotki_backed"
+    }
+  ],
+  "unsupported_segments": [],
+  "metadata": {
+    "oracle_name": "rotki",
+    "source_url": "https://github.com/rotki/rotki/archive/refs/tags/v1.43.1.tar.gz",
+    "source_checksum": "sha256:8434b653104f8d5b0638e98d88a5ef256fac7720cc459eb33b729e2848900e3b",
+    "version_or_commit": "a2e00be49a0ea36e7563a5d235cfa6a7c91edbfb",
+    "adapter_arguments": [
+      "--source-root",
+      ".cache/empiricaloracle/rotki-source/rotki-1.43.1",
+      "--input",
+      ".cache/empiricaloracle/oracle-inputs/lifo/case-lifo-beta-2024.json",
+      "--rotki-method",
+      "lifo",
+      "--method",
+      "lifo"
+    ],
+    "adapter_constraints": [
+      "Verified pinned rotki source archive execution from an untracked project-local cache",
+      "Zero-priced holding reductions are excluded from external-oracle fixture generation"
+    ],
+    "dataset_input_hash": "sha256:6287f862061b1f51d795694ab768b1927ff4422cc94b10a7ef053b45ef581042",
+    "external_oracle_input_hash": "sha256:3145baf29bba401b6b6960ef3a89fa31a5a6738565e3460790e123f470c8f979",
+    "decimal_policy": "scale=16,rounding=half_up",
+    "normalization_version": "1",
+    "financial_tolerances": {
+      "allocated_basis": "0",
+      "closing_basis": "0",
+      "realized_gain_or_loss": "0"
+    },
+    "tolerance_notes": {},
+    "oracle_output_hash": "sha256:e9d49542d36d550a0246e46973ff06d4e9c6d80dd0c17520ad55991c0be327fc"
+  }
+}

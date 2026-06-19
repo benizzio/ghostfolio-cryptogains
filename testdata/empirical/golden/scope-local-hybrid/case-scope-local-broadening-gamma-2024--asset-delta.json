@@ -1,0 +1,70 @@
+{
+  "fixture_version": "1",
+  "dataset_version": "1",
+  "case_id": "case-scope-local-broadening-gamma-2024",
+  "method": "scope_local_hybrid",
+  "year": 2024,
+  "asset_identity_key": "asset-delta",
+  "values": {
+    "realized_gain_or_loss": "8.38",
+    "allocated_basis": "21.62",
+    "closing_quantity": "9",
+    "closing_basis": "139.72"
+  },
+  "matches": [
+    {
+      "disposed_source_id": "emp-act-000083",
+      "acquisition_source_id": "asset-delta",
+      "matched_quantity": "1",
+      "matched_basis": "21.62",
+      "matched_proceeds": "30",
+      "matched_gain_or_loss": "8.38",
+      "support_label": "rotki_backed"
+    }
+  ],
+  "unsupported_segments": [
+    {
+      "case_id": "case-scope-local-broadening-gamma-2024",
+      "method": "scope_local_hybrid",
+      "activity_source_ids": [
+        "emp-act-000081",
+        "emp-act-000082",
+        "emp-act-000084"
+      ],
+      "reason": "Hybrid broadening and fallback activation remain partly project-owned composition rules",
+      "comparison_policy": "project_composition_only"
+    }
+  ],
+  "metadata": {
+    "oracle_name": "scope_local_hybrid_composite",
+    "source_url": "https://github.com/rotki/rotki/archive/refs/tags/v1.43.1.tar.gz",
+    "source_checksum": "sha256:8434b653104f8d5b0638e98d88a5ef256fac7720cc459eb33b729e2848900e3b",
+    "version_or_commit": "a2e00be49a0ea36e7563a5d235cfa6a7c91edbfb",
+    "adapter_arguments": [
+      "--source-root",
+      ".cache/empiricaloracle/rotki-source/rotki-1.43.1",
+      "--input",
+      ".cache/empiricaloracle/oracle-inputs/scope-local-hybrid/case-scope-local-broadening-gamma-2024--asset-delta.json",
+      "--rotki-method",
+      "average_cost",
+      "--method",
+      "scope_local_hybrid"
+    ],
+    "adapter_constraints": [
+      "Verified pinned rotki source archive execution from an untracked project-local cache",
+      "Scope-local routing and lifecycle assertions remain documented project-owned composition rules"
+    ],
+    "dataset_input_hash": "sha256:6287f862061b1f51d795694ab768b1927ff4422cc94b10a7ef053b45ef581042",
+    "external_oracle_input_hash": "sha256:c97cdcc4e0381bc1f7182a53418d64d111c2e4f0d26033e87c4985caa9b2d436",
+    "decimal_policy": "scale=16,rounding=half_up",
+    "normalization_version": "1",
+    "composite_rule_version": "scope_local_hybrid_composite_v1",
+    "financial_tolerances": {
+      "allocated_basis": "0",
+      "closing_basis": "0",
+      "realized_gain_or_loss": "0"
+    },
+    "tolerance_notes": {},
+    "oracle_output_hash": "sha256:40fa2cb4cb444965c01e45734a2db54dd1e9b28ea9f1ba17e7fc3375b287a350"
+  }
+}

@@ -5,13 +5,13 @@ package unit
 
 import (
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
 	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	supporttext "github.com/benizzio/ghostfolio-cryptogains/internal/support/text"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/cockroachdb/apd/v3"
 )
@@ -424,7 +424,7 @@ func TestCalculateReturnsStructuredActivityReferencesForInputFailures(t *testing
 	if calculationError.DisplayLabel() != "BAD" {
 		t.Fatalf("unexpected calculation error display label: %q", calculationError.DisplayLabel())
 	}
-	if !containsAll(err.Error(), "BAD", "bad-buy-2024-001", "incomplete") {
+	if !supporttext.ContainsAll(err.Error(), "BAD", "bad-buy-2024-001", "incomplete") {
 		t.Fatalf("expected user-visible error references, got %q", err.Error())
 	}
 }
@@ -731,18 +731,6 @@ func detailSectionByAsset(t *testing.T, report reportmodel.CapitalGainsReport, a
 
 	t.Fatalf("detail section %q not found", assetIdentityKey)
 	return reportmodel.AssetDetailSection{}
-}
-
-// containsAll reports whether one string contains all expected substrings.
-// Authored by: OpenCode
-func containsAll(text string, parts ...string) bool {
-	for _, part := range parts {
-		if !strings.Contains(text, part) {
-			return false
-		}
-	}
-
-	return true
 }
 
 // assertCalculationDecimalString verifies one exact decimal value against its

@@ -44,10 +44,16 @@ func main() {
 	}
 }
 
-// run starts the application runtime and returns startup errors to the caller.
+// run selects startup configuration, applies the active decimal policy, and
+// starts the application runtime.
 // Authored by: OpenCode
 func run() error {
 	var options, err = bootstrap.ParseOptions(os.Args[1:])
+	if err != nil {
+		return err
+	}
+
+	_, err = bootstrap.ConfigureProcessDecimalPolicy()
 	if err != nil {
 		return err
 	}

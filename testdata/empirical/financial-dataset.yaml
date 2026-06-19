@@ -1,0 +1,1931 @@
+dataset_version: "1"
+description: "Synthetic empirical financial validation dataset"
+currency: "USD"
+supported_years:
+  - 2023
+  - 2024
+  - 2025
+supported_methods:
+  - fifo
+  - lifo
+  - hifo
+  - average_cost
+  - scope_local_hybrid
+coverage_tags:
+  - fifo
+  - lifo
+  - hifo
+  - average_cost
+  - scope_local_hybrid
+  - acquisitions
+  - partial_liquidations
+  - full_liquidations
+  - gain_cases
+  - loss_cases
+  - zero_result_liquidations
+  - fees_on_priced_activity
+  - same_source_calendar_date_ordering
+  - pre_year_opening_positions
+  - multi_year_opening_history
+  - selected_year_in_year_activity
+  - post_selected_year_ignored_activity
+  - full_liquidation_followed_by_reacquisition
+  - excluded_assets_from_selected_year_main_results
+  - selected_year_single_lot_liquidation
+  - selected_year_multi_lot_liquidation
+  - hifo_deterministic_tie_breaking
+  - average_cost_multiple_acquisitions
+  - average_cost_partial_disposal
+  - average_cost_full_disposal
+  - average_cost_pool_reset_after_zero
+  - average_cost_reacquisition_after_zero
+  - scope_local_reliable_activity
+  - scope_local_narrowing
+  - scope_local_unreliable_or_unavailable_activity
+  - scope_local_broadening
+  - scope_local_fallback_activation
+  - scope_local_fallback_carry_forward_until_zero
+  - scope_local_same_scope_reset_after_zero
+  - scope_local_independent_other_scope_state
+  - zero_priced_holding_reduction_explicit_zero_fields
+  - zero_priced_holding_reduction_missing_optional_fields
+  - rounded_internal_division_or_allocation
+  - negative_yearly_totals
+activities:
+  - source_id: emp-act-000001
+    occurred_at: "2023-01-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "10"
+    unit_price: "10"
+    currency: "USD"
+  - source_id: emp-act-000002
+    occurred_at: "2023-01-05T09:00:00Z"
+    deterministic_order: 2
+    activity_type: BUY
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "2"
+    gross_value: "24"
+    unit_price: "12"
+    currency: "USD"
+  - source_id: emp-act-000003
+    occurred_at: "2023-01-05T09:00:00Z"
+    deterministic_order: 3
+    activity_type: SELL
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "15"
+    unit_price: "15"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000004
+    occurred_at: "2023-03-10T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "3"
+    gross_value: "10"
+    unit_price: "3.3333333333333333"
+    currency: "USD"
+  - source_id: emp-act-000005
+    occurred_at: "2023-04-15T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "9"
+    unit_price: "9"
+    currency: "USD"
+  - source_id: emp-act-000006
+    occurred_at: "2023-06-20T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "14"
+    unit_price: "14"
+    currency: "USD"
+  - source_id: emp-act-000007
+    occurred_at: "2023-07-25T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "2"
+    gross_value: "22"
+    unit_price: "11"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000008
+    occurred_at: "2023-09-01T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "16"
+    unit_price: "16"
+    currency: "USD"
+  - source_id: emp-act-000009
+    occurred_at: "2023-09-01T09:00:00Z"
+    deterministic_order: 2
+    activity_type: SELL
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "16"
+    unit_price: "16"
+    currency: "USD"
+  - source_id: emp-act-000010
+    occurred_at: "2023-11-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "13"
+    unit_price: "13"
+    currency: "USD"
+  - source_id: emp-act-000011
+    occurred_at: "2023-01-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "13"
+    unit_price: "13"
+    currency: "USD"
+  - source_id: emp-act-000012
+    occurred_at: "2023-01-05T09:00:00Z"
+    deterministic_order: 2
+    activity_type: BUY
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "2"
+    gross_value: "30"
+    unit_price: "15"
+    currency: "USD"
+  - source_id: emp-act-000013
+    occurred_at: "2023-01-05T09:00:00Z"
+    deterministic_order: 3
+    activity_type: SELL
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "18"
+    unit_price: "18"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000014
+    occurred_at: "2023-03-10T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "3"
+    gross_value: "10"
+    unit_price: "3.3333333333333333"
+    currency: "USD"
+  - source_id: emp-act-000015
+    occurred_at: "2023-04-15T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "12"
+    unit_price: "12"
+    currency: "USD"
+  - source_id: emp-act-000016
+    occurred_at: "2023-06-20T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "17"
+    unit_price: "17"
+    currency: "USD"
+  - source_id: emp-act-000017
+    occurred_at: "2023-07-25T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "2"
+    gross_value: "28"
+    unit_price: "14"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000018
+    occurred_at: "2023-09-01T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "19"
+    unit_price: "19"
+    currency: "USD"
+  - source_id: emp-act-000019
+    occurred_at: "2023-09-01T09:00:00Z"
+    deterministic_order: 2
+    activity_type: SELL
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "19"
+    unit_price: "19"
+    currency: "USD"
+  - source_id: emp-act-000020
+    occurred_at: "2023-11-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "16"
+    unit_price: "16"
+    currency: "USD"
+  - source_id: emp-act-000031
+    occurred_at: "2023-01-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "19"
+    unit_price: "19"
+    currency: "USD"
+  - source_id: emp-act-000032
+    occurred_at: "2023-01-05T09:00:00Z"
+    deterministic_order: 2
+    activity_type: BUY
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "2"
+    gross_value: "42"
+    unit_price: "21"
+    currency: "USD"
+  - source_id: emp-act-000033
+    occurred_at: "2023-01-05T09:00:00Z"
+    deterministic_order: 3
+    activity_type: SELL
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "24"
+    unit_price: "24"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000034
+    occurred_at: "2023-03-10T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "3"
+    gross_value: "10"
+    unit_price: "3.3333333333333333"
+    currency: "USD"
+  - source_id: emp-act-000035
+    occurred_at: "2023-04-15T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "18"
+    unit_price: "18"
+    currency: "USD"
+  - source_id: emp-act-000036
+    occurred_at: "2023-06-20T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "23"
+    unit_price: "23"
+    currency: "USD"
+  - source_id: emp-act-000037
+    occurred_at: "2023-07-25T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "2"
+    gross_value: "40"
+    unit_price: "20"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000038
+    occurred_at: "2023-09-01T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "25"
+    unit_price: "25"
+    currency: "USD"
+  - source_id: emp-act-000039
+    occurred_at: "2023-09-01T09:00:00Z"
+    deterministic_order: 2
+    activity_type: SELL
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "25"
+    unit_price: "25"
+    currency: "USD"
+  - source_id: emp-act-000040
+    occurred_at: "2023-11-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "22"
+    unit_price: "22"
+    currency: "USD"
+  - source_id: emp-act-000041
+    occurred_at: "2023-01-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "22"
+    unit_price: "22"
+    currency: "USD"
+  - source_id: emp-act-000042
+    occurred_at: "2023-01-05T09:00:00Z"
+    deterministic_order: 2
+    activity_type: BUY
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "2"
+    gross_value: "48"
+    unit_price: "24"
+    currency: "USD"
+  - source_id: emp-act-000043
+    occurred_at: "2023-01-05T09:00:00Z"
+    deterministic_order: 3
+    activity_type: SELL
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "27"
+    unit_price: "27"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000044
+    occurred_at: "2023-03-10T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "3"
+    gross_value: "10"
+    unit_price: "3.3333333333333333"
+    currency: "USD"
+  - source_id: emp-act-000045
+    occurred_at: "2023-04-15T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "21"
+    unit_price: "21"
+    currency: "USD"
+  - source_id: emp-act-000046
+    occurred_at: "2023-06-20T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "26"
+    unit_price: "26"
+    currency: "USD"
+  - source_id: emp-act-000047
+    occurred_at: "2023-07-25T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "2"
+    gross_value: "46"
+    unit_price: "23"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000048
+    occurred_at: "2023-09-01T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "28"
+    unit_price: "28"
+    currency: "USD"
+  - source_id: emp-act-000049
+    occurred_at: "2023-09-01T09:00:00Z"
+    deterministic_order: 2
+    activity_type: SELL
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "28"
+    unit_price: "28"
+    currency: "USD"
+  - source_id: emp-act-000050
+    occurred_at: "2023-11-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "25"
+    unit_price: "25"
+    currency: "USD"
+  - source_id: emp-act-000021
+    occurred_at: "2023-01-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "16"
+    unit_price: "16"
+    currency: "USD"
+  - source_id: emp-act-000022
+    occurred_at: "2023-01-05T09:00:00Z"
+    deterministic_order: 2
+    activity_type: BUY
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "2"
+    gross_value: "36"
+    unit_price: "18"
+    currency: "USD"
+  - source_id: emp-act-000023
+    occurred_at: "2023-01-05T09:00:00Z"
+    deterministic_order: 3
+    activity_type: SELL
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "21"
+    unit_price: "21"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000024
+    occurred_at: "2023-03-10T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "3"
+    gross_value: "10"
+    unit_price: "3.3333333333333333"
+    currency: "USD"
+  - source_id: emp-act-000025
+    occurred_at: "2023-04-15T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "15"
+    unit_price: "15"
+    currency: "USD"
+  - source_id: emp-act-000026
+    occurred_at: "2023-06-20T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "20"
+    unit_price: "20"
+    currency: "USD"
+  - source_id: emp-act-000027
+    occurred_at: "2023-07-25T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "2"
+    gross_value: "34"
+    unit_price: "17"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000028
+    occurred_at: "2023-09-01T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "22"
+    unit_price: "22"
+    currency: "USD"
+  - source_id: emp-act-000029
+    occurred_at: "2023-09-01T09:00:00Z"
+    deterministic_order: 2
+    activity_type: SELL
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "22"
+    unit_price: "22"
+    currency: "USD"
+  - source_id: emp-act-000030
+    occurred_at: "2023-11-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "19"
+    unit_price: "19"
+    currency: "USD"
+  - source_id: emp-act-000051
+    occurred_at: "2024-01-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "17"
+    unit_price: "17"
+    currency: "USD"
+    source_scope:
+      scope_id: wallet-alpha
+      scope_kind: wallet
+      reliability: reliable
+      display_name: "Synthetic Wallet Alpha"
+  - source_id: emp-act-000052
+    occurred_at: "2024-01-05T09:00:00Z"
+    deterministic_order: 2
+    activity_type: BUY
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "2"
+    gross_value: "38"
+    unit_price: "19"
+    currency: "USD"
+    source_scope:
+      scope_id: wallet-alpha
+      scope_kind: wallet
+      reliability: reliable
+      display_name: "Synthetic Wallet Alpha"
+  - source_id: emp-act-000053
+    occurred_at: "2024-01-05T09:00:00Z"
+    deterministic_order: 3
+    activity_type: SELL
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "22"
+    unit_price: "22"
+    fee_amount: "1"
+    currency: "USD"
+    source_scope:
+      scope_id: wallet-alpha
+      scope_kind: wallet
+      reliability: reliable
+      display_name: "Synthetic Wallet Alpha"
+  - source_id: emp-act-000054
+    occurred_at: "2024-03-10T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "3"
+    gross_value: "10"
+    unit_price: "3.3333333333333333"
+    currency: "USD"
+  - source_id: emp-act-000055
+    occurred_at: "2024-04-15T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "16"
+    unit_price: "16"
+    currency: "USD"
+  - source_id: emp-act-000056
+    occurred_at: "2024-06-20T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "21"
+    unit_price: "21"
+    currency: "USD"
+  - source_id: emp-act-000057
+    occurred_at: "2024-07-25T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "2"
+    gross_value: "36"
+    unit_price: "18"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000058
+    occurred_at: "2024-09-01T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "23"
+    unit_price: "23"
+    currency: "USD"
+  - source_id: emp-act-000059
+    occurred_at: "2024-09-01T09:00:00Z"
+    deterministic_order: 2
+    activity_type: SELL
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "23"
+    unit_price: "23"
+    currency: "USD"
+  - source_id: emp-act-000060
+    occurred_at: "2024-11-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "20"
+    unit_price: "20"
+    currency: "USD"
+  - source_id: emp-act-000061
+    occurred_at: "2024-01-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "20"
+    unit_price: "20"
+    currency: "USD"
+    source_scope:
+      scope_id: account-beta
+      scope_kind: account
+      reliability: reliable
+      display_name: "Synthetic Account Beta"
+  - source_id: emp-act-000062
+    occurred_at: "2024-01-05T09:00:00Z"
+    deterministic_order: 2
+    activity_type: BUY
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "2"
+    gross_value: "44"
+    unit_price: "22"
+    currency: "USD"
+    source_scope:
+      scope_id: account-beta
+      scope_kind: account
+      reliability: reliable
+      display_name: "Synthetic Account Beta"
+  - source_id: emp-act-000063
+    occurred_at: "2024-01-05T09:00:00Z"
+    deterministic_order: 3
+    activity_type: SELL
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "25"
+    unit_price: "25"
+    fee_amount: "1"
+    currency: "USD"
+    source_scope:
+      scope_id: account-beta
+      scope_kind: account
+      reliability: reliable
+      display_name: "Synthetic Account Beta"
+  - source_id: emp-act-000064
+    occurred_at: "2024-03-10T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "3"
+    gross_value: "10"
+    unit_price: "3.3333333333333333"
+    currency: "USD"
+  - source_id: emp-act-000065
+    occurred_at: "2024-04-15T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "19"
+    unit_price: "19"
+    currency: "USD"
+  - source_id: emp-act-000066
+    occurred_at: "2024-06-20T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "24"
+    unit_price: "24"
+    currency: "USD"
+  - source_id: emp-act-000067
+    occurred_at: "2024-07-25T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "2"
+    gross_value: "42"
+    unit_price: "21"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000068
+    occurred_at: "2024-09-01T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "26"
+    unit_price: "26"
+    currency: "USD"
+  - source_id: emp-act-000069
+    occurred_at: "2024-09-01T09:00:00Z"
+    deterministic_order: 2
+    activity_type: SELL
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "26"
+    unit_price: "26"
+    currency: "USD"
+  - source_id: emp-act-000070
+    occurred_at: "2024-11-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "23"
+    unit_price: "23"
+    currency: "USD"
+  - source_id: emp-act-000081
+    occurred_at: "2024-01-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "26"
+    unit_price: "26"
+    currency: "USD"
+    source_scope:
+      reliability: unavailable
+  - source_id: emp-act-000082
+    occurred_at: "2024-01-05T09:00:00Z"
+    deterministic_order: 2
+    activity_type: BUY
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "2"
+    gross_value: "56"
+    unit_price: "28"
+    currency: "USD"
+    source_scope:
+      reliability: unavailable
+  - source_id: emp-act-000083
+    occurred_at: "2024-01-05T09:00:00Z"
+    deterministic_order: 3
+    activity_type: SELL
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "31"
+    unit_price: "31"
+    fee_amount: "1"
+    currency: "USD"
+    source_scope:
+      reliability: unavailable
+  - source_id: emp-act-000084
+    occurred_at: "2024-03-10T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "3"
+    gross_value: "10"
+    unit_price: "3.3333333333333333"
+    currency: "USD"
+    source_scope:
+      reliability: unavailable
+  - source_id: emp-act-000085
+    occurred_at: "2024-04-15T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "25"
+    unit_price: "25"
+    currency: "USD"
+  - source_id: emp-act-000086
+    occurred_at: "2024-06-20T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "30"
+    unit_price: "30"
+    currency: "USD"
+  - source_id: emp-act-000087
+    occurred_at: "2024-07-25T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "2"
+    gross_value: "54"
+    unit_price: "27"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000088
+    occurred_at: "2024-09-01T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "32"
+    unit_price: "32"
+    currency: "USD"
+  - source_id: emp-act-000089
+    occurred_at: "2024-09-01T09:00:00Z"
+    deterministic_order: 2
+    activity_type: SELL
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "32"
+    unit_price: "32"
+    currency: "USD"
+  - source_id: emp-act-000090
+    occurred_at: "2024-11-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "29"
+    unit_price: "29"
+    currency: "USD"
+  - source_id: emp-act-000091
+    occurred_at: "2024-01-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "29"
+    unit_price: "29"
+    currency: "USD"
+    source_scope:
+      scope_id: wallet-epsilon-primary
+      scope_kind: wallet
+      reliability: reliable
+      display_name: "Synthetic Wallet Epsilon Primary"
+  - source_id: emp-act-000092
+    occurred_at: "2024-01-05T09:00:00Z"
+    deterministic_order: 2
+    activity_type: BUY
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "2"
+    gross_value: "62"
+    unit_price: "31"
+    currency: "USD"
+    source_scope:
+      scope_id: wallet-epsilon-primary
+      scope_kind: wallet
+      reliability: reliable
+      display_name: "Synthetic Wallet Epsilon Primary"
+  - source_id: emp-act-000093
+    occurred_at: "2024-01-05T09:00:00Z"
+    deterministic_order: 3
+    activity_type: SELL
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "34"
+    unit_price: "34"
+    fee_amount: "1"
+    currency: "USD"
+    source_scope:
+      scope_id: wallet-epsilon-primary
+      scope_kind: wallet
+      reliability: reliable
+      display_name: "Synthetic Wallet Epsilon Primary"
+  - source_id: emp-act-000094
+    occurred_at: "2024-03-10T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "3"
+    gross_value: "10"
+    unit_price: "3.3333333333333333"
+    currency: "USD"
+    source_scope:
+      scope_id: wallet-epsilon-primary
+      scope_kind: wallet
+      reliability: reliable
+      display_name: "Synthetic Wallet Epsilon Primary"
+  - source_id: emp-act-000095
+    occurred_at: "2024-04-15T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "28"
+    unit_price: "28"
+    currency: "USD"
+    source_scope:
+      scope_id: wallet-epsilon-primary
+      scope_kind: wallet
+      reliability: reliable
+      display_name: "Synthetic Wallet Epsilon Primary"
+  - source_id: emp-act-000096
+    occurred_at: "2024-06-20T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "33"
+    unit_price: "33"
+    currency: "USD"
+    source_scope:
+      scope_id: wallet-epsilon-secondary
+      scope_kind: wallet
+      reliability: reliable
+      display_name: "Synthetic Wallet Epsilon Secondary"
+  - source_id: emp-act-000097
+    occurred_at: "2024-07-25T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "2"
+    gross_value: "60"
+    unit_price: "30"
+    fee_amount: "1"
+    currency: "USD"
+    source_scope:
+      scope_id: wallet-epsilon-secondary
+      scope_kind: wallet
+      reliability: reliable
+      display_name: "Synthetic Wallet Epsilon Secondary"
+  - source_id: emp-act-000098
+    occurred_at: "2024-09-01T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "35"
+    unit_price: "35"
+    currency: "USD"
+    source_scope:
+      scope_id: wallet-epsilon-secondary
+      scope_kind: wallet
+      reliability: reliable
+      display_name: "Synthetic Wallet Epsilon Secondary"
+  - source_id: emp-act-000099
+    occurred_at: "2024-09-01T09:00:00Z"
+    deterministic_order: 2
+    activity_type: SELL
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "35"
+    unit_price: "35"
+    currency: "USD"
+    source_scope:
+      scope_id: wallet-epsilon-secondary
+      scope_kind: wallet
+      reliability: reliable
+      display_name: "Synthetic Wallet Epsilon Secondary"
+  - source_id: emp-act-000100
+    occurred_at: "2024-11-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "32"
+    unit_price: "32"
+    currency: "USD"
+    source_scope:
+      scope_id: wallet-epsilon-secondary
+      scope_kind: wallet
+      reliability: reliable
+      display_name: "Synthetic Wallet Epsilon Secondary"
+  - source_id: emp-act-000071
+    occurred_at: "2024-01-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "23"
+    unit_price: "23"
+    currency: "USD"
+    source_scope:
+      scope_kind: wallet
+      reliability: partial
+      display_name: "Synthetic Partial Wallet Gamma"
+  - source_id: emp-act-000072
+    occurred_at: "2024-01-05T09:00:00Z"
+    deterministic_order: 2
+    activity_type: BUY
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "2"
+    gross_value: "50"
+    unit_price: "25"
+    currency: "USD"
+    source_scope:
+      scope_kind: wallet
+      reliability: partial
+      display_name: "Synthetic Partial Wallet Gamma"
+  - source_id: emp-act-000073
+    occurred_at: "2024-01-05T09:00:00Z"
+    deterministic_order: 3
+    activity_type: SELL
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "28"
+    unit_price: "28"
+    fee_amount: "1"
+    currency: "USD"
+    source_scope:
+      scope_kind: wallet
+      reliability: partial
+      display_name: "Synthetic Partial Wallet Gamma"
+  - source_id: emp-act-000074
+    occurred_at: "2024-03-10T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "3"
+    gross_value: "10"
+    unit_price: "3.3333333333333333"
+    currency: "USD"
+    source_scope:
+      scope_kind: wallet
+      reliability: partial
+      display_name: "Synthetic Partial Wallet Gamma"
+  - source_id: emp-act-000075
+    occurred_at: "2024-04-15T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "22"
+    unit_price: "22"
+    currency: "USD"
+    source_scope:
+      scope_kind: wallet
+      reliability: partial
+      display_name: "Synthetic Partial Wallet Gamma"
+  - source_id: emp-act-000076
+    occurred_at: "2024-06-20T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "27"
+    unit_price: "27"
+    currency: "USD"
+    source_scope:
+      scope_kind: wallet
+      reliability: partial
+      display_name: "Synthetic Partial Wallet Gamma"
+  - source_id: emp-act-000077
+    occurred_at: "2024-07-25T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "2"
+    gross_value: "48"
+    unit_price: "24"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000078
+    occurred_at: "2024-09-01T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "29"
+    unit_price: "29"
+    currency: "USD"
+  - source_id: emp-act-000079
+    occurred_at: "2024-09-01T09:00:00Z"
+    deterministic_order: 2
+    activity_type: SELL
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "29"
+    unit_price: "29"
+    currency: "USD"
+  - source_id: emp-act-000080
+    occurred_at: "2024-11-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    zero_priced_reduction_explanation: "Synthetic basis-only reduction with explicit zero-valued source fields in upstream source"
+  - source_id: emp-act-000101
+    occurred_at: "2025-01-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "24"
+    unit_price: "24"
+    currency: "USD"
+  - source_id: emp-act-000102
+    occurred_at: "2025-01-05T09:00:00Z"
+    deterministic_order: 2
+    activity_type: BUY
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "2"
+    gross_value: "52"
+    unit_price: "26"
+    currency: "USD"
+  - source_id: emp-act-000103
+    occurred_at: "2025-01-05T09:00:00Z"
+    deterministic_order: 3
+    activity_type: SELL
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "29"
+    unit_price: "29"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000104
+    occurred_at: "2025-03-10T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "3"
+    gross_value: "10"
+    unit_price: "3.3333333333333333"
+    currency: "USD"
+  - source_id: emp-act-000105
+    occurred_at: "2025-04-15T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "23"
+    unit_price: "23"
+    currency: "USD"
+  - source_id: emp-act-000106
+    occurred_at: "2025-06-20T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "28"
+    unit_price: "28"
+    currency: "USD"
+  - source_id: emp-act-000107
+    occurred_at: "2025-07-25T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "2"
+    gross_value: "50"
+    unit_price: "25"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000108
+    occurred_at: "2025-09-01T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "30"
+    unit_price: "30"
+    currency: "USD"
+  - source_id: emp-act-000109
+    occurred_at: "2025-09-01T09:00:00Z"
+    deterministic_order: 2
+    activity_type: SELL
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "30"
+    unit_price: "30"
+    currency: "USD"
+  - source_id: emp-act-000110
+    occurred_at: "2025-11-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-alpha
+    asset_symbol: ALPHA
+    quantity: "1"
+    gross_value: "27"
+    unit_price: "27"
+    currency: "USD"
+  - source_id: emp-act-000111
+    occurred_at: "2025-01-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "27"
+    unit_price: "27"
+    currency: "USD"
+  - source_id: emp-act-000112
+    occurred_at: "2025-01-05T09:00:00Z"
+    deterministic_order: 2
+    activity_type: BUY
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "2"
+    gross_value: "58"
+    unit_price: "29"
+    currency: "USD"
+  - source_id: emp-act-000113
+    occurred_at: "2025-01-05T09:00:00Z"
+    deterministic_order: 3
+    activity_type: SELL
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "32"
+    unit_price: "32"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000114
+    occurred_at: "2025-03-10T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "3"
+    gross_value: "10"
+    unit_price: "3.3333333333333333"
+    currency: "USD"
+  - source_id: emp-act-000115
+    occurred_at: "2025-04-15T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "26"
+    unit_price: "26"
+    currency: "USD"
+  - source_id: emp-act-000116
+    occurred_at: "2025-06-20T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "31"
+    unit_price: "31"
+    currency: "USD"
+  - source_id: emp-act-000117
+    occurred_at: "2025-07-25T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "2"
+    gross_value: "56"
+    unit_price: "28"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000118
+    occurred_at: "2025-09-01T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "33"
+    unit_price: "33"
+    currency: "USD"
+  - source_id: emp-act-000119
+    occurred_at: "2025-09-01T09:00:00Z"
+    deterministic_order: 2
+    activity_type: SELL
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "33"
+    unit_price: "33"
+    currency: "USD"
+  - source_id: emp-act-000120
+    occurred_at: "2025-11-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-beta
+    asset_symbol: BETA
+    quantity: "1"
+    gross_value: "30"
+    unit_price: "30"
+    currency: "USD"
+  - source_id: emp-act-000131
+    occurred_at: "2025-01-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "33"
+    unit_price: "33"
+    currency: "USD"
+  - source_id: emp-act-000132
+    occurred_at: "2025-01-05T09:00:00Z"
+    deterministic_order: 2
+    activity_type: BUY
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "2"
+    gross_value: "70"
+    unit_price: "35"
+    currency: "USD"
+  - source_id: emp-act-000133
+    occurred_at: "2025-01-05T09:00:00Z"
+    deterministic_order: 3
+    activity_type: SELL
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "38"
+    unit_price: "38"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000134
+    occurred_at: "2025-03-10T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "3"
+    gross_value: "10"
+    unit_price: "3.3333333333333333"
+    currency: "USD"
+  - source_id: emp-act-000135
+    occurred_at: "2025-04-15T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "32"
+    unit_price: "32"
+    currency: "USD"
+  - source_id: emp-act-000136
+    occurred_at: "2025-06-20T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "37"
+    unit_price: "37"
+    currency: "USD"
+  - source_id: emp-act-000137
+    occurred_at: "2025-07-25T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "2"
+    gross_value: "68"
+    unit_price: "34"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000138
+    occurred_at: "2025-09-01T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "39"
+    unit_price: "39"
+    currency: "USD"
+  - source_id: emp-act-000139
+    occurred_at: "2025-09-01T09:00:00Z"
+    deterministic_order: 2
+    activity_type: SELL
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    gross_value: "39"
+    unit_price: "39"
+    currency: "USD"
+  - source_id: emp-act-000140
+    occurred_at: "2025-11-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-delta
+    asset_symbol: DELTA
+    quantity: "1"
+    zero_priced_reduction_explanation: "Synthetic basis-only reduction with missing optional source fields in upstream source"
+  - source_id: emp-act-000141
+    occurred_at: "2025-01-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "36"
+    unit_price: "36"
+    currency: "USD"
+  - source_id: emp-act-000142
+    occurred_at: "2025-01-05T09:00:00Z"
+    deterministic_order: 2
+    activity_type: BUY
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "2"
+    gross_value: "76"
+    unit_price: "38"
+    currency: "USD"
+  - source_id: emp-act-000143
+    occurred_at: "2025-01-05T09:00:00Z"
+    deterministic_order: 3
+    activity_type: SELL
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "41"
+    unit_price: "41"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000144
+    occurred_at: "2025-03-10T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "3"
+    gross_value: "10"
+    unit_price: "3.3333333333333333"
+    currency: "USD"
+  - source_id: emp-act-000145
+    occurred_at: "2025-04-15T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "35"
+    unit_price: "35"
+    currency: "USD"
+  - source_id: emp-act-000146
+    occurred_at: "2025-06-20T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "40"
+    unit_price: "40"
+    currency: "USD"
+  - source_id: emp-act-000147
+    occurred_at: "2025-07-25T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "2"
+    gross_value: "74"
+    unit_price: "37"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000148
+    occurred_at: "2025-09-01T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "42"
+    unit_price: "42"
+    currency: "USD"
+  - source_id: emp-act-000149
+    occurred_at: "2025-09-01T09:00:00Z"
+    deterministic_order: 2
+    activity_type: SELL
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "42"
+    unit_price: "42"
+    currency: "USD"
+  - source_id: emp-act-000150
+    occurred_at: "2025-11-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-epsilon
+    asset_symbol: EPS
+    quantity: "1"
+    gross_value: "39"
+    unit_price: "39"
+    currency: "USD"
+  - source_id: emp-act-000121
+    occurred_at: "2025-01-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "30"
+    unit_price: "30"
+    currency: "USD"
+  - source_id: emp-act-000122
+    occurred_at: "2025-01-05T09:00:00Z"
+    deterministic_order: 2
+    activity_type: BUY
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "2"
+    gross_value: "64"
+    unit_price: "32"
+    currency: "USD"
+  - source_id: emp-act-000123
+    occurred_at: "2025-01-05T09:00:00Z"
+    deterministic_order: 3
+    activity_type: SELL
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "35"
+    unit_price: "35"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000124
+    occurred_at: "2025-03-10T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "3"
+    gross_value: "10"
+    unit_price: "3.3333333333333333"
+    currency: "USD"
+  - source_id: emp-act-000125
+    occurred_at: "2025-04-15T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "29"
+    unit_price: "29"
+    currency: "USD"
+  - source_id: emp-act-000126
+    occurred_at: "2025-06-20T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "34"
+    unit_price: "34"
+    currency: "USD"
+  - source_id: emp-act-000127
+    occurred_at: "2025-07-25T09:00:00Z"
+    deterministic_order: 1
+    activity_type: SELL
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "2"
+    gross_value: "62"
+    unit_price: "31"
+    fee_amount: "1"
+    currency: "USD"
+  - source_id: emp-act-000128
+    occurred_at: "2025-09-01T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "36"
+    unit_price: "36"
+    currency: "USD"
+  - source_id: emp-act-000129
+    occurred_at: "2025-09-01T09:00:00Z"
+    deterministic_order: 2
+    activity_type: SELL
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "36"
+    unit_price: "36"
+    currency: "USD"
+  - source_id: emp-act-000130
+    occurred_at: "2025-11-05T09:00:00Z"
+    deterministic_order: 1
+    activity_type: BUY
+    asset_identity_key: asset-gamma
+    asset_symbol: GAMMA
+    quantity: "1"
+    gross_value: "33"
+    unit_price: "33"
+    currency: "USD"
+cases:
+  - case_id: case-fifo-alpha-2024
+    description: "Synthetic FIFO liquidation with opening lots and same-date ordering"
+    methods:
+      - fifo
+    year: 2024
+    asset_identity_keys:
+      - asset-alpha
+    activity_source_ids:
+      - emp-act-000001
+      - emp-act-000002
+      - emp-act-000051
+      - emp-act-000052
+      - emp-act-000053
+      - emp-act-000054
+      - emp-act-000055
+    coverage_tags:
+      - fifo
+      - multi_year_opening_history
+      - pre_year_opening_positions
+      - selected_year_single_lot_liquidation
+      - same_source_calendar_date_ordering
+      - gain_cases
+      - partial_liquidations
+    oracle_support: supported
+  - case_id: case-lifo-beta-2024
+    description: "Synthetic LIFO slice with fees and a negative yearly total"
+    methods:
+      - lifo
+    year: 2024
+    asset_identity_keys:
+      - asset-beta
+    activity_source_ids:
+      - emp-act-000011
+      - emp-act-000012
+      - emp-act-000061
+      - emp-act-000062
+      - emp-act-000063
+      - emp-act-000065
+      - emp-act-000067
+    coverage_tags:
+      - lifo
+      - selected_year_multi_lot_liquidation
+      - fees_on_priced_activity
+      - loss_cases
+      - negative_yearly_totals
+    oracle_support: supported
+  - case_id: case-hifo-gamma-2024
+    description: "Synthetic HIFO slice with deterministic tie-breaking evidence"
+    methods:
+      - hifo
+    year: 2024
+    asset_identity_keys:
+      - asset-gamma
+    activity_source_ids:
+      - emp-act-000021
+      - emp-act-000022
+      - emp-act-000071
+      - emp-act-000072
+      - emp-act-000073
+      - emp-act-000074
+      - emp-act-000075
+    coverage_tags:
+      - hifo
+      - hifo_deterministic_tie_breaking
+      - gain_cases
+      - rounded_internal_division_or_allocation
+    oracle_support: supported
+  - case_id: case-average-cost-delta-2024
+    description: "Synthetic average-cost partial disposal with opening history"
+    methods:
+      - average_cost
+    year: 2024
+    asset_identity_keys:
+      - asset-delta
+    activity_source_ids:
+      - emp-act-000031
+      - emp-act-000032
+      - emp-act-000081
+      - emp-act-000082
+      - emp-act-000084
+      - emp-act-000085
+      - emp-act-000086
+    coverage_tags:
+      - average_cost
+      - average_cost_multiple_acquisitions
+      - average_cost_partial_disposal
+      - acquisitions
+    oracle_support: supported
+  - case_id: case-average-cost-reset-delta-2024
+    description: "Synthetic average-cost full liquidation followed by reacquisition"
+    methods:
+      - average_cost
+    year: 2024
+    asset_identity_keys:
+      - asset-delta
+    activity_source_ids:
+      - emp-act-000081
+      - emp-act-000082
+      - emp-act-000083
+      - emp-act-000084
+      - emp-act-000085
+      - emp-act-000086
+      - emp-act-000087
+      - emp-act-000088
+      - emp-act-000090
+    coverage_tags:
+      - average_cost
+      - average_cost_full_disposal
+      - average_cost_pool_reset_after_zero
+      - average_cost_reacquisition_after_zero
+      - full_liquidations
+      - full_liquidation_followed_by_reacquisition
+    oracle_support: supported
+  - case_id: case-scope-local-reliable-epsilon-2024
+    description: "Synthetic scope-local reliable slice that stays inside one wallet scope"
+    methods:
+      - scope_local_hybrid
+    year: 2024
+    asset_identity_keys:
+      - asset-epsilon
+    activity_source_ids:
+      - emp-act-000041
+      - emp-act-000042
+      - emp-act-000091
+      - emp-act-000092
+      - emp-act-000093
+      - emp-act-000094
+      - emp-act-000095
+    coverage_tags:
+      - scope_local_hybrid
+      - scope_local_reliable_activity
+      - scope_local_narrowing
+      - selected_year_in_year_activity
+    oracle_support: partially_supported
+    unsupported_reason: "Hybrid lifecycle composition remains project-owned outside the repository-controlled composite scope slice"
+  - case_id: case-scope-local-broadening-gamma-2024
+    description: "Synthetic scope-local broadened slice from partial or unavailable scope data"
+    methods:
+      - scope_local_hybrid
+    year: 2024
+    asset_identity_keys:
+      - asset-gamma
+      - asset-delta
+    activity_source_ids:
+      - emp-act-000071
+      - emp-act-000072
+      - emp-act-000073
+      - emp-act-000074
+      - emp-act-000075
+      - emp-act-000076
+      - emp-act-000081
+      - emp-act-000082
+      - emp-act-000083
+      - emp-act-000084
+    coverage_tags:
+      - scope_local_hybrid
+      - scope_local_unreliable_or_unavailable_activity
+      - scope_local_broadening
+      - scope_local_fallback_activation
+      - scope_local_fallback_carry_forward_until_zero
+    oracle_support: partially_supported
+    unsupported_reason: "Hybrid broadening and fallback activation remain partly project-owned composition rules"
+  - case_id: case-scope-local-reset-epsilon-2024
+    description: "Synthetic scope-local slice that resets after zero and keeps other-scope state independent"
+    methods:
+      - scope_local_hybrid
+    year: 2024
+    asset_identity_keys:
+      - asset-epsilon
+    activity_source_ids:
+      - emp-act-000096
+      - emp-act-000097
+      - emp-act-000098
+      - emp-act-000099
+      - emp-act-000100
+      - emp-act-000141
+      - emp-act-000142
+    coverage_tags:
+      - scope_local_hybrid
+      - scope_local_same_scope_reset_after_zero
+      - scope_local_independent_other_scope_state
+    oracle_support: partially_supported
+    unsupported_reason: "Hybrid reset and independent-scope assertions require project-owned composition rules"
+  - case_id: case-zero-priced-gamma-2024
+    description: "Synthetic zero-priced holding reduction with explicit upstream zero-value semantics"
+    methods:
+      - fifo
+      - hifo
+    year: 2024
+    asset_identity_keys:
+      - asset-gamma
+    activity_source_ids:
+      - emp-act-000077
+      - emp-act-000078
+      - emp-act-000079
+      - emp-act-000080
+    coverage_tags:
+      - zero_priced_holding_reduction_explicit_zero_fields
+      - zero_result_liquidations
+      - same_source_calendar_date_ordering
+    oracle_support: unsupported
+    unsupported_reason: "Zero-priced holding reductions stay outside empirical external-oracle scope after BUG-001"
+  - case_id: case-post-year-ignore-delta-2024
+    description: "Synthetic 2024 report slice that includes after-year activity references for ignore-path review"
+    methods:
+      - average_cost
+    year: 2024
+    asset_identity_keys:
+      - asset-delta
+    activity_source_ids:
+      - emp-act-000088
+      - emp-act-000089
+      - emp-act-000090
+      - emp-act-000131
+      - emp-act-000132
+      - emp-act-000133
+      - emp-act-000134
+    coverage_tags:
+      - post_selected_year_ignored_activity
+      - excluded_assets_from_selected_year_main_results
+    oracle_support: supported
+  - case_id: case-zero-priced-delta-2025
+    description: "Synthetic zero-priced holding reduction with missing optional upstream source fields"
+    methods:
+      - average_cost
+    year: 2025
+    asset_identity_keys:
+      - asset-delta
+    activity_source_ids:
+      - emp-act-000137
+      - emp-act-000138
+      - emp-act-000139
+      - emp-act-000140
+    coverage_tags:
+      - zero_priced_holding_reduction_missing_optional_fields
+      - average_cost
+    oracle_support: unsupported
+    unsupported_reason: "Zero-priced holding reductions stay outside empirical external-oracle scope after BUG-001"

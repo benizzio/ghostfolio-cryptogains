@@ -2,6 +2,8 @@
 .idea/
 .vscode/
 .cache
+# Verified pinned rotki source for explicit empirical regeneration only.
+.cache/empiricaloracle/rotki-source/
 .specify/extensions/.cache/
 Thumbs.db
 .env*
@@ -13,6 +15,7 @@ Thumbs.db
 *.tmp
 *.class
 build/
+dist/
 dist/coverage/
 node_modules/
 vendor/

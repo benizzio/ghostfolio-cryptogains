@@ -8,6 +8,8 @@ import (
 
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
+	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
+	supporttext "github.com/benizzio/ghostfolio-cryptogains/internal/support/text"
 )
 
 type fakeStore struct {
@@ -66,6 +68,135 @@ func TestParseOptionsAcceptsSupportedFlags(t *testing.T) {
 	}
 	if options.InitialWindowHeight != 40 {
 		t.Fatalf("unexpected InitialWindowHeight: got %d want %d", options.InitialWindowHeight, 40)
+	}
+}
+
+func TestConfigureProcessDecimalPolicyUsesDefaultWhenUnset(t *testing.T) {
+	var previousLookupEnv = lookupEnv
+	defer func() {
+		lookupEnv = previousLookupEnv
+	}()
+
+	var customPolicy, err = supportmath.ParseDecimalPolicy("scale=4,rounding=half_up")
+	if err != nil {
+		t.Fatalf("parse custom decimal policy: %v", err)
+	}
+	if err = supportmath.SetActiveDecimalPolicy(customPolicy); err != nil {
+		t.Fatalf("set active decimal policy: %v", err)
+	}
+	t.Cleanup(func() {
+		if resetErr := supportmath.SetActiveDecimalPolicy(supportmath.DefaultDecimalPolicy()); resetErr != nil {
+			t.Fatalf("reset active decimal policy: %v", resetErr)
+		}
+	})
+
+	lookupEnv = func(string) (string, bool) {
+		return "", false
+	}
+
+	var policy supportmath.DecimalPolicy
+	policy, err = ConfigureProcessDecimalPolicy()
+	if err != nil {
+		t.Fatalf("configure process decimal policy: %v", err)
+	}
+	if got := policy.CanonicalString(); got != supportmath.DefaultDecimalPolicy().CanonicalString() {
+		t.Fatalf("unexpected configured policy: %q", got)
+	}
+	if got := supportmath.ActiveDecimalPolicy().CanonicalString(); got != supportmath.DefaultDecimalPolicy().CanonicalString() {
+		t.Fatalf("unexpected active decimal policy: %q", got)
+	}
+}
+
+func TestConfigureProcessDecimalPolicyAppliesEnvironmentOverride(t *testing.T) {
+	var previousLookupEnv = lookupEnv
+	defer func() {
+		lookupEnv = previousLookupEnv
+	}()
+	t.Cleanup(func() {
+		if resetErr := supportmath.SetActiveDecimalPolicy(supportmath.DefaultDecimalPolicy()); resetErr != nil {
+			t.Fatalf("reset active decimal policy: %v", resetErr)
+		}
+	})
+
+	lookupEnv = func(name string) (string, bool) {
+		if name != reportDecimalPolicyEnvironmentVariable {
+			t.Fatalf("unexpected environment-variable lookup: %q", name)
+		}
+		return "scale=4,rounding=half_up", true
+	}
+
+	var policy, err = ConfigureProcessDecimalPolicy()
+	if err != nil {
+		t.Fatalf("configure process decimal policy: %v", err)
+	}
+	if got := policy.CanonicalString(); got != "scale=4,rounding=half_up" {
+		t.Fatalf("unexpected configured policy: %q", got)
+	}
+	if got := supportmath.ActiveDecimalPolicy().CanonicalString(); got != "scale=4,rounding=half_up" {
+		t.Fatalf("unexpected active decimal policy: %q", got)
+	}
+}
+
+func TestConfigureProcessDecimalPolicyRejectsInvalidEnvironmentOverride(t *testing.T) {
+	var previousLookupEnv = lookupEnv
+	defer func() {
+		lookupEnv = previousLookupEnv
+	}()
+	t.Cleanup(func() {
+		if resetErr := supportmath.SetActiveDecimalPolicy(supportmath.DefaultDecimalPolicy()); resetErr != nil {
+			t.Fatalf("reset active decimal policy: %v", resetErr)
+		}
+	})
+
+	var customPolicy, err = supportmath.ParseDecimalPolicy("scale=4,rounding=half_up")
+	if err != nil {
+		t.Fatalf("parse custom decimal policy: %v", err)
+	}
+	if err = supportmath.SetActiveDecimalPolicy(customPolicy); err != nil {
+		t.Fatalf("set active decimal policy: %v", err)
+	}
+
+	lookupEnv = func(string) (string, bool) {
+		return "scale=65,rounding=half_up", true
+	}
+
+	_, err = ConfigureProcessDecimalPolicy()
+	if err == nil {
+		t.Fatalf("expected decimal-policy startup error")
+	}
+	if got := err.Error(); got == "" || !supporttext.ContainsAll(got, reportDecimalPolicyEnvironmentVariable, "scale=65,rounding=half_up", "exceeds maximum supported scale 64") {
+		t.Fatalf("unexpected decimal-policy startup error: %v", err)
+	}
+	if got := supportmath.ActiveDecimalPolicy().CanonicalString(); got != "scale=4,rounding=half_up" {
+		t.Fatalf("expected active decimal policy to stay unchanged after failure, got %q", got)
+	}
+}
+
+func TestConfigureProcessDecimalPolicyPropagatesActivationError(t *testing.T) {
+	var previousLookupEnv = lookupEnv
+	var previousSetActiveDecimalPolicy = setActiveDecimalPolicy
+	defer func() {
+		lookupEnv = previousLookupEnv
+		setActiveDecimalPolicy = previousSetActiveDecimalPolicy
+	}()
+
+	lookupEnv = func(string) (string, bool) {
+		return "", false
+	}
+	setActiveDecimalPolicy = func(policy supportmath.DecimalPolicy) error {
+		if got := policy.CanonicalString(); got != supportmath.DefaultDecimalPolicy().CanonicalString() {
+			t.Fatalf("unexpected activation policy: %q", got)
+		}
+
+		return errors.New("activation failed")
+	}
+
+	_, err := ConfigureProcessDecimalPolicy()
+	if err == nil {
+		t.Fatalf("expected decimal-policy activation error")
+	}
+	if got := err.Error(); got == "" || !supporttext.ContainsAll(got, reportDecimalPolicyEnvironmentVariable, "activation failed") {
+		t.Fatalf("unexpected decimal-policy activation error: %v", err)
 	}
 }
 

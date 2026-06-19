@@ -99,7 +99,7 @@ func (defaultNormalizer) Normalize(records []syncmodel.ActivityRecord) (syncmode
 		RetrievedCount:       len(records),
 		ActivityCount:        len(activities),
 		AvailableReportYears: years,
-		ScopeReliability:     deriveScopeReliability(activities),
+		ScopeReliability:     DeriveScopeReliability(activities),
 		Activities:           activities,
 	}, nil
 }
@@ -212,9 +212,17 @@ func deduplicateAndDeriveYears(records []normalizedRecord) ([]syncmodel.Activity
 	return activities, years
 }
 
-// deriveScopeReliability records a coarse phase-3 scope-reliability summary.
+// DeriveScopeReliability records a coarse source-scope reliability summary for
+// one already ordered activity history. Runtime normalization and empirical
+// translation use this shared rule source so scope support remains consistent.
+//
+// Example:
+//
+//	reliability := normalize.DeriveScopeReliability(records)
+//	_ = reliability
+//
 // Authored by: OpenCode
-func deriveScopeReliability(records []syncmodel.ActivityRecord) syncmodel.ScopeReliability {
+func DeriveScopeReliability(records []syncmodel.ActivityRecord) syncmodel.ScopeReliability {
 	if len(records) == 0 {
 		return syncmodel.ScopeReliabilityUnavailable
 	}

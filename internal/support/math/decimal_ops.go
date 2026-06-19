@@ -136,7 +136,7 @@ func RequireFinite(value apd.Decimal) error {
 }
 
 // DivideFiniteRoundHalfUp divides one finite decimal by another and rounds the
-// quotient half up to the shared internal fixed scale.
+// quotient half up to the active process decimal policy.
 //
 // Example:
 //
@@ -158,6 +158,31 @@ func RequireFinite(value apd.Decimal) error {
 // operands before calling this helper.
 // Authored by: OpenCode
 func DivideFiniteRoundHalfUp(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, error) {
+	return DivideFiniteRoundHalfUpWithPolicy(dividend, divisor, ActiveDecimalPolicy())
+}
+
+// DivideFiniteRoundHalfUpWithPolicy divides one finite decimal by another and
+// rounds the quotient half up to an explicitly selected supported decimal
+// policy. Use this helper only at boundaries that have already selected and
+// validated a policy.
+//
+// Example:
+//
+//	policy, err := math.ParseDecimalPolicy("scale=16,rounding=half_up")
+//	if err != nil {
+//		panic(err)
+//	}
+//	quotient, err := math.DivideFiniteRoundHalfUpWithPolicy(dividend, divisor, policy)
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = quotient
+//
+// Authored by: OpenCode
+func DivideFiniteRoundHalfUpWithPolicy(dividend apd.Decimal, divisor apd.Decimal, policy DecimalPolicy) (apd.Decimal, error) {
+	if err := validateDecimalPolicy(policy); err != nil {
+		return apd.Decimal{}, fmt.Errorf("division decimal policy is invalid: %w", err)
+	}
 	if err := RequireFinite(dividend); err != nil {
 		return apd.Decimal{}, fmt.Errorf("division dividend is invalid: %w", err)
 	}
@@ -168,8 +193,8 @@ func DivideFiniteRoundHalfUp(dividend apd.Decimal, divisor apd.Decimal) (apd.Dec
 		return apd.Decimal{}, fmt.Errorf("division requires a non-zero divisor")
 	}
 
-	var scaledQuotient = scaledRoundedQuotient(dividend, divisor, InternalCalculationScale)
-	return scaledCoefficientDecimal(scaledQuotient, InternalCalculationScale), nil
+	var scaledQuotient = scaledRoundedQuotient(dividend, divisor, policy.scale)
+	return scaledCoefficientDecimal(scaledQuotient, policy.scale), nil
 }
 
 // Compare validates two finite decimal operands and returns their ordering.
