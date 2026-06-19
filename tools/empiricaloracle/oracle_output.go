@@ -9,6 +9,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -116,15 +118,15 @@ func normalizeOracleOutput(input oracleOutputNormalizationInput) (fixture.Oracle
 			SourceURL:               strings.TrimSpace(input.Metadata.SourceURL),
 			SourceChecksum:          strings.TrimSpace(input.Metadata.SourceChecksum),
 			VersionOrCommit:         strings.TrimSpace(input.Metadata.VersionOrCommit),
-			AdapterArguments:        copyStringSlice(input.Metadata.AdapterArguments),
-			AdapterConstraints:      copyStringSlice(input.Metadata.AdapterConstraints),
+			AdapterArguments:        slices.Clone(input.Metadata.AdapterArguments),
+			AdapterConstraints:      slices.Clone(input.Metadata.AdapterConstraints),
 			DatasetInputHash:        strings.TrimSpace(input.Metadata.DatasetInputHash),
 			ExternalOracleInputHash: strings.TrimSpace(input.Metadata.ExternalOracleInputHash),
 			DecimalPolicy:           strings.TrimSpace(input.Metadata.DecimalPolicy),
 			NormalizationVersion:    oracleOutputNormalizationVersion,
 			CompositeRuleVersion:    strings.TrimSpace(input.Metadata.CompositeRuleVersion),
-			FinancialTolerances:     copyStringMap(input.Metadata.FinancialTolerances),
-			ToleranceNotes:          copyStringMap(input.Metadata.ToleranceNotes),
+			FinancialTolerances:     maps.Clone(input.Metadata.FinancialTolerances),
+			ToleranceNotes:          maps.Clone(input.Metadata.ToleranceNotes),
 			GeneratedAt:             strings.TrimSpace(input.Metadata.GeneratedAt),
 		},
 	}
@@ -276,7 +278,7 @@ func normalizeUnsupportedOracleSegments(segments []unsupportedOracleSegmentInput
 	var index int
 
 	for index = range segments {
-		var activitySourceIDs = copyStringSlice(segments[index].ActivitySourceIDs)
+		var activitySourceIDs = slices.Clone(segments[index].ActivitySourceIDs)
 		sort.Strings(activitySourceIDs)
 
 		normalized = append(normalized, fixture.UnsupportedOracleSegment{
@@ -299,7 +301,7 @@ func normalizeUnsupportedOracleSegments(segments []unsupportedOracleSegmentInput
 // value into the fixed-point form required by fixtures.
 // Authored by: OpenCode
 func normalizeFinancialTolerances(tolerances map[string]string) (map[string]string, error) {
-	var normalized = copyStringMap(tolerances)
+	var normalized = maps.Clone(tolerances)
 
 	for field, rawValue := range normalized {
 		var canonicalValue, err = normalizeRequiredDecimalString(rawValue)
@@ -365,24 +367,4 @@ func unsupportedOracleSegmentSortKey(segment fixture.UnsupportedOracleSegment) s
 		segment.Reason,
 		string(segment.ComparisonPolicy),
 	}, "\x00")
-}
-
-// copyStringSlice returns one non-nil copy of a string slice.
-// Authored by: OpenCode
-func copyStringSlice(values []string) []string {
-	var copied = make([]string, len(values))
-	copy(copied, values)
-	return copied
-}
-
-// copyStringMap returns one non-nil copy of a string map.
-// Authored by: OpenCode
-func copyStringMap(values map[string]string) map[string]string {
-	var copied = make(map[string]string, len(values))
-
-	for key, value := range values {
-		copied[key] = value
-	}
-
-	return copied
 }

@@ -2,6 +2,7 @@ package fixture
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -18,7 +19,7 @@ func buildEmpiricalComparisonSkips(oracle OracleOutput) []EmpiricalComparisonSki
 
 	var index int
 	for index = range segments {
-		var relevantIDs = copyStringSlice(segments[index].ActivitySourceIDs)
+		var relevantIDs = slices.Clone(segments[index].ActivitySourceIDs)
 		sort.Strings(relevantIDs)
 		skips = append(skips, EmpiricalComparisonSkip{
 			CaseID:            oracle.CaseID,

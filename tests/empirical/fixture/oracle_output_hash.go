@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -145,7 +147,7 @@ func canonicalUnsupportedOracleSegments(segments []UnsupportedOracleSegment) ([]
 
 	var index int
 	for index = range canonical {
-		canonical[index].ActivitySourceIDs = copyStringSlice(canonical[index].ActivitySourceIDs)
+		canonical[index].ActivitySourceIDs = slices.Clone(canonical[index].ActivitySourceIDs)
 		sort.Strings(canonical[index].ActivitySourceIDs)
 	}
 
@@ -159,10 +161,10 @@ func canonicalUnsupportedOracleSegments(segments []UnsupportedOracleSegment) ([]
 // canonicalOracleGenerationRun canonicalizes the hash-relevant generation metadata.
 // Authored by: OpenCode
 func canonicalOracleGenerationRun(metadata OracleGenerationRun) (OracleGenerationRun, error) {
-	metadata.AdapterArguments = copyStringSlice(metadata.AdapterArguments)
-	metadata.AdapterConstraints = copyStringSlice(metadata.AdapterConstraints)
-	metadata.FinancialTolerances = copyStringMap(metadata.FinancialTolerances)
-	metadata.ToleranceNotes = copyStringMap(metadata.ToleranceNotes)
+	metadata.AdapterArguments = slices.Clone(metadata.AdapterArguments)
+	metadata.AdapterConstraints = slices.Clone(metadata.AdapterConstraints)
+	metadata.FinancialTolerances = maps.Clone(metadata.FinancialTolerances)
+	metadata.ToleranceNotes = maps.Clone(metadata.ToleranceNotes)
 
 	for field, rawValue := range metadata.FinancialTolerances {
 		var canonicalValue, err = canonicalRequiredPersistedDecimal(rawValue)
@@ -228,24 +230,4 @@ func unsupportedOracleSegmentSortKey(segment UnsupportedOracleSegment) string {
 		segment.Reason,
 		string(segment.ComparisonPolicy),
 	}, "\x00")
-}
-
-// copyStringSlice returns one stable non-nil copy of a string slice.
-// Authored by: OpenCode
-func copyStringSlice(values []string) []string {
-	var copied = make([]string, len(values))
-	copy(copied, values)
-	return copied
-}
-
-// copyStringMap returns one stable non-nil copy of a string map.
-// Authored by: OpenCode
-func copyStringMap(values map[string]string) map[string]string {
-	var copied = make(map[string]string, len(values))
-
-	for key, value := range values {
-		copied[key] = value
-	}
-
-	return copied
 }
