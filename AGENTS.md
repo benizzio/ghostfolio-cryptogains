@@ -63,8 +63,16 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
 
 - Application assembly:
   - `internal/app/bootstrap/` owns process options and startup routing decisions before the TUI starts.
-  - `internal/app/runtime/` wires concrete services and coordinates the end-to-end sync workflow, snapshot lifecycle, and diagnostic report generation.
+  - `internal/app/runtime/` wires concrete services and coordinates the end-to-end sync workflow, protected snapshot lifecycle, report generation, and diagnostic report generation.
   - Put cross-package orchestration here, not in `cmd/` and not in `internal/tui/`.
+
+- Shared support and reusable utility code:
+  - `internal/support/decimal/` centralizes exact-decimal parsing and canonical formatting.
+  - `internal/support/math/` centralizes exact-decimal arithmetic, comparison, rounding, and decimal-policy helpers. Keep report-specific financial calculation in `internal/report/calculate/`.
+  - `internal/support/redact/` centralizes safe error, note, and diagnostic redaction.
+  - `internal/support/text/` centralizes small reusable plain-text predicates and string matching helpers.
+  - Before adding package-local helpers for decimal parsing or formatting, exact arithmetic, rounding, redaction, sanitization, or plain-text predicates, reuse or extend `internal/support/` when the behavior is domain-neutral.
+  - Do not move package-specific domain rules into `internal/support/`. Shared helpers must stay general, policy-light, and reusable across app, sync, report, tests, and tools.
 
 - Bootstrap setup persistence:
   - `internal/config/model/` defines the persisted `setup.json` model and origin normalization rules.
@@ -84,38 +92,44 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
   - `internal/sync/validate/` owns supported-history validation, currency-context checks, and running-holdings defensibility rules.
   - Put business rules for normalized activity history here before considering changes in runtime or UI.
 
+- Reporting domain:
+  - `internal/report/model/` defines report requests, calculated report models, report documents, output-file metadata, cost-basis method identifiers, validation, and report-domain errors.
+  - `internal/report/basis/` owns cost-basis state and allocation rules, including average cost, FIFO, LIFO, HIFO, and scope-local hybrid behavior.
+  - `internal/report/calculate/` owns yearly gains-and-losses calculation from the protected synced activity cache.
+  - `internal/report/markdown/` owns Markdown rendering for calculated reports and the externally visible Markdown document contract.
+  - `internal/report/output/` owns local report-file naming, Documents-directory resolution, file writing, cleanup, and post-save opening.
+  - Keep report-specific financial rules here. Do not put them in `internal/app/runtime/`, `internal/tui/`, or generic `internal/support/` helpers.
+
 - Protected snapshot storage:
   - `internal/snapshot/model/` defines encrypted payload and compatibility versions.
   - `internal/snapshot/envelope/` owns envelope encoding and cryptographic sealing/opening helpers.
   - `internal/snapshot/store/` owns snapshot discovery, compatibility checks, decrypt/read, encrypt/write, and atomic replacement on disk.
   - Treat this package as the only persistence boundary for synced protected data.
 
-- Shared support:
-  - `internal/support/decimal/` centralizes exact-decimal parsing and canonical formatting.
-  - `internal/support/math/` centralizes math implementations and calculation code.
-  - `internal/support/redact/` centralizes safe error and diagnostic redaction.
-  - Prefer reusing these helpers instead of duplicating formatting or redaction logic in runtime packages. General-purpose code should go here
-
 - TUI:
   - `internal/tui/flow/` owns the root Bubble Tea model, screen routing, async command wiring, and workflow state transitions.
-  - `internal/tui/screen/` renders full-screen views for setup, main menu, sync entry, server replacement, and sync result flows.
-  - `internal/tui/component/` contains reusable layout, theme, and help-rendering primitives.
+  - `internal/tui/screen/` renders full-screen views for setup, main menu, Sync and Reports, sync entry, server replacement, sync result, report selection, report busy, and report result flows.
+  - `internal/tui/component/` contains reusable layout, theme, menu, help-rendering, action-label, and workflow-copy primitives.
   - Keep rendering and interaction state here. Do not move HTTP, crypto, or normalization rules into the TUI layer.
 
 - Tests:
   - `tests/contract/` verifies externally visible workflow and storage contracts.
   - `tests/integration/` verifies end-to-end runtime flows across packages.
   - `tests/unit/` targets isolated domain and storage behavior.
+  - `tests/empirical/` verifies synthetic empirical financial datasets against generated oracle fixtures.
+  - `tests/empirical/fixture/` contains reusable empirical dataset parsers, validators, oracle fixture helpers, project-output translators, and comparison helpers.
   - `tests/testutil/` contains shared test fixtures and helpers.
   - Many packages also keep package-local `_internal_test.go` files for narrower behavior checks.
-  - Optional empirical financial validation suites must stay as integration tests,
-    and any backing empirical external dataset must remain read-only unless the
-    active spec is explicitly dedicated to dataset maintenance.
+  - Any backing empirical dataset or generated oracle fixture under `testdata/empirical/` must remain read-only unless the active spec is explicitly dedicated to dataset or oracle maintenance.
 
 - Tools and operational files:
   - `tools/coverpkg/` computes the production package set used by coverage runs.
   - `tools/coveragegate/` enforces the repository coverage gate from generated reports.
-  - `specs/` contains feature plans, contracts, checklists, and research. Read the active spec before making non-trivial changes.
+  - `tools/empiricaloracle/` contains the regeneration-only oracle command for empirical financial fixtures.
+  - `tools/tools.go` pins development-only tool dependencies.
+  - `testdata/empirical/` contains the synthetic empirical dataset and generated golden oracle fixtures.
+  - `third_party/rotki/` records pinned rotki provenance for empirical oracle boundaries. It is not vendored application runtime code.
+  - `specs/` contains feature plans, contracts, checklists, and research. `specs/tiny/` contains lightweight active or recent TinySpec artifacts. Read the active spec before making non-trivial changes.
   - `.cov.json` defines maintained coverage expectations.
 
 - Working rules for this repository related to code structure:
