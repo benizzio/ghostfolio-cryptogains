@@ -44,7 +44,7 @@ The user receives a report whose conversions use an official or officially trust
 2. **Given** the report base currency is USD, **When** any priced activity must be converted, **Then** conversion rates are sourced from the Federal Reserve or a source officially trusted or authorized by the Federal Reserve for conversion into USD.
 3. **Given** an activity requires conversion, **When** the rate is selected, **Then** the rate is based on the original source-calendar date of that activity, not the report-generation date, sync date, or machine-local date.
 4. **Given** the official source publishes only one daily reference or closing rate for the activity date, **When** the rate is selected, **Then** that daily rate is used and the report identifies it as a daily reference or closing rate.
-5. **Given** the official source publishes no rate for the activity date, **When** a prior official rate exists, **Then** the most recent prior official published rate is used and the report discloses both the activity date and the rate date.
+5. **Given** the official source publishes no rate for the activity date, **When** a prior business date has a rate available from the authorized provider, **Then** the most recent previous business-date rate from that provider is used and the report discloses both the activity date and the rate date.
 6. **Given** a report contains converted monetary values, **When** the user reviews conversion details, **Then** the report shows the source currency, report base currency, activity date, rate date, rate authority, rate value, original amount, and converted amount for each converted priced activity or for an equivalent per-activity audit section.
 
 ---
@@ -73,7 +73,7 @@ When an official conversion cannot be obtained or the activity currency is not s
 - A fee and gross value are both present in one selected activity currency context and must be converted together before they affect basis or proceeds.
 - A priced activity has a valid explicit zero fee, so the fee converts to zero and remains valid.
 - A selected activity currency code is missing, malformed, or not supported by the selected authority source.
-- The activity date falls on a weekend, public holiday, or other date where the authority source publishes no rate.
+- The activity date falls on a weekend, public holiday, or other date where the authority source publishes no rate, so conversion falls back to the last previous business date where the authorized provider can supply a rate.
 - The authority source revises a previously published rate after an earlier report was generated.
 - Conversion succeeds for many activities and then fails for one later activity in deterministic history order.
 - The report includes only zero-priced holding reductions after the selected year and therefore needs no conversion for those rows.
@@ -99,7 +99,7 @@ Each feature specification MUST capture security, persistence, financial precisi
 - **FR-012**: The system MUST NOT silently fall back to unofficial, community, market-data, or application-defined exchange-rate sources when an official or officially authorized source cannot provide the required rate.
 - **FR-013**: The system MUST select conversion rates by the original source-calendar date of each activity, using the preserved activity timestamp and its own stored offset.
 - **FR-014**: If the authority source publishes only one daily reference or closing rate for the selected activity date, the system MUST use that daily rate and identify the rate kind in the report.
-- **FR-015**: If the authority source publishes no rate on the activity date, the system MUST use the most recent prior official published rate available from that source and disclose the activity date and actual rate date.
+- **FR-015**: If the authority source publishes no rate on the activity date, the system MUST use the most recent previous business-date rate available from the authorized provider and disclose the activity date and actual rate date.
 - **FR-016**: The system MUST fail report generation if no official or officially authorized rate is available for a required source currency, report base currency, and activity date under the rules above.
 - **FR-017**: The system MUST fail report generation if the selected authority source is unavailable and the required rate is not defensibly available for the report run.
 - **FR-018**: The system MUST express all cost basis, proceeds, realized gains, realized losses, and cross-activity monetary totals in the selected report base currency for successful converted reports.
@@ -120,8 +120,8 @@ Each feature specification MUST capture security, persistence, financial precisi
 ### Financial Calculation Evidence *(include when feature affects financial calculations)*
 
 - **Numeric Representation**: Monetary amounts, quantities, exchange rates, converted amounts, cost basis, proceeds, gains, and losses use exact decimal values. Every monetary value remains tied to an explicit currency before conversion and to the selected report base currency after conversion.
-- **Conversion And Rounding**: Conversion is authorized only at the report-generation boundary after one activity monetary context has been selected and before cost basis or gain and loss calculations consume that activity's monetary values. Rates come from the official or officially authorized source for the selected report base currency and the original activity date. Daily reference or closing rates are acceptable when that is the authority source's available historical rate. Non-publication dates use the most recent prior official published rate and must disclose that substitution. Internal decimal bounding uses the existing 16-decimal round half up policy where required.
-- **Empirical Solidified Financial Tests**: Existing empirical financial tests for cost-basis methods remain applicable after activity values have been normalized into one report base currency. New project-owned contract, integration, and unit coverage is required for conversion boundaries, rate-source selection rules, audit details, and failure handling.
+- **Conversion And Rounding**: Conversion is authorized only at the report-generation boundary after one activity monetary context has been selected and before cost basis or gain and loss calculations consume that activity's monetary values. Rates come from the official or officially authorized source for the selected report base currency and the original activity date. Daily reference or closing rates are acceptable when that is the authority source's available historical rate. Non-publication dates use the last previous business date where the authorized provider can supply a conversion rate and must disclose that substitution. Internal decimal bounding uses the existing 16-decimal round half up policy where required.
+- **Empirical Solidified Financial Tests**: Existing empirical financial tests for cost-basis methods remain single-currency calculation evidence and MUST NOT be changed in nature to validate conversion behavior. They remain focused on calculation correctness without conversions. New project-owned contract, integration, and unit coverage is required for conversion boundaries, rate-source selection rules, audit details, and failure handling.
 - **Empirical External Dataset Changes**: The empirical external dataset remains read-only for this feature. This feature is not a dataset-maintenance specification.
 
 ### Key Entities *(include if feature involves data)*
@@ -150,7 +150,7 @@ Each feature specification MUST capture security, persistence, financial precisi
 - The user-facing base currency choices for this feature are limited to USD and EUR because the issue explicitly names those currencies and authorities.
 - Activity currency identity is expected to use explicit currency codes already preserved by synced activity data.
 - The original activity date is the source-calendar date derived from the preserved activity timestamp and its stored offset, consistent with the existing report specification.
-- When an authority source has no rate for a weekend, public holiday, or other non-publication day, the most recent prior official published rate is the defensible default unless later planning identifies a stricter authority-specific rule.
+- When an authorized provider has no rate for a weekend, public holiday, or other non-publication day, the last previous business date where that provider can supply a conversion rate is the required fallback unless later planning identifies a stricter authority-specific rule.
 - The saved Markdown report remains intentionally cleartext after generation, consistent with the existing reporting feature, and must contain enough non-secret conversion evidence for user audit.
 - No new long-lived exchange-rate cache is required by this specification. If planning introduces any persisted rate data, that plan must justify storage, protection, invalidation, and user removal.
 - Official source access details, supported currency coverage, and authority trust evidence are planning research outputs, not user choices.
