@@ -1,9 +1,11 @@
 installed:
+- agent-context
 - bugfix
 - coding-standards-drift-control
 - data-model-diagram
 - git
 - test-coverage-drift-control
+- tinyspec
 settings:
   auto_execute_hooks: true
 hooks:
@@ -22,6 +24,14 @@ hooks:
     optional: false
     prompt: Execute speckit.git.feature?
     description: Create feature branch before specification
+    condition: null
+  - extension: tinyspec
+    command: speckit.tinyspec.classify
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Check if this task is small enough for the lightweight tinyspec workflow?
+    description: Auto-classify task complexity before starting the full SDD workflow
     condition: null
   before_clarify:
   - extension: git
@@ -95,6 +105,14 @@ hooks:
     prompt: Commit specification changes?
     description: Auto-commit after specification
     condition: null
+  - extension: agent-context
+    command: speckit.agent-context.update
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Execute speckit.agent-context.update?
+    description: Refresh agent context after specification
+    condition: null
   after_clarify:
   - extension: git
     command: speckit.git.commit
@@ -117,6 +135,14 @@ hooks:
     optional: true
     prompt: Generate a Mermaid ER diagram after planning?
     description: Generate a Mermaid ER diagram from the active feature data model
+    condition: null
+  - extension: agent-context
+    command: speckit.agent-context.update
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Execute speckit.agent-context.update?
+    description: Refresh agent context after planning
     condition: null
   after_tasks:
   - extension: git
