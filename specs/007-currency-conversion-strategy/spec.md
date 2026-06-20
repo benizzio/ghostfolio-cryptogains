@@ -10,6 +10,12 @@
 
 **Source Issue**: [Currency Conversion Strategy for Multi-Currency Asset Pricing](https://github.com/benizzio/ghostfolio-cryptogains/issues/5)
 
+## Clarifications
+
+### Session 2026-06-20
+
+- Q: How should regenerated reports handle official authority revisions to historical exchange rates? → A: Use the currently published authorized rate at generation time and disclose rate details in the report.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Select A Report Base Currency (Priority: P1)
@@ -74,7 +80,7 @@ When an official conversion cannot be obtained or the activity currency is not s
 - A priced activity has a valid explicit zero fee, so the fee converts to zero and remains valid.
 - A selected activity currency code is missing, malformed, or not supported by the selected authority source.
 - The activity date falls on a weekend, public holiday, or other date where the authority source publishes no rate, so conversion falls back to the last previous business date where the authorized provider can supply a rate.
-- The authority source revises a previously published rate after an earlier report was generated.
+- The authority source revises a previously published rate after an earlier report was generated, so a regenerated report uses the currently published authorized rate at generation time and discloses the rate details used.
 - Conversion succeeds for many activities and then fails for one later activity in deterministic history order.
 - The report includes only zero-priced holding reductions after the selected year and therefore needs no conversion for those rows.
 - The user generates the same year and method twice with different report base currencies and expects separate results and rate audit details.
@@ -116,6 +122,7 @@ Each feature specification MUST capture security, persistence, financial precisi
 - **FR-029**: Outside explicit development mode, diagnostics for conversion failures MUST follow the existing production redaction policy for financial-value fields while still identifying the affected activity by non-secret reference, source currency, report base currency, and activity date.
 - **FR-030**: The implementation plan MUST record the selected official or officially authorized data source for USD and EUR, the authority relationship, supported currencies, historical coverage, unavailable-date behavior, revision behavior, failure modes, and test evidence before implementation begins.
 - **FR-031**: The system MUST treat the existing no-conversion `NOT APPLICABLE` report calculation currency behavior as superseded for reports generated under this feature.
+- **FR-032**: If an official authority revises a historical exchange rate after an earlier report was generated, a regenerated report MUST use the currently published authorized rate at generation time and disclose the rate authority, rate date, and rate value used for the regenerated report.
 
 ### Financial Calculation Evidence *(include when feature affects financial calculations)*
 
@@ -153,5 +160,6 @@ Each feature specification MUST capture security, persistence, financial precisi
 - When an authorized provider has no rate for a weekend, public holiday, or other non-publication day, the last previous business date where that provider can supply a conversion rate is the required fallback unless later planning identifies a stricter authority-specific rule.
 - The saved Markdown report remains intentionally cleartext after generation, consistent with the existing reporting feature, and must contain enough non-secret conversion evidence for user audit.
 - No new long-lived exchange-rate cache is required by this specification. If planning introduces any persisted rate data, that plan must justify storage, protection, invalidation, and user removal.
+- Regenerated reports use currently published authorized exchange rates at generation time instead of reusing earlier report-specific rate evidence.
 - Official source access details, supported currency coverage, and authority trust evidence are planning research outputs, not user choices.
 - The empirical external dataset is unchanged by this feature.
