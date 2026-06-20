@@ -40,10 +40,11 @@ func TestMarkdownReportDocumentContract(t *testing.T) {
 	assertContains(t, document.Content, "| Asset | Full Liquidation Count Through Year End | Main Section Status |")
 	assertContains(t, document.Content, "### Opening Position")
 	assertContains(t, document.Content, "### In-Year Activity")
+	assertContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency | Basis After Row | Calculation Currency | Quantity After Row | Note |")
 	assertContains(t, document.Content, "### Liquidation Calculations")
 	assertContains(t, document.Content, "### Closing Position")
-	assertContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 0 | USD | 22009 | NOT APPLICABLE | 1 | note token=[REDACTED] |")
-	assertContains(t, document.Content, "| 2024-04-01 12:00:00 | xrp-reduction-2024-001 | SELL | 200 | 0 | 0 |  | 400 | NOT APPLICABLE | 800 | custody transfer |")
+	assertContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | USD | 22009 | NOT APPLICABLE | 1 | note token=[REDACTED] |")
+	assertContains(t, document.Content, "| 2024-04-01 12:00:00 | xrp-reduction-2024-001 | SELL | 200 | 0 | 0 | 0 |  | 400 | NOT APPLICABLE | 800 | custody transfer |")
 	assertContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | 1 | USD | 22009 | 25000 | 1240.5 | NOT APPLICABLE |")
 	assertNotContains(t, document.Content, "secret-token")
 }
@@ -116,6 +117,7 @@ func contractMarkdownReportFixture() reportmodel.CapitalGainsReport {
 				OccurredAt:                  time.Date(2024, time.January, 1, 0, 15, 0, 0, time.Local),
 				ActivityType:                reportmodel.ActivityTypeSell,
 				Quantity:                    mustContractDecimal("1"),
+				UnitPrice:                   contractDecimalPointer("25000"),
 				GrossValue:                  contractDecimalPointer("25000"),
 				FeeAmount:                   contractDecimalPointer("0"),
 				ActivityCurrency:            "USD",

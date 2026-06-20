@@ -198,13 +198,18 @@ func writeActivityBlock(builder *strings.Builder, section reportmodel.AssetDetai
 		return nil
 	}
 
-	builder.WriteString("| Date | Source ID | Type | Quantity | Gross Value | Fee | Activity Currency | Basis After Row | Calculation Currency | Quantity After Row | Note |\n")
-	builder.WriteString("|------|-----------|------|----------|-------------|-----|-------------------|-----------------|----------------------|--------------------|------|\n")
+	builder.WriteString("| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency | Basis After Row | Calculation Currency | Quantity After Row | Note |\n")
+	builder.WriteString("|------|-----------|------|----------|------------|-------------|-----|-------------------|-----------------|----------------------|--------------------|------|\n")
 
 	for _, row := range section.ActivityRows {
 		var quantityText, err = canonicalDecimal(row.Quantity)
 		if err != nil {
 			return fmt.Errorf("render activity row %q quantity: %w", row.SourceID, err)
+		}
+		var unitPriceText string
+		unitPriceText, err = canonicalDecimalPointer(row.UnitPrice)
+		if err != nil {
+			return fmt.Errorf("render activity row %q unit price: %w", row.SourceID, err)
 		}
 		var grossValueText string
 		grossValueText, err = canonicalDecimalPointer(row.GrossValue)
@@ -228,11 +233,12 @@ func writeActivityBlock(builder *strings.Builder, section reportmodel.AssetDetai
 		}
 
 		builder.WriteString(fmt.Sprintf(
-			"| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
+			"| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
 			row.OccurredAt.Local().Format("2006-01-02 15:04:05"),
 			sanitizeInlineText(row.SourceID),
 			sanitizeInlineText(string(row.ActivityType)),
 			quantityText,
+			unitPriceText,
 			grossValueText,
 			feeText,
 			activityCurrencyColumn(row),
