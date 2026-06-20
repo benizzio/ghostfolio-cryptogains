@@ -11,6 +11,8 @@ Address GitHub issue #26 by adding `Unit Price` immediately after `Quantity` in 
 
 ## Context
 
+Existing numbered spec directories, including `specs/006-empirical-financial-tests`, are retained as historical completed feature artifacts. `.specify/feature.json` points only to the active tinyspec context for this work.
+
 | File | Role |
 |------|------|
 | `internal/report/markdown/renderer.go` | Will be modified - add the column header, separator, row value, and unit-price render error context |
