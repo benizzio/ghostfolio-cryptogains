@@ -2,7 +2,7 @@
 
 **Branch**: 007-issue-26-report-activity-unit-price  
 **Date**: 2026-06-20  
-**Status**: draft  
+**Status**: done
 **Complexity**: small
 
 ## What
@@ -39,14 +39,14 @@ Existing numbered spec directories, including `specs/006-empirical-financial-tes
 
 ## Tasks
 
-- [ ] Add the `Unit Price` column to `internal/report/markdown/renderer.go`.
-- [ ] Add unit-price render error coverage in `internal/report/markdown/renderer_internal_test.go`.
-- [ ] Update `tests/unit/report_markdown_test.go` table header and row assertions.
-- [ ] Update `tests/contract/markdown_report_contract_test.go` visible Markdown contract assertions.
-- [ ] Run `go test ./internal/report/markdown ./tests/unit ./tests/contract`.
+- [x] Add the `Unit Price` column to `internal/report/markdown/renderer.go`.
+- [x] Add unit-price render error coverage in `internal/report/markdown/renderer_internal_test.go`.
+- [x] Update `tests/unit/report_markdown_test.go` table header and row assertions.
+- [x] Update `tests/contract/markdown_report_contract_test.go` visible Markdown contract assertions.
+- [x] Run `go test ./internal/report/markdown ./tests/unit ./tests/contract`.
 
 ## Done When
 
-- [ ] All tasks checked off
-- [ ] Relevant tests pass
-- [ ] No lint or formatting errors
+- [x] All tasks checked off
+- [x] Relevant tests pass
+- [x] No lint or formatting errors

@@ -158,6 +158,28 @@ func TestRendererInternalErrorBranches(t *testing.T) {
 		}
 	})
 
+	t.Run("activity row invalid optional unit price", func(t *testing.T) {
+		var builder strings.Builder
+		var invalid apd.Decimal
+		invalid.Form = apd.Infinite
+
+		var err = writeActivityBlock(&builder, reportmodel.AssetDetailSection{
+			ActivityRows: []reportmodel.AssetActivityRow{{
+				SourceID:            "row-unit-price",
+				OccurredAt:          time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
+				ActivityType:        reportmodel.ActivityTypeBuy,
+				Quantity:            *apd.New(1, 0),
+				UnitPrice:           &invalid,
+				BasisAfterRow:       *apd.New(1, 0),
+				CalculationCurrency: "USD",
+				QuantityAfterRow:    *apd.New(1, 0),
+			}},
+		})
+		if err == nil || !strings.Contains(err.Error(), `render activity row "row-unit-price" unit price`) {
+			t.Fatalf("expected wrapped activity-row unit-price error, got %v", err)
+		}
+	})
+
 	t.Run("liquidation invalid decimal", func(t *testing.T) {
 		var builder strings.Builder
 		var invalid apd.Decimal
@@ -407,7 +429,7 @@ func TestRenderCoversDetailAndLiquidationBranches(t *testing.T) {
 			"### In-Year Activity",
 			"### Liquidation Calculations",
 			"### Closing Position",
-			"| sell-1 | SELL | 1 | 12 | 2 | USD | 0 | USD | 0 |  |",
+			"| sell-1 | SELL | 1 |  | 12 | 2 | USD | 0 | USD | 0 |  |",
 		} {
 			if !strings.Contains(document.Content, expected) {
 				t.Fatalf("expected rendered report to contain %q", expected)

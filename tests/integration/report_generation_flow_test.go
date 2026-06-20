@@ -214,10 +214,10 @@ func TestReportGenerationSkipsCurrencylessOrderTier(t *testing.T) {
 		t.Fatalf("read saved report %q: %v", reportPath, err)
 	}
 	var reportText = string(rawReport)
-	if !strings.Contains(reportText, "| sol-buy-2026-asset-tier-001 | BUY | 50 | 4000 | 0.5 | EUR |") {
+	if !strings.Contains(reportText, "| sol-buy-2026-asset-tier-001 | BUY | 50 | 80 | 4000 | 0.5 | EUR |") {
 		t.Fatalf("expected saved report to show the later explicit-currency asset tier, got %q", reportText)
 	}
-	if strings.Contains(reportText, "| sol-buy-2026-asset-tier-001 | BUY | 50 | 4050 | 1 |") {
+	if strings.Contains(reportText, "| sol-buy-2026-asset-tier-001 | BUY | 50 | 81 | 4050 | 1 |") {
 		t.Fatalf("expected saved report to skip the currencyless order-tier monetary values, got %q", reportText)
 	}
 	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
@@ -261,8 +261,8 @@ func TestReportGenerationRoundsSameTierUnitPriceDerivation(t *testing.T) {
 	}
 	var reportText = string(rawReport)
 	for _, expected := range []string{
-		"| unit-buy-2024-001 | BUY | 3 | 1 | 0 | USD | 1 | NOT APPLICABLE | 3 |",
-		"| unit-sell-2024-001 | SELL | 1 | 1 | 0 | USD | 0.6666666666666667 | NOT APPLICABLE | 2 |",
+		"| unit-buy-2024-001 | BUY | 3 | 0.3333333333333333 | 1 | 0 | USD | 1 | NOT APPLICABLE | 3 |",
+		"| unit-sell-2024-001 | SELL | 1 | 1 | 1 | 0 | USD | 0.6666666666666667 | NOT APPLICABLE | 2 |",
 		"| unit-sell-2024-001 | 1 | USD | 0.3333333333333333 | 1 | 0.6666666666666667 | NOT APPLICABLE |",
 	} {
 		if !strings.Contains(reportText, expected) {
@@ -333,8 +333,8 @@ func TestReportGenerationAfterSyncAllowsRepeatingGrossValueOnlyUnitPriceDerivati
 	}
 	var reportText = string(rawReport)
 	for _, expected := range []string{
-		"| repeat-buy-1 | BUY | 3 | 1 | 0 | USD | 1 | NOT APPLICABLE | 3 |",
-		"| repeat-sell-1 | SELL | 1 | 1 | 0 | USD | 0.6666666666666667 | NOT APPLICABLE | 2 |",
+		"| repeat-buy-1 | BUY | 3 | 0.3333333333333333 | 1 | 0 | USD | 1 | NOT APPLICABLE | 3 |",
+		"| repeat-sell-1 | SELL | 1 | 1 | 1 | 0 | USD | 0.6666666666666667 | NOT APPLICABLE | 2 |",
 		"| repeat-sell-1 | 1 | USD | 0.3333333333333333 | 1 | 0.6666666666666667 | NOT APPLICABLE |",
 	} {
 		if !strings.Contains(reportText, expected) {
