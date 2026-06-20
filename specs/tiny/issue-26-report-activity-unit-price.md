@@ -1,6 +1,6 @@
 # TinySpec: Report Activity Unit Price Column
 
-**Branch**: 007-capital-gains-losses-report-fix  
+**Branch**: 007-issue-26-report-activity-unit-price  
 **Date**: 2026-06-20  
 **Status**: draft  
 **Complexity**: small

@@ -1,3 +1,4 @@
 {
-  "feature_directory": "specs/007-capital-gains-losses-report-fix"
+  "feature_directory": "specs/tiny",
+  "tinyspec_file": "specs/tiny/issue-26-report-activity-unit-price.md"
 }
