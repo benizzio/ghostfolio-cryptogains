@@ -1,4 +1,3 @@
 {
-  "feature_directory": "specs/tiny",
-  "tinyspec_file": "specs/tiny/issue-26-report-activity-unit-price.md"
+  "feature_directory": "specs/007-currency-conversion-strategy"
 }
