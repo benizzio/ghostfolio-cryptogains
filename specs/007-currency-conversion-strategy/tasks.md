@@ -6,13 +6,93 @@
 
 **Tests**: Automated tests are mandatory for this feature because the specification requires project-owned contract, integration, unit, external integration, redaction, performance, and regression coverage. Write the listed test tasks first and verify they fail before implementation tasks make them pass.
 
-**Organization**: Tasks are grouped by user story so each story can be implemented and tested as an independently reviewable increment after the shared foundation is complete.
+**Organization**: Tasks are grouped by user story so each story can be implemented and tested as an independently reviewable increment after the shared foundation is complete. The context-orchestration work-unit ledger below is the execution control plane for parent agents and clean-context subagents.
 
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel because it targets a different file and has no dependency on another incomplete task in the same phase.
 - **[Story]**: User story label for traceability. Setup, foundational, and polish tasks do not use story labels.
 - Every task includes an exact repository path.
+
+## Context Orchestration Process
+
+**Purpose**: Keep implementation context bounded by delegating atomic work units to clean-context subagents while a parent orchestrator preserves phase order, cross-unit consistency, and final verification.
+
+### Parent Orchestrator Rules
+
+- Execute work units in ledger order. Do not start a later phase until every required earlier-phase unit has been parent-verified.
+- Treat individual task checkboxes in this file as authoritative. The ledger is complete only when every referenced task is checked after parent verification.
+- Use a clean subagent session for each work unit. WU23 may use a subagent for command output triage, but the parent must rerun final validation commands before marking T059 through T062 complete.
+- Include all required handoff context in the subagent prompt. Do not rely on the subagent having prior conversation state.
+- Keep subagents inside the listed scope. If a subagent needs to edit outside the work-unit paths, it must stop and report the required path and reason.
+- Require fail-first behavior for test tasks. For test-only units, successful completion means the tests exist, were run, and fail only for the expected missing implementation.
+- After each subagent returns, the parent must inspect the diff, run the targeted verification, check for unrelated changes, and fix or re-delegate any inconsistency before starting the next unit.
+- Do not allow provider DTOs or network details to cross into report calculation, cost-basis, TUI, runtime diagnostics, or Markdown rendering except through canonical currency integration models.
+- Do not add third-party dependencies, persisted exchange-rate caches, user-supplied provider URLs, floating-point financial logic, or changes under `testdata/empirical/`.
+
+### Required Subagent Handoff Packet
+
+Every handoff must include:
+
+- Work unit ID, phase, task IDs, exact task descriptions, and exact paths from the ledger.
+- The relevant spec sources: `spec.md`, `plan.md`, `data-model.md`, `research.md`, and the specific contract files named by the unit.
+- The non-negotiable rules for the unit: exact decimals only, fixed official provider hosts, no persisted rate evidence, no unofficial fallback rates, fail before final save on non-defensible conversion, and production-safe diagnostics.
+- Current implementation status from previously verified units, including any public types, interfaces, helpers, or fixtures that the subagent must reuse.
+- Allowed edit paths and any explicitly forbidden paths.
+- Tests to run before implementation for test tasks and after implementation for mixed or implementation units.
+- Required final response: files changed, task IDs completed, tests run with results, expected failures if any, assumptions made, and any requested parent follow-up.
+
+### Parent Verification Gate
+
+After each work unit, the parent must:
+
+- Inspect `git diff -- <unit paths>` plus any extra paths reported by the subagent.
+- Confirm all edits are within the unit scope or are justified adjacent changes.
+- Run the unit's targeted tests or the closest compiling package test if the unit only adds scaffolding.
+- Re-read the relevant contract or data-model section when a boundary type, public service, report output, or diagnostic behavior changed.
+- Confirm `testdata/empirical/` remains unchanged.
+- Confirm no exchange-rate evidence is persisted outside the final Markdown report.
+- Mark the referenced task checkboxes only after the unit passes the verification gate.
+
+### Context Compaction Recovery
+
+If the parent context is compacted or a new parent agent resumes work:
+
+- Read this `Context Orchestration Process`, the `Work Unit Ledger`, and the task checklist before editing.
+- Run `git status --short` and inspect any existing diffs before selecting a unit.
+- Identify the first ledger unit with unchecked referenced tasks. Resume there unless the current diff shows an incomplete earlier unit.
+- Reconstruct prior state from checked task IDs, current diffs, and targeted tests. Do not assume a previous subagent result is valid without parent verification.
+- If a unit has partial work, finish and verify that unit before opening a new subagent for another unit.
+
+### Work Unit Ledger
+
+Process units in this order. Units marked as parallel candidates may run concurrently only when their prerequisites are verified and the parent can review and merge both results before the next dependent unit.
+
+| Unit | Phase | Tasks | Atomic scope and touched paths | Prerequisites | Required handoff sources | Parent verification |
+|------|-------|-------|--------------------------------|---------------|--------------------------|---------------------|
+| WU01 | Phase 1 Setup | T001, T002, T003 | Create feature package docs and skeletal fixtures in `internal/integration/currency/doc.go`, `tests/testutil/currency_provider_fixtures.go`, and `tests/externalintegration/helpers_test.go`. | None. | `plan.md` summary and project structure, `contracts/rate-provider-integration.md` test double and external integration sections. | Compile the touched packages or closest packages and inspect helper APIs for future reuse. |
+| WU02 | Phase 2 Foundation | T004, T005, T006, T007 | Define report-owned base-currency, request, report, and conversion audit model changes in `internal/report/model/`. | WU01. | `spec.md` FR-001 through FR-004 and FR-019 through FR-021, `data-model.md` ReportBaseCurrency, ReportRequest, ConversionAuditEntry, and CapitalGainsReport, `contracts/markdown-report.md`. | Run `go test ./internal/report/model` and inspect public model validation. |
+| WU03 | Phase 2 Foundation | T008, T009, T010 | Define currency integration canonical evidence, lookup service contract, and in-memory session cache in `internal/integration/currency/`. | WU01. | `data-model.md` CurrencyRateService, RateLookupRequest, CurrencyRateSessionCache, and ExchangeRateEvidence, `contracts/rate-provider-integration.md`, `research.md` anticorruption and revision behavior. | Run `go test ./internal/integration/currency` and inspect for no persistence or provider DTO leakage. |
+| WU04 | Phase 2 Foundation | T011, T012 | Add report calculation rate-service seam and runtime dependency wiring seams in `internal/report/calculate/currency_rate_service.go`, `internal/app/runtime/report_service.go`, and `internal/app/runtime/runtime.go`. | WU02 and WU03. | `plan.md` architecture and conversion boundary, `data-model.md` ReportRequest and CurrencyRateService. | Run `go test ./internal/report/calculate ./internal/app/runtime` or the closest compiling package set. |
+| WU05 | Phase 3 US1 Tests | T014, T015, T017 | Add fail-first TUI screen, TUI flow, and report request validation tests in `internal/tui/screen/report_screen_internal_test.go`, `internal/tui/flow/model_internal_test.go`, and `internal/report/model/report_internal_test.go`. | WU04. | `contracts/tui-workflows.md`, `data-model.md` ReportBaseCurrency and ReportRequest, `spec.md` US1. | Run targeted package tests and confirm failures are only expected missing US1 behavior. |
+| WU06 | Phase 3 US1 Tests | T013, T016, T018, T063 | Add fail-first workflow, integration, Markdown, and same-currency regression tests in `tests/contract/report_generation_workflow_contract_test.go`, `tests/integration/report_generation_flow_test.go`, and `tests/contract/markdown_report_contract_test.go`. | WU04. | `contracts/tui-workflows.md`, `contracts/markdown-report.md`, `quickstart.md` automated verification flow, `spec.md` Mixed-Currency Acceptance Matrix and Single-Currency Regression Suite. | Run targeted contract and integration tests and record expected failures. |
+| WU07 | Phase 3 US1 Implementation | T019, T020, T021, T022, T023, T024 | Implement base-currency selection state, rendering, flow navigation, disabled generation, and request construction in `internal/tui/flow/` and `internal/tui/screen/report_screen.go`. | WU05 and WU06 fail-first tests verified. | `contracts/tui-workflows.md`, `data-model.md` ReportBaseCurrency state transitions, previously verified WU02 model API. | Run `go test ./internal/tui/flow ./internal/tui/screen` plus affected US1 contract tests. |
+| WU08 | Phase 3 US1 Implementation | T025, T026, T027 | Use request base currency in calculation, implement same-currency bypass and conversion boundary through the rate-service seam, and propagate report currency into artifacts in `internal/report/calculate/`. | WU07. | `plan.md` Conversion Boundary And Rounding, `data-model.md` SelectedActivityMonetaryContext and ConvertedActivityAmount, WU04 rate-service seam. | Run `go test ./internal/report/calculate ./tests/integration` with the US1 targeted tests. |
+| WU09 | Phase 4 US2 Tests | T028, T029, T030, T031, T068 | Add fail-first provider contract, ECB, Federal Reserve, conversion math, and session-cache revision tests in `tests/contract/rate_provider_integration_contract_test.go` and `internal/integration/currency/*_internal_test.go`. | WU08. | `contracts/rate-provider-integration.md`, `research.md` provider source decisions, supported currency coverage, quote direction, unavailable-date rule, and revision behavior. | Run `go test ./internal/integration/currency ./tests/contract` and confirm failures are limited to missing US2 provider behavior. |
+| WU10 | Phase 4 US2 Tests | T032, T064, T065, T067, T069 | Add fail-first deterministic mixed-currency, source-calendar date, no-tier-mixing, zero-valued field, and 10,000-activity responsiveness tests in `tests/integration/report_generation_flow_test.go`, `tests/integration/report_generation_responsiveness_test.go`, and `internal/report/calculate/calculator_internal_test.go`. | WU08. | `spec.md` Deterministic Conversion Fixture and 10,000-Activity Responsiveness Fixture, `plan.md` Performance Validation, `data-model.md` SelectedActivityMonetaryContext and ConvertedActivityAmount. | Run targeted integration and calculation tests and record expected failures. |
+| WU11 | Phase 4 US2 Tests | T033, T066 | Add fail-first Markdown audit, rate source summary, and same-currency versus converted-row tests in `tests/contract/markdown_report_contract_test.go`. | WU08. | `contracts/markdown-report.md`, `data-model.md` ConversionAuditEntry and CapitalGainsReport, `spec.md` FR-020 and FR-021. | Run targeted Markdown contract tests and record expected failures. |
+| WU12 | Phase 4 US2 Implementation | T034, T035, T040 | Implement exact conversion formulas, provider registry and public lookup service, and session cache lookups/writes in `internal/integration/currency/conversion.go`, `service.go`, and `session_cache.go`. | WU09 fail-first tests verified. | `research.md` Conversion And Rounding and Anticorruption Layer, `contracts/rate-provider-integration.md` canonical lookup and cache contracts, WU03 contracts. | Run `go test ./internal/integration/currency` and inspect exact-decimal division/multiplication handling. |
+| WU13 | Phase 4 US2 Implementation | T036, T037 | Implement ECB EXR HTTP client and response canonicalization in `internal/integration/currency/ecb_client.go` and `ecb_mapper.go`. | WU12. Parallel candidate with WU14. | `research.md` EUR Base Currency Source and EUR Source Coverage, `contracts/rate-provider-integration.md` ECB EXR Contract. | Run ECB-focused `go test ./internal/integration/currency` tests and inspect fixed HTTPS endpoint use. |
+| WU14 | Phase 4 US2 Implementation | T038, T039 | Implement Federal Reserve H.10 HTTP client and quote-direction canonicalization in `internal/integration/currency/federal_reserve_client.go` and `federal_reserve_mapper.go`. | WU12. Parallel candidate with WU13. | `research.md` USD Base Currency Source and USD Source Coverage, `contracts/rate-provider-integration.md` Federal Reserve H.10 Contract. | Run Federal-Reserve-focused `go test ./internal/integration/currency` tests and inspect starred/unstarred quote handling. |
+| WU15 | Phase 4 US2 Implementation | T041, T042 | Resolve provider evidence per unique rate key before asset replay and record conversion audit entries in `internal/report/calculate/calculator.go` and `artifacts.go`. | WU13 and WU14 verified. | `plan.md` Conversion Boundary And Rounding and Performance Validation, `data-model.md` ConvertedActivityAmount and ConversionAuditEntry. | Run `go test ./internal/report/calculate ./tests/integration` with WU10 targeted tests. |
+| WU16 | Phase 4 US2 Implementation | T043, T044, T045 | Validate conversion audit/rate source report construction and render rate source summary and converted activity audit table in `internal/report/model/capital_gains_report.go` and `internal/report/markdown/renderer_currency.go`. | WU15 and WU11 tests verified. | `contracts/markdown-report.md`, `data-model.md` ConversionAuditEntry and CapitalGainsReport. | Run `go test ./internal/report/model ./internal/report/markdown ./tests/contract`. |
+| WU17 | Phase 4 US2 Implementation | T046, T047 | Wire concrete currency rate service into runtime report generation and add opt-in live provider checks in `internal/app/runtime/report_service.go` and `tests/externalintegration/currency_provider_live_test.go`. | WU16. | `contracts/rate-provider-integration.md` external integration contract, `quickstart.md` external integration verification flow, `plan.md` runtime architecture. | Run runtime and externalintegration tests with default skip behavior, then run WU10 responsiveness target. |
+| WU18 | Phase 5 US3 Tests | T048, T049, T050, T051 | Add fail-first conversion failure matrix, production diagnostic redaction, provider failure classification, and zero-priced no-lookup tests in `tests/integration/report_failure_flow_test.go`, `tests/integration/diagnostic_redaction_test.go`, `internal/integration/currency/errors_internal_test.go`, and `internal/report/calculate/calculator_internal_test.go`. | WU17. | `spec.md` US3 and Conversion Failure Matrix, `plan.md` Failure Handling, `contracts/rate-provider-integration.md` Failure Contract, `contracts/tui-workflows.md` result screen failure rules. | Run targeted integration, currency, and calculation tests and record expected failures. |
+| WU19 | Phase 5 US3 Implementation | T052, T053 | Implement conversion failure errors, safe message shaping, and malformed/missing/unsupported/mismatched evidence rejection in `internal/integration/currency/errors.go` and `service.go`. | WU18 fail-first tests verified. | `data-model.md` ConversionFailure, `contracts/rate-provider-integration.md` Failure Contract, `research.md` Failure Modes. | Run `go test ./internal/integration/currency` and inspect safe messages for no secrets or financial values. |
+| WU20 | Phase 5 US3 Implementation | T054, T055 | Map conversion failures into report calculation errors and keep zero-priced no-cost holding reductions out of rate lookup in `internal/report/calculate/errors.go` and `currency_conversion.go`. | WU19. | `plan.md` Failure Handling and Conversion Boundary, `spec.md` FR-022, FR-027, and FR-028. | Run `go test ./internal/report/calculate` and WU18 calculation targets. |
+| WU21 | Phase 5 US3 Implementation | T056, T057 | Include source currency, base currency, and activity date in runtime failure copy, and show selected base currency on failure result screens in `internal/app/runtime/report_service.go` and `internal/tui/screen/report_screen.go`. | WU20. | `contracts/tui-workflows.md` Report Result Screen, `spec.md` FR-027 through FR-029, `data-model.md` ConversionFailure. | Run `go test ./internal/app/runtime ./internal/tui/screen ./tests/integration` with WU18 failure and redaction targets. |
+| WU22 | Phase 6 Polish | T058, T070 | Update validation notes and fixed-host provider security review evidence in `specs/007-currency-conversion-strategy/quickstart.md`. | WU21. | `quickstart.md`, `plan.md` Security Review and Testing Strategy, `research.md` Security Review. | Re-read quickstart for automated/manual/external validation and fixed-host/no-user-controlled-provider evidence. |
+| WU23 | Phase 6 Polish | T059, T060, T061, T062 | Run final coverage, coverage XML export, empirical unchanged check, and external integration default skip verification using `coverage.cov`, `coverage.xml`, `testdata/empirical/`, and `tests/externalintegration/currency_provider_live_test.go`. | WU22. | `quickstart.md` Automated Verification Flow and External Integration Verification Flow, `.cov.json` if coverage gate behavior is inspected. | Run final commands, inspect generated coverage artifacts, verify `testdata/empirical/` has no diff, and fix any failed gate before completion. |
 
 ## Phase 1: Setup (Shared Infrastructure)
 
@@ -164,14 +244,14 @@
 - **Setup (Phase 1)**: No dependencies. Can start immediately.
 - **Foundational (Phase 2)**: Depends on Setup. Blocks all user stories.
 - **User Story 1 (Phase 3)**: Depends on Foundational. MVP scope.
-- **User Story 2 (Phase 4)**: Provider client work can start after Foundational. Full report integration depends on User Story 1 conversion boundary and request model.
+- **User Story 2 (Phase 4)**: The ledger starts US2 after US1 to preserve phase order. Provider adapter work is technically independent after Foundational, but full report integration depends on User Story 1 conversion boundary and request model.
 - **User Story 3 (Phase 5)**: Depends on User Story 1 and User Story 2 error surfaces.
 - **Polish (Phase 6)**: Depends on all targeted user stories.
 
 ### User Story Dependencies
 
 - **US1 (P1)**: Starts after Foundational. No dependency on official live provider clients when tested with deterministic rate-service seams.
-- **US2 (P1)**: Starts after Foundational for provider-layer work. Complete end-to-end behavior depends on US1 request and conversion boundary tasks.
+- **US2 (P1)**: Starts after US1 in this orchestration ledger. Complete end-to-end behavior depends on US1 request and conversion boundary tasks.
 - **US3 (P2)**: Starts after US1 and US2 establish conversion lookup, provider errors, and runtime failure handling.
 
 ### Within Each User Story
@@ -184,41 +264,33 @@
 
 ### Parallel Opportunities
 
-- T002 and T003 can run in parallel after T001 is not required.
-- T007, T008, T009, and T010 can run in parallel after T004 through T006 decisions are understood.
-- US1 test tasks T013 through T018 can run in parallel.
-- US2 provider tests T028 through T031 and T064 through T069 can run in parallel with Markdown and integration test work T032 and T033.
-- US2 provider clients T036 and T038 can run in parallel, as can provider mappers T037 and T039 after their client tests exist.
-- US3 test tasks T048 through T051 can run in parallel.
-- Polish documentation and external skip validation T058 and T062 can run in parallel after implementation is complete.
+- Work-unit ordering controls orchestration. Task-level `[P]` markers are local parallelism hints only when the parent can still verify the full work unit before any dependent unit starts.
+- WU02 and WU03 can run in parallel after WU01 if the parent verifies both before WU04.
+- WU05 and WU06 can run in parallel after WU04 because both are US1 fail-first test units.
+- WU09, WU10, and WU11 can run in parallel after WU08 because they are US2 fail-first test units. The parent must verify all expected failures before WU12 starts.
+- WU13 and WU14 can run in parallel after WU12 because ECB and Federal Reserve adapter files are separate. The parent must verify both before WU15 starts.
+- WU22 is documentation-only after WU21. WU23 is the parent-controlled final validation gate and should not be bypassed by a subagent result alone.
 
 ---
 
-## Parallel Example: User Story 1
+## Subagent Handoff Example: US1 Tests
 
 ```bash
-Task: "T013 Add contract tests for required USD/EUR report base-currency choices in tests/contract/report_generation_workflow_contract_test.go"
-Task: "T014 Add report screen render tests for base-currency menu, busy state, and result labels in internal/tui/screen/report_screen_internal_test.go"
-Task: "T015 Add flow tests for focus movement and disabled generation before base-currency selection in internal/tui/flow/model_internal_test.go"
-Task: "T017 Add request validation tests for missing and invalid report base currency in internal/report/model/report_internal_test.go"
+Subagent: "WU05 Phase 3 US1 Tests. Add fail-first tests for T014, T015, and T017 only. Use contracts/tui-workflows.md, data-model.md ReportBaseCurrency and ReportRequest, and spec.md US1. Edit only internal/tui/screen/report_screen_internal_test.go, internal/tui/flow/model_internal_test.go, and internal/report/model/report_internal_test.go unless you stop and report a needed extra path. Run targeted package tests and report expected failures."
 ```
 
-## Parallel Example: User Story 2
+## Subagent Handoff Example: US2 Providers
 
 ```bash
-Task: "T029 Add ECB EXR client and mapper unit tests in internal/integration/currency/ecb_client_internal_test.go"
-Task: "T030 Add Federal Reserve H.10 client and mapper unit tests in internal/integration/currency/federal_reserve_client_internal_test.go"
-Task: "T036 Implement ECB EXR HTTP client in internal/integration/currency/ecb_client.go"
-Task: "T038 Implement Federal Reserve H.10 HTTP client in internal/integration/currency/federal_reserve_client.go"
+Subagent: "WU13 Phase 4 US2 Implementation. Implement only T036 and T037 for ECB EXR after WU12 is verified. Use research.md EUR sections and contracts/rate-provider-integration.md ECB EXR Contract. Edit only internal/integration/currency/ecb_client.go and internal/integration/currency/ecb_mapper.go unless you stop and report a needed extra path. Run ECB-focused internal/integration/currency tests."
+
+Subagent: "WU14 Phase 4 US2 Implementation. Implement only T038 and T039 for Federal Reserve H.10 after WU12 is verified. Use research.md USD sections and contracts/rate-provider-integration.md Federal Reserve H.10 Contract. Edit only internal/integration/currency/federal_reserve_client.go and internal/integration/currency/federal_reserve_mapper.go unless you stop and report a needed extra path. Run Federal-Reserve-focused internal/integration/currency tests."
 ```
 
-## Parallel Example: User Story 3
+## Subagent Handoff Example: US3 Tests
 
 ```bash
-Task: "T048 Add conversion failure matrix integration tests in tests/integration/report_failure_flow_test.go"
-Task: "T049 Add production diagnostic redaction tests for conversion failures in tests/integration/diagnostic_redaction_test.go"
-Task: "T050 Add provider failure classification unit tests in internal/integration/currency/errors_internal_test.go"
-Task: "T051 Add zero-priced holding reduction no-lookup unit tests in internal/report/calculate/calculator_internal_test.go"
+Subagent: "WU18 Phase 5 US3 Tests. Add fail-first tests for T048, T049, T050, and T051 only. Use spec.md US3, plan.md Failure Handling, contracts/rate-provider-integration.md Failure Contract, and contracts/tui-workflows.md result screen rules. Run targeted integration, currency, and calculation tests and report expected failures."
 ```
 
 ---
@@ -230,7 +302,7 @@ Task: "T051 Add zero-priced holding reduction no-lookup unit tests in internal/r
 1. Complete Phase 1 setup.
 2. Complete Phase 2 foundation.
 3. Complete Phase 3 User Story 1 with deterministic rate-service seams.
-4. Validate US1 independently with T013 through T018 and targeted report generation tests.
+4. Validate US1 independently with T013 through T018, T063, and targeted report generation tests.
 5. Stop before official-provider work if an MVP review is needed.
 
 ### Incremental Delivery
@@ -241,12 +313,12 @@ Task: "T051 Add zero-priced holding reduction no-lookup unit tests in internal/r
 4. Deliver US3 for failure safety, redaction, and no-partial-save behavior.
 5. Complete Polish validation and coverage gates.
 
-### Parallel Team Strategy
+### Context-Orchestrated Subagent Strategy
 
-1. One developer owns TUI and report request changes in US1.
-2. One developer owns provider integration and canonical evidence in US2.
-3. One developer owns failure classification, diagnostics, and redaction in US3 after US2 errors are shaped.
-4. Test authors can start contract and unit tests from the beginning of each story phase.
+1. The parent orchestrator owns phase order, handoff completeness, diff review, targeted verification, and final coverage gates.
+2. Subagents own one ledger unit at a time with a clean context and the exact handoff packet required by that unit.
+3. Test-only units must be completed and parent-verified as fail-first before implementation units for the same story begin.
+4. Parallel subagents are allowed only for ledger-approved parallel candidates, and the parent must verify all parallel results before any dependent unit starts.
 
 ---
 
