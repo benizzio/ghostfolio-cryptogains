@@ -3,11 +3,13 @@
 package calculate
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
 	"time"
 
+	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
 	reportbasis "github.com/benizzio/ghostfolio-cryptogains/internal/report/basis"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
@@ -23,6 +25,31 @@ type stubAssetBasisState struct {
 	disposeFunc        func(basisDisposalInput) (basisDisposalResult, error)
 	openQuantityFunc   func() (apd.Decimal, error)
 	openBasisFunc      func() (apd.Decimal, error)
+}
+
+// stubCurrencyRateService records calculator rate lookups for boundary tests.
+// Authored by: OpenCode
+type stubCurrencyRateService struct {
+	lookupErr error
+	evidences map[string]currencyintegration.ExchangeRateEvidence
+	requests  []currencyintegration.RateLookupRequest
+}
+
+// LookupRate records one lookup and returns the configured result.
+// Authored by: OpenCode
+func (service *stubCurrencyRateService) LookupRate(_ context.Context, request currencyintegration.RateLookupRequest) (currencyintegration.ExchangeRateEvidence, error) {
+	service.requests = append(service.requests, request)
+	if service.lookupErr != nil {
+		return currencyintegration.ExchangeRateEvidence{}, service.lookupErr
+	}
+	if service.evidences != nil {
+		var evidence, ok = service.evidences[rateLookupRequestKey(request)]
+		if ok {
+			return evidence, nil
+		}
+	}
+
+	return currencyintegration.ExchangeRateEvidence{}, nil
 }
 
 // AddAcquisition forwards one acquisition into the configured stub callback.
@@ -549,6 +576,348 @@ func TestSelectAssetInputGroupsThroughYearFiltersAndPreservesOrder(t *testing.T)
 	}
 	if groups[1].AssetIdentityKey != "asset-eth" || groups[1].DisplayLabel != "ETH" || len(groups[1].Inputs) != 2 {
 		t.Fatalf("expected ETH group label fallback to update from later input, got %#v", groups[1])
+	}
+}
+
+// TestApplyReportCurrencyBoundaryBypassesRowsWithoutLookup verifies same-
+// currency rows and zero-priced holding reductions do not call the rate seam.
+// Authored by: OpenCode
+func TestApplyReportCurrencyBoundaryBypassesRowsWithoutLookup(t *testing.T) {
+	t.Parallel()
+
+	var service = &stubCurrencyRateService{lookupErr: errors.New("unexpected lookup")}
+	var result, err = applyReportCurrencyBoundary(context.Background(), service, reportmodel.ReportBaseCurrencyUSD, []assetInputGroup{{
+		AssetIdentityKey: "asset-unit",
+		DisplayLabel:     "UNIT",
+		Inputs: []reportmodel.ActivityCalculationInput{
+			{
+				SourceID:             "same-currency-buy",
+				OccurredAt:           time.Date(2024, time.January, 2, 10, 0, 0, 0, time.UTC),
+				SourceYear:           2024,
+				ActivityType:         reportmodel.ActivityTypeBuy,
+				Quantity:             mustReportDecimal(t, "1"),
+				SelectedCurrencyCode: "USD",
+			},
+			{
+				SourceID:                     "zero-priced-sell",
+				OccurredAt:                   time.Date(2024, time.January, 3, 10, 0, 0, 0, time.UTC),
+				SourceYear:                   2024,
+				ActivityType:                 reportmodel.ActivityTypeSell,
+				Quantity:                     mustReportDecimal(t, "1"),
+				UnitPrice:                    activityInputDecimalPointer(t, "0"),
+				GrossValue:                   activityInputDecimalPointer(t, "0"),
+				FeeAmount:                    activityInputDecimalPointer(t, "0"),
+				SelectedCurrencyCode:         "EUR",
+				IsZeroPricedHoldingReduction: true,
+			},
+		},
+	}})
+	if err != nil {
+		t.Fatalf("apply report currency boundary: %v", err)
+	}
+	if len(service.requests) != 0 {
+		t.Fatalf("expected no rate lookups, got %#v", service.requests)
+	}
+	var groups = result.Groups
+	if groups[0].Inputs[0].SelectedCurrencyCode != "USD" || groups[0].Inputs[1].SelectedCurrencyCode != "USD" {
+		t.Fatalf("expected selected report currency to be prepared on bypassed rows, got %#v", groups[0].Inputs)
+	}
+	if len(result.ConversionAuditEntries) != 0 || len(result.RateSources) != 0 {
+		t.Fatalf("expected no conversion artifacts for bypassed rows, got %#v", result)
+	}
+}
+
+// TestCalculateZeroPricedHoldingReductionDoesNotLookupCrossCurrencyRate verifies
+// a zero-priced no-cost reduction does not require rate evidence even when its
+// preserved source currency differs from the report base currency.
+// Authored by: OpenCode
+func TestCalculateZeroPricedHoldingReductionDoesNotLookupCrossCurrencyRate(t *testing.T) {
+	t.Parallel()
+
+	var service = &stubCurrencyRateService{lookupErr: errors.New("unexpected rate lookup for zero-priced reduction")}
+	var calculator = NewCalculator(service)
+	var buy = zeroPricedNoLookupAcquisitionRecord(t)
+	var reduction = zeroPricedHoldingReductionRecord(t, "zero-reduction-eur-sell", "2024-02-02T10:00:00Z", "asset-zero-no-lookup", "ZNL", "Zero No Lookup")
+	reduction.OrderCurrency = "EUR"
+
+	var report, err = calculator.Calculate(context.Background(), validReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO), syncmodel.ProtectedActivityCache{
+		AvailableReportYears: []int{2024},
+		Activities:           []syncmodel.ActivityRecord{buy, reduction},
+	})
+	if err != nil {
+		t.Fatalf("expected zero-priced cross-currency holding reduction to calculate without lookup, got %v", err)
+	}
+	if len(service.requests) != 0 {
+		t.Fatalf("expected no lookup for zero-priced holding reduction, got %#v", service.requests)
+	}
+	if len(report.RateSources) != 0 || len(report.ConversionAuditEntries) != 0 {
+		t.Fatalf("expected no conversion artifacts for zero-priced holding reduction, got %#v", report)
+	}
+}
+
+// TestCalculateFutureZeroPricedHoldingReductionDoesNotLookupRate verifies rows
+// after the selected report year are ignored before any rate lookup can occur.
+// Authored by: OpenCode
+func TestCalculateFutureZeroPricedHoldingReductionDoesNotLookupRate(t *testing.T) {
+	t.Parallel()
+
+	var service = &stubCurrencyRateService{lookupErr: errors.New("unexpected future-year lookup")}
+	var calculator = NewCalculator(service)
+	var reduction = zeroPricedHoldingReductionRecord(t, "future-zero-reduction-gbp-sell", "2025-02-02T10:00:00Z", "asset-zero-no-lookup", "ZNL", "Zero No Lookup")
+	reduction.OrderCurrency = "GBP"
+
+	_, err := calculator.Calculate(context.Background(), validReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO), syncmodel.ProtectedActivityCache{
+		AvailableReportYears: []int{2024},
+		Activities:           []syncmodel.ActivityRecord{reduction},
+	})
+	if err != nil {
+		t.Fatalf("expected future zero-priced holding reduction to be ignored without lookup, got %v", err)
+	}
+	if len(service.requests) != 0 {
+		t.Fatalf("expected no lookup for future zero-priced holding reduction, got %#v", service.requests)
+	}
+}
+
+// TestApplyReportCurrencyBoundaryUsesRateServiceForCrossCurrency verifies cross-
+// currency priced rows use the seam and surface lookup failures safely.
+// Authored by: OpenCode
+func TestApplyReportCurrencyBoundaryUsesRateServiceForCrossCurrency(t *testing.T) {
+	t.Parallel()
+
+	var occurredAt = time.Date(2024, time.February, 3, 22, 0, 0, 0, time.FixedZone("source", 2*60*60))
+	var activityDate = time.Date(2024, time.February, 3, 0, 0, 0, 0, time.UTC)
+	var request = mustCalculatorRateLookupRequest(t, "EUR", "USD", activityDate)
+	var service = &stubCurrencyRateService{lookupErr: currencyintegration.NewConversionFailure(
+		request,
+		currencyintegration.ProviderIDFederalReserveH10,
+		currencyintegration.ConversionFailureReasonMissingRate,
+		"raw provider detail with Bearer jwt-secret and amount 1000.25",
+	)}
+	_, err := applyReportCurrencyBoundary(context.Background(), service, reportmodel.ReportBaseCurrencyUSD, []assetInputGroup{{
+		AssetIdentityKey: "asset-btc",
+		DisplayLabel:     "BTC",
+		Inputs: []reportmodel.ActivityCalculationInput{{
+			SourceID:             "eur-buy",
+			OccurredAt:           occurredAt,
+			SourceYear:           2024,
+			ActivityType:         reportmodel.ActivityTypeBuy,
+			Quantity:             mustReportDecimal(t, "1"),
+			SelectedCurrencyCode: "EUR",
+		}},
+	}})
+	var calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindActivityInput)
+	for _, expected := range []string{"reason=missing_rate", "source_currency=EUR", "report_base_currency=USD", "activity_date=2024-02-03", "provider=federal_reserve_h10", `source "eur-buy"`} {
+		if !strings.Contains(calcErr.Error(), expected) {
+			t.Fatalf("expected classified conversion failure to contain %q, got %q", expected, calcErr.Error())
+		}
+	}
+	var reason, ok = currencyintegration.ConversionFailureReasonOf(err)
+	if !ok || reason != currencyintegration.ConversionFailureReasonMissingRate {
+		t.Fatalf("expected conversion failure reason extraction through calculation error, got reason=%q ok=%v", reason, ok)
+	}
+	var diagnosticChain = strings.Join(calcErr.DiagnosticFailureCauseChain(), "\n")
+	for _, forbidden := range []string{"jwt-secret", "1000.25", "raw provider detail"} {
+		if strings.Contains(diagnosticChain, forbidden) {
+			t.Fatalf("expected diagnostic cause chain to exclude %q, got %#v", forbidden, calcErr.DiagnosticFailureCauseChain())
+		}
+	}
+	if len(service.requests) != 1 {
+		t.Fatalf("expected one rate lookup, got %#v", service.requests)
+	}
+	var actualRequest = service.requests[0]
+	if actualRequest.SourceCurrency != "EUR" || actualRequest.BaseCurrency != "USD" || !actualRequest.ActivityDate.Equal(activityDate) {
+		t.Fatalf("unexpected rate lookup request: %#v", actualRequest)
+	}
+}
+
+// TestApplyReportCurrencyBoundaryConvertsSingleActivityWithoutTierMixing
+// verifies that one selected monetary context is converted as a unit and that
+// lower-priority monetary tiers cannot mix into the converted report input.
+// Authored by: OpenCode
+func TestApplyReportCurrencyBoundaryConvertsSingleActivityWithoutTierMixing(t *testing.T) {
+	t.Parallel()
+
+	var occurredAt = time.Date(2024, time.January, 5, 14, 30, 0, 0, time.FixedZone("source", -5*60*60))
+	var activityDate = time.Date(2024, time.January, 5, 0, 0, 0, 0, time.UTC)
+	var request = mustCalculatorRateLookupRequest(t, "EUR", "USD", activityDate)
+	var service = &stubCurrencyRateService{evidences: map[string]currencyintegration.ExchangeRateEvidence{
+		rateLookupRequestKey(request): mustCalculatorRateEvidence(
+			t,
+			request,
+			activityDate,
+			currencyintegration.RateAuthorityFederalReserve,
+			currencyintegration.ProviderIDFederalReserveH10,
+			currencyintegration.RateKindFederalReserveH10NoonBuying,
+			currencyintegration.QuoteDirectionSourcePerBase,
+			"2",
+			"H10/EUR/unstarred/2024-01-05",
+		),
+	}}
+
+	var result, err = applyReportCurrencyBoundary(context.Background(), service, reportmodel.ReportBaseCurrencyUSD, []assetInputGroup{{
+		AssetIdentityKey: "asset-btc",
+		DisplayLabel:     "BTC",
+		Inputs: []reportmodel.ActivityCalculationInput{{
+			SourceID:                "eur-order-tier-buy",
+			OccurredAt:              occurredAt,
+			SourceYear:              2024,
+			ActivityType:            reportmodel.ActivityTypeBuy,
+			AssetIdentityKey:        "asset-btc",
+			DisplayLabel:            "BTC",
+			Quantity:                mustReportDecimal(t, "2"),
+			UnitPrice:               decimalPointer(t, "50"),
+			GrossValue:              decimalPointer(t, "100"),
+			FeeAmount:               decimalPointer(t, "4"),
+			SelectedCurrencyContext: reportmodel.SelectedCurrencyContextOrder,
+			SelectedCurrencyCode:    "EUR",
+		}},
+	}})
+	if err != nil {
+		t.Fatalf("expected single-activity conversion success, got %v", err)
+	}
+	if len(service.requests) != 1 {
+		t.Fatalf("expected one lookup for one selected context, got %#v", service.requests)
+	}
+
+	var input = result.Groups[0].Inputs[0]
+	if input.SelectedCurrencyContext != reportmodel.SelectedCurrencyContextOrder || input.SelectedCurrencyCode != "USD" {
+		t.Fatalf("expected converted order context in USD without tier mixing, got %#v", input)
+	}
+	assertReportDecimalPointer(t, input.UnitPrice, "25")
+	assertReportDecimalPointer(t, input.GrossValue, "50")
+	assertReportDecimalPointer(t, input.FeeAmount, "2")
+	if len(result.ConversionAuditEntries) != 1 || len(result.RateSources) != 1 {
+		t.Fatalf("expected one conversion audit and one rate source, got %#v", result)
+	}
+	var audit = result.ConversionAuditEntries[0]
+	if audit.SourceID != "eur-order-tier-buy" || audit.AssetLabel != "BTC" || audit.SourceCurrency != "EUR" || audit.ReportBaseCurrency != reportmodel.ReportBaseCurrencyUSD {
+		t.Fatalf("unexpected conversion audit identity: %#v", audit)
+	}
+	if len(audit.Amounts) != 3 {
+		t.Fatalf("expected three converted audit amounts, got %#v", audit.Amounts)
+	}
+	assertReportConvertedAmount(t, audit.Amounts[0], reportmodel.ConvertedAmountKindUnitPrice, "50", "25")
+	assertReportConvertedAmount(t, audit.Amounts[1], reportmodel.ConvertedAmountKindGrossValue, "100", "50")
+	assertReportConvertedAmount(t, audit.Amounts[2], reportmodel.ConvertedAmountKindFeeAmount, "4", "2")
+}
+
+// TestApplyReportCurrencyBoundaryResolvesEvidencePerUniqueRateKey verifies that
+// repeated source/base/date keys reuse one resolved evidence record before replay.
+// Authored by: OpenCode
+func TestApplyReportCurrencyBoundaryResolvesEvidencePerUniqueRateKey(t *testing.T) {
+	t.Parallel()
+
+	var activityDate = time.Date(2024, time.January, 5, 0, 0, 0, 0, time.UTC)
+	var request = mustCalculatorRateLookupRequest(t, "EUR", "USD", activityDate)
+	var service = &stubCurrencyRateService{evidences: map[string]currencyintegration.ExchangeRateEvidence{
+		rateLookupRequestKey(request): mustCalculatorRateEvidence(
+			t,
+			request,
+			activityDate,
+			currencyintegration.RateAuthorityFederalReserve,
+			currencyintegration.ProviderIDFederalReserveH10,
+			currencyintegration.RateKindFederalReserveH10NoonBuying,
+			currencyintegration.QuoteDirectionSourcePerBase,
+			"2",
+			"H10/EUR/unstarred/2024-01-05",
+		),
+	}}
+
+	var result, err = applyReportCurrencyBoundary(context.Background(), service, reportmodel.ReportBaseCurrencyUSD, []assetInputGroup{{
+		AssetIdentityKey: "asset-btc",
+		DisplayLabel:     "BTC",
+		Inputs: []reportmodel.ActivityCalculationInput{
+			{
+				SourceID:             "eur-buy-1",
+				OccurredAt:           activityDate,
+				SourceYear:           2024,
+				ActivityType:         reportmodel.ActivityTypeBuy,
+				AssetIdentityKey:     "asset-btc",
+				DisplayLabel:         "BTC",
+				Quantity:             mustReportDecimal(t, "1"),
+				GrossValue:           decimalPointer(t, "100"),
+				SelectedCurrencyCode: "EUR",
+			},
+			{
+				SourceID:             "eur-buy-2",
+				OccurredAt:           activityDate.Add(2 * time.Hour),
+				SourceYear:           2024,
+				ActivityType:         reportmodel.ActivityTypeBuy,
+				AssetIdentityKey:     "asset-btc",
+				DisplayLabel:         "BTC",
+				Quantity:             mustReportDecimal(t, "1"),
+				GrossValue:           decimalPointer(t, "80"),
+				SelectedCurrencyCode: "EUR",
+			},
+		},
+	}})
+	if err != nil {
+		t.Fatalf("expected unique-key conversion success, got %v", err)
+	}
+	if len(service.requests) != 1 {
+		t.Fatalf("expected one lookup for repeated key, got %#v", service.requests)
+	}
+	if len(result.ConversionAuditEntries) != 2 || len(result.RateSources) != 1 {
+		t.Fatalf("expected two audit entries and one rate source, got %#v", result)
+	}
+	assertReportDecimalPointer(t, result.Groups[0].Inputs[0].GrossValue, "50")
+	assertReportDecimalPointer(t, result.Groups[0].Inputs[1].GrossValue, "40")
+}
+
+// TestApplyReportCurrencyBoundaryConvertsZeroValuedMonetaryFields verifies that
+// explicit zero unit prices, gross amounts, and fees remain valid zeros after a
+// cross-currency conversion boundary.
+// Authored by: OpenCode
+func TestApplyReportCurrencyBoundaryConvertsZeroValuedMonetaryFields(t *testing.T) {
+	t.Parallel()
+
+	var activityDate = time.Date(2024, time.February, 9, 0, 0, 0, 0, time.UTC)
+	var request = mustCalculatorRateLookupRequest(t, "GBP", "USD", activityDate)
+	var service = &stubCurrencyRateService{evidences: map[string]currencyintegration.ExchangeRateEvidence{
+		rateLookupRequestKey(request): mustCalculatorRateEvidence(
+			t,
+			request,
+			activityDate,
+			currencyintegration.RateAuthorityFederalReserve,
+			currencyintegration.ProviderIDFederalReserveH10,
+			currencyintegration.RateKindFederalReserveH10NoonBuying,
+			currencyintegration.QuoteDirectionBasePerSource,
+			"1.25",
+			"H10/GBP/starred/2024-02-09",
+		),
+	}}
+
+	var result, err = applyReportCurrencyBoundary(context.Background(), service, reportmodel.ReportBaseCurrencyUSD, []assetInputGroup{{
+		AssetIdentityKey: "asset-zero",
+		DisplayLabel:     "ZERO",
+		Inputs: []reportmodel.ActivityCalculationInput{{
+			SourceID:                "gbp-zero-buy",
+			OccurredAt:              activityDate,
+			SourceYear:              2024,
+			ActivityType:            reportmodel.ActivityTypeBuy,
+			AssetIdentityKey:        "asset-zero",
+			DisplayLabel:            "ZERO",
+			Quantity:                mustReportDecimal(t, "1"),
+			UnitPrice:               decimalPointer(t, "0"),
+			GrossValue:              decimalPointer(t, "0"),
+			FeeAmount:               decimalPointer(t, "0"),
+			SelectedCurrencyContext: reportmodel.SelectedCurrencyContextOrder,
+			SelectedCurrencyCode:    "GBP",
+		}},
+	}})
+	if err != nil {
+		t.Fatalf("expected zero-valued conversion success, got %v", err)
+	}
+
+	var input = result.Groups[0].Inputs[0]
+	if input.SelectedCurrencyCode != "USD" {
+		t.Fatalf("expected converted input currency USD, got %#v", input)
+	}
+	assertReportDecimalPointer(t, input.UnitPrice, "0")
+	assertReportDecimalPointer(t, input.GrossValue, "0")
+	assertReportDecimalPointer(t, input.FeeAmount, "0")
+	if len(result.ConversionAuditEntries) != 1 || len(result.ConversionAuditEntries[0].Amounts) != 3 {
+		t.Fatalf("expected zero-valued fields in conversion audit, got %#v", result.ConversionAuditEntries)
 	}
 }
 
@@ -1442,7 +1811,12 @@ func requireCalculationError(t *testing.T, err error, kind reportmodel.Calculati
 func validReportRequest(t *testing.T, year int, method reportmodel.CostBasisMethod) reportmodel.ReportRequest {
 	t.Helper()
 
-	var request, err = reportmodel.NewReportRequest(year, method, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
+	var request, err = reportmodel.NewReportRequest(
+		year,
+		method,
+		reportmodel.ReportBaseCurrencyUSD,
+		time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
+	)
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
@@ -1510,6 +1884,27 @@ func zeroPricedHoldingReductionRecord(t *testing.T, sourceID string, occurredAt 
 	}
 }
 
+// zeroPricedNoLookupAcquisitionRecord returns one same-currency acquisition that
+// gives the zero-priced reduction tests open basis without using rate lookup.
+// Authored by: OpenCode
+func zeroPricedNoLookupAcquisitionRecord(t *testing.T) syncmodel.ActivityRecord {
+	t.Helper()
+
+	return syncmodel.ActivityRecord{
+		SourceID:         "zero-no-lookup-usd-buy",
+		OccurredAt:       "2024-01-02T10:00:00Z",
+		ActivityType:     syncmodel.ActivityTypeBuy,
+		AssetIdentityKey: "asset-zero-no-lookup",
+		AssetSymbol:      "ZNL",
+		AssetName:        "Zero No Lookup",
+		Quantity:         mustReportDecimal(t, "1"),
+		OrderCurrency:    "USD",
+		OrderUnitPrice:   decimalPointer(t, "10"),
+		OrderGrossValue:  decimalPointer(t, "10"),
+		OrderFeeAmount:   decimalPointer(t, "0"),
+	}
+}
+
 // decimalPointer returns one report-decimal pointer for calculator tests.
 // Authored by: OpenCode
 func decimalPointer(t *testing.T, raw string) *apd.Decimal {
@@ -1517,4 +1912,93 @@ func decimalPointer(t *testing.T, raw string) *apd.Decimal {
 
 	var value = mustReportDecimal(t, raw)
 	return &value
+}
+
+// rateLookupRequestKey returns the stable key used by calculator rate-service
+// stubs.
+// Authored by: OpenCode
+func rateLookupRequestKey(request currencyintegration.RateLookupRequest) string {
+	return request.SourceCurrency + "|" + request.BaseCurrency + "|" + request.ActivityDate.Format(time.DateOnly)
+}
+
+// mustCalculatorRateLookupRequest creates one validated calculator lookup fixture.
+// Authored by: OpenCode
+func mustCalculatorRateLookupRequest(t *testing.T, sourceCurrency string, baseCurrency string, activityDate time.Time) currencyintegration.RateLookupRequest {
+	t.Helper()
+
+	var request, err = currencyintegration.NewRateLookupRequest(sourceCurrency, baseCurrency, activityDate)
+	if err != nil {
+		t.Fatalf("new calculator rate lookup request: %v", err)
+	}
+
+	return request
+}
+
+// mustCalculatorRateEvidence creates one validated canonical rate evidence
+// fixture for calculator conversion-boundary tests.
+// Authored by: OpenCode
+func mustCalculatorRateEvidence(
+	t *testing.T,
+	request currencyintegration.RateLookupRequest,
+	rateDate time.Time,
+	authority currencyintegration.RateAuthority,
+	providerID currencyintegration.ProviderID,
+	rateKind string,
+	quoteDirection currencyintegration.QuoteDirection,
+	rateValue string,
+	datasetReference string,
+) currencyintegration.ExchangeRateEvidence {
+	t.Helper()
+
+	var evidence, err = currencyintegration.NewExchangeRateEvidence(
+		request,
+		rateDate,
+		authority,
+		providerID,
+		rateKind,
+		quoteDirection,
+		mustReportDecimal(t, rateValue),
+		datasetReference,
+	)
+	if err != nil {
+		t.Fatalf("new calculator rate evidence: %v", err)
+	}
+
+	return evidence
+}
+
+// assertReportDecimalPointer verifies one optional decimal has the expected
+// canonical text value.
+// Authored by: OpenCode
+func assertReportDecimalPointer(t *testing.T, actual *apd.Decimal, expected string) {
+	t.Helper()
+
+	if actual == nil {
+		t.Fatalf("expected decimal %s, got nil", expected)
+	}
+	var expectedDecimal = mustReportDecimal(t, expected)
+	if actual.Cmp(&expectedDecimal) != 0 {
+		t.Fatalf("unexpected decimal: got %s want %s", actual.Text('f'), expected)
+	}
+}
+
+// assertReportConvertedAmount verifies one conversion audit amount fixture.
+// Authored by: OpenCode
+func assertReportConvertedAmount(t *testing.T, actual reportmodel.ConvertedActivityAmount, kind reportmodel.ConvertedAmountKind, original string, converted string) {
+	t.Helper()
+
+	if actual.AmountKind != kind {
+		t.Fatalf("unexpected converted amount kind: got %s want %s", actual.AmountKind, kind)
+	}
+	var originalDecimal = mustReportDecimal(t, original)
+	if actual.OriginalAmount.Cmp(&originalDecimal) != 0 {
+		t.Fatalf("unexpected original amount: got %s want %s", actual.OriginalAmount.Text('f'), original)
+	}
+	var convertedDecimal = mustReportDecimal(t, converted)
+	if actual.ConvertedAmount.Cmp(&convertedDecimal) != 0 {
+		t.Fatalf("unexpected converted amount: got %s want %s", actual.ConvertedAmount.Text('f'), converted)
+	}
+	if actual.ConversionStatus != reportmodel.ConversionStatusConverted || actual.ExchangeRateEvidence == nil {
+		t.Fatalf("expected converted status with evidence, got %#v", actual)
+	}
 }

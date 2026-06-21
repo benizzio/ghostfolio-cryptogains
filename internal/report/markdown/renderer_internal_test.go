@@ -247,7 +247,7 @@ func TestRenderRejectsInvalidReport(t *testing.T) {
 func TestRenderWrapsInjectedHelperFailures(t *testing.T) {
 	t.Parallel()
 
-	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
+	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
@@ -316,7 +316,7 @@ func TestRenderWrapsInjectedHelperFailures(t *testing.T) {
 // in the final Markdown document.
 // Authored by: OpenCode
 func TestRenderRendersReferenceEmptyState(t *testing.T) {
-	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
+	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
@@ -361,7 +361,7 @@ func TestRenderRendersReferenceEmptyState(t *testing.T) {
 // Authored by: OpenCode
 func TestRenderCoversDetailAndLiquidationBranches(t *testing.T) {
 	t.Run("renders full detail and liquidation sections", func(t *testing.T) {
-		var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodHIFO, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
+		var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodHIFO, reportmodel.ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
 		if err != nil {
 			t.Fatalf("new report request: %v", err)
 		}
@@ -429,7 +429,7 @@ func TestRenderCoversDetailAndLiquidationBranches(t *testing.T) {
 			"### In-Year Activity",
 			"### Liquidation Calculations",
 			"### Closing Position",
-			"| sell-1 | SELL | 1 |  | 12 | 2 | USD | 0 | USD | 0 |  |",
+			"| sell-1 | SELL | 1 |  | 12 | 2 | USD | 0 | USD | 0 | same_currency |  |",
 		} {
 			if !strings.Contains(document.Content, expected) {
 				t.Fatalf("expected rendered report to contain %q", expected)

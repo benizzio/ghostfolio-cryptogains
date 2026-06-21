@@ -19,7 +19,7 @@ import (
 // reportCalculator defines the calculation seam used by the runtime report
 // service.
 // Authored by: OpenCode
-type reportCalculator func(reportmodel.ReportRequest, syncmodel.ProtectedActivityCache) (
+type reportCalculator func(context.Context, reportmodel.ReportRequest, syncmodel.ProtectedActivityCache) (
 	reportmodel.CapitalGainsReport,
 	error,
 )
@@ -46,6 +46,7 @@ type reportService struct {
 	snapshots         *snapshotLifecycle
 	allowDevHTTP      bool
 	diagnosticReports diagnosticReportService
+	currencyRates     reportcalculate.CurrencyRateService
 	calculate         reportCalculator
 	render            reportRenderer
 	write             reportDocumentWriter
@@ -55,12 +56,20 @@ type reportService struct {
 // newReportService creates the runtime report service backed by the shared
 // readable protected-snapshot lifecycle.
 // Authored by: OpenCode
-func newReportService(snapshots *snapshotLifecycle, baseConfigDir string, allowDevHTTP bool) ReportService {
+func newReportService(
+	snapshots *snapshotLifecycle,
+	baseConfigDir string,
+	allowDevHTTP bool,
+	currencyRates reportcalculate.CurrencyRateService,
+) ReportService {
+	var calculator = reportcalculate.NewCalculator(currencyRates)
+
 	return &reportService{
 		snapshots:         snapshots,
 		allowDevHTTP:      allowDevHTTP,
 		diagnosticReports: newDiagnosticReportService(baseConfigDir),
-		calculate:         reportcalculate.Calculate,
+		currencyRates:     currencyRates,
+		calculate:         calculator.Calculate,
 		render:            reportmarkdown.Render,
 		write:             reportoutput.WriteReportDocument,
 		open:              reportoutput.OpenPath,
@@ -71,8 +80,6 @@ func newReportService(snapshots *snapshotLifecycle, baseConfigDir string, allowD
 // Markdown, writes the final file, and performs one post-save open request.
 // Authored by: OpenCode
 func (s *reportService) Generate(ctx context.Context, request ReportGenerationRequest) ReportOutcome {
-	_ = ctx
-
 	var outcomeAttempt = reportAttempt(request)
 
 	var cache, outcome, ok = s.readAvailableCache(request.Request)
@@ -81,7 +88,7 @@ func (s *reportService) Generate(ctx context.Context, request ReportGenerationRe
 		return outcome
 	}
 
-	var report, err = s.calculate(request.Request, cache)
+	var report, err = s.calculate(ctx, request.Request, cache)
 	if err != nil {
 		return s.reportFailureOutcome(
 			ctx,
@@ -356,12 +363,147 @@ func reportDiagnosticContextFromError(err error) syncmodel.DiagnosticContext {
 // reportCalculationFailureMessage formats one actionable calculation failure.
 // Authored by: OpenCode
 func reportCalculationFailureMessage(request reportmodel.ReportRequest, err error) string {
+	var detail = strings.TrimSpace(err.Error())
+	var conversionContext = reportConversionFailureContext(request, err)
+	if conversionContext != "" {
+		detail += "\n\n" + conversionContext
+	}
+
 	return fmt.Sprintf(
 		"Could not generate the %d %s report: %s. Review the referenced synced activity data and try again. No report file was saved.",
 		request.Year,
 		request.CostBasisMethod.Label(),
-		strings.TrimSpace(err.Error()),
+		detail,
 	)
+}
+
+// reportConversionFailureContext formats known non-secret conversion lookup
+// context as short lines that survive terminal wrapping.
+// Authored by: OpenCode
+func reportConversionFailureContext(request reportmodel.ReportRequest, err error) string {
+	var calculationError *reportmodel.CalculationError
+	if !errors.As(err, &calculationError) || calculationError == nil {
+		return ""
+	}
+
+	var parsed = parseReportConversionFailureDetail(calculationError.Error())
+	if parsed.sourceCurrency == "" || parsed.activityDate == "" {
+		return ""
+	}
+	if parsed.reportBaseCurrency == "" {
+		parsed.reportBaseCurrency = request.ReportBaseCurrency.Label()
+	}
+	if parsed.reason == "" && strings.Contains(calculationError.Error(), "could not prepare currency conversion") {
+		parsed.reason = "invalid_activity_currency"
+	}
+	if parsed.provider == "" {
+		parsed.provider = reportConversionProviderCategory(parsed.reportBaseCurrency)
+	}
+
+	var lines = []string{"Conversion Failure Context"}
+	if sourceID := strings.TrimSpace(calculationError.SourceID()); sourceID != "" {
+		lines = append(lines, "Source ID: "+sourceID)
+	}
+	lines = append(lines,
+		"Source Currency: "+parsed.sourceCurrency,
+		"Report Base Currency: "+parsed.reportBaseCurrency,
+		"Activity Date: "+parsed.activityDate,
+	)
+	if parsed.reason != "" {
+		lines = append(lines, "Failure Reason: "+parsed.reason)
+	}
+	if parsed.provider != "" && parsed.reason != "invalid_activity_currency" {
+		lines = append(lines, "Provider Category: "+parsed.provider)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// reportConversionFailureDetail stores safe fields parsed from report-owned
+// calculation error copy.
+// Authored by: OpenCode
+type reportConversionFailureDetail struct {
+	sourceCurrency     string
+	reportBaseCurrency string
+	activityDate       string
+	reason             string
+	provider           string
+}
+
+// parseReportConversionFailureDetail extracts stable conversion context from
+// safe report-calculation copy without using raw provider detail.
+// Authored by: OpenCode
+func parseReportConversionFailureDetail(detail string) reportConversionFailureDetail {
+	var parsed reportConversionFailureDetail
+	var normalized = strings.TrimSpace(detail)
+	parsed.reason = reportValueAfterToken(normalized, "reason=")
+	parsed.provider = reportValueAfterToken(normalized, "provider=")
+	parsed.sourceCurrency = reportValueAfterToken(normalized, "source_currency=")
+	parsed.reportBaseCurrency = reportValueAfterToken(normalized, "report_base_currency=")
+	parsed.activityDate = reportValueAfterToken(normalized, "activity_date=")
+	if parsed.sourceCurrency != "" && parsed.reportBaseCurrency != "" && parsed.activityDate != "" {
+		return parsed
+	}
+
+	var beforeDate, activityDate, ok = strings.Cut(normalized, " on ")
+	if !ok {
+		return parsed
+	}
+	var beforeSource, reportBaseCurrency, hasCurrencyPair = strings.Cut(beforeDate, " to ")
+	if !hasCurrencyPair {
+		return parsed
+	}
+	var sourceIndex = strings.LastIndex(beforeSource, " from ")
+	if sourceIndex < 0 {
+		return parsed
+	}
+
+	parsed.sourceCurrency = strings.TrimSpace(beforeSource[sourceIndex+len(" from "):])
+	parsed.reportBaseCurrency = strings.TrimSpace(reportBaseCurrency)
+	parsed.activityDate = reportLeadingDate(activityDate)
+	return parsed
+}
+
+// reportValueAfterToken reads one unquoted token value from safe diagnostic
+// copy.
+// Authored by: OpenCode
+func reportValueAfterToken(detail string, token string) string {
+	var index = strings.Index(detail, token)
+	if index < 0 {
+		return ""
+	}
+	var value = detail[index+len(token):]
+	if separator := strings.IndexAny(value, " \n\t)"); separator >= 0 {
+		value = value[:separator]
+	}
+	if value == "unknown" {
+		return ""
+	}
+	return strings.TrimSpace(value)
+}
+
+// reportLeadingDate returns the leading YYYY-MM-DD token when available.
+// Authored by: OpenCode
+func reportLeadingDate(detail string) string {
+	var value = strings.TrimSpace(detail)
+	if len(value) < len(time.DateOnly) {
+		return ""
+	}
+	return value[:len(time.DateOnly)]
+}
+
+// reportConversionProviderCategory returns the official provider category for a
+// known report base currency.
+// Authored by: OpenCode
+func reportConversionProviderCategory(reportBaseCurrency string) string {
+	switch strings.TrimSpace(reportBaseCurrency) {
+	case "EUR":
+		return "ecb_exr"
+	case "USD":
+		return "federal_reserve_h10"
+	default:
+		return ""
+	}
 }
 
 // reportRenderDiagnosticError wraps one renderer failure with report-level

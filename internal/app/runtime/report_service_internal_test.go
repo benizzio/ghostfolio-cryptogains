@@ -101,7 +101,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
-			calculate: func(request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
 			render: func(reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
@@ -135,7 +135,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		var savedPath string
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
-			calculate: func(request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
 			render: func(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
@@ -170,7 +170,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		var savedPath = filepath.Join(fixture.DocumentsDir, "report.md")
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
-			calculate: func(request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
 			render: func(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
@@ -203,7 +203,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		var savedPath = filepath.Join(fixture.DocumentsDir, "report.md")
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
-			calculate: func(request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
 			render: func(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
@@ -231,7 +231,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
-			calculate: func(request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
 			render: func(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
@@ -265,7 +265,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
-			calculate: func(request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
 			render: func(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
@@ -292,7 +292,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
-			calculate: func(request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
 			render: func(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
@@ -328,7 +328,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		var service = &reportService{
 			snapshots:         reportSnapshotLifecycleWithCache(syncmodel.ProtectedActivityCache{ActivityCount: 1, AvailableReportYears: []int{2025}, Activities: []syncmodel.ActivityRecord{offendingRecord}}),
 			diagnosticReports: newDiagnosticReportService(t.TempDir()),
-			calculate: func(reportmodel.ReportRequest, syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			calculate: func(context.Context, reportmodel.ReportRequest, syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return reportmodel.CapitalGainsReport{}, runtimeDiagnosticCarrierError{
 					context: syncmodel.DiagnosticContext{
 						FailureDetail:           "incomplete context (asset \"BTC\", source \"report-failure-buy-1\")",
@@ -359,7 +359,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 			snapshots:         reportSnapshotLifecycleWithCache(syncmodel.ProtectedActivityCache{ActivityCount: 1, AvailableReportYears: []int{2025}, Activities: []syncmodel.ActivityRecord{offendingRecord}}),
 			allowDevHTTP:      true,
 			diagnosticReports: newDiagnosticReportService(baseDir),
-			calculate: func(reportmodel.ReportRequest, syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			calculate: func(context.Context, reportmodel.ReportRequest, syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return reportmodel.CapitalGainsReport{}, runtimeDiagnosticCarrierError{
 					context: syncmodel.DiagnosticContext{
 						FailureDetail:           "incomplete context (asset \"BTC\", source \"report-failure-buy-1\")",
@@ -408,6 +408,19 @@ func TestReportServiceHelperFunctionsCoverRemainingBranches(t *testing.T) {
 	var message = reportCalculationFailureMessage(request, errors.New(" calculation boom "))
 	if !strings.Contains(message, "Could not generate the 2024 FIFO report: calculation boom") {
 		t.Fatalf("expected trimmed calculation failure message, got %q", message)
+	}
+	var conversionErr = reportmodel.NewCalculationError(
+		reportmodel.CalculationErrorKindActivityInput,
+		"could not resolve currency conversion rate from GBP to USD on 2024-06-13: reason=missing_rate",
+		"late-gbp-buy",
+		"FAIL",
+		nil,
+	)
+	var conversionMessage = reportCalculationFailureMessage(request, conversionErr)
+	for _, expected := range []string{"Conversion Failure Context", "Source ID: late-gbp-buy", "Source Currency: GBP", "Report Base Currency: USD", "Activity Date: 2024-06-13", "Failure Reason: missing_rate", "Provider Category: federal_reserve_h10"} {
+		if !strings.Contains(conversionMessage, expected) {
+			t.Fatalf("expected conversion failure message to contain %q, got %q", expected, conversionMessage)
+		}
 	}
 	if !reportDiagnosticEligible(ReportFailureUnsupportedReportCalculation) {
 		t.Fatalf("expected unsupported calculation to remain diagnostic eligible")
@@ -538,7 +551,12 @@ func reportSnapshotLifecycleWithCache(cache syncmodel.ProtectedActivityCache) *s
 func reportRequestFixture(t *testing.T, year int, method reportmodel.CostBasisMethod) reportmodel.ReportRequest {
 	t.Helper()
 
-	var request, err = reportmodel.NewReportRequest(year, method, time.Date(2026, time.May, 20, 15, 4, 5, 0, time.UTC))
+	var request, err = reportmodel.NewReportRequest(
+		year,
+		method,
+		reportmodel.ReportBaseCurrencyUSD,
+		time.Date(2026, time.May, 20, 15, 4, 5, 0, time.UTC),
+	)
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}

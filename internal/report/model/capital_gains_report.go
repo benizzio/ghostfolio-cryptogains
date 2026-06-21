@@ -84,6 +84,69 @@ func (report CapitalGainsReport) Validate() error {
 			return fmt.Errorf("capital gains report detail section %d: %w", index, err)
 		}
 	}
+	if err := report.validateConversionArtifacts(); err != nil {
+		return err
+	}
 
 	return nil
+}
+
+// validateConversionArtifacts verifies report-visible conversion audit entries
+// and their canonical rate source evidence.
+// Authored by: OpenCode
+func (report CapitalGainsReport) validateConversionArtifacts() error {
+	for index, source := range report.RateSources {
+		if err := source.Validate(); err != nil {
+			return fmt.Errorf("capital gains report rate source %d: %w", index, err)
+		}
+		if err := report.validateRateSourceCurrency(index, source); err != nil {
+			return err
+		}
+	}
+
+	for index, entry := range report.ConversionAuditEntries {
+		if err := entry.Validate(); err != nil {
+			return fmt.Errorf("capital gains report conversion audit entry %d: %w", index, err)
+		}
+		if !report.hasMatchingRateSource(entry) {
+			return fmt.Errorf("capital gains report conversion audit entry %d: matching rate source is required", index)
+		}
+	}
+
+	return nil
+}
+
+// validateRateSourceCurrency verifies that rate evidence belongs to the report
+// calculation currency when the rendered report declares one.
+// Authored by: OpenCode
+func (report CapitalGainsReport) validateRateSourceCurrency(index int, source ExchangeRateEvidence) error {
+	var reportCurrency = strings.TrimSpace(report.ReportCalculationCurrency)
+	if reportCurrency == "" || reportCurrency == "NOT APPLICABLE" {
+		return nil
+	}
+	if source.BaseCurrency.Label() != reportCurrency {
+		return fmt.Errorf("capital gains report rate source %d: base currency must match report calculation currency", index)
+	}
+
+	return nil
+}
+
+// hasMatchingRateSource reports whether one audit entry is backed by canonical
+// rate source evidence from the report model.
+// Authored by: OpenCode
+func (report CapitalGainsReport) hasMatchingRateSource(entry ConversionAuditEntry) bool {
+	for _, source := range report.RateSources {
+		if strings.TrimSpace(source.SourceCurrency) == strings.TrimSpace(entry.SourceCurrency) &&
+			source.BaseCurrency == entry.ReportBaseCurrency &&
+			source.ActivityDate.Equal(entry.ActivityDate) &&
+			source.RateDate.Equal(entry.RateDate) &&
+			source.Authority == entry.RateAuthority &&
+			strings.TrimSpace(source.RateKind) == strings.TrimSpace(entry.RateKind) &&
+			source.QuoteDirection == entry.QuoteDirection &&
+			source.RateValue.Cmp(&entry.RateValue) == 0 {
+			return true
+		}
+	}
+
+	return false
 }

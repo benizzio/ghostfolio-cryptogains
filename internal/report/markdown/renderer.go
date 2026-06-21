@@ -48,10 +48,16 @@ func Render(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, 
 	if err := renderWriteSummarySection(&builder, report, calculationCurrency); err != nil {
 		return reportmodel.ReportDocument{}, err
 	}
+	if err := writeRateSourceSummary(&builder, report); err != nil {
+		return reportmodel.ReportDocument{}, err
+	}
 	if err := renderWriteReferenceSection(&builder, report); err != nil {
 		return reportmodel.ReportDocument{}, err
 	}
 	if err := renderWriteDetailSections(&builder, report, calculationCurrency); err != nil {
+		return reportmodel.ReportDocument{}, err
+	}
+	if err := writeConversionAuditSection(&builder, report); err != nil {
 		return reportmodel.ReportDocument{}, err
 	}
 
@@ -62,6 +68,47 @@ func Render(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, 
 		report.CostBasisMethod,
 		report.GeneratedAt,
 	)
+}
+
+// writeRateSourceSummary renders the official rate-provider summary disclosed
+// by the report model.
+// Authored by: OpenCode
+func writeRateSourceSummary(builder *strings.Builder, report reportmodel.CapitalGainsReport) error {
+	builder.WriteString("## Rate Source Summary\n\n")
+	builder.WriteString(fmt.Sprintf("- Report Base Currency: %s\n", calculationCurrencyLabel(report.ReportCalculationCurrency)))
+	if len(report.RateSources) == 0 {
+		builder.WriteString("- Exchange Rate Use: No activity required exchange-rate conversion.\n\n")
+		return nil
+	}
+
+	var rendered = make(map[string]bool)
+	for index, source := range report.RateSources {
+		var rateValue, err = canonicalDecimal(source.RateValue)
+		if err != nil {
+			return fmt.Errorf("render rate source %d rate value: %w", index, err)
+		}
+		var key = strings.Join([]string{
+			string(source.Authority),
+			string(source.ProviderID),
+			source.RateKind,
+			string(source.QuoteDirection),
+			rateValue,
+		}, "|")
+		if rendered[key] {
+			continue
+		}
+		rendered[key] = true
+
+		builder.WriteString(fmt.Sprintf("- Authority: %s\n", rateAuthorityLabel(source.Authority)))
+		builder.WriteString(fmt.Sprintf("- Provider: %s\n", rateProviderLabel(source.ProviderID)))
+		builder.WriteString(fmt.Sprintf("- Rate Kind: %s\n", sanitizeInlineText(source.RateKind)))
+		builder.WriteString(fmt.Sprintf("- Unavailable-Date Rule: %s\n", unavailableDateRule(source.ProviderID)))
+		builder.WriteString(fmt.Sprintf("- Quote Direction: %s\n", sanitizeInlineText(string(source.QuoteDirection))))
+		builder.WriteString(fmt.Sprintf("- Rate Value: %s\n", rateValue))
+	}
+
+	builder.WriteString("\n")
+	return nil
 }
 
 // writeHeader renders the required document heading and metadata block.
@@ -198,8 +245,8 @@ func writeActivityBlock(builder *strings.Builder, section reportmodel.AssetDetai
 		return nil
 	}
 
-	builder.WriteString("| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency | Basis After Row | Calculation Currency | Quantity After Row | Note |\n")
-	builder.WriteString("|------|-----------|------|----------|------------|-------------|-----|-------------------|-----------------|----------------------|--------------------|------|\n")
+	builder.WriteString("| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency | Basis After Row | Calculation Currency | Quantity After Row | Conversion Status | Note |\n")
+	builder.WriteString("|------|-----------|------|----------|------------|-------------|-----|-------------------|-----------------|----------------------|--------------------|-------------------|------|\n")
 
 	for _, row := range section.ActivityRows {
 		var quantityText, err = canonicalDecimal(row.Quantity)
@@ -233,7 +280,7 @@ func writeActivityBlock(builder *strings.Builder, section reportmodel.AssetDetai
 		}
 
 		builder.WriteString(fmt.Sprintf(
-			"| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
+			"| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
 			row.OccurredAt.Local().Format("2006-01-02 15:04:05"),
 			sanitizeInlineText(row.SourceID),
 			sanitizeInlineText(string(row.ActivityType)),
@@ -245,12 +292,122 @@ func writeActivityBlock(builder *strings.Builder, section reportmodel.AssetDetai
 			basisAfterRowText,
 			calculationCurrencyLabel(row.CalculationCurrency),
 			quantityAfterRowText,
+			conversionStatusColumn(row),
 			sanitizeInlineText(row.HoldingReductionExplanation),
 		))
 	}
 
 	builder.WriteString("\n")
 	return nil
+}
+
+// writeConversionAuditSection renders one audit row per converted monetary
+// amount disclosed by the report model.
+// Authored by: OpenCode
+func writeConversionAuditSection(builder *strings.Builder, report reportmodel.CapitalGainsReport) error {
+	if len(report.ConversionAuditEntries) == 0 {
+		return nil
+	}
+
+	builder.WriteString("## Currency Conversion Audit\n\n")
+	builder.WriteString("| Date | Source ID | Asset | Source Currency | Report Base Currency | Rate Date | Rate Authority | Rate Kind | Quote Direction | Rate Value | Amount Kind | Original Amount | Converted Amount |\n")
+	builder.WriteString("|------|-----------|-------|-----------------|----------------------|-----------|----------------|-----------|-----------------|------------|-------------|-----------------|------------------|\n")
+
+	for entryIndex, entry := range report.ConversionAuditEntries {
+		var rateValue, err = canonicalDecimal(entry.RateValue)
+		if err != nil {
+			return fmt.Errorf("render conversion audit entry %d rate value: %w", entryIndex, err)
+		}
+
+		for amountIndex, amount := range entry.Amounts {
+			var originalAmount string
+			originalAmount, err = canonicalDecimal(amount.OriginalAmount)
+			if err != nil {
+				return fmt.Errorf("render conversion audit entry %d amount %d original amount: %w", entryIndex, amountIndex, err)
+			}
+			var convertedAmount string
+			convertedAmount, err = canonicalDecimal(amount.ConvertedAmount)
+			if err != nil {
+				return fmt.Errorf("render conversion audit entry %d amount %d converted amount: %w", entryIndex, amountIndex, err)
+			}
+
+			builder.WriteString(fmt.Sprintf(
+				"| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
+				entry.ActivityDate.Local().Format("2006-01-02"),
+				sanitizeInlineText(entry.SourceID),
+				sanitizeInlineText(entry.AssetLabel),
+				sanitizeInlineText(entry.SourceCurrency),
+				sanitizeInlineText(entry.ReportBaseCurrency.Label()),
+				entry.RateDate.Local().Format("2006-01-02"),
+				rateAuthorityLabel(entry.RateAuthority),
+				sanitizeInlineText(entry.RateKind),
+				sanitizeInlineText(string(entry.QuoteDirection)),
+				rateValue,
+				sanitizeInlineText(string(amount.AmountKind)),
+				originalAmount,
+				convertedAmount,
+			))
+		}
+	}
+
+	builder.WriteString("\n")
+	return nil
+}
+
+// conversionStatusColumn classifies rendered priced activity rows without
+// exposing provider implementation details.
+// Authored by: OpenCode
+func conversionStatusColumn(row reportmodel.AssetActivityRow) string {
+	if activityCurrencyColumn(row) == "" {
+		return ""
+	}
+	if strings.TrimSpace(row.ActivityCurrency) == strings.TrimSpace(row.CalculationCurrency) {
+		return sanitizeInlineText(string(reportmodel.ConversionStatusSameCurrency))
+	}
+
+	return sanitizeInlineText(string(reportmodel.ConversionStatusConverted))
+}
+
+// rateAuthorityLabel returns report-facing authority labels for canonical rate
+// evidence.
+// Authored by: OpenCode
+func rateAuthorityLabel(authority reportmodel.ExchangeRateAuthority) string {
+	switch authority {
+	case reportmodel.ExchangeRateAuthorityEuropeanCentralBank:
+		return "European Central Bank"
+	case reportmodel.ExchangeRateAuthorityFederalReserve:
+		return "Federal Reserve"
+	default:
+		return sanitizeInlineText(string(authority))
+	}
+}
+
+// rateProviderLabel returns report-facing provider labels for canonical rate
+// evidence.
+// Authored by: OpenCode
+func rateProviderLabel(provider reportmodel.ExchangeRateProviderID) string {
+	switch provider {
+	case reportmodel.ExchangeRateProviderIDECBEXR:
+		return "ECB Data Portal `EXR`"
+	case reportmodel.ExchangeRateProviderIDFederalReserveH10:
+		return "Federal Reserve Board H.10/Data Download Program"
+	default:
+		return sanitizeInlineText(string(provider))
+	}
+}
+
+// unavailableDateRule returns the report-facing prior-observation rule for one
+// canonical provider.
+// Authored by: OpenCode
+func unavailableDateRule(provider reportmodel.ExchangeRateProviderID) string {
+	switch provider {
+	case reportmodel.ExchangeRateProviderIDECBEXR:
+		return "most recent previous available ECB observation"
+	case reportmodel.ExchangeRateProviderIDFederalReserveH10:
+		return "most recent previous available H.10 observation"
+	default:
+		return "most recent previous available official observation"
+	}
 }
 
 // writeLiquidationBlock renders the priced liquidation table when the section

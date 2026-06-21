@@ -4,6 +4,7 @@
 package calculate
 
 import (
+	"context"
 	"fmt"
 
 	reportbasis "github.com/benizzio/ghostfolio-cryptogains/internal/report/basis"
@@ -37,7 +38,7 @@ var (
 //
 // Example:
 //
-//	request, err := reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, time.Now())
+//	request, err := reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, time.Now())
 //	if err != nil {
 //		panic(err)
 //	}
@@ -49,6 +50,18 @@ var (
 //
 // Authored by: OpenCode
 func Calculate(request reportmodel.ReportRequest, cache syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+	return calculateReport(context.Background(), nil, request, cache)
+}
+
+// calculateReport replays synced activity history after applying the selected
+// report base-currency boundary.
+// Authored by: OpenCode
+func calculateReport(
+	ctx context.Context,
+	currencyRates CurrencyRateService,
+	request reportmodel.ReportRequest,
+	cache syncmodel.ProtectedActivityCache,
+) (reportmodel.CapitalGainsReport, error) {
 	if err := request.Validate(); err != nil {
 		return reportmodel.CapitalGainsReport{}, reportmodel.NewCalculationError(
 			reportmodel.CalculationErrorKindInvalidRequest,
@@ -72,6 +85,12 @@ func Calculate(request reportmodel.ReportRequest, cache syncmodel.ProtectedActiv
 	if err != nil {
 		return reportmodel.CapitalGainsReport{}, err
 	}
+	var currencyBoundaryResult reportCurrencyBoundaryResult
+	currencyBoundaryResult, err = applyReportCurrencyBoundaryWithRecords(ctx, currencyRates, request.ReportBaseCurrency, groups, cache.Activities)
+	if err != nil {
+		return reportmodel.CapitalGainsReport{}, err
+	}
+	groups = currencyBoundaryResult.Groups
 
 	var summaryEntries []reportmodel.AssetSummaryEntry
 	var referenceEntries []reportmodel.ReferenceLiquidationEntry
@@ -109,7 +128,7 @@ func Calculate(request reportmodel.ReportRequest, cache syncmodel.ProtectedActiv
 	var report, reportErr = newCapitalGainsReport(
 		request,
 		request.RequestedAt,
-		reportCalculationCurrencyLabel,
+		request.ReportBaseCurrency.Label(),
 		summaryEntries,
 		yearlyNetTotal,
 		referenceEntries,
@@ -124,6 +143,8 @@ func Calculate(request reportmodel.ReportRequest, cache syncmodel.ProtectedActiv
 			reportErr,
 		)
 	}
+	report.ConversionAuditEntries = currencyBoundaryResult.ConversionAuditEntries
+	report.RateSources = currencyBoundaryResult.RateSources
 
 	return report, nil
 }

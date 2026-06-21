@@ -153,21 +153,23 @@ func (m *Model) viewSyncReportsMenuScreen() string {
 	})
 }
 
-// viewReportSelectionScreen renders year and method selection.
+// viewReportSelectionScreen renders year, method, and base-currency selection.
 // Authored by: OpenCode
 func (m *Model) viewReportSelectionScreen() string {
 	return screen.ReportSelectionScreenView(screen.ReportSelectionScreenParams{
-		Theme:             m.theme,
-		Width:             m.width,
-		Height:            m.height,
-		AvailableYears:    m.syncReports.ProtectedData.AvailableReportYears,
-		SelectedYearIndex: m.report.YearIndex,
-		MethodItems:       m.reportMethodItems(),
-		SelectedMethod:    m.report.MethodIndex,
-		MethodExplanation: reportMethodForIndex(m.report.MethodIndex).Explanation(),
-		MenuItems:         m.reportSelectionMenuItems(),
-		SelectedAction:    m.report.ActionIndex,
-		HelpText:          m.reportSelectionHelpText(),
+		Theme:                     m.theme,
+		Width:                     m.width,
+		Height:                    m.height,
+		AvailableYears:            m.syncReports.ProtectedData.AvailableReportYears,
+		SelectedYearIndex:         m.report.YearIndex,
+		MethodItems:               m.reportMethodItems(),
+		SelectedMethod:            m.report.MethodIndex,
+		BaseCurrencyItems:         m.reportBaseCurrencyItems(),
+		SelectedBaseCurrencyIndex: m.report.BaseCurrencyIndex,
+		MethodExplanation:         reportMethodForIndex(m.report.MethodIndex).Explanation(),
+		MenuItems:                 m.reportSelectionMenuItems(),
+		SelectedAction:            m.report.ActionIndex,
+		HelpText:                  m.reportSelectionHelpText(),
 	})
 }
 
@@ -175,14 +177,15 @@ func (m *Model) viewReportSelectionScreen() string {
 // Authored by: OpenCode
 func (m *Model) viewReportBusyScreen() string {
 	return screen.ReportBusyScreenView(screen.ReportBusyScreenParams{
-		Theme:        m.theme,
-		Width:        m.width,
-		Height:       m.height,
-		SelectedYear: m.report.SelectedYear,
-		MethodLabel:  reportMethodForIndex(m.report.MethodIndex).Label(),
-		BusyText:     m.report.BusyText,
-		SpinnerFrame: m.spinner.View(),
-		HelpText:     m.reportBusyHelpText(),
+		Theme:              m.theme,
+		Width:              m.width,
+		Height:             m.height,
+		SelectedYear:       m.report.SelectedYear,
+		MethodLabel:        reportMethodForIndex(m.report.MethodIndex).Label(),
+		ReportBaseCurrency: m.report.SelectedBaseCurrency,
+		BusyText:           m.report.BusyText,
+		SpinnerFrame:       m.spinner.View(),
+		HelpText:           m.reportBusyHelpText(),
 	})
 }
 

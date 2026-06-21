@@ -520,11 +520,11 @@ func appendPerformanceAssetActivities(input performanceAssetInput) []syncmodel.A
 // Authored by: OpenCode
 func deterministicExpectedReportsByMethod() map[reportmodel.CostBasisMethod]ExpectedReportLedger {
 	return map[reportmodel.CostBasisMethod]ExpectedReportLedger{
-		reportmodel.CostBasisMethodFIFO:             buildExpectedPrimaryReportLedger("4936", expectedADAFIFO(), expectedLTCFIFO(), expectedAVAXFIFO(), expectedHybridReference(false)),
-		reportmodel.CostBasisMethodLIFO:             buildExpectedPrimaryReportLedger("5121", expectedADALIFO(), expectedLTCLIFO(), expectedAVAXLIFO(), expectedHybridReference(false)),
-		reportmodel.CostBasisMethodHIFO:             buildExpectedPrimaryReportLedger("4721", expectedADAHIFO(), expectedLTCHIFO(), expectedAVAXHIFO(), expectedHybridReference(false)),
-		reportmodel.CostBasisMethodAverageCost:      buildExpectedPrimaryReportLedger("5026", expectedADAAverage(), expectedLTCAverage(), expectedAVAXAverage(), expectedHybridReference(false)),
-		reportmodel.CostBasisMethodScopeLocalHybrid: buildExpectedPrimaryReportLedger("5226", expectedADAHybrid(), expectedLTCHybrid(), expectedAVAXHybrid(), expectedHybridReference(true)),
+		reportmodel.CostBasisMethodFIFO:             buildExpectedPrimaryReportLedger("2935.1", expectedADAFIFO(), expectedLTCFIFO(), expectedAVAXFIFO(), expectedHybridReference(false)),
+		reportmodel.CostBasisMethodLIFO:             buildExpectedPrimaryReportLedger("3120.1", expectedADALIFO(), expectedLTCLIFO(), expectedAVAXLIFO(), expectedHybridReference(false)),
+		reportmodel.CostBasisMethodHIFO:             buildExpectedPrimaryReportLedger("2720.1", expectedADAHIFO(), expectedLTCHIFO(), expectedAVAXHIFO(), expectedHybridReference(false)),
+		reportmodel.CostBasisMethodAverageCost:      buildExpectedPrimaryReportLedger("3025.1", expectedADAAverage(), expectedLTCAverage(), expectedAVAXAverage(), expectedHybridReference(false)),
+		reportmodel.CostBasisMethodScopeLocalHybrid: buildExpectedPrimaryReportLedger("3225.1", expectedADAHybrid(), expectedLTCHybrid(), expectedAVAXHybrid(), expectedHybridReference(true)),
 	}
 }
 
@@ -539,10 +539,10 @@ func buildExpectedPrimaryReportLedger(
 	includeHybridScopeReference bool,
 ) ExpectedReportLedger {
 	var report = ExpectedReportLedger{
-		ReportCalculationCurrency: "NOT APPLICABLE",
+		ReportCalculationCurrency: "USD",
 		YearlyNetTotal:            yearlyNetTotal,
 		SummaryByAsset: map[string]ExpectedAssetSummary{
-			"asset-btc-001":  expectedSummary("asset-btc-001", "BTC", "4991"),
+			"asset-btc-001":  expectedSummary("asset-btc-001", "BTC", "2990.1"),
 			"asset-xrp-001":  expectedSummary("asset-xrp-001", "XRP", "0"),
 			"asset-ada-001":  expectedSummary("asset-ada-001", "ADA", netGainFromDetail(ada)),
 			"asset-ltc-001":  expectedSummary("asset-ltc-001", "LTC", netGainFromDetail(ltc)),
@@ -595,16 +595,16 @@ func expectedBTCDetail() ExpectedAssetDetail {
 		AssetIdentityKey:             "asset-btc-001",
 		DisplayLabel:                 "BTC",
 		OpeningQuantity:              "2",
-		OpeningCostBasis:             "40018",
+		OpeningCostBasis:             "44019.8",
 		ClosingQuantity:              "1",
-		ClosingCostBasis:             "20009",
-		CalculationCurrency:          "NOT APPLICABLE",
+		ClosingCostBasis:             "22009.9",
+		CalculationCurrency:          "USD",
 		ExpectedFullLiquidationCount: 0,
 		ActivityRows: []ExpectedAssetActivityRow{
-			expectedPricedRow("btc-sell-2024-zero-fee-001", syncmodel.ActivityTypeSell, "1", "25000", "0", "USD", "20009", "1"),
+			expectedPricedRow("btc-sell-2024-zero-fee-001", syncmodel.ActivityTypeSell, "1", "25000", "0", "USD", "22009.9", "1"),
 		},
 		LiquidationSummaries: []ExpectedLiquidationSummary{
-			expectedLiquidation("btc-sell-2024-zero-fee-001", "1", "20009", "25000", "4991", "USD"),
+			expectedLiquidation("btc-sell-2024-zero-fee-001", "1", "22009.9", "25000", "2990.1", "USD"),
 		},
 	}
 }
@@ -619,7 +619,7 @@ func expectedXRPDetail() ExpectedAssetDetail {
 		OpeningCostBasis:             "0",
 		ClosingQuantity:              "800",
 		ClosingCostBasis:             "400.8",
-		CalculationCurrency:          "NOT APPLICABLE",
+		CalculationCurrency:          "USD",
 		ExpectedFullLiquidationCount: 0,
 		ActivityRows: []ExpectedAssetActivityRow{
 			expectedPricedRow("xrp-buy-2024-001", syncmodel.ActivityTypeBuy, "1000", "500", "1", "USD", "501", "1000"),
@@ -669,7 +669,7 @@ func expectedADADetail(closingBasis string, allocatedBasis string, gain string) 
 		OpeningCostBasis:             "0",
 		ClosingQuantity:              "500",
 		ClosingCostBasis:             closingBasis,
-		CalculationCurrency:          "NOT APPLICABLE",
+		CalculationCurrency:          "USD",
 		ExpectedFullLiquidationCount: 0,
 		ActivityRows: []ExpectedAssetActivityRow{
 			expectedPricedRow("ada-buy-2024-001", syncmodel.ActivityTypeBuy, "1000", "250", "2", "USD", "252", "1000"),
@@ -723,7 +723,7 @@ func expectedLTCDetail(closingBasis string, allocatedBasis string, gain string) 
 		OpeningCostBasis:             "400",
 		ClosingQuantity:              "1",
 		ClosingCostBasis:             closingBasis,
-		CalculationCurrency:          "NOT APPLICABLE",
+		CalculationCurrency:          "USD",
 		ExpectedFullLiquidationCount: 0,
 		ActivityRows: []ExpectedAssetActivityRow{
 			expectedPricedRow("ltc-sell-2024-001", syncmodel.ActivityTypeSell, "1", "250", "0", "USD", closingBasis, "1"),
@@ -775,7 +775,7 @@ func expectedAVAXDetail(closingBasis string, allocatedBasis string, gain string,
 		OpeningCostBasis:             "600",
 		ClosingQuantity:              "1",
 		ClosingCostBasis:             closingBasis,
-		CalculationCurrency:          "NOT APPLICABLE",
+		CalculationCurrency:          "USD",
 		ExpectedFullLiquidationCount: fullLiquidationCount,
 		ActivityRows: []ExpectedAssetActivityRow{
 			expectedPricedRow("avax-sell-alpha-2024-001", syncmodel.ActivityTypeSell, "1", "250", "0", "USD", closingBasis, "1"),
@@ -816,7 +816,7 @@ func expectedPricedRow(sourceID string, activityType syncmodel.ActivityType, qua
 		FeeAmount:           feeAmount,
 		ActivityCurrency:    activityCurrency,
 		BasisAfterRow:       basisAfterRow,
-		CalculationCurrency: "NOT APPLICABLE",
+		CalculationCurrency: "USD",
 		QuantityAfterRow:    quantityAfterRow,
 	}
 }
@@ -833,7 +833,7 @@ func expectedHoldingReductionRow(sourceID string, quantity string, basisAfterRow
 		GrossValue:                  "0",
 		FeeAmount:                   "0",
 		BasisAfterRow:               basisAfterRow,
-		CalculationCurrency:         "NOT APPLICABLE",
+		CalculationCurrency:         "USD",
 		QuantityAfterRow:            quantityAfterRow,
 		HoldingReductionExplanation: explanation,
 	}
@@ -849,7 +849,7 @@ func expectedLiquidation(sourceID string, disposedQuantity string, allocatedBasi
 		NetLiquidationProceeds: netLiquidationProceeds,
 		GainOrLoss:             gainOrLoss,
 		ActivityCurrency:       activityCurrency,
-		CalculationCurrency:    "NOT APPLICABLE",
+		CalculationCurrency:    "USD",
 	}
 }
 

@@ -95,10 +95,28 @@ func (m *Model) reportMethodItems() []component.MenuItem {
 	return items
 }
 
+// reportBaseCurrencyItems builds the supported report base-currency menu.
+// Authored by: OpenCode
+func (m *Model) reportBaseCurrencyItems() []component.MenuItem {
+	var currencies = reportmodel.SupportedReportBaseCurrencies()
+	var items = make([]component.MenuItem, 0, len(currencies))
+	for _, currency := range currencies {
+		items = append(items, component.MenuItem{Label: currency.Label(), Enabled: true})
+	}
+	return items
+}
+
 // reportSelectionMenuItems builds the report-selection action menu.
 // Authored by: OpenCode
 func (m *Model) reportSelectionMenuItems() []component.MenuItem {
-	return []component.MenuItem{{Label: component.GenerateReportActionLabel, Enabled: true}, {Label: component.BackActionLabel, Enabled: true}}
+	return []component.MenuItem{{Label: component.GenerateReportActionLabel, Enabled: m.reportCanGenerate()}, {Label: component.BackActionLabel, Enabled: true}}
+}
+
+// reportCanGenerate reports whether the selection screen has all required user
+// choices for starting report generation.
+// Authored by: OpenCode
+func (m *Model) reportCanGenerate() bool {
+	return m.report.SelectedYear > 0 && m.report.MethodIndex >= 0 && m.report.SelectedBaseCurrency != ""
 }
 
 // reportResultMenuItems builds the completed report-result action menu.

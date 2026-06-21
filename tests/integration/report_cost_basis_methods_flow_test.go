@@ -46,6 +46,7 @@ func TestReportGenerationMatchesControlledLedgersAcrossCostBasisMethods(t *testi
 			model = openReportSelectionFromContext(t, model)
 			model = selectReportYear(t, model, fixture.PrimaryReportYear)
 			model = selectReportMethod(t, model, method.Label())
+			model = selectReportBaseCurrencyFromMethodFocus(t, model, reportmodel.ReportBaseCurrencyUSD)
 
 			var selectionContent = normalizeRenderedText(model.View().Content)
 			if !strings.Contains(compactWhitespace(selectionContent), compactWhitespace(method.Explanation())) {
@@ -137,6 +138,7 @@ func TestReportGenerationSupportsRoundedRepeatingDecimalHistoryAcrossMethods(t *
 			model = openReportSelectionFromContext(t, model)
 			model = selectReportYear(t, model, 2024)
 			model = selectReportMethod(t, model, method.Label())
+			model = selectReportBaseCurrencyFromMethodFocus(t, model, reportmodel.ReportBaseCurrencyUSD)
 			model, cmd := startReportGenerationFromSelection(t, model)
 			model = applyBatchCmd(t, model, cmd)
 
@@ -192,7 +194,7 @@ func TestReportCalculationRetainsFragmentLevelPricedLiquidationMatchesAcrossMeth
 	for _, method := range methods {
 		var method = method
 		t.Run(string(method), func(t *testing.T) {
-			var request, err = reportmodel.NewReportRequest(2024, method, mustIntegrationTime())
+			var request, err = reportmodel.NewReportRequest(2024, method, reportmodel.ReportBaseCurrencyUSD, mustIntegrationTime())
 			if err != nil {
 				t.Fatalf("new report request: %v", err)
 			}

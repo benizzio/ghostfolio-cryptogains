@@ -54,6 +54,7 @@ func TestReportPerformanceFlowLargeHistoryFixture(t *testing.T) {
 	var request, err = reportmodel.NewReportRequest(
 		fixture.ReportYear,
 		reportmodel.CostBasisMethodHIFO,
+		reportmodel.ReportBaseCurrencyUSD,
 		time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
 	)
 	if err != nil {

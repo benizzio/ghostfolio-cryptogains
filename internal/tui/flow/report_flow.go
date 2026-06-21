@@ -19,6 +19,14 @@ import (
 // Authored by: OpenCode
 const reportBusyStatusText = "Generating capital gains report..."
 
+const (
+	reportSelectionFocusYear = iota
+	reportSelectionFocusMethod
+	reportSelectionFocusBaseCurrency
+	reportSelectionFocusAction
+	reportSelectionFocusCount
+)
+
 // updateReport handles report selection, busy-state completion, and result
 // navigation.
 // Authored by: OpenCode
@@ -59,15 +67,16 @@ func (m *Model) updateReport(message tea.Msg) (tea.Model, tea.Cmd) {
 func (m *Model) handleReportSelectionKey(message tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var yearCount = len(m.syncReports.ProtectedData.AvailableReportYears)
 	var methodCount = len(m.reportMethodItems())
+	var baseCurrencyCount = len(m.reportBaseCurrencyItems())
 	var actionCount = len(m.reportSelectionActions())
 
 	switch {
 	case key.Matches(message, focusBinding()):
 		m.advanceReportSelectionFocus()
 	case key.Matches(message, upBinding()):
-		m.moveReportSelection(-1, yearCount, methodCount, actionCount)
+		m.moveReportSelection(-1, yearCount, methodCount, baseCurrencyCount, actionCount)
 	case key.Matches(message, downBinding()):
-		m.moveReportSelection(1, yearCount, methodCount, actionCount)
+		m.moveReportSelection(1, yearCount, methodCount, baseCurrencyCount, actionCount)
 	case key.Matches(message, enterBinding()):
 		return m.activateReportSelection()
 	}
@@ -76,10 +85,11 @@ func (m *Model) handleReportSelectionKey(message tea.KeyPressMsg) (tea.Model, te
 	return m, nil
 }
 
-// advanceReportSelectionFocus cycles focus across year, method, and action panes.
+// advanceReportSelectionFocus cycles focus across year, method, base-currency,
+// and action panes.
 // Authored by: OpenCode
 func (m *Model) advanceReportSelectionFocus() {
-	if m.report.FocusArea < 2 {
+	if m.report.FocusArea < reportSelectionFocusCount-1 {
 		m.report.FocusArea++
 		return
 	}
@@ -89,13 +99,16 @@ func (m *Model) advanceReportSelectionFocus() {
 
 // moveReportSelection advances the currently focused report-selection index by one step.
 // Authored by: OpenCode
-func (m *Model) moveReportSelection(step int, yearCount int, methodCount int, actionCount int) {
+func (m *Model) moveReportSelection(step int, yearCount int, methodCount int, baseCurrencyCount int, actionCount int) {
 	switch m.report.FocusArea {
-	case 0:
+	case reportSelectionFocusYear:
 		m.report.YearIndex = boundedMenuIndex(m.report.YearIndex, step, yearCount)
-	case 1:
+	case reportSelectionFocusMethod:
 		m.report.MethodIndex = boundedMenuIndex(m.report.MethodIndex, step, methodCount)
-	case 2:
+	case reportSelectionFocusBaseCurrency:
+		m.report.BaseCurrencyIndex = boundedMenuIndex(m.report.BaseCurrencyIndex, step, baseCurrencyCount)
+		m.selectReportBaseCurrencyAtCurrentIndex()
+	case reportSelectionFocusAction:
 		m.report.ActionIndex = boundedMenuIndex(m.report.ActionIndex, step, actionCount)
 	}
 }
@@ -103,15 +116,25 @@ func (m *Model) moveReportSelection(step int, yearCount int, methodCount int, ac
 // activateReportSelection runs the selected report-selection action or advances focus.
 // Authored by: OpenCode
 func (m *Model) activateReportSelection() (tea.Model, tea.Cmd) {
-	if m.report.FocusArea != 2 {
-		if m.report.FocusArea < 2 {
-			m.report.FocusArea++
+	if m.report.FocusArea == reportSelectionFocusBaseCurrency {
+		if !m.selectReportBaseCurrencyAtCurrentIndex() {
+			m.report.BaseCurrencyIndex = 0
+			m.selectReportBaseCurrencyAtCurrentIndex()
 		}
+		m.report.FocusArea = reportSelectionFocusAction
+		return m, nil
+	}
+
+	if m.report.FocusArea != reportSelectionFocusAction {
+		m.advanceReportSelectionFocus()
 		return m, nil
 	}
 
 	switch m.selectedReportSelectionAction() {
 	case reportSelectionActionGenerateReport:
+		if !m.reportCanGenerate() {
+			return m, nil
+		}
 		return m.startReportGeneration()
 	case reportSelectionActionBack:
 		m.clearTransientReportState()
@@ -131,14 +154,55 @@ func (m *Model) syncSelectedReportYear(yearCount int) {
 	}
 }
 
+// selectReportBaseCurrencyAtCurrentIndex applies the highlighted base currency
+// as the selected value for the pending report request.
+// Authored by: OpenCode
+func (m *Model) selectReportBaseCurrencyAtCurrentIndex() bool {
+	var currency = reportBaseCurrencyForIndex(m.report.BaseCurrencyIndex)
+	if currency == "" {
+		return false
+	}
+
+	m.report.SelectedBaseCurrency = currency
+	return true
+}
+
+// reportBaseCurrencyForIndex returns the supported report base currency at one
+// stable UI index.
+// Authored by: OpenCode
+func reportBaseCurrencyForIndex(index int) reportmodel.ReportBaseCurrency {
+	var currencies = reportmodel.SupportedReportBaseCurrencies()
+	if index < 0 || index >= len(currencies) {
+		return ""
+	}
+	return currencies[index]
+}
+
 // startReportGeneration validates report prerequisites and starts one async
 // generation request.
 // Authored by: OpenCode
 func (m *Model) startReportGeneration() (tea.Model, tea.Cmd) {
+	if m.report.SelectedBaseCurrency == "" {
+		return m, nil
+	}
+
+	var requestedAt = time.Now()
 	var request = reportmodel.ReportRequest{
-		Year:            m.report.SelectedYear,
-		CostBasisMethod: reportMethodForIndex(m.report.MethodIndex),
-		RequestedAt:     time.Now(),
+		Year:               m.report.SelectedYear,
+		CostBasisMethod:    reportMethodForIndex(m.report.MethodIndex),
+		ReportBaseCurrency: m.report.SelectedBaseCurrency,
+		RequestedAt:        requestedAt,
+	}
+
+	var validatedRequest, err = reportmodel.NewReportRequest(m.report.SelectedYear, reportMethodForIndex(m.report.MethodIndex), m.report.SelectedBaseCurrency, requestedAt)
+	if err != nil {
+		m.enterReportResult(runtime.ReportOutcome{
+			Success:       false,
+			FailureReason: runtime.ReportFailureUnsupportedReportCalculation,
+			Message:       err.Error(),
+			Request:       request,
+		})
+		return m, nil
 	}
 
 	if m.deps.ReportService == nil {
@@ -146,18 +210,7 @@ func (m *Model) startReportGeneration() (tea.Model, tea.Cmd) {
 			Success:       false,
 			FailureReason: runtime.ReportFailureUnsupportedReportCalculation,
 			Message:       "Report generation is unavailable because no runtime report service is configured.",
-			Request:       request,
-		})
-		return m, nil
-	}
-
-	var validatedRequest, err = reportmodel.NewReportRequest(m.report.SelectedYear, reportMethodForIndex(m.report.MethodIndex), time.Now())
-	if err != nil {
-		m.enterReportResult(runtime.ReportOutcome{
-			Success:       false,
-			FailureReason: runtime.ReportFailureUnsupportedReportCalculation,
-			Message:       err.Error(),
-			Request:       request,
+			Request:       validatedRequest,
 		})
 		return m, nil
 	}

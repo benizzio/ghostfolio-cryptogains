@@ -70,7 +70,7 @@ func TestCalculateUsesSelectedYearCutoffForOpeningClosingAndLaterActivityExclusi
 		t.Fatalf("calculate report: %v", err)
 	}
 
-	if report.ReportCalculationCurrency != "NOT APPLICABLE" {
+	if report.ReportCalculationCurrency != reportmodel.ReportBaseCurrencyUSD.Label() {
 		t.Fatalf("unexpected report calculation currency: %q", report.ReportCalculationCurrency)
 	}
 	if len(report.SummaryEntries) != 1 {
@@ -680,7 +680,7 @@ func calculationActivity(t *testing.T, input calculationActivityInput) syncmodel
 func mustReportRequest(t *testing.T, year int, method reportmodel.CostBasisMethod) reportmodel.ReportRequest {
 	t.Helper()
 
-	var request, err = reportmodel.NewReportRequest(year, method, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
+	var request, err = reportmodel.NewReportRequest(year, method, reportmodel.ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}

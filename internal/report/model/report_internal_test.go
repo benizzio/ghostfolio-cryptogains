@@ -137,27 +137,71 @@ func TestCalculationErrorHelpersCoverRemainingBranches(t *testing.T) {
 func TestNewReportRequestValidatesRequiredFields(t *testing.T) {
 	t.Parallel()
 
-	_, err := NewReportRequest(0, CostBasisMethodFIFO, time.Now())
+	_, err := NewReportRequest(0, CostBasisMethodFIFO, ReportBaseCurrencyUSD, time.Now())
 	if err == nil || !strings.Contains(err.Error(), "year must be greater than zero") {
 		t.Fatalf("expected invalid year error, got %v", err)
 	}
 
-	_, err = NewReportRequest(2024, CostBasisMethod("bad"), time.Now())
+	_, err = NewReportRequest(2024, CostBasisMethod("bad"), ReportBaseCurrencyUSD, time.Now())
 	if err == nil || !strings.Contains(err.Error(), "unsupported cost basis method") {
 		t.Fatalf("expected invalid method error, got %v", err)
 	}
 
-	_, err = NewReportRequest(2024, CostBasisMethodFIFO, time.Time{})
+	_, err = NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, time.Time{})
 	if err == nil || !strings.Contains(err.Error(), "requested-at timestamp is required") {
 		t.Fatalf("expected missing timestamp error, got %v", err)
 	}
 
-	request, err := NewReportRequest(2024, CostBasisMethodFIFO, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
+	_, err = NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrency("GBP"), time.Now())
+	if err == nil || !strings.Contains(err.Error(), "unsupported report base currency") {
+		t.Fatalf("expected invalid report base currency error, got %v", err)
+	}
+
+	request, err := NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
 	if err = request.Validate(); err != nil {
 		t.Fatalf("validate request: %v", err)
+	}
+}
+
+// TestReportRequestValidatesBaseCurrency verifies missing and unsupported base
+// currencies are rejected by both constructor and direct request validation.
+// Authored by: OpenCode
+func TestReportRequestValidatesBaseCurrency(t *testing.T) {
+	t.Parallel()
+
+	var requestedAt = time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC)
+	var testCases = []struct {
+		name     string
+		currency ReportBaseCurrency
+		want     string
+	}{
+		{name: "missing", currency: ReportBaseCurrency(""), want: "report base currency is required"},
+		{name: "invalid", currency: ReportBaseCurrency("GBP"), want: "unsupported report base currency"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := NewReportRequest(2024, CostBasisMethodFIFO, testCase.currency, requestedAt)
+			if err == nil || !strings.Contains(err.Error(), testCase.want) {
+				t.Fatalf("expected constructor error containing %q, got %v", testCase.want, err)
+			}
+
+			var request = ReportRequest{
+				Year:               2024,
+				CostBasisMethod:    CostBasisMethodFIFO,
+				ReportBaseCurrency: testCase.currency,
+				RequestedAt:        requestedAt,
+			}
+			err = request.Validate()
+			if err == nil || !strings.Contains(err.Error(), testCase.want) {
+				t.Fatalf("expected validation error containing %q, got %v", testCase.want, err)
+			}
+		})
 	}
 }
 
@@ -167,7 +211,7 @@ func TestNewReportRequestValidatesRequiredFields(t *testing.T) {
 func TestNewCapitalGainsReportValidatesNestedContent(t *testing.T) {
 	t.Parallel()
 
-	request, err := NewReportRequest(2024, CostBasisMethodHIFO, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
+	request, err := NewReportRequest(2024, CostBasisMethodHIFO, ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
@@ -374,7 +418,7 @@ func TestReportConstructorsCloneOptionalDetailDecimals(t *testing.T) {
 			}},
 		}},
 	}}
-	var request, requestErr = NewReportRequest(2024, CostBasisMethodFIFO, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
+	var request, requestErr = NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
 	if requestErr != nil {
 		t.Fatalf("new report request: %v", requestErr)
 	}
@@ -538,7 +582,7 @@ func TestReportDocumentAndOutputValidation(t *testing.T) {
 func TestReportDocumentValidationGuardrails(t *testing.T) {
 	t.Parallel()
 
-	request, err := NewReportRequest(2024, CostBasisMethodFIFO, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
+	request, err := NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
@@ -631,7 +675,7 @@ func TestReportConstructorsAndValidationHelpersCoverRemainingBranches(t *testing
 		t.Fatalf("expected invalid basis match to fail, got %v", err)
 	}
 
-	var request, requestErr = NewReportRequest(2024, CostBasisMethodFIFO, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
+	var request, requestErr = NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
 	if requestErr != nil {
 		t.Fatalf("new report request: %v", requestErr)
 	}

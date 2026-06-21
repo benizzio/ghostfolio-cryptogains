@@ -11,6 +11,7 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
+	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 )
 
 // setupState holds transient UI state for the setup workflow.
@@ -65,14 +66,16 @@ type syncContextResultState struct {
 // and result routing.
 // Authored by: OpenCode
 type reportState struct {
-	FocusArea    int
-	YearIndex    int
-	MethodIndex  int
-	ActionIndex  int
-	Busy         bool
-	BusyText     string
-	AttemptID    string
-	SelectedYear int
+	FocusArea            int
+	YearIndex            int
+	MethodIndex          int
+	BaseCurrencyIndex    int
+	ActionIndex          int
+	Busy                 bool
+	BusyText             string
+	AttemptID            string
+	SelectedYear         int
+	SelectedBaseCurrency reportmodel.ReportBaseCurrency
 }
 
 // serverReplacementState holds transient UI state for server-mismatch confirmation.
@@ -145,7 +148,7 @@ func newSyncReportsContextState(serverOrigin string, protectedData runtime.Prote
 // newReportState creates the initial report workflow state.
 // Authored by: OpenCode
 func newReportState(years []int) reportState {
-	var state = reportState{FocusArea: 0, MethodIndex: 0}
+	var state = reportState{FocusArea: 0, MethodIndex: 0, BaseCurrencyIndex: -1}
 	if len(years) > 0 {
 		state.SelectedYear = years[0]
 	}

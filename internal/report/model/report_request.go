@@ -11,27 +11,34 @@ import (
 // ReportRequest stores the user-selected inputs for one report-generation run.
 // Authored by: OpenCode
 type ReportRequest struct {
-	Year            int
-	CostBasisMethod CostBasisMethod
-	RequestedAt     time.Time
+	Year               int
+	CostBasisMethod    CostBasisMethod
+	ReportBaseCurrency ReportBaseCurrency
+	RequestedAt        time.Time
 }
 
 // NewReportRequest creates one validated report-generation request.
 //
 // Example:
 //
-//	request, err := model.NewReportRequest(2024, model.CostBasisMethodFIFO, time.Now())
+//	request, err := model.NewReportRequest(2024, model.CostBasisMethodFIFO, model.ReportBaseCurrencyUSD, time.Now())
 //	if err != nil {
 //		panic(err)
 //	}
 //	_ = request.Year
 //
 // Authored by: OpenCode
-func NewReportRequest(year int, method CostBasisMethod, requestedAt time.Time) (ReportRequest, error) {
+func NewReportRequest(
+	year int,
+	method CostBasisMethod,
+	reportBaseCurrency ReportBaseCurrency,
+	requestedAt time.Time,
+) (ReportRequest, error) {
 	var request = ReportRequest{
-		Year:            year,
-		CostBasisMethod: method,
-		RequestedAt:     requestedAt,
+		Year:               year,
+		CostBasisMethod:    method,
+		ReportBaseCurrency: reportBaseCurrency,
+		RequestedAt:        requestedAt,
 	}
 
 	if err := request.Validate(); err != nil {
@@ -50,6 +57,9 @@ func (request ReportRequest) Validate() error {
 	}
 	if err := validateCostBasisMethod(request.CostBasisMethod); err != nil {
 		return fmt.Errorf("report request cost basis method: %w", err)
+	}
+	if err := validateReportBaseCurrency(request.ReportBaseCurrency); err != nil {
+		return fmt.Errorf("report request base currency: %w", err)
 	}
 	if request.RequestedAt.IsZero() {
 		return fmt.Errorf("report request requested-at timestamp is required")
