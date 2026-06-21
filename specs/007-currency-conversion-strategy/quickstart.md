@@ -2,6 +2,8 @@
 
 This document defines validation flows for the report base-currency conversion feature. Default automated validation must use deterministic fixtures and mocked official providers. Live provider checks belong to a separate opt-in external integration test category.
 
+**Bugfix**: 2026-06-21 — BUG-001 Updated final coverage commands to use maintained `dist/coverage` artifacts.
+
 ## Prerequisites
 
 - Go 1.26.3 installed.
@@ -13,16 +15,22 @@ This document defines validation flows for the report base-currency conversion f
 
 WU22 implementation note: WU01 through WU21 are recorded as complete and targeted automated tests have passed for the implemented report base-currency conversion work. This note does not claim full final coverage; final full-suite and coverage-gate evidence remains part of the WU23 verification commands.
 
-1. Run the full automated test suite.
+Superseded by BUG-001: ~~`go test ./... -covermode=atomic -coverprofile=coverage.cov` followed by `gocoverageplus -i coverage.cov -o coverage.xml`~~ wrote generated coverage artifacts to the repository root.
+
+1. Run the maintained coverage gate, which runs the covered package set and writes generated coverage artifacts under `dist/coverage`.
 
 ```bash
-go test ./... -covermode=atomic -coverprofile=coverage.cov
+make coverage
 ```
 
-2. Generate the branch and file coverage report required by the constitution.
+2. If running the coverage commands manually instead of `make coverage`, use the maintained generated-output paths.
 
 ```bash
-gocoverageplus -i coverage.cov -o coverage.xml
+mkdir -p dist/coverage
+PRODUCTION_PACKAGES=$(go run ./tools/coverpkg -go go ./cmd/... ./internal/...)
+go test ./cmd/... ./internal/... ./tests/contract ./tests/empirical ./tests/empirical/fixture ./tests/integration ./tests/unit -covermode=atomic -coverpkg="${PRODUCTION_PACKAGES}" -coverprofile=dist/coverage/coverage.out
+gocoverageplus -i dist/coverage/coverage.out -o dist/coverage/coverage.xml
+go run ./tools/coveragegate -profile dist/coverage/coverage.out -cobertura dist/coverage/coverage.xml
 ```
 
 3. Confirm contract and integration coverage includes these scenarios:

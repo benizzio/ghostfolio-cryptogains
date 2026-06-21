@@ -6,6 +6,8 @@
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/plan-template.md` for the execution workflow.
 
+**Bugfix**: 2026-06-21 — BUG-001 Updated from bugfix patch
+
 ## Summary
 
 Add a required report base-currency selection to yearly capital gains report generation, limited to `USD` and `EUR`. The report pipeline will keep the existing single-activity monetary-context selection rules, then convert every priced activity whose selected currency differs from the report base currency before cost-basis, proceeds, gain/loss, and report-total calculations consume the values. EUR-base conversions use the ECB Data Portal `EXR` daily reference-rate data. USD-base conversions use the Federal Reserve Board H.10/Data Download Program data. Provider-specific payloads, quote directions, provider selection, and canonicalization stay behind `internal/integration/currency/`, which exposes a public rate lookup service consumed by the report calculator and disclosed in the Markdown report through canonical rate evidence.
@@ -18,7 +20,7 @@ Add a required report base-currency selection to yearly capital gains report gen
 
 **Storage**: No new exchange-rate persistence. Existing protected snapshots remain token-derived encrypted local data. Canonical rate evidence may be held in an in-memory TUI-session cache that survives multiple report runs and different security-token unlocks in the same process. The cache is not written to disk and is disclosed only through the generated cleartext Markdown report saved under the existing report-output contract.
 
-**Testing**: Go `testing` with contract, integration, unit, and external integration suites. Default contract, integration, and unit tests cover provider behavior with deterministic `httptest.Server` fixtures and golden response snippets, not live ECB or Federal Reserve calls. External integration tests are a separate opt-in category that targets only official-provider HTTP clients with one fixed historical observation per unique client endpoint and committed expected values. Coverage remains enforced with `go test ./... -covermode=atomic -coverprofile=coverage.cov` and `gocoverageplus`/repository coverage gates.
+**Testing**: Go `testing` with contract, integration, unit, and external integration suites. Default contract, integration, and unit tests cover provider behavior with deterministic `httptest.Server` fixtures and golden response snippets, not live ECB or Federal Reserve calls. External integration tests are a separate opt-in category that targets only official-provider HTTP clients with one fixed historical observation per unique client endpoint and committed expected values. Coverage remains enforced with ~~`go test ./... -covermode=atomic -coverprofile=coverage.cov` and `gocoverageplus`/repository coverage gates~~ `make coverage`, which writes `dist/coverage/coverage.out` and `dist/coverage/coverage.xml` and runs the repository coverage gate; the root-level coverage command is superseded by BUG-001 because it writes generated artifacts outside `dist/coverage`.
 
 **Empirical Dataset**: Existing `testdata/empirical/` synthetic empirical dataset and oracle fixtures remain read-only. Existing empirical tests continue to validate single-currency cost-basis behavior and are not repurposed for exchange-rate integration.
 
@@ -169,6 +171,7 @@ The issue requirement for scalability is handled by keeping provider selection b
 - External integration tests directly exercise each official-provider HTTP client endpoint with one fixed historical observation and committed expected rate data, avoiding repeated live-provider load and avoiding report-domain setup.
 - Regression tests verify existing single-currency report cases produce the same monetary results when selected activity currency equals the chosen report base currency.
 - Performance validation uses the 10,000-activity responsiveness fixture to assert asynchronous TUI behavior, bounded provider lookups by unique rate key, no per-monetary-field network requests, and successful calculation at scale with deterministic provider fixtures.
+- Final coverage-gate validation uses the maintained repository output paths `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`; root-level `coverage.cov` and `coverage.xml` are not valid final verification artifacts for this feature.
 - Existing empirical tests remain unchanged and continue to guard cost-basis methods without conversion.
 
 ## Complexity Tracking

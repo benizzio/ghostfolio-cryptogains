@@ -19,6 +19,7 @@
 ### Session 2026-06-21
 
 - Q: Can canonical rate evidence be reused after one report run completes? → A: Yes. It may be reused from in-memory cache while the TUI session is executing, including across multiple report runs and different security-token unlocks. It must not be persisted, and the generated report must disclose the actual rate evidence used.
+- **Bugfix**: 2026-06-21 — BUG-001 Added maintained coverage artifact location requirement for final feature verification.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -127,6 +128,7 @@ Each feature specification MUST capture security, persistence, financial precisi
 - **FR-030**: The implementation plan MUST record the selected official or officially authorized data source for USD and EUR, the authority relationship, supported currencies, historical coverage, unavailable-date behavior, revision behavior, failure modes, and test evidence before implementation begins.
 - **FR-031**: The system MUST treat the existing no-conversion `NOT APPLICABLE` report calculation currency behavior as superseded for reports generated under this feature.
 - **FR-032**: If an official authority revises a historical exchange rate after an earlier report was generated and no same-key evidence is defensibly available in the current TUI-session cache, a regenerated report MUST use the currently published authorized rate and disclose the rate authority, rate date, and rate value used for the regenerated report.
+- **FR-033**: Final feature coverage verification MUST write generated coverage artifacts to the maintained repository coverage-output paths `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`, and MUST NOT create root-level `coverage.cov` or `coverage.xml` artifacts.
 
 ### Financial Calculation Evidence *(include when feature affects financial calculations)*
 
@@ -164,6 +166,7 @@ Each feature specification MUST capture security, persistence, financial precisi
 - **SC-005**: In the 10,000-Activity Responsiveness Fixture, base-currency selection and generation confirmation are accepted before any provider fixture response is made available, and the workflow shows the report-generation busy state instead of blocking in the selection screen.
 - **SC-006**: In the Single-Currency Regression Suite, 100% of cases where the selected activity currency equals the report base currency preserve the same monetary results as the prior no-conversion behavior.
 - **SC-007**: In the Production Diagnostic Redaction Fixture Set, 100% of conversion failure diagnostics exclude Ghostfolio security tokens, bearer tokens, reusable token verifiers, and unredacted financial-value fields.
+- **SC-008**: Final coverage validation produces and checks `dist/coverage/coverage.out` and `dist/coverage/coverage.xml` through the maintained repository coverage gate without leaving root-level `coverage.cov` or `coverage.xml` generated artifacts.
 
 ## Assumptions
 

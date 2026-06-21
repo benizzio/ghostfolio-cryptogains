@@ -8,6 +8,8 @@
 
 **Organization**: Tasks are grouped by user story so each story can be implemented and tested as an independently reviewable increment after the shared foundation is complete. The context-orchestration work-unit ledger below is the execution control plane for parent agents and clean-context subagents.
 
+**Bugfix**: 2026-06-21 — BUG-001 Updated from bugfix patch
+
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel because it targets a different file and has no dependency on another incomplete task in the same phase.
@@ -22,7 +24,7 @@
 
 - Execute work units in ledger order. Do not start a later phase until every required earlier-phase unit has been parent-verified.
 - Treat individual task checkboxes in this file as authoritative. The ledger is complete only when every referenced task is checked after parent verification.
-- Use a clean subagent session for each work unit. WU23 may use a subagent for command output triage, but the parent must rerun final validation commands before marking T059 through T062 complete.
+- Use a clean subagent session for each work unit. WU23 may use a subagent for command output triage, but the parent must rerun final validation commands before marking T059 through T062, T071, and T072 complete.
 - Include all required handoff context in the subagent prompt. Do not rely on the subagent having prior conversation state.
 - Keep subagents inside the listed scope. If a subagent needs to edit outside the work-unit paths, it must stop and report the required path and reason.
 - Require fail-first behavior for test tasks. For test-only units, successful completion means the tests exist, were run, and fail only for the expected missing implementation.
@@ -92,7 +94,7 @@ Process units in this order. Units marked as parallel candidates may run concurr
 | WU20 | Phase 5 US3 Implementation | T054, T055 | Map conversion failures into report calculation errors and keep zero-priced no-cost holding reductions out of rate lookup in `internal/report/calculate/errors.go` and `currency_conversion.go`. | WU19. | `plan.md` Failure Handling and Conversion Boundary, `spec.md` FR-022, FR-027, and FR-028. | Run `go test ./internal/report/calculate` and WU18 calculation targets. |
 | WU21 | Phase 5 US3 Implementation | T056, T057 | Include source currency, base currency, and activity date in runtime failure copy, and show selected base currency on failure result screens in `internal/app/runtime/report_service.go` and `internal/tui/screen/report_screen.go`. | WU20. | `contracts/tui-workflows.md` Report Result Screen, `spec.md` FR-027 through FR-029, `data-model.md` ConversionFailure. | Run `go test ./internal/app/runtime ./internal/tui/screen ./tests/integration` with WU18 failure and redaction targets. |
 | WU22 | Phase 6 Polish | T058, T070 | Update validation notes and fixed-host provider security review evidence in `specs/007-currency-conversion-strategy/quickstart.md`. | WU21. | `quickstart.md`, `plan.md` Security Review and Testing Strategy, `research.md` Security Review. | Re-read quickstart for automated/manual/external validation and fixed-host/no-user-controlled-provider evidence. |
-| WU23 | Phase 6 Polish | T059, T060, T061, T062 | Run final coverage, coverage XML export, empirical unchanged check, and external integration default skip verification using `coverage.cov`, `coverage.xml`, `testdata/empirical/`, and `tests/externalintegration/currency_provider_live_test.go`. | WU22. | `quickstart.md` Automated Verification Flow and External Integration Verification Flow, `.cov.json` if coverage gate behavior is inspected. | Run final commands, inspect generated coverage artifacts, verify `testdata/empirical/` has no diff, and fix any failed gate before completion. |
+| WU23 | Phase 6 Polish | T059, T060, T061, T062, T071, T072 | Run final coverage, coverage XML export, empirical unchanged check, external integration default skip verification, stale root-level coverage artifact cleanup, and maintained coverage-gate verification using ~~`coverage.cov`, `coverage.xml`~~ `dist/coverage/coverage.out`, `dist/coverage/coverage.xml`, `testdata/empirical/`, and `tests/externalintegration/currency_provider_live_test.go`; root-level coverage artifacts are superseded by BUG-001. | WU22. | `quickstart.md` Automated Verification Flow and External Integration Verification Flow, `.cov.json` if coverage gate behavior is inspected. | Run final commands, inspect generated coverage artifacts under `dist/coverage`, verify root-level coverage artifacts are absent, verify `testdata/empirical/` has no diff, and fix any failed gate before completion. |
 
 ## Phase 1: Setup (Shared Infrastructure)
 
@@ -229,11 +231,13 @@ Process units in this order. Units marked as parallel candidates may run concurr
 **Purpose**: Final validation, documentation alignment, and coverage-gate checks.
 
 - [X] T058 [P] Update automated and manual validation notes after implementation in `specs/007-currency-conversion-strategy/quickstart.md`
-- [X] T059 Run full Go coverage test command and create `coverage.cov`
-- [X] T060 Run coverage XML export and create `coverage.xml`
+- [ ] T059 ⚠️ Reopened ~~Run full Go coverage test command and create `coverage.cov`~~ Run full Go coverage test command with the maintained output path and create `dist/coverage/coverage.out` (reopened — BUG-001)
+- [ ] T060 ⚠️ Reopened ~~Run coverage XML export and create `coverage.xml`~~ Run coverage XML export from `dist/coverage/coverage.out` and create `dist/coverage/coverage.xml` (reopened — BUG-001)
 - [X] T061 Verify empirical dataset files remain unchanged under `testdata/empirical/`
 - [X] T062 Run opt-in external integration tests only when explicitly enabled and verify default skip behavior in `tests/externalintegration/currency_provider_live_test.go`
 - [X] T070 Record fixed-host provider integration security review evidence, including OWASP Top 10 coverage and no user-controlled provider URL review, in `specs/007-currency-conversion-strategy/quickstart.md`
+- [ ] T071 Remove stale root-level generated coverage artifacts `coverage.cov` and `coverage.xml` if present in the repository root
+- [ ] T072 Run `make coverage` from the repository root and verify the coverage gate consumes `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`
 
 ---
 
