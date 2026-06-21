@@ -8,6 +8,20 @@ All financial amounts, quantities, exchange rates, converted amounts, basis valu
 
 Provider identity, authority metadata, provider DTOs, and provider selection are owned by the currency integration layer. Report models submit base currency, source currency, and activity date to that layer and consume canonical rate evidence.
 
+## Currency Identity Traceability
+
+This feature consumes existing synced activity currency identity and does not add a sync persistence migration. The sync contract in `specs/003-store-activity-data/spec.md` FR-018 and `specs/003-store-activity-data/contracts/ghostfolio-sync.md` preserves the independent currency tiers required for reporting.
+
+Traceable protected activity fields:
+
+| Selected tier | Currency field | Same-tier monetary fields |
+|---------------|----------------|---------------------------|
+| `order` | `ActivityRecord.OrderCurrency` | `OrderUnitPrice`, `OrderGrossValue`, `OrderFeeAmount` |
+| `asset_profile` | `ActivityRecord.AssetProfileCurrency` | `AssetProfileUnitPrice`, `AssetProfileFeeAmount` |
+| `base` | `ActivityRecord.BaseCurrency` | `BaseGrossValue`, `BaseFeeAmount` |
+
+Report calculation records the chosen tier as `SelectedCurrencyContext` and uses only that tier's currency identity for conversion.
+
 ## ReportBaseCurrency
 
 Purpose: The one user-selected fiat currency used for all report calculations and monetary totals in a report run.
@@ -150,7 +164,7 @@ Fields:
 | `provider_id` | enum | `ecb_exr` or `federal_reserve_h10` |
 | `authority` | enum | `european_central_bank` or `federal_reserve` |
 | `base_currency` | enum | `EUR` or `USD` |
-| `rate_kind` | string | Daily reference rate or noon buying rate |
+| `rate_kind` | string | Provider-specific daily rate kind, such as daily reference rate or noon buying rate |
 | `endpoint_identity` | string | Fixed provider host and dataset identity, not user-provided |
 | `supported_currencies` | string set | Provider-supported source currencies mapped to stored currency codes |
 
@@ -247,7 +261,7 @@ Fields:
 | `rate_date` | date | Actual provider observation date used |
 | `authority` | enum | `european_central_bank` or `federal_reserve` |
 | `provider_id` | enum | `ecb_exr` or `federal_reserve_h10` |
-| `rate_kind` | string | Daily reference rate or noon buying rate |
+| `rate_kind` | string | Provider-specific daily rate kind, such as daily reference rate or noon buying rate |
 | `quote_direction` | enum | `source_per_base` or `base_per_source` |
 | `rate_value` | decimal | Provider-published rate value with precision preserved |
 | `dataset_reference` | string | Non-secret dataset/series identity |

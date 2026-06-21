@@ -68,9 +68,9 @@
 ## Acceptance Criteria Quality
 
 - [x] CHK013 Do success criteria define measurable coverage for mixed-currency reports, converted activity audit entries, failures, and regression cases? [Acceptance Criteria, Spec §SC-001-SC-007]
-- [ ] CHK014 Is the "under 30 seconds" outcome scoped well enough to avoid dependence on unspecified dataset size, terminal environment, or provider availability? [Measurability, Spec §SC-005]
-- [ ] CHK015 Does the deterministic dataset success criterion define enough dataset composition to measure source-currency, report-year, and rounding coverage? [Acceptance Criteria, Spec §SC-002]
-- [ ] CHK016 Are "100%" success criteria tied to clearly identified scenario sets so the requirement is objectively auditable? [Measurability, Spec §SC-001-SC-004, Spec §SC-006-SC-007]
+- [x] CHK014 Is the "under 30 seconds" outcome scoped well enough to avoid dependence on unspecified dataset size, terminal environment, or provider availability? [Measurability, Spec §SC-005]
+- [x] CHK015 Does the deterministic dataset success criterion define enough dataset composition to measure source-currency, report-year, and rounding coverage? [Acceptance Criteria, Spec §SC-002]
+- [x] CHK016 Are "100%" success criteria tied to clearly identified scenario sets so the requirement is objectively auditable? [Measurability, Spec §SC-001-SC-004, Spec §SC-006-SC-007]
 
 ## Scenario Coverage
 
@@ -90,19 +90,19 @@
 
 - [x] CHK025 Are precision requirements specific enough to prohibit floating-point financial decisions across amounts, rates, converted values, and assertions? [Non-Functional, Spec §FR-024]
 - [x] CHK026 Are security requirements complete for token exclusion, financial-value redaction, and cleartext report audit disclosure boundaries? [Security, Spec §FR-028-FR-029, Spec §Assumptions]
-- [ ] CHK027 Are performance requirements complete for responsive provider lookup and calculation across the stated 10,000-activity scale target? [Performance, Plan §Performance Goals]
+- [x] CHK027 Are performance requirements complete for responsive provider lookup and calculation across the stated 10,000-activity scale target? [Performance, Plan §Performance Goals]
 - [x] CHK028 Are persistence requirements complete for no exchange-rate disk cache and in-memory session cache lifecycle boundaries? [Persistence, Spec §Assumptions, Plan §Technical Context]
 
 ## Dependencies & Assumptions
 
-- [ ] CHK029 Are assumptions about preserved activity currency identity documented and tied to existing sync data contracts? [Assumption, Spec §Assumptions, Spec §FR-005]
+- [x] CHK029 Are assumptions about preserved activity currency identity documented and tied to existing sync data contracts? [Assumption, Spec §Assumptions, Spec §FR-005]
 - [x] CHK030 Are provider authority relationships documented enough to distinguish primary official sources from merely unofficial compatible datasets? [Dependency, Spec §FR-010-FR-011, Plan §Official Rate Source Decisions]
 - [x] CHK031 Are assumptions about empirical dataset immutability and new project-owned conversion coverage explicit enough to avoid repurposing existing oracle fixtures? [Assumption, Spec §Financial Calculation Evidence, Plan §Testing Strategy]
 - [x] CHK032 Are dependencies on outbound HTTPS access to fixed official-provider hosts documented as environmental prerequisites for manual or live report generation? [Dependency, Plan §Target Platform, Plan §Constraints]
 
 ## Ambiguities & Conflicts
 
-- [ ] CHK033 Is there any unresolved ambiguity between "daily reference or closing rate" and provider-specific rate kinds such as ECB reference rates and Federal Reserve H.10 noon buying rates? [Ambiguity, Spec §FR-014, Plan §Official Rate Source Decisions]
+- [x] CHK033 Is there any unresolved ambiguity between "daily reference or closing rate" and provider-specific rate kinds such as ECB reference rates and Federal Reserve H.10 noon buying rates? [Ambiguity, Spec §FR-014, Plan §Official Rate Source Decisions]
 - [x] CHK034 Is the supported source-currency set defined or intentionally delegated to provider research outputs? [Gap, Spec §FR-016, Spec §FR-030]
 - [x] CHK035 Is the report audit detail granularity clear when one activity has multiple converted monetary values such as gross amount and fee? [Ambiguity, Spec §FR-020]
 - [x] CHK036 Is the boundary between report-domain requirements and provider-integration implementation details clearly separated in the plan? [Architecture, Plan §Integration Anticorruption Layer]

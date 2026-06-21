@@ -32,6 +32,8 @@ Add a required report base-currency selection to yearly capital gains report gen
 
 **Scale/Scope**: Two report base currencies (`USD`, `EUR`), one canonical exchange-rate evidence model, two initial provider adapters (ECB EXR and Federal Reserve H.10/Data Download Program), existing five cost-basis methods, Markdown output audit details for every converted priced activity, and no changes to Ghostfolio sync contracts except consuming the already stored selected activity currency fields.
 
+**Sync Currency Identity Traceability**: This feature relies on the existing sync contract from `specs/003-store-activity-data/spec.md` FR-018 and `specs/003-store-activity-data/contracts/ghostfolio-sync.md`. Protected `internal/sync/model.ActivityRecord` values already preserve order-tier, asset-profile-tier, and base-tier currency identity as `OrderCurrency`, `AssetProfileCurrency`, and `BaseCurrency` with their same-tier monetary fields. Report calculation already selects one tier as `SelectedCurrencyContext`; conversion consumes that selected currency identity and does not require a protected snapshot schema change or sync persistence migration.
+
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
@@ -123,6 +125,18 @@ tests/
 6. In the report calculation tier, convert every selected monetary value that can affect cost basis, proceeds, fees, gains, losses, or totals before it enters basis state or liquidation calculations.
 7. Use the existing 16-decimal round-half-up policy only when division or another bounded internal decimal result is required. Preserve provider-published rate precision in audit evidence.
 
+## Performance Validation
+
+The 10,000-activity responsiveness fixture validates the scale target with deterministic provider fixtures and no live-provider dependency.
+
+Required validation:
+
+- Base-currency selection and generation confirmation do not perform provider lookup.
+- Provider lookup and report calculation run through the asynchronous report-generation workflow and do not block TUI input or rendering while provider responses are delayed.
+- Provider lookup requests are bounded by unique `(base currency, source currency, activity source-calendar date)` keys, not by monetary field count.
+- Same-currency rows and zero-priced no-cost holding reductions create no provider lookup requests.
+- Report calculation succeeds for 10,000 cached activities using deterministic provider evidence.
+
 ## Integration Anticorruption Layer
 
 Provider adapters must expose a canonical currency integration application service that returns rate evidence independent of provider payload shape. The public lookup request includes source currency, base currency, and activity date. The canonical model includes source currency, base currency, activity date, rate date, authority, provider, rate kind, quote direction, rate value, and source URL or dataset identity. ECB and Federal Reserve DTOs do not cross into `internal/report/calculate/`, `internal/report/basis/`, TUI, Markdown rendering, or report-owned models.
@@ -146,6 +160,7 @@ The issue requirement for scalability is handled by keeping provider selection b
 - Unit tests cover ECB EXR mapping, Federal Reserve H.10 quote-direction mapping, canonical rate evidence validation, conversion formulas, 16-decimal division bounding, in-memory TUI-session rate reuse, and redaction-safe failure construction.
 - External integration tests directly exercise each official-provider HTTP client endpoint with one fixed historical observation and committed expected rate data, avoiding repeated live-provider load and avoiding report-domain setup.
 - Regression tests verify existing single-currency report cases produce the same monetary results when selected activity currency equals the chosen report base currency.
+- Performance validation uses the 10,000-activity responsiveness fixture to assert asynchronous TUI behavior, bounded provider lookups by unique rate key, no per-monetary-field network requests, and successful calculation at scale with deterministic provider fixtures.
 - Existing empirical tests remain unchanged and continue to guard cost-basis methods without conversion.
 
 ## Complexity Tracking

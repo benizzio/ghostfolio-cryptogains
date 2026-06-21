@@ -6,7 +6,7 @@ This document defines validation flows for the report base-currency conversion f
 
 - Go 1.26.3 installed.
 - `gocoverageplus` installed for branch and file coverage export: `go install github.com/Fabianexe/gocoverageplus/cmd/gocoverageplus@v1.2.0`
-- Existing synced test fixtures containing priced activity in at least three source currencies across at least two report years.
+- Existing synced test fixtures containing priced activity in at least three source currencies across at least two report years, including deterministic division, multiplication, previous-available-date, and 16-decimal round-half-up conversion cases.
 - Optional external integration validation network access to `https://data-api.ecb.europa.eu` and `https://www.federalreserve.gov`.
 
 ## Automated Verification Flow
@@ -31,7 +31,10 @@ gocoverageplus -i coverage.cov -o coverage.xml
 - mixed-currency EUR report uses ECB EXR fixture evidence
 - mixed-currency USD report uses Federal Reserve H.10 fixture evidence
 - Federal Reserve starred and unstarred quote directions produce expected converted amounts
+- deterministic conversion fixtures cover at least one division result requiring 16-decimal round-half-up internal bounding and at least one multiplication quote-direction conversion
 - the in-memory TUI-session rate cache can reuse evidence across multiple report runs and different security-token unlocks without persisting evidence
+- the 10,000-activity responsiveness fixture accepts report base-currency selection and generation confirmation before delayed provider fixture responses are released
+- provider lookup requests are bounded by unique `(base currency, source currency, activity source-calendar date)` keys rather than monetary field count
 - weekend or non-publication activity date uses the previous provider observation and discloses both dates
 - unsupported or malformed source currency fails before final save
 - provider outage without current TUI-session evidence fails before final save
@@ -118,6 +121,8 @@ Project-owned fixtures should include:
 - malformed provider payload and malformed decimal value
 - mixed-currency activity history with fees and gross values converted together before basis calculation
 - explicit zero fee and zero-priced holding reduction cases
+- deterministic conversion values that prove 16-decimal round-half-up division bounding
+- 10,000-activity responsiveness fixture with repeated rate keys and delayed provider responses
 
 These fixtures must allow CI to validate conversion behavior without a live ECB or Federal Reserve dependency.
 
