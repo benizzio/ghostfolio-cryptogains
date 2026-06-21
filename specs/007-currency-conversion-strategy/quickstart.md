@@ -1,13 +1,13 @@
 # Quickstart: Report Base Currency Conversion
 
-This document defines validation flows for the report base-currency conversion feature. Automated validation must use deterministic fixtures and mocked official providers. Live provider checks are optional manual validation only.
+This document defines validation flows for the report base-currency conversion feature. Default automated validation must use deterministic fixtures and mocked official providers. Live provider checks belong to a separate opt-in external integration test category.
 
 ## Prerequisites
 
 - Go 1.26.3 installed.
 - `gocoverageplus` installed for branch and file coverage export: `go install github.com/Fabianexe/gocoverageplus/cmd/gocoverageplus@v1.2.0`
 - Existing synced test fixtures containing priced activity in at least three source currencies across at least two report years.
-- Optional manual validation network access to `https://data-api.ecb.europa.eu` and `https://www.federalreserve.gov`.
+- Optional external integration validation network access to `https://data-api.ecb.europa.eu` and `https://www.federalreserve.gov`.
 
 ## Automated Verification Flow
 
@@ -31,9 +31,10 @@ gocoverageplus -i coverage.cov -o coverage.xml
 - mixed-currency EUR report uses ECB EXR fixture evidence
 - mixed-currency USD report uses Federal Reserve H.10 fixture evidence
 - Federal Reserve starred and unstarred quote directions produce expected converted amounts
+- the in-memory TUI-session rate cache can reuse evidence across multiple report runs and different security-token unlocks without persisting evidence
 - weekend or non-publication activity date uses the previous provider observation and discloses both dates
 - unsupported or malformed source currency fails before final save
-- provider outage without current-run evidence fails before final save
+- provider outage without current TUI-session evidence fails before final save
 - zero-priced holding reduction does not require exchange-rate lookup solely because explicit zero source fields exist
 - generated Markdown replaces `NOT APPLICABLE` with the selected report base currency
 - converted priced activities include source currency, report base currency, activity date, rate date, authority, rate kind, rate value, original amount, and converted amount
@@ -92,6 +93,17 @@ Expected result:
 - the user remains in the unlocked reporting context
 - the failure message identifies source currency, report base currency, and activity date without exposing token material
 
+## External Integration Verification Flow
+
+External integration tests are optional and must be explicitly enabled by the developer or by a CI job dedicated to live provider verification.
+
+Expected external integration coverage:
+
+- one fixed historical ECB EXR observation through the live ECB HTTP client
+- one fixed historical Federal Reserve H.10/Data Download Program observation through the live Federal Reserve HTTP client
+- committed expected values for source currency, base currency, activity date, rate date, rate value, quote direction, and provider identity
+- no report calculation, no TUI workflow, no token handling, and no broad provider date or currency sweeps
+
 ## Fixture Expectations
 
 Project-owned fixtures should include:
@@ -102,9 +114,11 @@ Project-owned fixtures should include:
 - Federal Reserve H.10 unstarred currency-units-per-USD observation
 - Federal Reserve H.10 starred USD-per-currency-unit observation
 - Federal Reserve H.10 `ND` or missing observation
-- provider outage after earlier successful conversion in the same report run
+- provider outage after earlier successful conversion in the same TUI session
 - malformed provider payload and malformed decimal value
 - mixed-currency activity history with fees and gross values converted together before basis calculation
 - explicit zero fee and zero-priced holding reduction cases
 
 These fixtures must allow CI to validate conversion behavior without a live ECB or Federal Reserve dependency.
+
+External integration fixtures must commit the one fixed historical observation expected for each live provider client endpoint.

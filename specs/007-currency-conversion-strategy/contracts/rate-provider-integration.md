@@ -2,7 +2,7 @@
 
 ## Scope
 
-This contract defines the external exchange-rate integration boundary for report base-currency conversion. It covers official provider selection, canonical evidence, provider failure behavior, and test doubles.
+This contract defines the external exchange-rate integration boundary for report base-currency conversion. It covers official provider selection, canonical rate evidence, provider failure behavior, deterministic test doubles, and opt-in external integration tests.
 
 ## Provider Selection
 
@@ -13,7 +13,7 @@ This contract defines the external exchange-rate integration boundary for report
 
 Rules:
 
-- Provider selection is derived only from the validated report base currency.
+- Provider selection is internal to the currency integration service and is derived only from the validated report base currency.
 - Provider hosts are fixed implementation constants and must use HTTPS.
 - User input must not alter provider host, scheme, or authority relationship.
 - Ghostfolio tokens, bearer JWTs, and protected snapshot payloads must never be sent to rate providers.
@@ -46,11 +46,12 @@ dataset_reference
 
 Rules:
 
+- The public lookup request must not include `provider_id`; provider identity is selected internally from `base_currency`.
 - `rate_date` must be the activity date or the most recent previous provider date with an available observation.
 - `rate_value` must be a positive exact decimal parsed without floating point.
 - `quote_direction` must be either `source_per_base` or `base_per_source`.
-- The provider adapter must reject responses that do not match the requested source currency, base currency, or date range.
-- The provider adapter must reject missing observations, `ND` observations, malformed decimals, and ambiguous quote direction.
+- The currency integration service must reject responses that do not match the requested source currency, base currency, or date range.
+- The currency integration service must reject missing observations, `ND` observations, malformed decimals, and ambiguous quote direction.
 
 ## ECB EXR Contract
 
@@ -102,12 +103,14 @@ Rules:
 - `ND` values and absent observations are not valid rates.
 - Past release archive pages are not the regenerated-report source of truth when they differ from current DDP/historical data.
 
-## In-Memory Report-Run Cache
+## In-Memory TUI-Session Cache
 
 Rules:
 
-- The application may cache canonical rate evidence only in memory for the active report run.
-- Cache key is `(provider_id, source_currency, base_currency, activity_date)`.
+- The application may cache canonical rate evidence only in memory while the TUI session is executing.
+- The cache may be reused across multiple report runs, years, cost-basis methods, and different security-token unlocks in the same process.
+- Public cache identity is `(source_currency, base_currency, activity_date)`; the implementation may include internally selected provider identity in a private key.
+- The cache must not include security-token values, token-derived verifiers, Ghostfolio tokens, bearer JWTs, or protected payload data in keys or values.
 - Cached evidence must not be written to protected snapshots, setup files, app-data caches, or temp files.
 - Final report output may disclose the evidence because the report is the intentional cleartext audit artifact.
 
@@ -117,7 +120,7 @@ Provider lookup fails the report before final save when any condition applies:
 
 - Unsupported source currency for selected provider.
 - Malformed or missing selected activity currency.
-- Provider request fails and no current-run evidence exists for the key.
+- Provider request fails and no current TUI-session evidence exists for the key.
 - Provider returns non-success HTTP status.
 - Provider response cannot be parsed.
 - Provider response contains no current or prior available observation.
@@ -129,7 +132,7 @@ User-visible failure messages must identify source currency, report base currenc
 
 ## Test Double Contract
 
-Automated tests must use local fixtures or `httptest.Server` implementations that can simulate:
+Default automated contract, integration, and unit tests must use local fixtures or `httptest.Server` implementations that can simulate:
 
 - ECB same-day observation.
 - ECB previous available observation for a weekend or TARGET closing day.
@@ -140,4 +143,16 @@ Automated tests must use local fixtures or `httptest.Server` implementations tha
 - Provider outage after some successful conversions.
 - Malformed decimal and malformed payload.
 
-Live ECB or Federal Reserve calls are optional manual validation only and must not be required for CI.
+Live ECB or Federal Reserve calls must not be required for default CI or coverage-gate execution.
+
+## External Integration Test Contract
+
+External integration tests are a separate opt-in category for validating that official provider HTTP clients still match live provider API behavior.
+
+Rules:
+
+- Tests target only the HTTP client layer under `internal/integration/currency/`; they do not run report calculation or TUI workflows.
+- Each unique client endpoint uses exactly one fixed historical observation whose expected provider response values are committed in the project.
+- Tests assert source currency, base currency, activity date, rate date, rate value, quote direction, and provider identity for the fixed observation.
+- Tests must avoid broad date ranges, randomized dates, loops over currency sets, or repeated calls that create unnecessary provider load.
+- Tests must be skipped unless explicitly enabled by the developer or CI job dedicated to external integration verification.

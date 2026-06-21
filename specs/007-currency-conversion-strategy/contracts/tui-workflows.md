@@ -8,6 +8,7 @@ This contract extends the existing `Sync and Reports` TUI report-generation work
 
 - The application remains terminal-native, full-screen, and keyboard-driven.
 - Report base-currency selection is transient and applies only to the active report run.
+- Canonical rate evidence may be reused from the in-memory TUI-session cache across report runs and security-token changes in the same process.
 - Report content is not previewed in the TUI before final save.
 - Provider lookup and report calculation run asynchronously and keep the Bubble Tea event loop responsive.
 - User-visible errors must be actionable and must not expose Ghostfolio tokens, JWTs, raw protected payloads, or unredacted production diagnostic financial values.
@@ -68,7 +69,8 @@ Visible content:
 Rules:
 
 - Calculation uses the currently unlocked protected cache and does not run a new sync.
-- Provider lookup uses only the fixed provider selected by report base currency.
+- Provider lookup uses only the currency integration service and the fixed provider selected internally from report base currency.
+- Provider lookup may use canonical evidence already present in the in-memory TUI-session cache.
 - The UI must not show cleartext report content as a preview.
 - On conversion, calculation, render, or save failure before final save, the workflow reports an actionable non-secret error and removes any partial cleartext output created by the attempt.
 - On save success and automatic-open failure, the workflow treats the save as successful and reports the open warning.

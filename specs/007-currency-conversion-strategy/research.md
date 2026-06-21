@@ -53,19 +53,19 @@ Alternatives considered: Use the next business date, but the spec requires previ
 
 ## Revision Behavior
 
-Decision: Regenerated reports use currently published provider observations at generation time and disclose the authority, provider, rate date, rate value, and quote direction used.
+Decision: Regenerated reports use currently published provider observations when the required evidence is not already defensibly available in the current in-memory TUI-session cache, and disclose the authority, provider, rate date, rate value, and quote direction used.
 
-Rationale: The feature clarification requires current authorized rates at generation time. ECB Data Portal supports retrieving current production values and has `updatedAfter`/history concepts for changes and revisions. Federal Reserve DDP help says data are available as currently published, while H.10 release archives may not reflect later revisions. Using current provider data avoids persisting stale rates and keeps regenerated reports auditable by their disclosed rate evidence.
+Rationale: The feature clarification requires current authorized rates instead of persisted stale report evidence. ECB Data Portal supports retrieving current production values and has `updatedAfter`/history concepts for changes and revisions. Federal Reserve DDP help says data are available as currently published, while H.10 release archives may not reflect later revisions. The TUI-session cache is process-local, non-persistent, and disclosed through generated reports, so it can avoid repeated provider calls within one session without creating a long-lived stale rate source.
 
-Alternatives considered: Persist rate evidence in the encrypted snapshot, but the spec assumes no long-lived cache and requires regenerated reports to use current published rates. Use archived release pages for historical authenticity, but H.10 explicitly warns that past releases are not revised and may not reflect subsequent revisions.
+Alternatives considered: Persist rate evidence in the encrypted snapshot, but the spec forbids persisted exchange-rate caches and requires future sessions to use current published rates. Use archived release pages for historical authenticity, but H.10 explicitly warns that past releases are not revised and may not reflect subsequent revisions.
 
 ## Anticorruption Layer And Canonical Model
 
-Decision: Build a report exchange-rate anticorruption layer that converts each provider response into canonical `ExchangeRateEvidence` before calculation.
+Decision: Build a currency integration layer under `internal/integration/currency/` that converts each provider response into canonical rate evidence before report calculation consumes it.
 
-Rationale: The original issue states that obtaining conversion rates involves multiple sources for the same data and must follow a proper anticorruption layer with a canonical model. ECB and Federal Reserve differ in endpoint shape, payload format, quote direction, release cadence, supported currency coverage, and missing-data markers. Canonical evidence protects `internal/report/calculate/`, cost-basis methods, TUI, and Markdown rendering from provider-specific DTOs.
+Rationale: The original issue states that obtaining conversion rates involves multiple sources for the same data and must follow a proper anticorruption layer with a canonical model. ECB and Federal Reserve differ in endpoint shape, payload format, quote direction, release cadence, supported currency coverage, and missing-data markers. A dedicated integration layer prevents provider IO, provider DTOs, provider selection, and canonicalization from bloating `internal/report/`, while still protecting `internal/report/calculate/`, cost-basis methods, TUI, and Markdown rendering from provider-specific representations.
 
-Alternatives considered: Put provider parsing directly inside the calculator, but that would mix IO and financial calculation rules. Create generic support helpers under `internal/support/`, but provider mapping is report-domain-specific and should stay under `internal/report/`. Store provider DTOs in report models, but that leaks external representations across domain boundaries.
+Alternatives considered: Put provider parsing directly inside the calculator, but that would mix IO and financial calculation rules. Create a report-local exchange package, but that would grow the report module with external integration and anticorruption responsibilities. Create generic support helpers under `internal/support/`, but provider mapping is integration-specific rather than domain-neutral support code. Store provider DTOs in report models, but that leaks external representations across domain boundaries.
 
 ## Conversion And Rounding
 
@@ -79,7 +79,7 @@ Alternatives considered: Convert during sync normalization, but the constitution
 
 Decision: Fail report generation before final save when authoritative conversion is unavailable or non-defensible.
 
-Rationale: The spec requires safe failure instead of silent unofficial fallbacks. Failure causes include unsupported source currency, malformed or missing selected activity currency, provider outage without current-run evidence, no prior available official observation, ambiguous quote direction, malformed provider response, non-decimal observation value, and provider response whose currency/date does not match the request. The runtime must keep the user inside the unlocked reporting context and leave no partial cleartext report artifact.
+Rationale: The spec requires safe failure instead of silent unofficial fallbacks. Failure causes include unsupported source currency, malformed or missing selected activity currency, provider outage without current TUI-session evidence, no prior available official observation, ambiguous quote direction, malformed provider response, non-decimal observation value, and provider response whose currency/date does not match the request. The runtime must keep the user inside the unlocked reporting context and leave no partial cleartext report artifact.
 
 Alternatives considered: Emit partial reports with skipped rows, but that can misstate taxable gains/losses. Use hard-coded rates for missing data, but that is unofficial and unauditable. Save diagnostic cleartext automatically in production, but production diagnostics must follow redaction policy and report diagnostics are separate from final reports.
 
@@ -101,8 +101,8 @@ Alternatives considered: Add an SDMX client, but it would require maintenance, s
 
 ## Test Evidence Strategy
 
-Decision: Automated tests use project-owned deterministic provider fixtures and do not depend on live ECB or Federal Reserve availability.
+Decision: Default automated tests use project-owned deterministic provider fixtures and do not depend on live ECB or Federal Reserve availability. A separate opt-in external integration test category verifies live official-provider HTTP clients with one fixed historical observation per unique endpoint.
 
-Rationale: Integration tests must be deterministic and CI-friendly. Fixture responses can prove endpoint mapping, quote direction, prior-date fallback, conversion formulas, audit evidence, and failure handling without network flakiness. Manual quickstart validation can optionally exercise live official endpoints.
+Rationale: Contract, integration, and unit tests must be deterministic and CI-friendly. Fixture responses can prove endpoint mapping, quote direction, prior-date fallback, conversion formulas, audit evidence, and failure handling without network flakiness. External integration tests still provide a narrow signal that live provider API behavior matches the HTTP clients, while limiting provider load to one committed historical observation per unique endpoint.
 
-Alternatives considered: Run live provider calls in CI, but provider availability and published-rate revisions would make tests nondeterministic. Use only unit tests for conversion math, but the feature also changes runtime workflow, report output, and failure cleanup.
+Alternatives considered: Run broad live provider calls in default CI, but provider availability, rate revisions, and provider load would make tests nondeterministic and noisy. Use only unit tests for conversion math, but the feature also changes runtime workflow, report output, failure cleanup, and official-provider HTTP client compatibility.

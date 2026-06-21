@@ -6,6 +6,8 @@ This feature extends report-generation runtime models. It does not add a long-li
 
 All financial amounts, quantities, exchange rates, converted amounts, basis values, proceeds, gains, and losses are exact decimals. Every monetary value has an explicit currency before and after conversion.
 
+Provider identity, authority metadata, provider DTOs, and provider selection are owned by the currency integration layer. Report models submit base currency, source currency, and activity date to that layer and consume canonical rate evidence.
+
 ## ReportBaseCurrency
 
 Purpose: The one user-selected fiat currency used for all report calculations and monetary totals in a report run.
@@ -16,12 +18,12 @@ Fields:
 |-------|------|-------|
 | `code` | enum | `USD` or `EUR` |
 | `label` | string | User-visible label |
-| `authority` | enum | `federal_reserve` for `USD`, `european_central_bank` for `EUR` |
 
 Relationships:
 
 - Selected by one `ReportRequest`.
-- Selects one `OfficialRateProvider`.
+- Submitted to the currency integration service when conversion is required.
+- May be used to request provider display metadata from the currency integration service for report source summaries.
 - Becomes the `ReportCalculationCurrency` on successful calculated and rendered reports.
 
 Validation rules:
@@ -52,7 +54,7 @@ Relationships:
 
 - Belongs to one active `SyncAndReportsContext`.
 - Consumes one `ProtectedActivityCache`.
-- Uses one `OfficialRateProvider` selected by `report_base_currency`.
+- Uses the currency integration service through report calculation when conversion is required.
 - Produces one `CapitalGainsReport` or one non-secret failure.
 
 Validation rules:
@@ -64,9 +66,9 @@ Validation rules:
 
 State transitions:
 
-- `draft -> validated -> resolving_rates -> calculated -> rendered -> saved` on success.
+- `draft -> validated -> resolving_currency_conversions -> calculated -> rendered -> saved` on success.
 - `draft -> failed` when request validation fails.
-- `resolving_rates -> failed` when official rate evidence is unavailable or non-defensible.
+- `resolving_currency_conversions -> failed` when official rate evidence is unavailable or non-defensible.
 
 ## SelectedActivityMonetaryContext
 
@@ -105,9 +107,41 @@ State transitions:
 - `selected -> conversion_required` when selected currency differs from report base currency.
 - `selected -> no_conversion_required` for zero-priced holding reductions with no proceeds and no acquisition cost.
 
+## CurrencyRateService
+
+Purpose: Public application service in `internal/integration/currency/` that owns official-provider selection, HTTP client access, anticorruption mapping, canonical rate evidence, and TUI-session rate caching.
+
+Fields:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `supported_base_currencies` | string set | `USD` and `EUR` for this feature |
+| `provider_registry` | map | Internal mapping from base currency to provider implementation |
+| `session_cache` | `CurrencyRateSessionCache` | In-memory cache shared for the active TUI session |
+
+Relationships:
+
+- Receives `RateLookupRequest` values from report calculation.
+- Chooses one `OfficialRateProvider` internally from the request base currency.
+- Resolves requests into `ExchangeRateEvidence` values.
+- Provides provider metadata for report source summaries when report rendering needs authority or provider names.
+
+Validation rules:
+
+- Public requests must not include provider IDs or user-controlled provider URLs.
+- Provider selection is derived only from validated base currency.
+- Ghostfolio tokens, JWTs, protected payload data, and token-derived verifiers must not be sent to providers.
+- Provider responses must be mapped into canonical evidence before report calculation consumes them.
+
+State transitions:
+
+- `idle -> cache_hit` when evidence already exists in the TUI-session cache.
+- `idle -> provider_lookup -> mapped -> validated -> returned` on successful provider response.
+- `provider_lookup -> failed` on network, HTTP status, parse, unsupported currency, no observation, or authority mismatch failure.
+
 ## OfficialRateProvider
 
-Purpose: Fixed official or officially authorized source selected by report base currency.
+Purpose: Internal fixed official or officially authorized provider selected by the currency integration service from report base currency.
 
 Fields:
 
@@ -122,8 +156,8 @@ Fields:
 
 Relationships:
 
-- Selected by `ReportBaseCurrency`.
-- Resolves `RateLookupRequest` into `ExchangeRateEvidence`.
+- Selected internally by `CurrencyRateService`, not by `ReportBaseCurrency` or `ReportRequest`.
+- Resolves provider-specific HTTP responses into `ExchangeRateEvidence`.
 - Emits `ConversionFailure` when official evidence cannot be returned.
 
 Validation rules:
@@ -149,25 +183,55 @@ Fields:
 | `source_currency` | string | Selected activity currency |
 | `base_currency` | string | Report base currency |
 | `activity_date` | date | Original source-calendar activity date |
-| `provider_id` | enum | Selected from base currency |
 
 Relationships:
 
 - Created from one `SelectedActivityMonetaryContext` requiring conversion.
-- Resolved by one `OfficialRateProvider`.
+- Resolved by `CurrencyRateService`.
 - Produces one `ExchangeRateEvidence` or one `ConversionFailure`.
 
 Validation rules:
 
 - Source and base currencies must be non-empty uppercase currency codes from supported sets.
 - `activity_date` must come from the activity timestamp, not report generation time, sync time, or machine-local date.
+- Provider identity is not part of the public request; it is selected internally from `base_currency`.
 - Requests where source currency equals base currency are not created.
 
 State transitions:
 
-- `new -> cached_in_run` if evidence already exists for the same report run key.
+- `new -> cache_hit` if evidence already exists for the same TUI-session key.
 - `new -> provider_lookup -> resolved` on success.
 - `provider_lookup -> failed` when no authoritative evidence is available.
+
+## CurrencyRateSessionCache
+
+Purpose: In-memory cache of canonical rate evidence maintained while the TUI session is executing.
+
+Fields:
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `key` | tuple | `(source_currency, base_currency, activity_date)`; implementation may include internal provider identity |
+| `exchange_rate_evidence` | `ExchangeRateEvidence` | Canonical evidence reused for the same lookup key |
+| `fetched_at` | timestamp | Local time the provider evidence entered the cache |
+
+Relationships:
+
+- Owned by `CurrencyRateService`.
+- May serve multiple report runs, years, cost-basis methods, and security-token unlocks in the same TUI process.
+- Is cleared when the TUI process exits.
+
+Validation rules:
+
+- Must not be persisted to protected snapshots, setup files, app-data caches, temp files, or report-output staging files.
+- Must not include Ghostfolio tokens, JWTs, protected payload data, token-derived verifiers, or security-token identifiers in keys or values.
+- Same-currency requests do not create cache entries.
+
+State transitions:
+
+- `empty -> populated` after successful provider evidence validation.
+- `populated -> reused` when a later report run or token unlock requires the same evidence key.
+- `populated -> discarded` when the TUI process exits.
 
 ## ExchangeRateEvidence
 
@@ -191,7 +255,7 @@ Fields:
 Relationships:
 
 - Resolved from one `RateLookupRequest`.
-- Used by one or more same-key `ConvertedActivityAmount` values in the same report run.
+- Used by one or more same-key `ConvertedActivityAmount` values in the same TUI session.
 - Referenced by `ConversionAuditEntry`.
 
 Validation rules:
@@ -291,13 +355,13 @@ Fields:
 | `source_currency` | string nullable | Affected selected activity currency |
 | `report_base_currency` | string | Selected report base currency |
 | `activity_date` | date nullable | Affected source-calendar date |
-| `provider_id` | enum nullable | Provider selected by base currency |
+| `provider_id` | enum nullable | Provider selected internally by the currency integration service |
 | `reason` | enum | `unsupported_currency`, `missing_rate`, `provider_unavailable`, `malformed_rate`, `ambiguous_quote`, `invalid_activity_currency`, or `authority_mismatch` |
 | `safe_message` | string | User-visible non-secret explanation |
 
 Relationships:
 
-- Created by provider mapping, conversion validation, or calculation boundary.
+- Created by provider mapping, currency integration validation, or calculation boundary.
 - Returned through runtime report failure handling.
 - May contribute redacted diagnostic context.
 

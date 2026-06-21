@@ -14,7 +14,11 @@
 
 ### Session 2026-06-20
 
-- Q: How should regenerated reports handle official authority revisions to historical exchange rates? → A: Use the currently published authorized rate at generation time and disclose rate details in the report.
+- Q: How should regenerated reports handle official authority revisions to historical exchange rates? → A: Use the currently published authorized rate when no same-key evidence is defensibly available in the current TUI-session cache, and disclose rate details in the report.
+
+### Session 2026-06-21
+
+- Q: Can canonical rate evidence be reused after one report run completes? → A: Yes. It may be reused from in-memory cache while the TUI session is executing, including across multiple report runs and different security-token unlocks. It must not be persisted, and the generated report must disclose the actual rate evidence used.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -66,7 +70,7 @@ When an official conversion cannot be obtained or the activity currency is not s
 **Acceptance Scenarios**:
 
 1. **Given** a priced activity requires conversion and no official or officially authorized rate is available for its source currency and activity date under the selected report base currency, **When** report generation reaches that activity, **Then** the report attempt fails before the final report file is saved.
-2. **Given** the selected authority source is temporarily unavailable and the required rate is not already defensibly available for the report run, **When** report generation attempts conversion, **Then** the report attempt fails with an actionable message rather than using an unofficial fallback.
+2. **Given** the selected authority source is temporarily unavailable and the required rate is not already defensibly available in the current TUI session's in-memory rate cache, **When** report generation attempts conversion, **Then** the report attempt fails with an actionable message rather than using an unofficial fallback.
 3. **Given** conversion fails for one activity, **When** the failure is reported, **Then** the user remains inside the unlocked reporting context, no partial cleartext report artifact remains, and the message identifies the affected source currency, report base currency, and activity date without exposing tokens or protected authentication material.
 4. **Given** a zero-priced holding reduction contributes no proceeds or acquisition cost, **When** the report is calculated, **Then** it does not require an exchange rate solely because the row reduces quantity or because explicit zero-valued source fields were preserved.
 
@@ -80,7 +84,7 @@ When an official conversion cannot be obtained or the activity currency is not s
 - A priced activity has a valid explicit zero fee, so the fee converts to zero and remains valid.
 - A selected activity currency code is missing, malformed, or not supported by the selected authority source.
 - The activity date falls on a weekend, public holiday, or other date where the authority source publishes no rate, so conversion falls back to the last previous business date where the authorized provider can supply a rate.
-- The authority source revises a previously published rate after an earlier report was generated, so a regenerated report uses the currently published authorized rate at generation time and discloses the rate details used.
+- The authority source revises a previously published rate after an earlier report was generated outside the current TUI-session cache, so a regenerated report obtains the currently published authorized rate and discloses the rate details used.
 - Conversion succeeds for many activities and then fails for one later activity in deterministic history order.
 - The report includes only zero-priced holding reductions after the selected year and therefore needs no conversion for those rows.
 - The user generates the same year and method twice with different report base currencies and expects separate results and rate audit details.
@@ -107,7 +111,7 @@ Each feature specification MUST capture security, persistence, financial precisi
 - **FR-014**: If the authority source publishes only one daily reference or closing rate for the selected activity date, the system MUST use that daily rate and identify the rate kind in the report.
 - **FR-015**: If the authority source publishes no rate on the activity date, the system MUST use the most recent previous business-date rate available from the authorized provider and disclose the activity date and actual rate date.
 - **FR-016**: The system MUST fail report generation if no official or officially authorized rate is available for a required source currency, report base currency, and activity date under the rules above.
-- **FR-017**: The system MUST fail report generation if the selected authority source is unavailable and the required rate is not defensibly available for the report run.
+- **FR-017**: The system MUST fail report generation if the selected authority source is unavailable and the required rate is not defensibly available in the current TUI session's in-memory rate cache.
 - **FR-018**: The system MUST express all cost basis, proceeds, realized gains, realized losses, and cross-activity monetary totals in the selected report base currency for successful converted reports.
 - **FR-019**: The system MUST preserve each priced activity's original selected currency and original selected monetary values in report audit details when conversion occurs.
 - **FR-020**: For each converted priced activity, the generated report MUST include or reference audit details containing source currency, report base currency, activity date, rate date, rate authority, rate kind when applicable, rate value, original amount, and converted amount.
@@ -122,13 +126,13 @@ Each feature specification MUST capture security, persistence, financial precisi
 - **FR-029**: Outside explicit development mode, diagnostics for conversion failures MUST follow the existing production redaction policy for financial-value fields while still identifying the affected activity by non-secret reference, source currency, report base currency, and activity date.
 - **FR-030**: The implementation plan MUST record the selected official or officially authorized data source for USD and EUR, the authority relationship, supported currencies, historical coverage, unavailable-date behavior, revision behavior, failure modes, and test evidence before implementation begins.
 - **FR-031**: The system MUST treat the existing no-conversion `NOT APPLICABLE` report calculation currency behavior as superseded for reports generated under this feature.
-- **FR-032**: If an official authority revises a historical exchange rate after an earlier report was generated, a regenerated report MUST use the currently published authorized rate at generation time and disclose the rate authority, rate date, and rate value used for the regenerated report.
+- **FR-032**: If an official authority revises a historical exchange rate after an earlier report was generated and no same-key evidence is defensibly available in the current TUI-session cache, a regenerated report MUST use the currently published authorized rate and disclose the rate authority, rate date, and rate value used for the regenerated report.
 
 ### Financial Calculation Evidence *(include when feature affects financial calculations)*
 
 - **Numeric Representation**: Monetary amounts, quantities, exchange rates, converted amounts, cost basis, proceeds, gains, and losses use exact decimal values. Every monetary value remains tied to an explicit currency before conversion and to the selected report base currency after conversion.
 - **Conversion And Rounding**: Conversion is authorized only at the report-generation boundary after one activity monetary context has been selected and before cost basis or gain and loss calculations consume that activity's monetary values. Rates come from the official or officially authorized source for the selected report base currency and the original activity date. Daily reference or closing rates are acceptable when that is the authority source's available historical rate. Non-publication dates use the last previous business date where the authorized provider can supply a conversion rate and must disclose that substitution. Internal decimal bounding uses the existing 16-decimal round half up policy where required.
-- **Empirical Solidified Financial Tests**: Existing empirical financial tests for cost-basis methods remain single-currency calculation evidence and MUST NOT be changed in nature to validate conversion behavior. They remain focused on calculation correctness without conversions. New project-owned contract, integration, and unit coverage is required for conversion boundaries, rate-source selection rules, audit details, and failure handling.
+- **Empirical Solidified Financial Tests**: Existing empirical financial tests for cost-basis methods remain single-currency calculation evidence and MUST NOT be changed in nature to validate conversion behavior. They remain focused on calculation correctness without conversions. New project-owned contract, integration, external integration, and unit coverage is required for conversion boundaries, rate-source selection rules, audit details, provider HTTP client compatibility, and failure handling.
 - **Empirical External Dataset Changes**: The empirical external dataset remains read-only for this feature. This feature is not a dataset-maintenance specification.
 
 ### Key Entities *(include if feature involves data)*
@@ -159,7 +163,7 @@ Each feature specification MUST capture security, persistence, financial precisi
 - The original activity date is the source-calendar date derived from the preserved activity timestamp and its stored offset, consistent with the existing report specification.
 - When an authorized provider has no rate for a weekend, public holiday, or other non-publication day, the last previous business date where that provider can supply a conversion rate is the required fallback unless later planning identifies a stricter authority-specific rule.
 - The saved Markdown report remains intentionally cleartext after generation, consistent with the existing reporting feature, and must contain enough non-secret conversion evidence for user audit.
-- No new long-lived exchange-rate cache is required by this specification. If planning introduces any persisted rate data, that plan must justify storage, protection, invalidation, and user removal.
-- Regenerated reports use currently published authorized exchange rates at generation time instead of reusing earlier report-specific rate evidence.
+- No persisted exchange-rate cache is required by this specification. The in-memory TUI-session cache may survive multiple report runs and different security-token unlocks in the same process, but it is cleared on process exit. If planning introduces any persisted rate data, that plan must justify storage, protection, invalidation, and user removal.
+- Regenerated reports use currently published authorized exchange rates when the required evidence is not already defensibly available in the in-memory TUI-session cache. Reports disclose the actual rate evidence used.
 - Official source access details, supported currency coverage, and authority trust evidence are planning research outputs, not user choices.
 - The empirical external dataset is unchanged by this feature.
