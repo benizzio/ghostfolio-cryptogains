@@ -921,6 +921,343 @@ func TestApplyReportCurrencyBoundaryConvertsZeroValuedMonetaryFields(t *testing.
 	}
 }
 
+// TestReportCurrencyBoundaryAttachesRedactedDiagnosticRecord verifies persisted
+// source activity context is attached only to structured calculation failures.
+// Authored by: OpenCode
+func TestReportCurrencyBoundaryAttachesRedactedDiagnosticRecord(t *testing.T) {
+	t.Parallel()
+
+	var activityDate = time.Date(2024, time.January, 5, 0, 0, 0, 0, time.UTC)
+	var service = &stubCurrencyRateService{lookupErr: errors.New("unexpected lookup")}
+	var _, err = applyReportCurrencyBoundaryWithRecords(context.Background(), service, reportmodel.ReportBaseCurrencyUSD, []assetInputGroup{{
+		AssetIdentityKey: "asset-btc",
+		DisplayLabel:     "BTC",
+		Inputs: []reportmodel.ActivityCalculationInput{{
+			SourceID:             "bad-currency-buy",
+			OccurredAt:           activityDate,
+			SourceYear:           2024,
+			ActivityType:         reportmodel.ActivityTypeBuy,
+			Quantity:             mustReportDecimal(t, "1"),
+			SelectedCurrencyCode: "usd",
+		}},
+	}}, []syncmodel.ActivityRecord{{
+		SourceID:   "bad-currency-buy",
+		OccurredAt: activityDate.Format(time.RFC3339),
+		DataSource: "Bearer source-secret",
+		RawHash:    "token=hash-secret",
+		Comment:    "private user comment",
+	}})
+	var calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindActivityInput)
+	var diagnosticErr, ok = err.(diagnosticCalculationError)
+	if !ok {
+		t.Fatalf("expected diagnostic calculation error, got %T", err)
+	}
+	var context = diagnosticErr.DiagnosticReportContext()
+	if context.OffendingActivityRecord == nil || context.OffendingActivityRecord.SourceID != "bad-currency-buy" {
+		t.Fatalf("expected offending persisted activity record, got %#v", context.OffendingActivityRecord)
+	}
+	if context.OffendingActivityRecord.Comment != "" || strings.Contains(context.OffendingActivityRecord.DataSource, "source-secret") || strings.Contains(context.OffendingActivityRecord.RawHash, "hash-secret") {
+		t.Fatalf("expected persisted activity record to be redacted, got %#v", context.OffendingActivityRecord)
+	}
+	if !strings.Contains(calcErr.Error(), "could not prepare currency conversion") {
+		t.Fatalf("expected invalid currency calculation error, got %q", calcErr.Error())
+	}
+}
+
+// TestReportCurrencyBoundaryDefensiveConversionBranches verifies nil context,
+// nil rate service, malformed evidence, and invalid arithmetic branches.
+// Authored by: OpenCode
+func TestReportCurrencyBoundaryDefensiveConversionBranches(t *testing.T) {
+	t.Parallel()
+
+	var activityDate = time.Date(2024, time.January, 5, 0, 0, 0, 0, time.UTC)
+	var request = mustCalculatorRateLookupRequest(t, "EUR", "USD", activityDate)
+	var input = reportmodel.ActivityCalculationInput{
+		SourceID:             "eur-buy",
+		OccurredAt:           activityDate,
+		SourceYear:           2024,
+		ActivityType:         reportmodel.ActivityTypeBuy,
+		AssetIdentityKey:     "asset-btc",
+		DisplayLabel:         "BTC",
+		Quantity:             mustReportDecimal(t, "1"),
+		GrossValue:           decimalPointer(t, "100"),
+		SelectedCurrencyCode: "EUR",
+	}
+
+	var _, nilServiceErr = applyReportCurrencyBoundary(nil, nil, reportmodel.ReportBaseCurrencyUSD, []assetInputGroup{{
+		AssetIdentityKey: "asset-btc",
+		DisplayLabel:     "BTC",
+		Inputs:           []reportmodel.ActivityCalculationInput{input},
+	}})
+	if nilServiceErr == nil || !strings.Contains(nilServiceErr.Error(), "requires a configured currency rate service") {
+		t.Fatalf("expected nil rate service failure, got %v", nilServiceErr)
+	}
+
+	var malformedEvidence = mustCalculatorRateEvidence(
+		t,
+		request,
+		activityDate,
+		currencyintegration.RateAuthorityFederalReserve,
+		currencyintegration.ProviderIDFederalReserveH10,
+		currencyintegration.RateKindFederalReserveH10NoonBuying,
+		currencyintegration.QuoteDirectionSourcePerBase,
+		"1.09",
+		"H10/EUR",
+	)
+	malformedEvidence.BaseCurrency = "GBP"
+	var service = &stubCurrencyRateService{evidences: map[string]currencyintegration.ExchangeRateEvidence{rateLookupRequestKey(request): malformedEvidence}}
+	var _, evidenceErr = applyReportCurrencyBoundary(context.Background(), service, reportmodel.ReportBaseCurrencyUSD, []assetInputGroup{{
+		AssetIdentityKey: "asset-btc",
+		DisplayLabel:     "BTC",
+		Inputs:           []reportmodel.ActivityCalculationInput{input},
+	}})
+	if evidenceErr == nil || !strings.Contains(evidenceErr.Error(), "could not validate currency conversion evidence") {
+		t.Fatalf("expected malformed evidence mapping failure, got %v", evidenceErr)
+	}
+
+	var invalidQuoteEvidence = mustCalculatorRateEvidence(
+		t,
+		request,
+		activityDate,
+		currencyintegration.RateAuthorityFederalReserve,
+		currencyintegration.ProviderIDFederalReserveH10,
+		currencyintegration.RateKindFederalReserveH10NoonBuying,
+		currencyintegration.QuoteDirectionSourcePerBase,
+		"1.09",
+		"H10/EUR",
+	)
+	invalidQuoteEvidence.QuoteDirection = currencyintegration.QuoteDirection("ambiguous")
+	var reportEvidence = reportmodel.ExchangeRateEvidence{
+		SourceCurrency:   "EUR",
+		BaseCurrency:     reportmodel.ReportBaseCurrencyUSD,
+		ActivityDate:     activityDate,
+		RateDate:         activityDate,
+		Authority:        reportmodel.ExchangeRateAuthorityFederalReserve,
+		ProviderID:       reportmodel.ExchangeRateProviderIDFederalReserveH10,
+		RateKind:         string(currencyintegration.RateKindFederalReserveH10NoonBuying),
+		QuoteDirection:   reportmodel.ExchangeRateQuoteDirectionSourcePerBase,
+		RateValue:        mustReportDecimal(t, "1.09"),
+		DatasetReference: "H10/EUR",
+	}
+	var _, _, conversionErr = convertInputMonetaryAmounts(input, reportmodel.ReportBaseCurrencyUSD, invalidQuoteEvidence, reportEvidence)
+	if conversionErr == nil || !strings.Contains(conversionErr.Error(), "could not convert gross_value") {
+		t.Fatalf("expected invalid quote conversion failure, got %v", conversionErr)
+	}
+
+	input.GrossValue = nil
+	input.UnitPrice = decimalPointer(t, "100")
+	_, _, conversionErr = convertInputMonetaryAmounts(input, reportmodel.ReportBaseCurrencyUSD, invalidQuoteEvidence, reportEvidence)
+	if conversionErr == nil || !strings.Contains(conversionErr.Error(), "could not convert unit_price") {
+		t.Fatalf("expected invalid unit-price conversion failure, got %v", conversionErr)
+	}
+
+	input.UnitPrice = nil
+	input.FeeAmount = decimalPointer(t, "1")
+	_, _, conversionErr = convertInputMonetaryAmounts(input, reportmodel.ReportBaseCurrencyUSD, invalidQuoteEvidence, reportEvidence)
+	if conversionErr == nil || !strings.Contains(conversionErr.Error(), "could not convert fee_amount") {
+		t.Fatalf("expected invalid fee conversion failure, got %v", conversionErr)
+	}
+
+	var eurRequest = mustCalculatorRateLookupRequest(t, "USD", "EUR", activityDate)
+	var eurEvidence = mustCalculatorRateEvidence(
+		t,
+		eurRequest,
+		activityDate,
+		currencyintegration.RateAuthorityEuropeanCentralBank,
+		currencyintegration.ProviderIDECBEXR,
+		currencyintegration.RateKindECBEXRDailyReference,
+		currencyintegration.QuoteDirectionSourcePerBase,
+		"1.09",
+		"EXR/D.USD.EUR.SP00.A",
+	)
+	if _, err := mapIntegrationEvidenceToReportEvidence(eurEvidence); err != nil {
+		t.Fatalf("expected EUR report evidence mapping: %v", err)
+	}
+}
+
+// TestReportCurrencyBoundaryHelperFallbackBranches verifies helper branches not
+// naturally reached by successful report calculation flows.
+// Authored by: OpenCode
+func TestReportCurrencyBoundaryHelperFallbackBranches(t *testing.T) {
+	t.Parallel()
+
+	var boundary = &reportCurrencyBoundaryContext{recordBySourceID: map[string]syncmodel.ActivityRecord{"other": {SourceID: "other"}}}
+	var passthrough = errors.New("plain")
+	if got := boundary.withInputDiagnosticRecord(reportmodel.ActivityCalculationInput{SourceID: "missing"}, passthrough); got != passthrough {
+		t.Fatalf("expected non-calculation error passthrough")
+	}
+	var calcErr = reportmodel.NewCalculationError(reportmodel.CalculationErrorKindActivityInput, "failure", "missing", "", nil)
+	if got := boundary.withInputDiagnosticRecord(reportmodel.ActivityCalculationInput{SourceID: "missing"}, calcErr); got != calcErr {
+		t.Fatalf("expected missing diagnostic record passthrough")
+	}
+	var indexed = recordBySourceID([]syncmodel.ActivityRecord{{SourceID: " "}, {SourceID: " kept "}})
+	if len(indexed) != 1 || indexed["kept"].SourceID != " kept " {
+		t.Fatalf("expected blank source IDs to be skipped, got %#v", indexed)
+	}
+
+	var calculator = NewCalculator(nil)
+	_, err := calculator.Calculate(nil, reportmodel.ReportRequest{}, syncmodel.ProtectedActivityCache{})
+	if err == nil || !strings.Contains(err.Error(), "report request year") {
+		t.Fatalf("expected nil context calculator path to validate request, got %v", err)
+	}
+
+	if got := safeConversionLookupFallbackMessage("", errors.New("missing_rate: raw detail")); got != "currency conversion lookup failed: reason=missing_rate" {
+		t.Fatalf("unexpected empty fallback conversion message %q", got)
+	}
+	if got := safeConversionLookupFallbackMessage("fallback", nil); got != "fallback" {
+		t.Fatalf("unexpected nil-cause fallback conversion message %q", got)
+	}
+	if got := safeConversionReasonPrefix(errors.New("unknown: raw detail")); got != "" {
+		t.Fatalf("expected unknown conversion reason to be ignored, got %q", got)
+	}
+	var safeCause safeConversionFailureCause
+	if got := safeCause.Error(); got != "conversion failed" {
+		t.Fatalf("unexpected nil safe conversion cause message %q", got)
+	}
+	var target string
+	if safeCause.As(&target) {
+		t.Fatalf("expected safe conversion cause not to match unrelated target")
+	}
+}
+
+// TestReportCurrencyBoundaryDirectValidationFailureBranches covers validation
+// failures reachable only through package-local helper seams after rate evidence
+// has already been resolved.
+// Authored by: OpenCode
+func TestReportCurrencyBoundaryDirectValidationFailureBranches(t *testing.T) {
+	t.Parallel()
+
+	var activityDate = time.Date(2024, time.January, 5, 0, 0, 0, 0, time.UTC)
+	var request = mustCalculatorRateLookupRequest(t, "EUR", "USD", activityDate)
+	var evidence = mustCalculatorRateEvidence(
+		t,
+		request,
+		activityDate,
+		currencyintegration.RateAuthorityFederalReserve,
+		currencyintegration.ProviderIDFederalReserveH10,
+		currencyintegration.RateKindFederalReserveH10NoonBuying,
+		currencyintegration.QuoteDirectionSourcePerBase,
+		"2",
+		"H10/EUR",
+	)
+	var reportEvidence, err = mapIntegrationEvidenceToReportEvidence(evidence)
+	if err != nil {
+		t.Fatalf("map report evidence: %v", err)
+	}
+	var input = reportmodel.ActivityCalculationInput{
+		SourceID:             "eur-buy",
+		OccurredAt:           activityDate,
+		SourceYear:           2024,
+		ActivityType:         reportmodel.ActivityTypeBuy,
+		AssetIdentityKey:     "asset-btc",
+		DisplayLabel:         "BTC",
+		Quantity:             mustReportDecimal(t, "1"),
+		GrossValue:           decimalPointer(t, "100"),
+		SelectedCurrencyCode: "EUR",
+	}
+
+	var invalidReportEvidence = reportEvidence
+	invalidReportEvidence.BaseCurrency = reportmodel.ReportBaseCurrencyEUR
+	var _, _, amountErr = convertOptionalInputAmount(input, reportmodel.ReportBaseCurrencyUSD, evidence, invalidReportEvidence, reportmodel.ConvertedAmountKindGrossValue, input.GrossValue, nil)
+	if amountErr == nil || !strings.Contains(amountErr.Error(), "could not validate converted gross_value") {
+		t.Fatalf("expected converted amount validation failure, got %v", amountErr)
+	}
+
+	var invalidEvidence = evidence
+	invalidEvidence.RateKind = " "
+	if _, err = mapIntegrationEvidenceToReportEvidence(invalidEvidence); err == nil || !strings.Contains(err.Error(), "rate kind") {
+		t.Fatalf("expected report evidence validation failure, got %v", err)
+	}
+
+	var key = rateLookupBoundaryKey(request)
+	var boundary = &reportCurrencyBoundaryContext{
+		ctx:                   context.Background(),
+		currencyRates:         &stubCurrencyRateService{lookupErr: errors.New("unexpected lookup")},
+		reportBaseCurrency:    reportmodel.ReportBaseCurrencyUSD,
+		resolvedEvidenceByKey: map[string]currencyintegration.ExchangeRateEvidence{key: evidence},
+		reportEvidenceByKey:   map[string]reportmodel.ExchangeRateEvidence{key: invalidReportEvidence},
+	}
+	if _, _, err = boundary.applyInputReportCurrencyBoundary(assetInputGroup{AssetIdentityKey: "asset-btc", DisplayLabel: "BTC"}, input); err == nil || !strings.Contains(err.Error(), "could not validate converted gross_value") {
+		t.Fatalf("expected apply input conversion validation failure, got %v", err)
+	}
+
+	boundary.reportEvidenceByKey[key] = reportEvidence
+	input.SourceID = "eur-no-amounts"
+	input.GrossValue = nil
+	input.UnitPrice = nil
+	input.FeeAmount = nil
+	if _, _, err = boundary.applyInputReportCurrencyBoundary(assetInputGroup{AssetIdentityKey: "asset-btc", DisplayLabel: "BTC"}, input); err == nil || !strings.Contains(err.Error(), "conversion audit entry") {
+		t.Fatalf("expected conversion audit validation failure, got %v", err)
+	}
+}
+
+// TestConversionAuditEntryConstructionGuardrails verifies audit-entry label
+// fallback and invalid-entry wrapping branches.
+// Authored by: OpenCode
+func TestConversionAuditEntryConstructionGuardrails(t *testing.T) {
+	t.Parallel()
+
+	var activityDate = time.Date(2024, time.January, 5, 0, 0, 0, 0, time.UTC)
+	var request = mustCalculatorRateLookupRequest(t, "EUR", "USD", activityDate)
+	var evidence = reportmodel.ExchangeRateEvidence{
+		SourceCurrency:   "EUR",
+		BaseCurrency:     reportmodel.ReportBaseCurrencyUSD,
+		ActivityDate:     activityDate,
+		RateDate:         activityDate,
+		Authority:        reportmodel.ExchangeRateAuthorityFederalReserve,
+		ProviderID:       reportmodel.ExchangeRateProviderIDFederalReserveH10,
+		RateKind:         string(currencyintegration.RateKindFederalReserveH10NoonBuying),
+		QuoteDirection:   reportmodel.ExchangeRateQuoteDirectionSourcePerBase,
+		RateValue:        mustReportDecimal(t, "2"),
+		DatasetReference: "H10/EUR/2024-01-05",
+	}
+	var amount = reportmodel.ConvertedActivityAmount{
+		SourceID:             "eur-buy-1",
+		AmountKind:           reportmodel.ConvertedAmountKindGrossValue,
+		OriginalCurrency:     "EUR",
+		OriginalAmount:       mustReportDecimal(t, "100"),
+		ReportBaseCurrency:   reportmodel.ReportBaseCurrencyUSD,
+		ConvertedAmount:      mustReportDecimal(t, "50"),
+		ExchangeRateEvidence: &evidence,
+		ConversionStatus:     reportmodel.ConversionStatusConverted,
+	}
+
+	var entry, err = buildConversionAuditEntry(assetInputGroup{AssetIdentityKey: "asset-btc"}, reportmodel.ActivityCalculationInput{
+		SourceID:             "eur-buy-1",
+		OccurredAt:           request.ActivityDate,
+		DisplayLabel:         "BTC",
+		SelectedCurrencyCode: "EUR",
+	}, evidence, []reportmodel.ConvertedActivityAmount{amount})
+	if err != nil {
+		t.Fatalf("expected audit entry using input label fallback: %v", err)
+	}
+	if entry.AssetLabel != "BTC" {
+		t.Fatalf("expected input display label fallback, got %#v", entry)
+	}
+
+	entry, err = buildConversionAuditEntry(assetInputGroup{AssetIdentityKey: " asset-btc "}, reportmodel.ActivityCalculationInput{
+		SourceID:             "eur-buy-1",
+		OccurredAt:           request.ActivityDate,
+		SelectedCurrencyCode: "EUR",
+	}, evidence, []reportmodel.ConvertedActivityAmount{amount})
+	if err != nil {
+		t.Fatalf("expected audit entry using asset-key fallback: %v", err)
+	}
+	if entry.AssetLabel != "asset asset-btc" {
+		t.Fatalf("expected asset identity fallback, got %#v", entry)
+	}
+
+	_, err = buildConversionAuditEntry(assetInputGroup{DisplayLabel: "BTC"}, reportmodel.ActivityCalculationInput{
+		SourceID:             "eur-buy-1",
+		OccurredAt:           request.ActivityDate,
+		SelectedCurrencyCode: "EUR",
+	}, evidence, nil)
+	var calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+	if !strings.Contains(calcErr.Error(), "could not build the conversion audit entry") {
+		t.Fatalf("expected wrapped audit-entry validation failure, got %q", calcErr.Error())
+	}
+}
+
 // TestCaptureOpeningPositionIfNeededSnapshotsOnce verifies the opening snapshot
 // boundary and no-op branches.
 // Authored by: OpenCode

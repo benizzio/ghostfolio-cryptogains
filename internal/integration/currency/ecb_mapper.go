@@ -19,7 +19,9 @@ func MapECBEXRCSVToEvidence(request RateLookupRequest, payload []byte, datasetRe
 	if err := validateSupportedECBSourceCurrency(request.SourceCurrency); err != nil {
 		return ExchangeRateEvidence{}, err
 	}
-	var records, err = csv.NewReader(strings.NewReader(string(payload))).ReadAll()
+	var reader = csv.NewReader(strings.NewReader(string(payload)))
+	reader.FieldsPerRecord = -1
+	var records, err = reader.ReadAll()
 	if err != nil {
 		return ExchangeRateEvidence{}, fmt.Errorf("parse ECB EXR CSV: %w", err)
 	}

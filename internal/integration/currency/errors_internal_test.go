@@ -73,3 +73,37 @@ func TestConversionFailureReasonOf(t *testing.T) {
 		t.Fatalf("expected provider unavailable reason through wrapped error, got %q %v", reason, ok)
 	}
 }
+
+// TestConversionFailureNilAndUnknownFieldsCoverDefensiveBranches verifies nil
+// receiver and empty-field safe-message branches used by defensive failure
+// handling.
+// Authored by: OpenCode
+func TestConversionFailureNilAndUnknownFieldsCoverDefensiveBranches(t *testing.T) {
+	t.Parallel()
+
+	var nilFailure *ConversionFailure
+	if nilFailure.Error() != "conversion failure" {
+		t.Fatalf("expected nil error fallback, got %q", nilFailure.Error())
+	}
+	if nilFailure.Unwrap() != nil {
+		t.Fatalf("expected nil unwrap fallback")
+	}
+	if nilFailure.SafeMessage() != "conversion failed" {
+		t.Fatalf("expected nil safe-message fallback, got %q", nilFailure.SafeMessage())
+	}
+
+	var err = NewConversionFailure(RateLookupRequest{}, "", ConversionFailureReasonInvalidActivityCurrency, "")
+	var failure *ConversionFailure
+	if !errors.As(err, &failure) {
+		t.Fatalf("expected conversion failure error, got %T", err)
+	}
+	if failure.Unwrap() != nil {
+		t.Fatalf("expected blank detail to omit wrapped cause")
+	}
+	var safeMessage = failure.SafeMessage()
+	for _, expected := range []string{"source_currency=unknown", "report_base_currency=unknown", "activity_date=unknown", "provider=unknown"} {
+		if !strings.Contains(safeMessage, expected) {
+			t.Fatalf("expected safe message to contain %q, got %q", expected, safeMessage)
+		}
+	}
+}

@@ -629,3 +629,102 @@ func reportFailureActivityRecordFixture(t *testing.T) syncmodel.ActivityRecord {
 		RawHash:          "doge-buy-2025-incomplete-001",
 	}
 }
+
+// TestReportConversionFailureContextParsesFallbackAndTokenizedDetails verifies
+// non-secret conversion context formatting for both calculation copy formats.
+// Authored by: OpenCode
+func TestReportConversionFailureContextParsesFallbackAndTokenizedDetails(t *testing.T) {
+	t.Parallel()
+
+	var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
+	var fallbackErr = reportmodel.NewCalculationError(
+		reportmodel.CalculationErrorKindActivityInput,
+		"could not prepare currency conversion from usd to EUR on 2024-01-02T10:00:00Z",
+		"bad-currency",
+		"BTC",
+		nil,
+	)
+	var fallbackContext = reportConversionFailureContext(request, fallbackErr)
+	for _, expected := range []string{
+		"Conversion Failure Context",
+		"Source ID: bad-currency",
+		"Source Currency: usd",
+		"Report Base Currency: EUR",
+		"Activity Date: 2024-01-02",
+		"Failure Reason: invalid_activity_currency",
+	} {
+		if !strings.Contains(fallbackContext, expected) {
+			t.Fatalf("expected fallback context to contain %q, got %q", expected, fallbackContext)
+		}
+	}
+	if strings.Contains(fallbackContext, "Provider Category") {
+		t.Fatalf("expected invalid activity currency context to suppress provider category, got %q", fallbackContext)
+	}
+
+	var tokenizedErr = reportmodel.NewCalculationError(
+		reportmodel.CalculationErrorKindActivityInput,
+		"reason=unknown provider=unknown source_currency=GBP report_base_currency=USD activity_date=2024-01-03)",
+		"",
+		"",
+		nil,
+	)
+	var tokenizedContext = reportConversionFailureContext(request, tokenizedErr)
+	for _, expected := range []string{
+		"Source Currency: GBP",
+		"Report Base Currency: USD",
+		"Activity Date: 2024-01-03",
+		"Provider Category: federal_reserve_h10",
+	} {
+		if !strings.Contains(tokenizedContext, expected) {
+			t.Fatalf("expected tokenized context to contain %q, got %q", expected, tokenizedContext)
+		}
+	}
+
+	var missingBaseErr = reportmodel.NewCalculationError(
+		reportmodel.CalculationErrorKindActivityInput,
+		"could not resolve currency conversion rate from GBP to  on 2024-01-04",
+		"",
+		"",
+		nil,
+	)
+	var missingBaseContext = reportConversionFailureContext(request, missingBaseErr)
+	if !strings.Contains(missingBaseContext, "Report Base Currency: USD") || !strings.Contains(missingBaseContext, "Provider Category: federal_reserve_h10") {
+		t.Fatalf("expected request base-currency fallback context, got %q", missingBaseContext)
+	}
+}
+
+// TestReportConversionFailureContextRejectsIncompleteDetails verifies helpers do
+// not manufacture conversion context from unrelated or incomplete errors.
+// Authored by: OpenCode
+func TestReportConversionFailureContextRejectsIncompleteDetails(t *testing.T) {
+	t.Parallel()
+
+	var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
+	if got := reportConversionFailureContext(request, errors.New("plain failure")); got != "" {
+		t.Fatalf("expected non-calculation error to produce no context, got %q", got)
+	}
+
+	var incompleteErr = reportmodel.NewCalculationError(reportmodel.CalculationErrorKindActivityInput, "could not resolve currency conversion rate from EUR", "", "", nil)
+	if got := reportConversionFailureContext(request, incompleteErr); got != "" {
+		t.Fatalf("expected incomplete conversion detail to produce no context, got %q", got)
+	}
+
+	var parsed = parseReportConversionFailureDetail("detail without date")
+	if parsed.sourceCurrency != "" || parsed.activityDate != "" {
+		t.Fatalf("expected detail without date to remain incomplete, got %#v", parsed)
+	}
+	parsed = parseReportConversionFailureDetail("could not resolve currency conversion rate from EUR on 2024-01-02")
+	if parsed.sourceCurrency != "" || parsed.reportBaseCurrency != "" {
+		t.Fatalf("expected detail without currency pair to remain incomplete, got %#v", parsed)
+	}
+	parsed = parseReportConversionFailureDetail("could not resolve currency conversion rate to USD on 2024-01-02")
+	if parsed.sourceCurrency != "" || parsed.reportBaseCurrency != "" {
+		t.Fatalf("expected detail without source marker to remain incomplete, got %#v", parsed)
+	}
+	if got := reportLeadingDate("bad"); got != "" {
+		t.Fatalf("expected short leading date to be blank, got %q", got)
+	}
+	if got := reportConversionProviderCategory("GBP"); got != "" {
+		t.Fatalf("expected unsupported base currency to have no provider category, got %q", got)
+	}
+}

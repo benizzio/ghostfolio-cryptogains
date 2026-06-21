@@ -2,7 +2,12 @@
 // Authored by: OpenCode
 package currency
 
-import "testing"
+import (
+	"strings"
+	"testing"
+
+	"github.com/cockroachdb/apd/v3"
+)
 
 // TestConvertAmountUsesExactQuoteDirectionFormula verifies provider quote
 // directions are applied without float math.
@@ -53,6 +58,13 @@ func TestConvertAmountBoundsRepeatingDivisionToSixteenDecimals(t *testing.T) {
 // Authored by: OpenCode
 func TestConvertAmountRejectsInvalidInputs(t *testing.T) {
 	t.Parallel()
+
+	var invalidAmount apd.Decimal
+	invalidAmount.Form = apd.Infinite
+	var _, amountErr = ConvertAmountToBase(invalidAmount, mustCurrencyDecimal(t, "1"), QuoteDirectionSourcePerBase)
+	if amountErr == nil || !strings.Contains(amountErr.Error(), "conversion amount is invalid") {
+		t.Fatalf("expected invalid amount rejection, got %v", amountErr)
+	}
 
 	var _, zeroRateErr = ConvertAmountToBase(mustCurrencyDecimal(t, "1"), mustCurrencyDecimal(t, "0"), QuoteDirectionSourcePerBase)
 	if zeroRateErr == nil {

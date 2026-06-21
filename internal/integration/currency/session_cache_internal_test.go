@@ -4,6 +4,7 @@ package currency
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 )
@@ -48,6 +49,44 @@ func TestCurrencyRateSessionCacheRejectsMismatchedEvidence(t *testing.T) {
 	var err = cache.Store(request, evidence)
 	if err == nil {
 		t.Fatalf("expected mismatched evidence rejection")
+	}
+}
+
+// TestCurrencyRateSessionCacheDefensiveBranches verifies nil, invalid-key, miss,
+// and zero fetched-at behavior without persisting any evidence.
+// Authored by: OpenCode
+func TestCurrencyRateSessionCacheDefensiveBranches(t *testing.T) {
+	t.Parallel()
+
+	var request = mustRateLookupRequest(t, "USD", BaseCurrencyEUR)
+	var evidence = mustExchangeRateEvidence(t, request, "1.09")
+	var nilCache *CurrencyRateSessionCache
+	if _, ok := nilCache.Get(request); ok {
+		t.Fatalf("expected nil cache miss")
+	}
+	if err := nilCache.Store(request, evidence); err == nil || !strings.Contains(err.Error(), "cache is required") {
+		t.Fatalf("expected nil cache store rejection, got %v", err)
+	}
+
+	var cache = &CurrencyRateSessionCache{}
+	if _, ok := cache.Get(RateLookupRequest{}); ok {
+		t.Fatalf("expected invalid key lookup to miss")
+	}
+	if _, ok := cache.Get(request); ok {
+		t.Fatalf("expected empty cache lookup to miss")
+	}
+	if err := cache.store(request, evidence, time.Time{}); err != nil {
+		t.Fatalf("expected zero fetched-at to be defaulted: %v", err)
+	}
+	if _, ok := cache.Get(request); !ok {
+		t.Fatalf("expected evidence to be cached after zero fetched-at store")
+	}
+	if err := cache.Store(RateLookupRequest{}, evidence); err == nil || !strings.Contains(err.Error(), "source currency is required") {
+		t.Fatalf("expected invalid cache key rejection, got %v", err)
+	}
+	evidence.RateValue = mustCurrencyDecimal(t, "0")
+	if err := cache.Store(request, evidence); err == nil || !strings.Contains(err.Error(), "cached exchange rate evidence") {
+		t.Fatalf("expected invalid evidence rejection, got %v", err)
 	}
 }
 

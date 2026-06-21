@@ -1056,6 +1056,42 @@ func TestReportSelectionDisablesGenerationBeforeBaseCurrencySelection(t *testing
 	if reportService.called {
 		t.Fatalf("expected disabled generation attempt not to call report service")
 	}
+
+	model.report.FocusArea = reportSelectionFocusAction
+	model.report.SelectedBaseCurrency = ""
+	updated, cmd = model.activateReportSelection()
+	if cmd != nil {
+		t.Fatalf("expected disabled activation to stay synchronous")
+	}
+	model = assertUpdatedModel(t, updated)
+	if model.active != reportSelectionScreenKey || reportService.called {
+		t.Fatalf("expected disabled activation to remain on selection without report service call, active=%s called=%v", model.active, reportService.called)
+	}
+}
+
+// TestReportSelectionActivationFallsBackFromInvalidBaseCurrencyIndex verifies
+// activating a stale base-currency index restores the first supported currency.
+// Authored by: OpenCode
+func TestReportSelectionActivationFallsBackFromInvalidBaseCurrencyIndex(t *testing.T) {
+	t.Parallel()
+
+	var config = mustSetupConfig(t)
+	var model = newTestModel(t, &config)
+	model.active = reportSelectionScreenKey
+	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
+	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
+	model.report.FocusArea = reportSelectionFocusBaseCurrency
+	model.report.BaseCurrencyIndex = 99
+	model.report.SelectedBaseCurrency = ""
+
+	var updated, cmd = model.activateReportSelection()
+	if cmd != nil {
+		t.Fatalf("expected base-currency fallback activation to stay synchronous")
+	}
+	model = assertUpdatedModel(t, updated)
+	if model.report.BaseCurrencyIndex != 0 || model.report.SelectedBaseCurrency != reportmodel.ReportBaseCurrencyUSD || model.report.FocusArea != reportSelectionFocusAction {
+		t.Fatalf("expected invalid base-currency index to fall back to USD and actions, got %#v", model.report)
+	}
 }
 
 func TestUpdateReportCoversIgnoredAndFallbackBranches(t *testing.T) {

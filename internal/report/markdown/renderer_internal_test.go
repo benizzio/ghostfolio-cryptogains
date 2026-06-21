@@ -61,6 +61,43 @@ func TestRendererHelperFallbacks(t *testing.T) {
 	if !strings.Contains(sanitized, "Bearer [REDACTED]") || !strings.Contains(sanitized, "\\|") {
 		t.Fatalf("expected sanitization to preserve redaction and pipe escaping, got %q", sanitized)
 	}
+
+	var convertedRow = reportmodel.AssetActivityRow{GrossValue: apdDecimalPointer(1), ActivityCurrency: "EUR", CalculationCurrency: "USD"}
+	if got := conversionStatusColumn(convertedRow); got != string(reportmodel.ConversionStatusConverted) {
+		t.Fatalf("expected converted status, got %q", got)
+	}
+	var blankRow = reportmodel.AssetActivityRow{ActivityCurrency: "EUR", CalculationCurrency: "USD"}
+	if got := conversionStatusColumn(blankRow); got != "" {
+		t.Fatalf("expected blank status without rendered activity currency, got %q", got)
+	}
+
+	if got := rateAuthorityLabel(reportmodel.ExchangeRateAuthorityEuropeanCentralBank); got != "European Central Bank" {
+		t.Fatalf("unexpected ECB authority label %q", got)
+	}
+	if got := rateAuthorityLabel(reportmodel.ExchangeRateAuthorityFederalReserve); got != "Federal Reserve" {
+		t.Fatalf("unexpected Federal Reserve authority label %q", got)
+	}
+	if got := rateAuthorityLabel(reportmodel.ExchangeRateAuthority("custom|authority")); got != "custom\\|authority" {
+		t.Fatalf("unexpected custom authority fallback %q", got)
+	}
+	if got := rateProviderLabel(reportmodel.ExchangeRateProviderIDECBEXR); !strings.Contains(got, "ECB Data Portal") {
+		t.Fatalf("unexpected ECB provider label %q", got)
+	}
+	if got := rateProviderLabel(reportmodel.ExchangeRateProviderIDFederalReserveH10); !strings.Contains(got, "Federal Reserve Board") {
+		t.Fatalf("unexpected Federal Reserve provider label %q", got)
+	}
+	if got := rateProviderLabel(reportmodel.ExchangeRateProviderID("custom|provider")); got != "custom\\|provider" {
+		t.Fatalf("unexpected provider fallback %q", got)
+	}
+	if got := unavailableDateRule(reportmodel.ExchangeRateProviderIDECBEXR); !strings.Contains(got, "ECB observation") {
+		t.Fatalf("unexpected ECB unavailable-date rule %q", got)
+	}
+	if got := unavailableDateRule(reportmodel.ExchangeRateProviderIDFederalReserveH10); !strings.Contains(got, "H.10 observation") {
+		t.Fatalf("unexpected Federal Reserve unavailable-date rule %q", got)
+	}
+	if got := unavailableDateRule(reportmodel.ExchangeRateProviderID("custom")); !strings.Contains(got, "official observation") {
+		t.Fatalf("unexpected fallback unavailable-date rule %q", got)
+	}
 }
 
 // TestRendererInternalErrorBranches verifies internal helper failures for
@@ -290,6 +327,24 @@ func TestRenderWrapsInjectedHelperFailures(t *testing.T) {
 		}
 	})
 
+	t.Run("rate source failure propagates from Render", func(t *testing.T) {
+		var previousSummary = renderWriteSummarySection
+		var previousRateSource = renderWriteRateSourceSummary
+		defer func() {
+			renderWriteSummarySection = previousSummary
+			renderWriteRateSourceSummary = previousRateSource
+		}()
+
+		renderWriteSummarySection = writeSummarySection
+		renderWriteRateSourceSummary = func(*strings.Builder, reportmodel.CapitalGainsReport) error {
+			return errors.New("rate source boom")
+		}
+
+		if _, renderErr := Render(report); renderErr == nil || !strings.Contains(renderErr.Error(), "rate source boom") {
+			t.Fatalf("expected rate source helper failure to propagate, got %v", renderErr)
+		}
+	})
+
 	t.Run("detail failure propagates from Render", func(t *testing.T) {
 		var previousSummary = renderWriteSummarySection
 		var previousReference = renderWriteReferenceSection
@@ -308,6 +363,33 @@ func TestRenderWrapsInjectedHelperFailures(t *testing.T) {
 
 		if _, renderErr := Render(report); renderErr == nil || !strings.Contains(renderErr.Error(), "detail boom") {
 			t.Fatalf("expected detail helper failure to propagate, got %v", renderErr)
+		}
+	})
+
+	t.Run("conversion audit failure propagates from Render", func(t *testing.T) {
+		var previousSummary = renderWriteSummarySection
+		var previousRateSource = renderWriteRateSourceSummary
+		var previousReference = renderWriteReferenceSection
+		var previousDetails = renderWriteDetailSections
+		var previousAudit = renderWriteConversionAuditSection
+		defer func() {
+			renderWriteSummarySection = previousSummary
+			renderWriteRateSourceSummary = previousRateSource
+			renderWriteReferenceSection = previousReference
+			renderWriteDetailSections = previousDetails
+			renderWriteConversionAuditSection = previousAudit
+		}()
+
+		renderWriteSummarySection = writeSummarySection
+		renderWriteRateSourceSummary = writeRateSourceSummary
+		renderWriteReferenceSection = writeReferenceSection
+		renderWriteDetailSections = writeDetailSections
+		renderWriteConversionAuditSection = func(*strings.Builder, reportmodel.CapitalGainsReport) error {
+			return errors.New("audit boom")
+		}
+
+		if _, renderErr := Render(report); renderErr == nil || !strings.Contains(renderErr.Error(), "audit boom") {
+			t.Fatalf("expected conversion audit helper failure to propagate, got %v", renderErr)
 		}
 	})
 }
@@ -485,6 +567,125 @@ func TestRenderCoversDetailAndLiquidationBranches(t *testing.T) {
 			t.Fatalf("expected wrapped liquidation gain-or-loss error, got %v", err)
 		}
 	})
+}
+
+// TestRendererRateSourceAndConversionAuditSections verifies successful provider
+// disclosure, duplicate rate-source suppression, and audit amount rendering.
+// Authored by: OpenCode
+func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
+	t.Parallel()
+
+	var activityDate = time.Date(2024, time.January, 5, 0, 0, 0, 0, time.UTC)
+	var report = reportmodel.CapitalGainsReport{
+		ReportCalculationCurrency: "USD",
+		RateSources: []reportmodel.ExchangeRateEvidence{
+			{
+				SourceCurrency:   "EUR",
+				BaseCurrency:     reportmodel.ReportBaseCurrencyUSD,
+				ActivityDate:     activityDate,
+				RateDate:         activityDate,
+				Authority:        reportmodel.ExchangeRateAuthorityFederalReserve,
+				ProviderID:       reportmodel.ExchangeRateProviderIDFederalReserveH10,
+				RateKind:         "daily noon buying rate",
+				QuoteDirection:   reportmodel.ExchangeRateQuoteDirectionBasePerSource,
+				RateValue:        *apd.New(10946, -4),
+				DatasetReference: "H10 fixture",
+			},
+			{
+				SourceCurrency:   "GBP",
+				BaseCurrency:     reportmodel.ReportBaseCurrencyUSD,
+				ActivityDate:     activityDate,
+				RateDate:         activityDate,
+				Authority:        reportmodel.ExchangeRateAuthorityFederalReserve,
+				ProviderID:       reportmodel.ExchangeRateProviderIDFederalReserveH10,
+				RateKind:         "daily noon buying rate",
+				QuoteDirection:   reportmodel.ExchangeRateQuoteDirectionBasePerSource,
+				RateValue:        *apd.New(10946, -4),
+				DatasetReference: "H10 fixture duplicate",
+			},
+		},
+		ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{
+			SourceID:           "eur-buy-1",
+			AssetLabel:         "BTC",
+			ActivityDate:       activityDate,
+			SourceCurrency:     "EUR",
+			ReportBaseCurrency: reportmodel.ReportBaseCurrencyUSD,
+			RateDate:           activityDate,
+			RateAuthority:      reportmodel.ExchangeRateAuthorityFederalReserve,
+			RateKind:           "daily noon buying rate",
+			RateValue:          *apd.New(10946, -4),
+			QuoteDirection:     reportmodel.ExchangeRateQuoteDirectionBasePerSource,
+			Amounts: []reportmodel.ConvertedActivityAmount{{
+				AmountKind:      reportmodel.ConvertedAmountKindGrossValue,
+				OriginalAmount:  *apd.New(100, 0),
+				ConvertedAmount: *apd.New(10946, -2),
+			}},
+		}},
+	}
+
+	var builder strings.Builder
+	if err := writeRateSourceSummary(&builder, report); err != nil {
+		t.Fatalf("write rate source summary: %v", err)
+	}
+	var summary = builder.String()
+	if strings.Count(summary, "- Authority: Federal Reserve") != 1 {
+		t.Fatalf("expected duplicate equivalent rate source to render once, got %q", summary)
+	}
+	for _, expected := range []string{"Report Base Currency: USD", "Federal Reserve Board H.10", "most recent previous available H.10 observation", "Rate Value: 1.0946"} {
+		if !strings.Contains(summary, expected) {
+			t.Fatalf("expected rate source summary to contain %q, got %q", expected, summary)
+		}
+	}
+
+	builder.Reset()
+	if err := writeConversionAuditSection(&builder, report); err != nil {
+		t.Fatalf("write conversion audit section: %v", err)
+	}
+	var audit = builder.String()
+	for _, expected := range []string{"## Currency Conversion Audit", "eur-buy-1", "gross_value", "100", "109.46"} {
+		if !strings.Contains(audit, expected) {
+			t.Fatalf("expected conversion audit to contain %q, got %q", expected, audit)
+		}
+	}
+}
+
+// TestRendererRateSourceAndConversionAuditErrors verifies invalid decimals in
+// rate-source and conversion-audit sections are wrapped with row context.
+// Authored by: OpenCode
+func TestRendererRateSourceAndConversionAuditErrors(t *testing.T) {
+	t.Parallel()
+
+	var invalid apd.Decimal
+	invalid.Form = apd.Infinite
+	var report = reportmodel.CapitalGainsReport{
+		RateSources: []reportmodel.ExchangeRateEvidence{{RateValue: invalid}},
+	}
+	var builder strings.Builder
+	if err := writeRateSourceSummary(&builder, report); err == nil || !strings.Contains(err.Error(), "render rate source 0 rate value") {
+		t.Fatalf("expected rate source invalid-decimal error, got %v", err)
+	}
+
+	report = reportmodel.CapitalGainsReport{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{RateValue: invalid}}}
+	builder.Reset()
+	if err := writeConversionAuditSection(&builder, report); err == nil || !strings.Contains(err.Error(), "render conversion audit entry 0 rate value") {
+		t.Fatalf("expected audit rate invalid-decimal error, got %v", err)
+	}
+
+	report = reportmodel.CapitalGainsReport{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{
+		RateValue: *apd.New(1, 0),
+		Amounts:   []reportmodel.ConvertedActivityAmount{{OriginalAmount: invalid}},
+	}}}
+	builder.Reset()
+	if err := writeConversionAuditSection(&builder, report); err == nil || !strings.Contains(err.Error(), "amount 0 original amount") {
+		t.Fatalf("expected audit original amount invalid-decimal error, got %v", err)
+	}
+
+	report.ConversionAuditEntries[0].Amounts[0].OriginalAmount = *apd.New(1, 0)
+	report.ConversionAuditEntries[0].Amounts[0].ConvertedAmount = invalid
+	builder.Reset()
+	if err := writeConversionAuditSection(&builder, report); err == nil || !strings.Contains(err.Error(), "amount 0 converted amount") {
+		t.Fatalf("expected audit converted amount invalid-decimal error, got %v", err)
+	}
 }
 
 // TestRendererAdditionalHelperFailures verifies the remaining direct helper

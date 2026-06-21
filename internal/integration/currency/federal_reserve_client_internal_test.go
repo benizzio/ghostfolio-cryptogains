@@ -95,6 +95,76 @@ func TestFederalReserveH10MapperRejectsUnsupportedAndMalformedObservations(t *te
 	}
 }
 
+// TestFederalReserveH10ClientDefensiveBranches verifies provider-interface
+// wrappers and request-building failures outside the successful fixture path.
+// Authored by: OpenCode
+func TestFederalReserveH10ClientDefensiveBranches(t *testing.T) {
+	t.Parallel()
+
+	var client = NewFederalReserveH10ClientForTesting("%", http.DefaultClient)
+	if client.baseCurrency() != BaseCurrencyUSD {
+		t.Fatalf("expected Federal Reserve provider to advertise USD base currency")
+	}
+	var request = mustRateLookupRequestOnDate(t, "EUR", BaseCurrencyUSD, "2024-01-06")
+	if _, err := client.federalReserveURL(request); err == nil || !strings.Contains(err.Error(), "build Federal Reserve H.10 URL") {
+		t.Fatalf("expected malformed Federal Reserve URL failure, got %v", err)
+	}
+	if _, err := client.LookupRate(context.Background(), request); err == nil || !strings.Contains(err.Error(), "build Federal Reserve H.10 URL") {
+		t.Fatalf("expected malformed Federal Reserve lookup URL failure, got %v", err)
+	}
+	if _, err := client.LookupRate(context.Background(), mustRateLookupRequestOnDate(t, "VES", BaseCurrencyUSD, "2024-01-06")); err == nil || !strings.Contains(err.Error(), "unsupported source currency VES") {
+		t.Fatalf("expected unsupported Federal Reserve source rejection, got %v", err)
+	}
+
+	var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.WriteHeader(http.StatusBadGateway)
+	}))
+	defer server.Close()
+	client = NewFederalReserveH10ClientForTesting(server.URL, http.DefaultClient)
+	if _, err := client.LookupRate(context.Background(), request); err == nil || !strings.Contains(err.Error(), "provider returned HTTP status") {
+		t.Fatalf("expected Federal Reserve provider fetch failure, got %v", err)
+	}
+
+	var malformedServer = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = writer.Write([]byte("Currency,Monetary unit,Quote direction,2024-01-05\n"))
+	}))
+	defer malformedServer.Close()
+	client = NewFederalReserveH10ClientForTesting(malformedServer.URL, http.DefaultClient)
+	if _, err := client.LookupRate(context.Background(), request); err == nil || !strings.Contains(err.Error(), "unsupported source currency EUR") {
+		t.Fatalf("expected Federal Reserve mapper failure through client, got %v", err)
+	}
+}
+
+// TestFederalReserveH10MapperRejectsCSVShapeAndDateFallbackGaps verifies
+// malformed CSV envelopes and unavailable observations fail without fallback rates.
+// Authored by: OpenCode
+func TestFederalReserveH10MapperRejectsCSVShapeAndDateFallbackGaps(t *testing.T) {
+	t.Parallel()
+
+	var request = mustRateLookupRequestOnDate(t, "MXN", BaseCurrencyUSD, "2024-01-06")
+	var testCases = []struct {
+		name    string
+		payload string
+		want    string
+	}{
+		{name: "empty payload", payload: "", want: "no current or prior available observation"},
+		{name: "malformed quoted CSV", payload: "Currency,Monetary unit,Quote direction,2024-01-05\n\"Mexico,MXN,currency units per USD,16.9140\n", want: "parse Federal Reserve H.10 CSV"},
+		{name: "missing source row", payload: "Currency,Monetary unit,Quote direction,2024-01-05\nEMU member countries,EUR,USD per currency unit,1.0946\n", want: "unsupported source currency MXN"},
+		{name: "too few columns", payload: "Currency,Monetary unit,Quote direction\nMexico,MXN,currency units per USD\n", want: "date observations are required"},
+		{name: "future observation only", payload: "Currency,Monetary unit,Quote direction,2024-01-07\nMexico,MXN,currency units per USD,16.9140\n", want: "no current or prior available observation"},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var _, err = MapFederalReserveH10CSVToEvidence(request, []byte(testCase.payload), "H10 fixture")
+			if err == nil || !strings.Contains(err.Error(), testCase.want) {
+				t.Fatalf("expected error containing %q, got %v", testCase.want, err)
+			}
+		})
+	}
+}
+
 // assertFederalReserveEvidence verifies canonical H.10 evidence.
 // Authored by: OpenCode
 func assertFederalReserveEvidence(t *testing.T, evidence ExchangeRateEvidence, request RateLookupRequest, quoteDirection QuoteDirection, rateDate string, rateValue string) {

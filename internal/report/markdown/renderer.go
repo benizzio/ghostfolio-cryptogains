@@ -19,9 +19,11 @@ const notApplicableCalculationCurrency = "NOT APPLICABLE"
 // weakening the validated helper behavior.
 // Authored by: OpenCode
 var (
-	renderWriteSummarySection   = writeSummarySection
-	renderWriteReferenceSection = writeReferenceSection
-	renderWriteDetailSections   = writeDetailSections
+	renderWriteSummarySection         = writeSummarySection
+	renderWriteRateSourceSummary      = writeRateSourceSummary
+	renderWriteReferenceSection       = writeReferenceSection
+	renderWriteDetailSections         = writeDetailSections
+	renderWriteConversionAuditSection = writeConversionAuditSection
 )
 
 // Render converts one calculated yearly capital-gains report into the Markdown
@@ -48,7 +50,7 @@ func Render(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, 
 	if err := renderWriteSummarySection(&builder, report, calculationCurrency); err != nil {
 		return reportmodel.ReportDocument{}, err
 	}
-	if err := writeRateSourceSummary(&builder, report); err != nil {
+	if err := renderWriteRateSourceSummary(&builder, report); err != nil {
 		return reportmodel.ReportDocument{}, err
 	}
 	if err := renderWriteReferenceSection(&builder, report); err != nil {
@@ -57,7 +59,7 @@ func Render(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, 
 	if err := renderWriteDetailSections(&builder, report, calculationCurrency); err != nil {
 		return reportmodel.ReportDocument{}, err
 	}
-	if err := writeConversionAuditSection(&builder, report); err != nil {
+	if err := renderWriteConversionAuditSection(&builder, report); err != nil {
 		return reportmodel.ReportDocument{}, err
 	}
 

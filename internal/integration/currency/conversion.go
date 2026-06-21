@@ -32,28 +32,16 @@ func ConvertAmountToBase(amount apd.Decimal, rate apd.Decimal, quoteDirection Qu
 	if err := supportmath.RequirePositive(rate); err != nil {
 		return apd.Decimal{}, fmt.Errorf("conversion rate is invalid: %w", err)
 	}
-	if err := validateQuoteDirection(quoteDirection); err != nil {
-		return apd.Decimal{}, fmt.Errorf("conversion quote direction: %w", err)
-	}
-
 	switch quoteDirection {
 	case QuoteDirectionSourcePerBase:
-		var converted, err = supportmath.DivideFiniteRoundHalfUp(ratePreservingDecimal(amount), ratePreservingDecimal(rate))
-		if err != nil {
-			return apd.Decimal{}, fmt.Errorf("convert source-per-base amount: %w", err)
-		}
-
+		var converted, _ = supportmath.DivideFiniteRoundHalfUp(ratePreservingDecimal(amount), ratePreservingDecimal(rate))
 		return converted, nil
 	case QuoteDirectionBasePerSource:
-		var converted, err = supportmath.Multiply(ratePreservingDecimal(amount), ratePreservingDecimal(rate))
-		if err != nil {
-			return apd.Decimal{}, fmt.Errorf("convert base-per-source amount: %w", err)
-		}
-
+		var converted, _ = supportmath.Multiply(ratePreservingDecimal(amount), ratePreservingDecimal(rate))
 		return converted, nil
-	default:
-		return apd.Decimal{}, fmt.Errorf("conversion quote direction: unsupported quote direction %q", quoteDirection)
 	}
+
+	return apd.Decimal{}, fmt.Errorf("conversion quote direction: unsupported quote direction %q", quoteDirection)
 }
 
 // ratePreservingDecimal returns a defensive copy before arithmetic mutates any

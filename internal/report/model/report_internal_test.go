@@ -844,6 +844,388 @@ func TestBasisMatchValidationAndCloneOptionalDecimalCoverRemainingBranches(t *te
 	}
 }
 
+// TestConversionAuditValidationGuardrails verifies conversion audit model
+// success paths and relationship guardrails around evidence and amounts.
+// Authored by: OpenCode
+func TestConversionAuditValidationGuardrails(t *testing.T) {
+	t.Parallel()
+
+	var activityDate = time.Date(2024, time.January, 5, 0, 0, 0, 0, time.UTC)
+	var evidence = ExchangeRateEvidence{
+		SourceCurrency:   "EUR",
+		BaseCurrency:     ReportBaseCurrencyUSD,
+		ActivityDate:     activityDate,
+		RateDate:         activityDate,
+		Authority:        ExchangeRateAuthorityFederalReserve,
+		ProviderID:       ExchangeRateProviderIDFederalReserveH10,
+		RateKind:         "noon buying rate in New York for cable transfers payable in listed currencies",
+		QuoteDirection:   ExchangeRateQuoteDirectionSourcePerBase,
+		RateValue:        mustReportDecimal(t, "2"),
+		DatasetReference: "H10/EUR/2024-01-05",
+	}
+	if err := evidence.Validate(); err != nil {
+		t.Fatalf("expected valid evidence: %v", err)
+	}
+
+	var amount = ConvertedActivityAmount{
+		SourceID:             "eur-buy-1",
+		AmountKind:           ConvertedAmountKindGrossValue,
+		OriginalCurrency:     "EUR",
+		OriginalAmount:       mustReportDecimal(t, "100"),
+		ReportBaseCurrency:   ReportBaseCurrencyUSD,
+		ConvertedAmount:      mustReportDecimal(t, "50"),
+		ExchangeRateEvidence: &evidence,
+		ConversionStatus:     ConversionStatusConverted,
+	}
+	if err := amount.Validate(); err != nil {
+		t.Fatalf("expected valid converted amount: %v", err)
+	}
+
+	var sameCurrencyAmount = ConvertedActivityAmount{
+		SourceID:           "usd-buy-1",
+		AmountKind:         ConvertedAmountKindGrossValue,
+		OriginalCurrency:   "USD",
+		OriginalAmount:     mustReportDecimal(t, "100"),
+		ReportBaseCurrency: ReportBaseCurrencyUSD,
+		ConvertedAmount:    mustReportDecimal(t, "100"),
+		ConversionStatus:   ConversionStatusSameCurrency,
+	}
+	if err := sameCurrencyAmount.Validate(); err != nil {
+		t.Fatalf("expected valid same-currency amount: %v", err)
+	}
+
+	var entry = ConversionAuditEntry{
+		SourceID:           "eur-buy-1",
+		AssetLabel:         "BTC",
+		ActivityDate:       activityDate,
+		SourceCurrency:     "EUR",
+		ReportBaseCurrency: ReportBaseCurrencyUSD,
+		RateDate:           activityDate,
+		RateAuthority:      ExchangeRateAuthorityFederalReserve,
+		RateKind:           evidence.RateKind,
+		RateValue:          mustReportDecimal(t, "2"),
+		QuoteDirection:     ExchangeRateQuoteDirectionSourcePerBase,
+		Amounts:            []ConvertedActivityAmount{amount},
+	}
+	if err := entry.Validate(); err != nil {
+		t.Fatalf("expected valid audit entry: %v", err)
+	}
+
+	var invalidEvidence = evidence
+	invalidEvidence.SourceCurrency = "USD"
+	if err := invalidEvidence.Validate(); err == nil || !strings.Contains(err.Error(), "must differ") {
+		t.Fatalf("expected same source/base evidence rejection, got %v", err)
+	}
+	invalidEvidence = evidence
+	invalidEvidence.SourceCurrency = "USD"
+	invalidEvidence.BaseCurrency = ReportBaseCurrencyEUR
+	if err := invalidEvidence.Validate(); err == nil || !strings.Contains(err.Error(), "provider does not match") {
+		t.Fatalf("expected provider/base mismatch rejection, got %v", err)
+	}
+	invalidEvidence = evidence
+	invalidEvidence.ActivityDate = time.Time{}
+	if err := invalidEvidence.Validate(); err == nil || !strings.Contains(err.Error(), "activity date") {
+		t.Fatalf("expected missing evidence activity date rejection, got %v", err)
+	}
+	invalidEvidence = evidence
+	invalidEvidence.RateDate = activityDate.AddDate(0, 0, 1)
+	if err := invalidEvidence.Validate(); err == nil || !strings.Contains(err.Error(), "must not be after") {
+		t.Fatalf("expected future rate date rejection, got %v", err)
+	}
+	invalidEvidence = evidence
+	invalidEvidence.DatasetReference = " "
+	if err := invalidEvidence.Validate(); err == nil || !strings.Contains(err.Error(), "dataset reference") {
+		t.Fatalf("expected missing dataset reference rejection, got %v", err)
+	}
+	invalidEvidence = evidence
+	invalidEvidence.SourceCurrency = " "
+	if err := invalidEvidence.Validate(); err == nil || !strings.Contains(err.Error(), "source currency is required") {
+		t.Fatalf("expected missing evidence source currency rejection, got %v", err)
+	}
+	invalidEvidence = evidence
+	invalidEvidence.BaseCurrency = ReportBaseCurrency("GBP")
+	if err := invalidEvidence.Validate(); err == nil || !strings.Contains(err.Error(), "base currency") {
+		t.Fatalf("expected unsupported evidence base currency rejection, got %v", err)
+	}
+	invalidEvidence = evidence
+	invalidEvidence.RateDate = time.Time{}
+	if err := invalidEvidence.Validate(); err == nil || !strings.Contains(err.Error(), "rate date") {
+		t.Fatalf("expected missing evidence rate date rejection, got %v", err)
+	}
+	invalidEvidence = evidence
+	invalidEvidence.Authority = ExchangeRateAuthority("market")
+	if err := invalidEvidence.Validate(); err == nil || !strings.Contains(err.Error(), "authority") {
+		t.Fatalf("expected unsupported evidence authority rejection, got %v", err)
+	}
+	invalidEvidence = evidence
+	invalidEvidence.ProviderID = ExchangeRateProviderID("market")
+	if err := invalidEvidence.Validate(); err == nil || !strings.Contains(err.Error(), "provider") {
+		t.Fatalf("expected unsupported evidence provider rejection, got %v", err)
+	}
+	invalidEvidence = evidence
+	invalidEvidence.RateKind = " "
+	if err := invalidEvidence.Validate(); err == nil || !strings.Contains(err.Error(), "rate kind") {
+		t.Fatalf("expected missing evidence rate kind rejection, got %v", err)
+	}
+	invalidEvidence = evidence
+	invalidEvidence.QuoteDirection = ExchangeRateQuoteDirection("ambiguous")
+	if err := invalidEvidence.Validate(); err == nil || !strings.Contains(err.Error(), "quote direction") {
+		t.Fatalf("expected unsupported evidence quote direction rejection, got %v", err)
+	}
+	invalidEvidence = evidence
+	invalidEvidence.RateValue = mustReportDecimal(t, "0")
+	if err := invalidEvidence.Validate(); err == nil || !strings.Contains(err.Error(), "rate value") {
+		t.Fatalf("expected non-positive evidence rate rejection, got %v", err)
+	}
+
+	var invalidAmount = sameCurrencyAmount
+	invalidAmount.SourceID = " "
+	if err := invalidAmount.Validate(); err == nil || !strings.Contains(err.Error(), "source ID") {
+		t.Fatalf("expected missing amount source ID rejection, got %v", err)
+	}
+	invalidAmount = sameCurrencyAmount
+	invalidAmount.AmountKind = ConvertedAmountKind("unknown")
+	if err := invalidAmount.Validate(); err == nil || !strings.Contains(err.Error(), "amount kind") {
+		t.Fatalf("expected unsupported amount kind rejection, got %v", err)
+	}
+	invalidAmount = sameCurrencyAmount
+	invalidAmount.OriginalCurrency = " "
+	if err := invalidAmount.Validate(); err == nil || !strings.Contains(err.Error(), "original currency") {
+		t.Fatalf("expected missing original currency rejection, got %v", err)
+	}
+	invalidAmount = sameCurrencyAmount
+	invalidAmount.ReportBaseCurrency = ReportBaseCurrency("GBP")
+	if err := invalidAmount.Validate(); err == nil || !strings.Contains(err.Error(), "report base currency") {
+		t.Fatalf("expected unsupported amount base currency rejection, got %v", err)
+	}
+	invalidAmount = sameCurrencyAmount
+	invalidAmount.OriginalAmount = reportInvalidDecimal
+	if err := invalidAmount.Validate(); err == nil || !strings.Contains(err.Error(), "original amount") {
+		t.Fatalf("expected invalid original amount rejection, got %v", err)
+	}
+	invalidAmount = sameCurrencyAmount
+	invalidAmount.ConvertedAmount = reportInvalidDecimal
+	if err := invalidAmount.Validate(); err == nil || !strings.Contains(err.Error(), "converted amount") {
+		t.Fatalf("expected invalid converted amount rejection, got %v", err)
+	}
+	invalidAmount = sameCurrencyAmount
+	invalidAmount.ConversionStatus = ConversionStatus("unknown")
+	if err := invalidAmount.Validate(); err == nil || !strings.Contains(err.Error(), "conversion status") {
+		t.Fatalf("expected unsupported conversion status rejection, got %v", err)
+	}
+	invalidAmount = sameCurrencyAmount
+	invalidAmount.OriginalCurrency = "EUR"
+	if err := invalidAmount.Validate(); err == nil || !strings.Contains(err.Error(), "must match") {
+		t.Fatalf("expected same-currency source mismatch rejection, got %v", err)
+	}
+	invalidAmount = sameCurrencyAmount
+	invalidAmount.ExchangeRateEvidence = &evidence
+	if err := invalidAmount.Validate(); err == nil || !strings.Contains(err.Error(), "must not include") {
+		t.Fatalf("expected same-currency evidence rejection, got %v", err)
+	}
+	invalidAmount = sameCurrencyAmount
+	invalidAmount.ConvertedAmount = mustReportDecimal(t, "99")
+	if err := invalidAmount.Validate(); err == nil || !strings.Contains(err.Error(), "must equal") {
+		t.Fatalf("expected same-currency amount mismatch rejection, got %v", err)
+	}
+	invalidAmount = amount
+	invalidAmount.ExchangeRateEvidence = nil
+	if err := invalidAmount.Validate(); err == nil || !strings.Contains(err.Error(), "evidence is required") {
+		t.Fatalf("expected missing converted evidence rejection, got %v", err)
+	}
+	invalidAmount = amount
+	invalidAmount.OriginalCurrency = "USD"
+	if err := invalidAmount.Validate(); err == nil || !strings.Contains(err.Error(), "must differ") {
+		t.Fatalf("expected converted same-currency rejection, got %v", err)
+	}
+	invalidAmount = amount
+	var mismatchedEvidence = evidence
+	mismatchedEvidence.SourceCurrency = "GBP"
+	invalidAmount.ExchangeRateEvidence = &mismatchedEvidence
+	if err := invalidAmount.Validate(); err == nil || !strings.Contains(err.Error(), "source currency mismatch") {
+		t.Fatalf("expected evidence source mismatch rejection, got %v", err)
+	}
+	invalidAmount = amount
+	mismatchedEvidence = evidence
+	mismatchedEvidence.BaseCurrency = ReportBaseCurrencyEUR
+	invalidAmount.ReportBaseCurrency = ReportBaseCurrencyUSD
+	invalidAmount.ExchangeRateEvidence = &mismatchedEvidence
+	if err := invalidAmount.Validate(); err == nil || !strings.Contains(err.Error(), "exchange-rate evidence") {
+		t.Fatalf("expected evidence base mismatch rejection, got %v", err)
+	}
+	invalidAmount = amount
+	invalidAmount.OriginalCurrency = "GBP"
+	mismatchedEvidence = evidence
+	mismatchedEvidence.SourceCurrency = "GBP"
+	mismatchedEvidence.BaseCurrency = ReportBaseCurrencyEUR
+	mismatchedEvidence.Authority = ExchangeRateAuthorityEuropeanCentralBank
+	mismatchedEvidence.ProviderID = ExchangeRateProviderIDECBEXR
+	invalidAmount.ExchangeRateEvidence = &mismatchedEvidence
+	if err := invalidAmount.Validate(); err == nil || !strings.Contains(err.Error(), "base currency mismatch") {
+		t.Fatalf("expected valid-evidence amount base mismatch rejection, got %v", err)
+	}
+
+	var invalidEntry = entry
+	invalidEntry.SourceID = " "
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "source ID") {
+		t.Fatalf("expected audit missing source ID rejection, got %v", err)
+	}
+	invalidEntry = entry
+	invalidEntry.AssetLabel = " "
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "asset label") {
+		t.Fatalf("expected audit missing asset label rejection, got %v", err)
+	}
+	invalidEntry = entry
+	invalidEntry.ActivityDate = time.Time{}
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "activity date") {
+		t.Fatalf("expected audit missing activity date rejection, got %v", err)
+	}
+	invalidEntry = entry
+	invalidEntry.SourceCurrency = " "
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "source currency") {
+		t.Fatalf("expected audit missing source currency rejection, got %v", err)
+	}
+	invalidEntry = entry
+	invalidEntry.ReportBaseCurrency = ReportBaseCurrency("GBP")
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "base currency") {
+		t.Fatalf("expected audit unsupported base currency rejection, got %v", err)
+	}
+	invalidEntry = entry
+	invalidEntry.RateDate = time.Time{}
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "rate date") {
+		t.Fatalf("expected audit missing rate-date rejection, got %v", err)
+	}
+	invalidEntry = entry
+	invalidEntry.RateAuthority = ExchangeRateAuthority("market")
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "authority") {
+		t.Fatalf("expected audit unsupported authority rejection, got %v", err)
+	}
+	invalidEntry = entry
+	invalidEntry.RateKind = " "
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "rate kind") {
+		t.Fatalf("expected audit missing rate kind rejection, got %v", err)
+	}
+	invalidEntry = entry
+	invalidEntry.RateValue = mustReportDecimal(t, "0")
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "rate value") {
+		t.Fatalf("expected audit non-positive rate rejection, got %v", err)
+	}
+	invalidEntry = entry
+	invalidEntry.QuoteDirection = ExchangeRateQuoteDirection("ambiguous")
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "quote direction") {
+		t.Fatalf("expected audit unsupported quote direction rejection, got %v", err)
+	}
+	invalidEntry = entry
+	invalidEntry.SourceCurrency = "USD"
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "must differ") {
+		t.Fatalf("expected audit source/base mismatch rejection, got %v", err)
+	}
+	invalidEntry = entry
+	invalidEntry.RateDate = activityDate.AddDate(0, 0, 1)
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "must not be after") {
+		t.Fatalf("expected audit future rate-date rejection, got %v", err)
+	}
+	invalidEntry = entry
+	invalidEntry.Amounts = nil
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "amounts are required") {
+		t.Fatalf("expected audit missing amounts rejection, got %v", err)
+	}
+	invalidEntry = entry
+	invalidEntry.Amounts = []ConvertedActivityAmount{sameCurrencyAmount}
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "amount must be converted") {
+		t.Fatalf("expected audit same-currency amount rejection, got %v", err)
+	}
+	invalidEntry = entry
+	var mismatchedAmount = amount
+	mismatchedAmount.SourceID = "other"
+	invalidEntry.Amounts = []ConvertedActivityAmount{mismatchedAmount}
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "source ID mismatch") {
+		t.Fatalf("expected audit source ID mismatch rejection, got %v", err)
+	}
+	invalidEntry = entry
+	mismatchedAmount = amount
+	mismatchedAmount.OriginalCurrency = "GBP"
+	mismatchedEvidence = evidence
+	mismatchedEvidence.SourceCurrency = "GBP"
+	mismatchedAmount.ExchangeRateEvidence = &mismatchedEvidence
+	invalidEntry.Amounts = []ConvertedActivityAmount{mismatchedAmount}
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "source currency mismatch") {
+		t.Fatalf("expected audit source currency mismatch rejection, got %v", err)
+	}
+	invalidEntry = entry
+	invalidEntry.SourceCurrency = "GBP"
+	mismatchedAmount = amount
+	mismatchedAmount.ReportBaseCurrency = ReportBaseCurrencyEUR
+	mismatchedAmount.OriginalCurrency = "GBP"
+	mismatchedEvidence = evidence
+	mismatchedEvidence.SourceCurrency = "GBP"
+	mismatchedEvidence.BaseCurrency = ReportBaseCurrencyEUR
+	mismatchedEvidence.Authority = ExchangeRateAuthorityEuropeanCentralBank
+	mismatchedEvidence.ProviderID = ExchangeRateProviderIDECBEXR
+	mismatchedAmount.ExchangeRateEvidence = &mismatchedEvidence
+	invalidEntry.Amounts = []ConvertedActivityAmount{mismatchedAmount}
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "report base currency") {
+		t.Fatalf("expected audit base currency mismatch rejection, got %v", err)
+	}
+	invalidEntry = entry
+	mismatchedAmount = amount
+	mismatchedEvidence = evidence
+	mismatchedEvidence.RateValue = mustReportDecimal(t, "3")
+	mismatchedAmount.ExchangeRateEvidence = &mismatchedEvidence
+	invalidEntry.Amounts = []ConvertedActivityAmount{mismatchedAmount}
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "exchange-rate evidence mismatch") {
+		t.Fatalf("expected audit evidence mismatch rejection, got %v", err)
+	}
+
+	invalidEntry = entry
+	invalidAmount = amount
+	invalidAmount.AmountKind = ConvertedAmountKind("bad")
+	invalidEntry.Amounts = []ConvertedActivityAmount{invalidAmount}
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "amount 0") {
+		t.Fatalf("expected audit invalid nested amount rejection, got %v", err)
+	}
+
+	var report = CapitalGainsReport{Year: 2024, CostBasisMethod: CostBasisMethodFIFO, GeneratedAt: activityDate, ReportCalculationCurrency: "USD", YearlyNetTotal: mustReportDecimal(t, "0")}
+	invalidEvidence = evidence
+	invalidEvidence.RateValue = mustReportDecimal(t, "0")
+	report.RateSources = []ExchangeRateEvidence{invalidEvidence}
+	if err := report.Validate(); err == nil || !strings.Contains(err.Error(), "rate source 0") {
+		t.Fatalf("expected invalid report rate source rejection, got %v", err)
+	}
+
+	report.RateSources = []ExchangeRateEvidence{evidence}
+	report.ReportCalculationCurrency = "EUR"
+	if err := report.Validate(); err == nil || !strings.Contains(err.Error(), "base currency must match") {
+		t.Fatalf("expected report rate-source currency mismatch rejection, got %v", err)
+	}
+
+	report.ReportCalculationCurrency = "USD"
+	invalidEntry = entry
+	invalidEntry.SourceID = " "
+	report.ConversionAuditEntries = []ConversionAuditEntry{invalidEntry}
+	if err := report.Validate(); err == nil || !strings.Contains(err.Error(), "conversion audit entry 0") {
+		t.Fatalf("expected invalid report audit entry rejection, got %v", err)
+	}
+
+	report.ConversionAuditEntries = []ConversionAuditEntry{entry}
+	report.RateSources = nil
+	if err := report.Validate(); err == nil || !strings.Contains(err.Error(), "matching rate source") {
+		t.Fatalf("expected missing report rate source rejection, got %v", err)
+	}
+
+	report.ReportCalculationCurrency = "NOT APPLICABLE"
+	report.RateSources = []ExchangeRateEvidence{evidence}
+	report.ConversionAuditEntries = nil
+	if err := report.validateRateSourceCurrency(0, evidence); err != nil {
+		t.Fatalf("expected NOT APPLICABLE report currency to skip rate-source currency validation: %v", err)
+	}
+	invalidEntry = entry
+	invalidEntry.SourceCurrency = "GBP"
+	if report.hasMatchingRateSource(invalidEntry) {
+		t.Fatalf("expected report without audit source fields to report no direct match")
+	}
+}
+
 // mustReportDecimal parses one decimal literal for report-model tests.
 // Authored by: OpenCode
 func mustReportDecimal(t *testing.T, raw string) apd.Decimal {

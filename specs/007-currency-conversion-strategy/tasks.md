@@ -231,13 +231,13 @@ Process units in this order. Units marked as parallel candidates may run concurr
 **Purpose**: Final validation, documentation alignment, and coverage-gate checks.
 
 - [X] T058 [P] Update automated and manual validation notes after implementation in `specs/007-currency-conversion-strategy/quickstart.md`
-- [ ] T059 ⚠️ Reopened ~~Run full Go coverage test command and create `coverage.cov`~~ Run full Go coverage test command with the maintained output path and create `dist/coverage/coverage.out` (reopened — BUG-001)
-- [ ] T060 ⚠️ Reopened ~~Run coverage XML export and create `coverage.xml`~~ Run coverage XML export from `dist/coverage/coverage.out` and create `dist/coverage/coverage.xml` (reopened — BUG-001)
+- [X] T059 ⚠️ Reopened ~~Run full Go coverage test command and create `coverage.cov`~~ Run full Go coverage test command with the maintained output path and create `dist/coverage/coverage.out` (reopened — BUG-001)
+- [X] T060 ⚠️ Reopened ~~Run coverage XML export and create `coverage.xml`~~ Run coverage XML export from `dist/coverage/coverage.out` and create `dist/coverage/coverage.xml` (reopened — BUG-001)
 - [X] T061 Verify empirical dataset files remain unchanged under `testdata/empirical/`
 - [X] T062 Run opt-in external integration tests only when explicitly enabled and verify default skip behavior in `tests/externalintegration/currency_provider_live_test.go`
 - [X] T070 Record fixed-host provider integration security review evidence, including OWASP Top 10 coverage and no user-controlled provider URL review, in `specs/007-currency-conversion-strategy/quickstart.md`
-- [ ] T071 Remove stale root-level generated coverage artifacts `coverage.cov` and `coverage.xml` if present in the repository root
-- [ ] T072 Run `make coverage` from the repository root and verify the coverage gate consumes `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`
+- [X] T071 Remove stale root-level generated coverage artifacts `coverage.cov` and `coverage.xml` if present in the repository root
+- [X] T072 Run `make coverage` from the repository root and verify the coverage gate consumes `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`
 
 ---
 

@@ -91,6 +91,76 @@ func TestECBEXRMapperRejectsUnsupportedAndMalformedObservations(t *testing.T) {
 	}
 }
 
+// TestECBEXRClientDefensiveBranches verifies provider-interface wrappers and
+// request-building failures outside the successful fixture path.
+// Authored by: OpenCode
+func TestECBEXRClientDefensiveBranches(t *testing.T) {
+	t.Parallel()
+
+	var client = NewECBEXRClientForTesting("%", http.DefaultClient)
+	if client.baseCurrency() != BaseCurrencyEUR {
+		t.Fatalf("expected ECB provider to advertise EUR base currency")
+	}
+	var request = mustRateLookupRequestOnDate(t, "USD", BaseCurrencyEUR, "2024-01-06")
+	if _, _, err := client.ecbURL(request); err == nil || !strings.Contains(err.Error(), "build ECB EXR URL") {
+		t.Fatalf("expected malformed ECB URL failure, got %v", err)
+	}
+	if _, err := client.LookupRate(context.Background(), request); err == nil || !strings.Contains(err.Error(), "build ECB EXR URL") {
+		t.Fatalf("expected malformed ECB lookup URL failure, got %v", err)
+	}
+	if _, err := client.LookupRate(context.Background(), mustRateLookupRequestOnDate(t, "RUB", BaseCurrencyEUR, "2024-01-06")); err == nil || !strings.Contains(err.Error(), "unsupported source currency RUB") {
+		t.Fatalf("expected unsupported ECB source rejection, got %v", err)
+	}
+
+	var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.WriteHeader(http.StatusBadGateway)
+	}))
+	defer server.Close()
+	client = NewECBEXRClientForTesting(server.URL, http.DefaultClient)
+	if _, err := client.LookupRate(context.Background(), request); err == nil || !strings.Contains(err.Error(), "provider returned HTTP status") {
+		t.Fatalf("expected ECB provider fetch failure, got %v", err)
+	}
+
+	var malformedServer = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = writer.Write([]byte("TIME_PERIOD,OBS_VALUE\n"))
+	}))
+	defer malformedServer.Close()
+	client = NewECBEXRClientForTesting(malformedServer.URL, http.DefaultClient)
+	if _, err := client.LookupRate(context.Background(), request); err == nil || !strings.Contains(err.Error(), "no current or prior available observation") {
+		t.Fatalf("expected ECB mapper failure through client, got %v", err)
+	}
+}
+
+// TestECBEXRMapperRejectsCSVShapeAndDateFallbackGaps verifies malformed CSV
+// envelopes and future-only observations fail without fallback rates.
+// Authored by: OpenCode
+func TestECBEXRMapperRejectsCSVShapeAndDateFallbackGaps(t *testing.T) {
+	t.Parallel()
+
+	var request = mustRateLookupRequestOnDate(t, "USD", BaseCurrencyEUR, "2024-01-06")
+	var testCases = []struct {
+		name    string
+		payload string
+		want    string
+	}{
+		{name: "empty payload", payload: "", want: "no current or prior available observation"},
+		{name: "malformed quoted CSV", payload: "TIME_PERIOD,OBS_VALUE\n\"2024-01-05,1.09\n", want: "parse ECB EXR CSV"},
+		{name: "missing required columns", payload: "DATE,VALUE\n2024-01-05,1.09\n", want: "required columns"},
+		{name: "future observation only", payload: "TIME_PERIOD,OBS_VALUE\n2024-01-07,1.09\n", want: "no current or prior available observation"},
+		{name: "short row skipped", payload: "TIME_PERIOD,OBS_VALUE\n2024-01-05\n", want: "no current or prior available observation"},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var _, err = MapECBEXRCSVToEvidence(request, []byte(testCase.payload), "EXR/D.USD.EUR.SP00.A")
+			if err == nil || !strings.Contains(err.Error(), testCase.want) {
+				t.Fatalf("expected error containing %q, got %v", testCase.want, err)
+			}
+		})
+	}
+}
+
 // assertECBEvidence verifies canonical ECB evidence.
 // Authored by: OpenCode
 func assertECBEvidence(t *testing.T, evidence ExchangeRateEvidence, request RateLookupRequest, rateDate string, rateValue string) {
