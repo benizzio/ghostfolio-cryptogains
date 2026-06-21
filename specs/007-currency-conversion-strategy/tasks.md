@@ -58,6 +58,7 @@
 - [ ] T016 [P] [US1] Add integration test proving USD and EUR report requests reach runtime generation in `tests/integration/report_generation_flow_test.go`
 - [ ] T017 [P] [US1] Add request validation tests for missing and invalid report base currency in `internal/report/model/report_internal_test.go`
 - [ ] T018 [P] [US1] Add Markdown contract test that selected base currency replaces `NOT APPLICABLE` in `tests/contract/markdown_report_contract_test.go`
+- [ ] T063 [P] [US1] Add single-currency regression tests proving same-currency report monetary results preserve prior no-conversion behavior in `tests/integration/report_generation_flow_test.go`
 
 ### Implementation for User Story 1
 
@@ -83,12 +84,18 @@
 
 ### Tests for User Story 2 (MANDATORY)
 
-- [ ] T028 [P] [US2] Add official rate-provider contract tests with deterministic fixtures in `tests/contract/rate_provider_integration_contract_test.go`
+- [ ] T028 [P] [US2] Add official rate-provider contract tests with deterministic fixtures covering supported and unsupported source currencies in `tests/contract/rate_provider_integration_contract_test.go`
 - [ ] T029 [P] [US2] Add ECB EXR client and mapper unit tests in `internal/integration/currency/ecb_client_internal_test.go`
 - [ ] T030 [P] [US2] Add Federal Reserve H.10 client and mapper unit tests in `internal/integration/currency/federal_reserve_client_internal_test.go`
 - [ ] T031 [P] [US2] Add exact conversion math and session-cache unit tests in `internal/integration/currency/conversion_internal_test.go`
-- [ ] T032 [P] [US2] Add deterministic mixed-currency conversion integration test in `tests/integration/report_generation_flow_test.go`
+- [ ] T032 [P] [US2] Add deterministic mixed-currency conversion integration test with at least 50 priced activities, 3 source currencies, 2 report years, ECB division, H.10 unstarred division, H.10 starred multiplication, and previous-available-rate fallback in `tests/integration/report_generation_flow_test.go`
 - [ ] T033 [P] [US2] Add Markdown audit and rate source summary contract tests in `tests/contract/markdown_report_contract_test.go`
+- [ ] T064 [P] [US2] Add offset-sensitive source-calendar date rate-selection tests where UTC date differs from the preserved activity offset date in `tests/integration/report_generation_flow_test.go`
+- [ ] T065 [P] [US2] Add single-activity monetary-context no-tier-mixing conversion tests in `internal/report/calculate/calculator_internal_test.go`
+- [ ] T066 [P] [US2] Add Markdown contract tests distinguishing same-currency rows from converted rows in `tests/contract/markdown_report_contract_test.go`
+- [ ] T067 [P] [US2] Add explicit zero-valued monetary field conversion tests proving valid zero fees and amounts remain zero in `internal/report/calculate/calculator_internal_test.go`
+- [ ] T068 [P] [US2] Add session-cache revision behavior tests proving same-key cached evidence is reused within one process and new service instances fetch currently published provider values in `internal/integration/currency/session_cache_internal_test.go`
+- [ ] T069 [P] [US2] Add 10,000-activity responsiveness integration test with delayed provider fixtures, asynchronous busy-state assertion, and bounded lookup-count assertions in `tests/integration/report_generation_responsiveness_test.go`
 
 ### Implementation for User Story 2
 
@@ -146,6 +153,7 @@
 - [ ] T060 Run coverage XML export and create `coverage.xml`
 - [ ] T061 Verify empirical dataset files remain unchanged under `testdata/empirical/`
 - [ ] T062 Run opt-in external integration tests only when explicitly enabled and verify default skip behavior in `tests/externalintegration/currency_provider_live_test.go`
+- [ ] T070 Record fixed-host provider integration security review evidence, including OWASP Top 10 coverage and no user-controlled provider URL review, in `specs/007-currency-conversion-strategy/quickstart.md`
 
 ---
 
@@ -179,7 +187,7 @@
 - T002 and T003 can run in parallel after T001 is not required.
 - T007, T008, T009, and T010 can run in parallel after T004 through T006 decisions are understood.
 - US1 test tasks T013 through T018 can run in parallel.
-- US2 provider tests T028 through T031 can run in parallel with Markdown and integration test work T032 and T033.
+- US2 provider tests T028 through T031 and T064 through T069 can run in parallel with Markdown and integration test work T032 and T033.
 - US2 provider clients T036 and T038 can run in parallel, as can provider mappers T037 and T039 after their client tests exist.
 - US3 test tasks T048 through T051 can run in parallel.
 - Polish documentation and external skip validation T058 and T062 can run in parallel after implementation is complete.

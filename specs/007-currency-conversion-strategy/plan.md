@@ -115,6 +115,14 @@ tests/
 - Unavailable date behavior: use the most recent previous available H.10 observation and disclose both activity date and rate date.
 - Revision behavior: use the currently published H.10/DDP data when no same-key evidence is defensibly available in the current TUI-session cache. Past release archive pages are not the source of truth for regenerated reports because they may not reflect subsequent revisions.
 
+## Supported Currency Coverage
+
+- Same-currency activity rows are always supported without provider lookup when the selected activity currency equals the report base currency.
+- EUR-base provider coverage is limited to ECB EXR daily reference-rate source currency series that use `D.<SOURCE>.EUR.SP00.A`. The initial supported source currency set is `AUD`, `BRL`, `CAD`, `CHF`, `CNY`, `CZK`, `DKK`, `GBP`, `HKD`, `HUF`, `IDR`, `ILS`, `INR`, `ISK`, `JPY`, `KRW`, `MXN`, `MYR`, `NOK`, `NZD`, `PHP`, `PLN`, `RON`, `SEK`, `SGD`, `THB`, `TRY`, `USD`, and `ZAR`. `RUB` and any other suspended, absent, malformed, or unmapped ECB source currency fail as unsupported for this feature.
+- USD-base provider coverage is limited to Federal Reserve H.10 rows with an unambiguous ISO-like stored currency mapping and quote direction. The initial supported source currency set is `AUD`, `BRL`, `CAD`, `CHF`, `CNY`, `DKK`, `EUR`, `GBP`, `HKD`, `INR`, `JPY`, `KRW`, `LKR`, `MXN`, `MYR`, `NOK`, `NZD`, `SEK`, `SGD`, `THB`, `TWD`, and `ZAR`. Venezuela rows and any other redenomination-sensitive, absent, malformed, or unmapped H.10 rows fail as unsupported until a date-bounded currency-code mapping is explicitly planned.
+- Historical coverage is observation-based. A source currency in the supported set still fails for a specific report when the selected provider cannot supply an activity-date observation or a previous available observation for the required date.
+- Unsupported, ambiguous, suspended, malformed, or missing selected activity currency values fail report generation before final save and are reported through the non-secret failure path.
+
 ## Conversion Boundary And Rounding
 
 1. Normalize and order synced activities using existing sync rules.
