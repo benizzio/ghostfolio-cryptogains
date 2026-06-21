@@ -11,6 +11,8 @@ This document defines validation flows for the report base-currency conversion f
 
 ## Automated Verification Flow
 
+WU22 implementation note: WU01 through WU21 are recorded as complete and targeted automated tests have passed for the implemented report base-currency conversion work. This note does not claim full final coverage; final full-suite and coverage-gate evidence remains part of the WU23 verification commands.
+
 1. Run the full automated test suite.
 
 ```bash
@@ -43,6 +45,14 @@ gocoverageplus -i coverage.cov -o coverage.xml
 - converted priced activities include source currency, report base currency, activity date, rate date, authority, rate kind, rate value, original amount, and converted amount
 - conversion failure diagnostics exclude Ghostfolio tokens and redact production-mode financial values
 - existing single-currency cases preserve prior monetary results when activity currency equals selected base currency
+
+Post-implementation validation notes:
+
+- default automated validation uses deterministic provider fixtures and test-only fixture endpoints instead of live ECB or Federal Reserve traffic
+- external integration checks are opt-in and must be enabled through the dedicated external integration environment variable used by the test suite
+- external integration checks are limited to fixed historical observations for the official ECB and Federal Reserve HTTP clients
+- the implemented in-memory rate evidence cache is process-local to the TUI session and has no persisted rate evidence
+- no user-controlled provider URL is accepted by the runtime report-generation path
 
 ## Manual TUI Verification Flow
 
@@ -100,12 +110,40 @@ Expected result:
 
 External integration tests are optional and must be explicitly enabled by the developer or by a CI job dedicated to live provider verification.
 
+The opt-in live checks target only the fixed production hosts `https://data-api.ecb.europa.eu` and `https://www.federalreserve.gov`. Default automated tests must continue to use test-only fixture endpoints and must not depend on network access.
+
 Expected external integration coverage:
 
 - one fixed historical ECB EXR observation through the live ECB HTTP client
 - one fixed historical Federal Reserve H.10/Data Download Program observation through the live Federal Reserve HTTP client
 - committed expected values for source currency, base currency, activity date, rate date, rate value, quote direction, and provider identity
 - no report calculation, no TUI workflow, no token handling, and no broad provider date or currency sweeps
+
+## Fixed-Host Provider Security Review Evidence
+
+Security evidence recorded for the implementation:
+
+- production ECB requests are constrained to `https://data-api.ecb.europa.eu`
+- production Federal Reserve requests are constrained to `https://www.federalreserve.gov`
+- provider requests do not include Ghostfolio tokens, bearer JWTs, reusable token verifiers, or provider authentication secrets
+- query inputs are derived from supported report base currencies, validated source currency codes, and activity dates
+- provider response parsing rejects malformed, unsupported, unavailable, ambiguous, or non-decimal rate evidence before final report save
+- conversion diagnostics exclude token material and redact production-mode financial values while preserving source currency, report base currency, activity date, and provider category
+- exchange-rate evidence is cached only in memory for the current TUI process and is not persisted to setup files, protected snapshots, or report metadata outside the generated cleartext Markdown report
+- no persisted rate evidence was introduced, so there is no persisted-rate removal, retention, encryption, or invalidation evidence to review
+
+OWASP Top 10 review coverage for this feature scope:
+
+- Broken Access Control: no new privileged local or remote access path was added for provider lookup; report generation remains inside the existing unlocked reporting workflow.
+- Cryptographic Failures: no provider secrets are introduced; existing token-derived protected snapshot handling is unchanged; generated reports remain cleartext output under the existing report-output contract.
+- Injection: provider URL construction is not user-controlled; currency and date inputs are validated before request construction; Markdown audit fields are derived from canonical evidence and existing report rendering rules.
+- Insecure Design: unsupported, unavailable, malformed, ambiguous, or non-authoritative rate evidence fails before final save instead of falling back to unofficial or hard-coded rates.
+- Security Misconfiguration: live provider access is limited to fixed HTTPS production hosts; default automated tests use fixture endpoints and do not require live network access.
+- Vulnerable and Outdated Components: no new third-party dependency was added for provider integration.
+- Identification and Authentication Failures: provider requests do not reuse Ghostfolio authentication material and do not require provider authentication.
+- Software and Data Integrity Failures: rate evidence records authority, provider, rate date, quote direction, and rate value; provider payloads are canonicalized before report calculation consumes them.
+- Security Logging and Monitoring Failures: failure diagnostics preserve non-secret context needed for troubleshooting and redact token material and production-mode financial values.
+- Server-Side Request Forgery: runtime provider selection has no user-controlled provider URL and is limited to fixed official production hosts.
 
 ## Fixture Expectations
 

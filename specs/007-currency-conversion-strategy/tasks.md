@@ -98,9 +98,9 @@ Process units in this order. Units marked as parallel candidates may run concurr
 
 **Purpose**: Establish feature-specific package and fixture locations without changing behavior.
 
-- [ ] T001 Create currency integration package documentation in `internal/integration/currency/doc.go`
-- [ ] T002 [P] Add deterministic provider fixture builder skeleton in `tests/testutil/currency_provider_fixtures.go`
-- [ ] T003 [P] Add opt-in external integration guard helper in `tests/externalintegration/helpers_test.go`
+- [X] T001 Create currency integration package documentation in `internal/integration/currency/doc.go`
+- [X] T002 [P] Add deterministic provider fixture builder skeleton in `tests/testutil/currency_provider_fixtures.go`
+- [X] T003 [P] Add opt-in external integration guard helper in `tests/externalintegration/helpers_test.go`
 
 ---
 
@@ -110,15 +110,15 @@ Process units in this order. Units marked as parallel candidates may run concurr
 
 **CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T004 Add `ReportBaseCurrency` enum and validation in `internal/report/model/report_base_currency.go`
-- [ ] T005 Extend `ReportRequest` with required report base currency in `internal/report/model/report_request.go`
-- [ ] T006 Extend calculated report model fields for conversion audit data in `internal/report/model/report.go`
-- [ ] T007 [P] Add conversion audit models and validators in `internal/report/model/conversion_audit.go`
-- [ ] T008 [P] Add canonical rate evidence types in `internal/integration/currency/rate_evidence.go`
-- [ ] T009 [P] Add lookup request and public rate service contracts in `internal/integration/currency/service.go`
-- [ ] T010 [P] Add in-memory TUI-session rate cache in `internal/integration/currency/session_cache.go`
-- [ ] T011 Add report calculation rate-service seam in `internal/report/calculate/currency_rate_service.go`
-- [ ] T012 Prepare runtime report service dependency wiring in `internal/app/runtime/report_service.go` and `internal/app/runtime/runtime.go`
+- [X] T004 Add `ReportBaseCurrency` enum and validation in `internal/report/model/report_base_currency.go`
+- [X] T005 Extend `ReportRequest` with required report base currency in `internal/report/model/report_request.go`
+- [X] T006 Extend calculated report model fields for conversion audit data in `internal/report/model/report.go`
+- [X] T007 [P] Add conversion audit models and validators in `internal/report/model/conversion_audit.go`
+- [X] T008 [P] Add canonical rate evidence types in `internal/integration/currency/rate_evidence.go`
+- [X] T009 [P] Add lookup request and public rate service contracts in `internal/integration/currency/service.go`
+- [X] T010 [P] Add in-memory TUI-session rate cache in `internal/integration/currency/session_cache.go`
+- [X] T011 Add report calculation rate-service seam in `internal/report/calculate/currency_rate_service.go`
+- [X] T012 Prepare runtime report service dependency wiring in `internal/app/runtime/report_service.go` and `internal/app/runtime/runtime.go`
 
 **Checkpoint**: Foundation ready. User-story implementation can now begin.
 
@@ -132,25 +132,25 @@ Process units in this order. Units marked as parallel candidates may run concurr
 
 ### Tests for User Story 1 (MANDATORY)
 
-- [ ] T013 [P] [US1] Add contract tests for required USD/EUR report base-currency choices in `tests/contract/report_generation_workflow_contract_test.go`
-- [ ] T014 [P] [US1] Add report screen render tests for base-currency menu, busy state, and result labels in `internal/tui/screen/report_screen_internal_test.go`
-- [ ] T015 [P] [US1] Add flow tests for focus movement and disabled generation before base-currency selection in `internal/tui/flow/model_internal_test.go`
-- [ ] T016 [P] [US1] Add integration test proving USD and EUR report requests reach runtime generation in `tests/integration/report_generation_flow_test.go`
-- [ ] T017 [P] [US1] Add request validation tests for missing and invalid report base currency in `internal/report/model/report_internal_test.go`
-- [ ] T018 [P] [US1] Add Markdown contract test that selected base currency replaces `NOT APPLICABLE` in `tests/contract/markdown_report_contract_test.go`
-- [ ] T063 [P] [US1] Add single-currency regression tests proving same-currency report monetary results preserve prior no-conversion behavior in `tests/integration/report_generation_flow_test.go`
+- [X] T013 [P] [US1] Add contract tests for required USD/EUR report base-currency choices in `tests/contract/report_generation_workflow_contract_test.go`
+- [X] T014 [P] [US1] Add report screen render tests for base-currency menu, busy state, and result labels in `internal/tui/screen/report_screen_internal_test.go`
+- [X] T015 [P] [US1] Add flow tests for focus movement and disabled generation before base-currency selection in `internal/tui/flow/model_internal_test.go`
+- [X] T016 [P] [US1] Add integration test proving USD and EUR report requests reach runtime generation in `tests/integration/report_generation_flow_test.go`
+- [X] T017 [P] [US1] Add request validation tests for missing and invalid report base currency in `internal/report/model/report_internal_test.go`
+- [X] T018 [P] [US1] Add Markdown contract test that selected base currency replaces `NOT APPLICABLE` in `tests/contract/markdown_report_contract_test.go`
+- [X] T063 [P] [US1] Add single-currency regression tests proving same-currency report monetary results preserve prior no-conversion behavior in `tests/integration/report_generation_flow_test.go`
 
 ### Implementation for User Story 1
 
-- [ ] T019 [US1] Add report base-currency indexes and selected value state in `internal/tui/flow/state.go`
-- [ ] T020 [US1] Render the USD/EUR base-currency menu in `internal/tui/screen/report_screen.go`
-- [ ] T021 [US1] Pass base-currency selection parameters from flow to screens in `internal/tui/flow/view.go`
-- [ ] T022 [US1] Add base-currency focus navigation and selection handling in `internal/tui/flow/report_flow.go`
-- [ ] T023 [US1] Disable `Generate Report` until year, method, and base currency are selected in `internal/tui/flow/menu_items.go`
-- [ ] T024 [US1] Build validated report requests with selected report base currency in `internal/tui/flow/report_flow.go`
-- [ ] T025 [US1] Use request base currency as the report calculation currency in `internal/report/calculate/calculator.go`
-- [ ] T026 [US1] Implement same-currency bypass and cross-currency conversion boundary using the rate-service seam in `internal/report/calculate/currency_conversion.go`
-- [ ] T027 [US1] Propagate selected report currency into summary, detail, and liquidation artifacts in `internal/report/calculate/artifacts.go`
+- [X] T019 [US1] Add report base-currency indexes and selected value state in `internal/tui/flow/state.go`
+- [X] T020 [US1] Render the USD/EUR base-currency menu in `internal/tui/screen/report_screen.go`
+- [X] T021 [US1] Pass base-currency selection parameters from flow to screens in `internal/tui/flow/view.go`
+- [X] T022 [US1] Add base-currency focus navigation and selection handling in `internal/tui/flow/report_flow.go`
+- [X] T023 [US1] Disable `Generate Report` until year, method, and base currency are selected in `internal/tui/flow/menu_items.go`
+- [X] T024 [US1] Build validated report requests with selected report base currency in `internal/tui/flow/report_flow.go`
+- [X] T025 [US1] Use request base currency as the report calculation currency in `internal/report/calculate/calculator.go`
+- [X] T026 [US1] Implement same-currency bypass and cross-currency conversion boundary using the rate-service seam in `internal/report/calculate/currency_conversion.go`
+- [X] T027 [US1] Propagate selected report currency into summary, detail, and liquidation artifacts in `internal/report/calculate/artifacts.go`
 
 **Checkpoint**: User Story 1 is functional with a deterministic test rate service and no official-provider dependency.
 
@@ -164,35 +164,35 @@ Process units in this order. Units marked as parallel candidates may run concurr
 
 ### Tests for User Story 2 (MANDATORY)
 
-- [ ] T028 [P] [US2] Add official rate-provider contract tests with deterministic fixtures covering supported and unsupported source currencies in `tests/contract/rate_provider_integration_contract_test.go`
-- [ ] T029 [P] [US2] Add ECB EXR client and mapper unit tests in `internal/integration/currency/ecb_client_internal_test.go`
-- [ ] T030 [P] [US2] Add Federal Reserve H.10 client and mapper unit tests in `internal/integration/currency/federal_reserve_client_internal_test.go`
-- [ ] T031 [P] [US2] Add exact conversion math and session-cache unit tests in `internal/integration/currency/conversion_internal_test.go`
-- [ ] T032 [P] [US2] Add deterministic mixed-currency conversion integration test with at least 50 priced activities, 3 source currencies, 2 report years, ECB division, H.10 unstarred division, H.10 starred multiplication, and previous-available-rate fallback in `tests/integration/report_generation_flow_test.go`
-- [ ] T033 [P] [US2] Add Markdown audit and rate source summary contract tests in `tests/contract/markdown_report_contract_test.go`
-- [ ] T064 [P] [US2] Add offset-sensitive source-calendar date rate-selection tests where UTC date differs from the preserved activity offset date in `tests/integration/report_generation_flow_test.go`
-- [ ] T065 [P] [US2] Add single-activity monetary-context no-tier-mixing conversion tests in `internal/report/calculate/calculator_internal_test.go`
-- [ ] T066 [P] [US2] Add Markdown contract tests distinguishing same-currency rows from converted rows in `tests/contract/markdown_report_contract_test.go`
-- [ ] T067 [P] [US2] Add explicit zero-valued monetary field conversion tests proving valid zero fees and amounts remain zero in `internal/report/calculate/calculator_internal_test.go`
-- [ ] T068 [P] [US2] Add session-cache revision behavior tests proving same-key cached evidence is reused within one process and new service instances fetch currently published provider values in `internal/integration/currency/session_cache_internal_test.go`
-- [ ] T069 [P] [US2] Add 10,000-activity responsiveness integration test with delayed provider fixtures, asynchronous busy-state assertion, and bounded lookup-count assertions in `tests/integration/report_generation_responsiveness_test.go`
+- [X] T028 [P] [US2] Add official rate-provider contract tests with deterministic fixtures covering supported and unsupported source currencies in `tests/contract/rate_provider_integration_contract_test.go`
+- [X] T029 [P] [US2] Add ECB EXR client and mapper unit tests in `internal/integration/currency/ecb_client_internal_test.go`
+- [X] T030 [P] [US2] Add Federal Reserve H.10 client and mapper unit tests in `internal/integration/currency/federal_reserve_client_internal_test.go`
+- [X] T031 [P] [US2] Add exact conversion math and session-cache unit tests in `internal/integration/currency/conversion_internal_test.go`
+- [X] T032 [P] [US2] Add deterministic mixed-currency conversion integration test with at least 50 priced activities, 3 source currencies, 2 report years, ECB division, H.10 unstarred division, H.10 starred multiplication, and previous-available-rate fallback in `tests/integration/report_generation_flow_test.go`
+- [X] T033 [P] [US2] Add Markdown audit and rate source summary contract tests in `tests/contract/markdown_report_contract_test.go`
+- [X] T064 [P] [US2] Add offset-sensitive source-calendar date rate-selection tests where UTC date differs from the preserved activity offset date in `tests/integration/report_generation_flow_test.go`
+- [X] T065 [P] [US2] Add single-activity monetary-context no-tier-mixing conversion tests in `internal/report/calculate/calculator_internal_test.go`
+- [X] T066 [P] [US2] Add Markdown contract tests distinguishing same-currency rows from converted rows in `tests/contract/markdown_report_contract_test.go`
+- [X] T067 [P] [US2] Add explicit zero-valued monetary field conversion tests proving valid zero fees and amounts remain zero in `internal/report/calculate/calculator_internal_test.go`
+- [X] T068 [P] [US2] Add session-cache revision behavior tests proving same-key cached evidence is reused within one process and new service instances fetch currently published provider values in `internal/integration/currency/session_cache_internal_test.go`
+- [X] T069 [P] [US2] Add 10,000-activity responsiveness integration test with delayed provider fixtures, asynchronous busy-state assertion, and bounded lookup-count assertions in `tests/integration/report_generation_responsiveness_test.go`
 
 ### Implementation for User Story 2
 
-- [ ] T034 [US2] Implement exact source-to-base conversion formulas in `internal/integration/currency/conversion.go`
-- [ ] T035 [US2] Implement provider registry and public lookup service in `internal/integration/currency/service.go`
-- [ ] T036 [US2] Implement ECB EXR HTTP client in `internal/integration/currency/ecb_client.go`
-- [ ] T037 [US2] Implement ECB EXR response canonicalization in `internal/integration/currency/ecb_mapper.go`
-- [ ] T038 [US2] Implement Federal Reserve H.10 HTTP client in `internal/integration/currency/federal_reserve_client.go`
-- [ ] T039 [US2] Implement Federal Reserve quote-direction canonicalization in `internal/integration/currency/federal_reserve_mapper.go`
-- [ ] T040 [US2] Apply session cache lookups and writes around provider requests in `internal/integration/currency/session_cache.go`
-- [ ] T041 [US2] Resolve provider evidence per unique rate key before asset replay in `internal/report/calculate/calculator.go`
-- [ ] T042 [US2] Record conversion audit entries during report artifact creation in `internal/report/calculate/artifacts.go`
-- [ ] T043 [US2] Add conversion audit and rate source validation to report construction in `internal/report/model/capital_gains_report.go`
-- [ ] T044 [US2] Render rate source summary in `internal/report/markdown/renderer_currency.go`
-- [ ] T045 [US2] Render converted activity audit table in `internal/report/markdown/renderer_currency.go`
-- [ ] T046 [US2] Wire concrete currency rate service into runtime report generation in `internal/app/runtime/report_service.go`
-- [ ] T047 [US2] Add opt-in live ECB and Federal Reserve client checks in `tests/externalintegration/currency_provider_live_test.go`
+- [X] T034 [US2] Implement exact source-to-base conversion formulas in `internal/integration/currency/conversion.go`
+- [X] T035 [US2] Implement provider registry and public lookup service in `internal/integration/currency/service.go`
+- [X] T036 [US2] Implement ECB EXR HTTP client in `internal/integration/currency/ecb_client.go`
+- [X] T037 [US2] Implement ECB EXR response canonicalization in `internal/integration/currency/ecb_mapper.go`
+- [X] T038 [US2] Implement Federal Reserve H.10 HTTP client in `internal/integration/currency/federal_reserve_client.go`
+- [X] T039 [US2] Implement Federal Reserve quote-direction canonicalization in `internal/integration/currency/federal_reserve_mapper.go`
+- [X] T040 [US2] Apply session cache lookups and writes around provider requests in `internal/integration/currency/session_cache.go`
+- [X] T041 [US2] Resolve provider evidence per unique rate key before asset replay in `internal/report/calculate/calculator.go`
+- [X] T042 [US2] Record conversion audit entries during report artifact creation in `internal/report/calculate/artifacts.go`
+- [X] T043 [US2] Add conversion audit and rate source validation to report construction in `internal/report/model/capital_gains_report.go`
+- [X] T044 [US2] Render rate source summary in `internal/report/markdown/renderer_currency.go`
+- [X] T045 [US2] Render converted activity audit table in `internal/report/markdown/renderer_currency.go`
+- [X] T046 [US2] Wire concrete currency rate service into runtime report generation in `internal/app/runtime/report_service.go`
+- [X] T047 [US2] Add opt-in live ECB and Federal Reserve client checks in `tests/externalintegration/currency_provider_live_test.go`
 
 **Checkpoint**: User Stories 1 and 2 both work with official-provider test doubles and auditable Markdown output.
 
@@ -206,19 +206,19 @@ Process units in this order. Units marked as parallel candidates may run concurr
 
 ### Tests for User Story 3 (MANDATORY)
 
-- [ ] T048 [P] [US3] Add conversion failure matrix integration tests in `tests/integration/report_failure_flow_test.go`
-- [ ] T049 [P] [US3] Add production diagnostic redaction tests for conversion failures in `tests/integration/diagnostic_redaction_test.go`
-- [ ] T050 [P] [US3] Add provider failure classification unit tests in `internal/integration/currency/errors_internal_test.go`
-- [ ] T051 [P] [US3] Add zero-priced holding reduction no-lookup unit tests in `internal/report/calculate/calculator_internal_test.go`
+- [X] T048 [P] [US3] Add conversion failure matrix integration tests in `tests/integration/report_failure_flow_test.go`
+- [X] T049 [P] [US3] Add production diagnostic redaction tests for conversion failures in `tests/integration/diagnostic_redaction_test.go`
+- [X] T050 [P] [US3] Add provider failure classification unit tests in `internal/integration/currency/errors_internal_test.go`
+- [X] T051 [P] [US3] Add zero-priced holding reduction no-lookup unit tests in `internal/report/calculate/calculator_internal_test.go`
 
 ### Implementation for User Story 3
 
-- [ ] T052 [US3] Implement conversion failure errors and safe message shaping in `internal/integration/currency/errors.go`
-- [ ] T053 [US3] Reject malformed, missing, unsupported, and mismatched rate evidence in `internal/integration/currency/service.go`
-- [ ] T054 [US3] Map conversion failures into report calculation errors and diagnostic context in `internal/report/calculate/errors.go`
-- [ ] T055 [US3] Keep zero-priced no-cost holding reductions out of rate lookup in `internal/report/calculate/currency_conversion.go`
-- [ ] T056 [US3] Include source currency, report base currency, and activity date in runtime failure copy in `internal/app/runtime/report_service.go`
-- [ ] T057 [US3] Show selected report base currency on report failure result screens in `internal/tui/screen/report_screen.go`
+- [X] T052 [US3] Implement conversion failure errors and safe message shaping in `internal/integration/currency/errors.go`
+- [X] T053 [US3] Reject malformed, missing, unsupported, and mismatched rate evidence in `internal/integration/currency/service.go`
+- [X] T054 [US3] Map conversion failures into report calculation errors and diagnostic context in `internal/report/calculate/errors.go`
+- [X] T055 [US3] Keep zero-priced no-cost holding reductions out of rate lookup in `internal/report/calculate/currency_conversion.go`
+- [X] T056 [US3] Include source currency, report base currency, and activity date in runtime failure copy in `internal/app/runtime/report_service.go`
+- [X] T057 [US3] Show selected report base currency on report failure result screens in `internal/tui/screen/report_screen.go`
 
 **Checkpoint**: All user stories are independently functional, and unsafe conversions fail before report save.
 
@@ -228,12 +228,12 @@ Process units in this order. Units marked as parallel candidates may run concurr
 
 **Purpose**: Final validation, documentation alignment, and coverage-gate checks.
 
-- [ ] T058 [P] Update automated and manual validation notes after implementation in `specs/007-currency-conversion-strategy/quickstart.md`
-- [ ] T059 Run full Go coverage test command and create `coverage.cov`
-- [ ] T060 Run coverage XML export and create `coverage.xml`
-- [ ] T061 Verify empirical dataset files remain unchanged under `testdata/empirical/`
-- [ ] T062 Run opt-in external integration tests only when explicitly enabled and verify default skip behavior in `tests/externalintegration/currency_provider_live_test.go`
-- [ ] T070 Record fixed-host provider integration security review evidence, including OWASP Top 10 coverage and no user-controlled provider URL review, in `specs/007-currency-conversion-strategy/quickstart.md`
+- [X] T058 [P] Update automated and manual validation notes after implementation in `specs/007-currency-conversion-strategy/quickstart.md`
+- [X] T059 Run full Go coverage test command and create `coverage.cov`
+- [X] T060 Run coverage XML export and create `coverage.xml`
+- [X] T061 Verify empirical dataset files remain unchanged under `testdata/empirical/`
+- [X] T062 Run opt-in external integration tests only when explicitly enabled and verify default skip behavior in `tests/externalintegration/currency_provider_live_test.go`
+- [X] T070 Record fixed-host provider integration security review evidence, including OWASP Top 10 coverage and no user-controlled provider URL review, in `specs/007-currency-conversion-strategy/quickstart.md`
 
 ---
 
