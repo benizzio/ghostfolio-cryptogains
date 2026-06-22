@@ -8,6 +8,8 @@
 
 **Bugfix**: 2026-06-21 — BUG-001 Updated from bugfix patch
 
+**Bugfix**: 2026-06-23 — BUG-002 Updated from bugfix patch
+
 ## Summary
 
 Add a required report base-currency selection to yearly capital gains report generation, limited to `USD` and `EUR`. The report pipeline will keep the existing single-activity monetary-context selection rules, then convert every priced activity whose selected currency differs from the report base currency before cost-basis, proceeds, gain/loss, and report-total calculations consume the values. EUR-base conversions use the ECB Data Portal `EXR` daily reference-rate data. USD-base conversions use the Federal Reserve Board H.10/Data Download Program data. Provider-specific payloads, quote directions, provider selection, and canonicalization stay behind `internal/integration/currency/`, which exposes a public rate lookup service consumed by the report calculator and disclosed in the Markdown report through canonical rate evidence.
@@ -21,6 +23,8 @@ Add a required report base-currency selection to yearly capital gains report gen
 **Storage**: No new exchange-rate persistence. Existing protected snapshots remain token-derived encrypted local data. Canonical rate evidence may be held in an in-memory TUI-session cache that survives multiple report runs and different security-token unlocks in the same process. The cache is not written to disk and is disclosed only through the generated cleartext Markdown report saved under the existing report-output contract.
 
 **Testing**: Go `testing` with contract, integration, unit, and external integration suites. Default contract, integration, and unit tests cover provider behavior with deterministic `httptest.Server` fixtures and golden response snippets, not live ECB or Federal Reserve calls. External integration tests are a separate opt-in category that targets only official-provider HTTP clients with one fixed historical observation per unique client endpoint and committed expected values. Coverage remains enforced with ~~`go test ./... -covermode=atomic -coverprofile=coverage.cov` and `gocoverageplus`/repository coverage gates~~ `make coverage`, which writes `dist/coverage/coverage.out` and `dist/coverage/coverage.xml` and runs the repository coverage gate; the root-level coverage command is superseded by BUG-001 because it writes generated artifacts outside `dist/coverage`.
+
+**Federal Reserve DDP Compatibility**: USD live-provider access uses the Data Download Program `Output.aspx` direct CSV package endpoint for H.10 daily rates, not the interactive DDP landing page. Federal Reserve deterministic fixtures and mapper tests must mirror the live `layout=seriesrow` package CSV shape, including metadata such as `Descriptions:`, `Unit:`, `Multiplier:`, `Currency:`, `Unique Identifier:`, and `Series Name:` before date observations.
 
 **Empirical Dataset**: Existing `testdata/empirical/` synthetic empirical dataset and oracle fixtures remain read-only. Existing empirical tests continue to validate single-currency cost-basis behavior and are not repurposed for exchange-rate integration.
 
@@ -110,6 +114,7 @@ tests/
 ### USD Report Base Currency
 
 - Source: Federal Reserve Board H.10 foreign exchange rates through the Federal Reserve Data Download Program and H.10 historical country data.
+- Direct download URL shape: `https://www.federalreserve.gov/datadownload/Output.aspx?rel=H10&series=60f32914ab61dfab590e0e470153e3ae&lastobs=&from=<YYYY-MM-DD>&to=<YYYY-MM-DD>&filetype=csv&label=include&layout=seriesrow&type=package`.
 - Authority relationship: Board of Governors `.gov` release; H.10 rates are certified by the Federal Reserve Bank of New York for customs purposes.
 - Rate kind: Daily noon buying rate in New York for cable transfers payable in listed currencies.
 - Quote direction: H.10 publishes most rates as currency units per USD, with starred rows as USD per currency unit. The provider adapter must map the quote direction explicitly into canonical evidence.
@@ -169,6 +174,7 @@ The issue requirement for scalability is handled by keeping provider selection b
 - Integration tests run report generation with mocked ECB and Federal Reserve provider responses behind the currency integration service, including same-currency rows, converted rows, mixed source currencies, prior-business-date fallback, provider outage, unsupported currency, malformed currency, and no-partial-file cleanup.
 - Unit tests cover ECB EXR mapping, Federal Reserve H.10 quote-direction mapping, canonical rate evidence validation, conversion formulas, 16-decimal division bounding, in-memory TUI-session rate reuse, and redaction-safe failure construction.
 - External integration tests directly exercise each official-provider HTTP client endpoint with one fixed historical observation and committed expected rate data, avoiding repeated live-provider load and avoiding report-domain setup.
+- Federal Reserve external integration tests must call the DDP `Output.aspx` direct CSV package endpoint and commit expected values from that same current DDP package source; BUG-002 updates the EUR `2024-01-05` expectation to `1.0957`.
 - Regression tests verify existing single-currency report cases produce the same monetary results when selected activity currency equals the chosen report base currency.
 - Performance validation uses the 10,000-activity responsiveness fixture to assert asynchronous TUI behavior, bounded provider lookups by unique rate key, no per-monetary-field network requests, and successful calculation at scale with deterministic provider fixtures.
 - Final coverage-gate validation uses the maintained repository output paths `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`; root-level `coverage.cov` and `coverage.xml` are not valid final verification artifacts for this feature.

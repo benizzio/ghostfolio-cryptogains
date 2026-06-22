@@ -21,6 +21,10 @@
 - Q: Can canonical rate evidence be reused after one report run completes? → A: Yes. It may be reused from in-memory cache while the TUI session is executing, including across multiple report runs and different security-token unlocks. It must not be persisted, and the generated report must disclose the actual rate evidence used.
 - **Bugfix**: 2026-06-21 — BUG-001 Added maintained coverage artifact location requirement for final feature verification.
 
+### Session 2026-06-23
+
+- **Bugfix**: 2026-06-23 — BUG-002 Clarified Federal Reserve DDP direct-download and live package CSV dependency assumptions for USD conversions.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Select A Report Base Currency (Priority: P1)
@@ -178,4 +182,5 @@ Each feature specification MUST capture security, persistence, financial precisi
 - No persisted exchange-rate cache is required by this specification. The in-memory TUI-session cache may survive multiple report runs and different security-token unlocks in the same process, but it is cleared on process exit. If planning introduces any persisted rate data, that plan must justify storage, protection, invalidation, and user removal.
 - Regenerated reports use currently published authorized exchange rates when the required evidence is not already defensibly available in the in-memory TUI-session cache. Reports disclose the actual rate evidence used.
 - Official source access details, supported currency coverage, and authority trust evidence are planning research outputs, not user choices.
+- Federal Reserve Data Download Program access for USD conversions uses the automated direct CSV download flow for the H.10 daily-rates package, not the interactive DDP landing page. Provider integration must handle the live package CSV layout, including DDP metadata rows or columns before date observations, while preserving starred and unstarred quote-direction evidence.
 - The empirical external dataset is unchanged by this feature.
