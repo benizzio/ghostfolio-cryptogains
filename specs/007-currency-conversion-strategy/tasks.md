@@ -180,7 +180,7 @@ Process units in this order. Units marked as parallel candidates may run concurr
 - [X] T067 [P] [US2] Add explicit zero-valued monetary field conversion tests proving valid zero fees and amounts remain zero in `internal/report/calculate/calculator_internal_test.go`
 - [X] T068 [P] [US2] Add session-cache revision behavior tests proving same-key cached evidence is reused within one process and new service instances fetch currently published provider values in `internal/integration/currency/session_cache_internal_test.go`
 - [X] T069 [P] [US2] Add 10,000-activity responsiveness integration test with delayed provider fixtures, asynchronous busy-state assertion, and bounded lookup-count assertions in `tests/integration/report_generation_responsiveness_test.go`
-- [ ] T073 [P] [US2] Add Federal Reserve DDP direct-download URL and live `seriesrow` package CSV fixture regression tests in `internal/integration/currency/federal_reserve_client_internal_test.go`
+- [X] T073 [P] [US2] Add Federal Reserve DDP direct-download URL and live `seriesrow` package CSV fixture regression tests in `internal/integration/currency/federal_reserve_client_internal_test.go`
 
 ### Implementation for User Story 2
 
@@ -188,9 +188,9 @@ Process units in this order. Units marked as parallel candidates may run concurr
 - [X] T035 [US2] Implement provider registry and public lookup service in `internal/integration/currency/service.go`
 - [X] T036 [US2] Implement ECB EXR HTTP client in `internal/integration/currency/ecb_client.go`
 - [X] T037 [US2] Implement ECB EXR response canonicalization in `internal/integration/currency/ecb_mapper.go`
-- [ ] T038 [US2] ⚠️ Reopened Implement Federal Reserve H.10 HTTP client using the DDP direct `Output.aspx` CSV package endpoint in `internal/integration/currency/federal_reserve_client.go` (reopened — BUG-002)
-- [ ] T039 [US2] ⚠️ Reopened Implement Federal Reserve quote-direction canonicalization for the live DDP `seriesrow` package CSV layout in `internal/integration/currency/federal_reserve_mapper.go` (reopened — BUG-002)
-- [ ] T074 [US2] Update Federal Reserve DDP client URL construction and mapper parsing for `Output.aspx` H.10 package CSV metadata rows while preserving starred and unstarred quote-direction mapping in `internal/integration/currency/federal_reserve_client.go` and `internal/integration/currency/federal_reserve_mapper.go`
+- [X] T038 [US2] ⚠️ Reopened Implement Federal Reserve H.10 HTTP client using the DDP direct `Output.aspx` CSV package endpoint in `internal/integration/currency/federal_reserve_client.go` (reopened — BUG-002)
+- [X] T039 [US2] ⚠️ Reopened Implement Federal Reserve quote-direction canonicalization for the live DDP `seriesrow` package CSV layout in `internal/integration/currency/federal_reserve_mapper.go` (reopened — BUG-002)
+- [X] T074 [US2] Update Federal Reserve DDP client URL construction and mapper parsing for `Output.aspx` H.10 package CSV metadata rows while preserving starred and unstarred quote-direction mapping in `internal/integration/currency/federal_reserve_client.go` and `internal/integration/currency/federal_reserve_mapper.go`
 - [X] T040 [US2] Apply session cache lookups and writes around provider requests in `internal/integration/currency/session_cache.go`
 - [X] T041 [US2] Resolve provider evidence per unique rate key before asset replay in `internal/report/calculate/calculator.go`
 - [X] T042 [US2] Record conversion audit entries during report artifact creation in `internal/report/calculate/artifacts.go`
@@ -198,8 +198,8 @@ Process units in this order. Units marked as parallel candidates may run concurr
 - [X] T044 [US2] Render rate source summary in `internal/report/markdown/renderer_currency.go`
 - [X] T045 [US2] Render converted activity audit table in `internal/report/markdown/renderer_currency.go`
 - [X] T046 [US2] Wire concrete currency rate service into runtime report generation in `internal/app/runtime/report_service.go`
-- [ ] T047 [US2] ⚠️ Reopened Add opt-in live ECB and Federal Reserve client checks against the official provider endpoints in `tests/externalintegration/currency_provider_live_test.go` (reopened — BUG-002)
-- [ ] T075 [US2] Update the opt-in Federal Reserve live expected EUR `2024-01-05` observation to current DDP package evidence in `tests/externalintegration/currency_provider_live_test.go`
+- [X] T047 [US2] ⚠️ Reopened Add opt-in live ECB and Federal Reserve client checks against the official provider endpoints in `tests/externalintegration/currency_provider_live_test.go` (reopened — BUG-002)
+- [X] T075 [US2] Update the opt-in Federal Reserve live expected EUR `2024-01-05` observation to current DDP package evidence in `tests/externalintegration/currency_provider_live_test.go`
 
 **Checkpoint**: ~~User Stories 1 and 2 both work with official-provider test doubles and auditable Markdown output.~~ Reopened by BUG-002 until Federal Reserve DDP direct-download tasks pass.
 
@@ -235,11 +235,11 @@ Process units in this order. Units marked as parallel candidates may run concurr
 
 **Purpose**: Final validation, documentation alignment, and coverage-gate checks.
 
-- [ ] T058 [P] ⚠️ Reopened Update automated and manual validation notes after BUG-002 Federal Reserve DDP remediation in `specs/007-currency-conversion-strategy/quickstart.md` (reopened — BUG-002)
+- [X] T058 [P] ⚠️ Reopened Update automated and manual validation notes after BUG-002 Federal Reserve DDP remediation in `specs/007-currency-conversion-strategy/quickstart.md` (reopened — BUG-002)
 - [X] T059 ⚠️ Reopened ~~Run full Go coverage test command and create `coverage.cov`~~ Run full Go coverage test command with the maintained output path and create `dist/coverage/coverage.out` (reopened — BUG-001)
 - [X] T060 ⚠️ Reopened ~~Run coverage XML export and create `coverage.xml`~~ Run coverage XML export from `dist/coverage/coverage.out` and create `dist/coverage/coverage.xml` (reopened — BUG-001)
 - [X] T061 Verify empirical dataset files remain unchanged under `testdata/empirical/`
-- [ ] T062 ⚠️ Reopened Run opt-in external integration tests only when explicitly enabled, verify default skip behavior, and verify explicitly enabled ECB and Federal Reserve live checks pass in `tests/externalintegration/currency_provider_live_test.go` (reopened — BUG-002)
+- [X] T062 ⚠️ Reopened Run opt-in external integration tests only when explicitly enabled, verify default skip behavior, and verify explicitly enabled ECB and Federal Reserve live checks pass in `tests/externalintegration/currency_provider_live_test.go` (reopened — BUG-002)
 - [X] T070 Record fixed-host provider integration security review evidence, including OWASP Top 10 coverage and no user-controlled provider URL review, in `specs/007-currency-conversion-strategy/quickstart.md`
 - [X] T071 Remove stale root-level generated coverage artifacts `coverage.cov` and `coverage.xml` if present in the repository root
 - [X] T072 Run `make coverage` from the repository root and verify the coverage gate consumes `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`

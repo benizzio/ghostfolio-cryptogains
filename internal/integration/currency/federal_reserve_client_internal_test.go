@@ -18,8 +18,17 @@ func TestFederalReserveH10ClientBuildsFixedRequest(t *testing.T) {
 	t.Parallel()
 
 	var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if !strings.Contains(request.URL.Path, "/datadownload/") {
+		if request.URL.Path != "/datadownload/Output.aspx" {
 			t.Fatalf("unexpected Federal Reserve path: %s", request.URL.Path)
+		}
+		if request.URL.Query().Get("rel") != "H10" {
+			t.Fatalf("unexpected rel query: %s", request.URL.RawQuery)
+		}
+		if request.URL.Query().Get("series") != federalReserveH10DDPPackageSeriesID {
+			t.Fatalf("unexpected series query: %s", request.URL.RawQuery)
+		}
+		if request.URL.Query().Get("filetype") != "csv" || request.URL.Query().Get("label") != "include" || request.URL.Query().Get("layout") != "seriesrow" || request.URL.Query().Get("type") != "package" {
+			t.Fatalf("unexpected DDP package query: %s", request.URL.RawQuery)
 		}
 		if request.URL.Query().Get("from") != "2023-12-07" {
 			t.Fatalf("unexpected from query: %s", request.URL.RawQuery)
@@ -28,7 +37,7 @@ func TestFederalReserveH10ClientBuildsFixedRequest(t *testing.T) {
 			t.Fatalf("unexpected to query: %s", request.URL.RawQuery)
 		}
 		writer.Header().Set("Content-Type", "text/csv")
-		_, _ = writer.Write([]byte("Currency,Monetary unit,Quote direction,2024-01-05,2024-01-06\nMexico,MXN,currency units per USD,16.9140,ND\nEMU member countries,EUR,USD per currency unit,1.0946,ND\n"))
+		_, _ = writer.Write([]byte(federalReserveDDPSeriesRowFixture()))
 	}))
 	defer server.Close()
 
@@ -39,7 +48,30 @@ func TestFederalReserveH10ClientBuildsFixedRequest(t *testing.T) {
 		t.Fatalf("lookup Federal Reserve rate: %v", err)
 	}
 
-	assertFederalReserveEvidence(t, evidence, request, QuoteDirectionSourcePerBase, "2024-01-05", "16.914")
+	assertFederalReserveEvidence(t, evidence, request, QuoteDirectionSourcePerBase, "2024-01-05", "16.9141")
+}
+
+// TestFederalReserveH10MapperParsesDDPSeriesRowPackage verifies the live
+// Federal Reserve DDP package CSV layout with metadata columns before date
+// observations.
+// Authored by: OpenCode
+func TestFederalReserveH10MapperParsesDDPSeriesRowPackage(t *testing.T) {
+	t.Parallel()
+
+	var payload = []byte(federalReserveDDPSeriesRowFixture())
+	var mxnRequest = mustRateLookupRequestOnDate(t, "MXN", BaseCurrencyUSD, "2024-01-06")
+	var mxnEvidence, mxnErr = MapFederalReserveH10CSVToEvidence(mxnRequest, payload, "H10 DDP fixture")
+	if mxnErr != nil {
+		t.Fatalf("map MXN DDP evidence: %v", mxnErr)
+	}
+	assertFederalReserveEvidence(t, mxnEvidence, mxnRequest, QuoteDirectionSourcePerBase, "2024-01-05", "16.9141")
+
+	var eurRequest = mustRateLookupRequestOnDate(t, "EUR", BaseCurrencyUSD, "2024-01-06")
+	var eurEvidence, eurErr = MapFederalReserveH10CSVToEvidence(eurRequest, payload, "H10 DDP fixture")
+	if eurErr != nil {
+		t.Fatalf("map EUR DDP evidence: %v", eurErr)
+	}
+	assertFederalReserveEvidence(t, eurEvidence, eurRequest, QuoteDirectionBasePerSource, "2024-01-05", "1.0957")
 }
 
 // TestFederalReserveH10MapperPreservesQuoteDirection verifies unstarred and
@@ -165,6 +197,37 @@ func TestFederalReserveH10MapperRejectsCSVShapeAndDateFallbackGaps(t *testing.T)
 	}
 }
 
+// TestFederalReserveH10MapperRejectsDDPSeriesRowFailures verifies failure paths
+// specific to the live DDP seriesrow package CSV layout.
+// Authored by: OpenCode
+func TestFederalReserveH10MapperRejectsDDPSeriesRowFailures(t *testing.T) {
+	t.Parallel()
+
+	var request = mustRateLookupRequestOnDate(t, "MXN", BaseCurrencyUSD, "2024-01-06")
+	var testCases = []struct {
+		name    string
+		payload string
+		want    string
+	}{
+		{name: "missing date header", payload: "\"Descriptions:\",\"Currency:\",\"Series Name:\"\n\"Mexican Peso\",\"MXN\",RXI_N.B.MX\n", want: "DDP seriesrow date observations are required"},
+		{name: "missing source row", payload: "\"Descriptions:\",\"Currency:\",\"Series Name:\",2024-01-05\n\"Euro-Area Euro\",\"EUR\",RXI$US_N.B.EU,1.0957\n", want: "unsupported source currency MXN"},
+		{name: "short source metadata", payload: "\"Descriptions:\",\"Currency:\",\"Series Name:\",2024-01-05\n\"Mexican Peso\",\"MXN\"\n", want: "DDP seriesrow metadata is required"},
+		{name: "ambiguous series", payload: "\"Descriptions:\",\"Currency:\",\"Series Name:\",2024-01-05\n\"Mexican Peso\",\"MXN\",UNKNOWN_SERIES,16.9141\n", want: "ambiguous quote direction"},
+		{name: "malformed decimal", payload: "\"Descriptions:\",\"Currency:\",\"Series Name:\",2024-01-05\n\"Mexican Peso\",\"MXN\",RXI_N.B.MX,not-a-decimal\n", want: "invalid Federal Reserve observation"},
+		{name: "invalid date and future only", payload: "\"Descriptions:\",\"Currency:\",\"Series Name:\",not-a-date,2024-01-07\n\"Mexican Peso\",\"MXN\",RXI_N.B.MX,16.0000,16.9141\n", want: "no current or prior available observation"},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var _, err = MapFederalReserveH10CSVToEvidence(request, []byte(testCase.payload), "H10 DDP fixture")
+			if err == nil || !strings.Contains(err.Error(), testCase.want) {
+				t.Fatalf("expected error containing %q, got %v", testCase.want, err)
+			}
+		})
+	}
+}
+
 // assertFederalReserveEvidence verifies canonical H.10 evidence.
 // Authored by: OpenCode
 func assertFederalReserveEvidence(t *testing.T, evidence ExchangeRateEvidence, request RateLookupRequest, quoteDirection QuoteDirection, rateDate string, rateValue string) {
@@ -183,4 +246,14 @@ func assertFederalReserveEvidence(t *testing.T, evidence ExchangeRateEvidence, r
 		t.Fatalf("unexpected Federal Reserve rate date: got %s want %s", evidence.RateDate.Format(time.DateOnly), rateDate)
 	}
 	assertCurrencyDecimalString(t, evidence.RateValue, rateValue)
+}
+
+// federalReserveDDPSeriesRowFixture returns a deterministic fixture matching the
+// Federal Reserve Data Download Program Output.aspx package CSV layout.
+// Authored by: OpenCode
+func federalReserveDDPSeriesRowFixture() string {
+	return `"Descriptions:","Unit:","Multiplier:","Currency:","Unique Identifier:","Series Name:",2024-01-05,2024-01-06
+"Euro-Area Euro","Currency","1","EUR",H10/H10/RXI$US_N.B.EU,RXI$US_N.B.EU,1.0957,ND
+"Mexican Peso","Currency","1","MXN",H10/H10/RXI_N.B.MX,RXI_N.B.MX,16.9141,ND
+`
 }

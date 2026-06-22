@@ -48,7 +48,7 @@ func TestLiveOfficialCurrencyProvidersResolveFixedHistoricalObservations(t *test
 			baseCurrency:   currency.BaseCurrencyUSD,
 			activityDate:   "2024-01-06",
 			rateDate:       "2024-01-05",
-			rateValue:      "1.0946",
+			rateValue:      "1.0957",
 			providerID:     currency.ProviderIDFederalReserveH10,
 			authority:      currency.RateAuthorityFederalReserve,
 			quoteDirection: currency.QuoteDirectionBasePerSource,

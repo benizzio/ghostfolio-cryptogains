@@ -34,11 +34,11 @@ func TestOfficialRateProviderContractResolvesDeterministicFixtures(t *testing.T)
 	defer ecbServer.Close()
 
 	var fedServer = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if !strings.Contains(request.URL.Path, "/datadownload/") {
+		if request.URL.Path != "/datadownload/Output.aspx" {
 			t.Fatalf("unexpected Federal Reserve path: %s", request.URL.Path)
 		}
 		writer.Header().Set("Content-Type", "text/csv")
-		_, _ = writer.Write([]byte("Currency,Monetary unit,Quote direction,2024-01-05,2024-01-06\nEMU member countries,EUR,USD per currency unit,1.0946,ND\nMexico,MXN,currency units per USD,16.9140,ND\n"))
+		_, _ = writer.Write([]byte("\"Descriptions:\",\"Unit:\",\"Multiplier:\",\"Currency:\",\"Unique Identifier:\",\"Series Name:\",2024-01-05,2024-01-06\n\"Euro-Area Euro\",\"Currency\",\"1\",\"EUR\",H10/H10/RXI$US_N.B.EU,RXI$US_N.B.EU,1.0957,ND\n\"Mexican Peso\",\"Currency\",\"1\",\"MXN\",H10/H10/RXI_N.B.MX,RXI_N.B.MX,16.9141,ND\n"))
 	}))
 	defer fedServer.Close()
 
@@ -63,7 +63,7 @@ func TestOfficialRateProviderContractResolvesDeterministicFixtures(t *testing.T)
 	if fedErr != nil {
 		t.Fatalf("lookup Federal Reserve fixture evidence: %v", fedErr)
 	}
-	assertContractEvidence(t, fedEvidence, currency.ProviderIDFederalReserveH10, currency.RateAuthorityFederalReserve, currency.QuoteDirectionBasePerSource, "2024-01-05", "1.0946")
+	assertContractEvidence(t, fedEvidence, currency.ProviderIDFederalReserveH10, currency.RateAuthorityFederalReserve, currency.QuoteDirectionBasePerSource, "2024-01-05", "1.0957")
 }
 
 // TestOfficialRateProviderContractRejectsUnsupportedSourceCurrencies verifies

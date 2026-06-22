@@ -4,6 +4,8 @@ This document defines validation flows for the report base-currency conversion f
 
 **Bugfix**: 2026-06-21 — BUG-001 Updated final coverage commands to use maintained `dist/coverage` artifacts.
 
+**Bugfix**: 2026-06-23 — BUG-002 Updated Federal Reserve validation to use the DDP `Output.aspx` direct CSV package endpoint and current EUR `2024-01-05` package evidence.
+
 ## Prerequisites
 
 - Go 1.26.3 installed.
@@ -162,6 +164,7 @@ Project-owned fixtures should include:
 - ECB EXR unsupported or suspended currency response
 - Federal Reserve H.10 unstarred currency-units-per-USD observation
 - Federal Reserve H.10 starred USD-per-currency-unit observation
+- Federal Reserve Data Download Program `Output.aspx` package CSV in `layout=seriesrow` shape, including metadata columns before date observations
 - Federal Reserve H.10 `ND` or missing observation
 - provider outage after earlier successful conversion in the same TUI session
 - malformed provider payload and malformed decimal value
@@ -172,4 +175,4 @@ Project-owned fixtures should include:
 
 These fixtures must allow CI to validate conversion behavior without a live ECB or Federal Reserve dependency.
 
-External integration fixtures must commit the one fixed historical observation expected for each live provider client endpoint.
+External integration fixtures must commit the one fixed historical observation expected for each live provider client endpoint. For Federal Reserve H.10, the live expected EUR observation uses DDP package evidence from `Output.aspx?rel=H10&series=60f32914ab61dfab590e0e470153e3ae&lastobs=&from=2024-01-05&to=2024-01-05&filetype=csv&label=include&layout=seriesrow&type=package`: rate date `2024-01-05`, rate value `1.0957`, and quote direction `base_per_source` from the `RXI$US_N.B.EU` series.

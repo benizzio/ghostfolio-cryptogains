@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	defaultFederalReserveH10BaseURL = "https://www.federalreserve.gov"
-	defaultFederalReserveH10Dataset = "Federal Reserve H.10/Data Download Program"
+	defaultFederalReserveH10BaseURL     = "https://www.federalreserve.gov"
+	defaultFederalReserveH10Dataset     = "Federal Reserve H.10/Data Download Program"
+	federalReserveH10DDPPackageSeriesID = "60f32914ab61dfab590e0e470153e3ae"
 )
 
 // federalReserveH10Client resolves USD-base rates from Federal Reserve H.10 CSV
@@ -73,15 +74,20 @@ func newFederalReserveH10Client(baseURL string, datasetID string, httpClient *ht
 // federalReserveURL builds the fixed Federal Reserve H.10 request URL for one lookup.
 // Authored by: OpenCode
 func (client *federalReserveH10Client) federalReserveURL(request RateLookupRequest) (string, error) {
-	var parsed, err = url.Parse(client.baseURL + "/datadownload/")
+	var parsed, err = url.Parse(client.baseURL + "/datadownload/Output.aspx")
 	if err != nil {
 		return "", fmt.Errorf("build Federal Reserve H.10 URL: %w", err)
 	}
 	var query = parsed.Query()
+	query.Set("rel", "H10")
+	query.Set("series", federalReserveH10DDPPackageSeriesID)
+	query.Set("lastobs", "")
 	query.Set("from", formatDate(request.ActivityDate.AddDate(0, 0, -providerLookbackDays)))
 	query.Set("to", formatDate(request.ActivityDate))
-	query.Set("rel", "H10")
 	query.Set("filetype", "csv")
+	query.Set("label", "include")
+	query.Set("layout", "seriesrow")
+	query.Set("type", "package")
 	parsed.RawQuery = query.Encode()
 
 	return parsed.String(), nil
