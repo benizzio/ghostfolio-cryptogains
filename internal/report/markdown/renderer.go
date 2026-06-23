@@ -84,17 +84,11 @@ func writeRateSourceSummary(builder *strings.Builder, report reportmodel.Capital
 	}
 
 	var rendered = make(map[string]bool)
-	for index, source := range report.RateSources {
-		var rateValue, err = canonicalDecimal(source.RateValue)
-		if err != nil {
-			return fmt.Errorf("render rate source %d rate value: %w", index, err)
-		}
+	for _, source := range report.RateSources {
 		var key = strings.Join([]string{
 			string(source.Authority),
 			string(source.ProviderID),
 			source.RateKind,
-			string(source.QuoteDirection),
-			rateValue,
 		}, "|")
 		if rendered[key] {
 			continue
@@ -105,8 +99,6 @@ func writeRateSourceSummary(builder *strings.Builder, report reportmodel.Capital
 		builder.WriteString(fmt.Sprintf("- Provider: %s\n", rateProviderLabel(source.ProviderID)))
 		builder.WriteString(fmt.Sprintf("- Rate Kind: %s\n", sanitizeInlineText(source.RateKind)))
 		builder.WriteString(fmt.Sprintf("- Unavailable-Date Rule: %s\n", unavailableDateRule(source.ProviderID)))
-		builder.WriteString(fmt.Sprintf("- Quote Direction: %s\n", sanitizeInlineText(string(source.QuoteDirection))))
-		builder.WriteString(fmt.Sprintf("- Rate Value: %s\n", rateValue))
 	}
 
 	builder.WriteString("\n")

@@ -175,7 +175,7 @@ Process units in this order. Units marked as parallel candidates may run concurr
 - [X] T030 [P] [US2] Add Federal Reserve H.10 client and mapper unit tests in `internal/integration/currency/federal_reserve_client_internal_test.go`
 - [X] T031 [P] [US2] Add exact conversion math and session-cache unit tests in `internal/integration/currency/conversion_internal_test.go`
 - [X] T032 [P] [US2] Add deterministic mixed-currency conversion integration test with at least 50 priced activities, 3 source currencies, 2 report years, ECB division, H.10 unstarred division, H.10 starred multiplication, and previous-available-rate fallback in `tests/integration/report_generation_flow_test.go`
-- [ ] T033 [P] [US2] ⚠️ Reopened ~~Add Markdown audit and rate source summary contract tests~~ Add Markdown audit and rate source summary contract tests proving the Rate Source Summary renders once per selected base-currency provider and excludes rate-specific `Quote Direction` and `Rate Value` in `tests/contract/markdown_report_contract_test.go` (reopened — BUG-003)
+- [X] T033 [P] [US2] ⚠️ Reopened ~~Add Markdown audit and rate source summary contract tests~~ Add Markdown audit and rate source summary contract tests proving the Rate Source Summary renders once per selected base-currency provider and excludes rate-specific `Quote Direction` and `Rate Value` in `tests/contract/markdown_report_contract_test.go` (reopened — BUG-003)
 - [X] T064 [P] [US2] Add offset-sensitive source-calendar date rate-selection tests where UTC date differs from the preserved activity offset date in `tests/integration/report_generation_flow_test.go`
 - [X] T065 [P] [US2] Add single-activity monetary-context no-tier-mixing conversion tests in `internal/report/calculate/calculator_internal_test.go`
 - [X] T066 [P] [US2] Add Markdown contract tests distinguishing same-currency rows from converted rows in `tests/contract/markdown_report_contract_test.go`
@@ -183,8 +183,8 @@ Process units in this order. Units marked as parallel candidates may run concurr
 - [X] T068 [P] [US2] Add session-cache revision behavior tests proving same-key cached evidence is reused within one process and new service instances fetch currently published provider values in `internal/integration/currency/session_cache_internal_test.go`
 - [X] T069 [P] [US2] Add 10,000-activity responsiveness integration test with delayed provider fixtures, asynchronous busy-state assertion, and bounded lookup-count assertions in `tests/integration/report_generation_responsiveness_test.go`
 - [X] T073 [P] [US2] Add Federal Reserve DDP direct-download URL and live `seriesrow` package CSV fixture regression tests in `internal/integration/currency/federal_reserve_client_internal_test.go`
-- [ ] T076 [P] [US2] Add Markdown contract regression that keeps `Quote Direction` and `Rate Value` in `Currency Conversion Audit` or equivalent per-activity details while excluding them from `Rate Source Summary` in `tests/contract/markdown_report_contract_test.go`
-- [ ] T077 [P] [US2] Add renderer unit coverage for provider-level `Rate Source Summary` aggregation across multiple rate values in `internal/report/markdown/renderer_internal_test.go`
+- [X] T076 [P] [US2] Add Markdown contract regression that keeps `Quote Direction` and `Rate Value` in `Currency Conversion Audit` or equivalent per-activity details while excluding them from `Rate Source Summary` in `tests/contract/markdown_report_contract_test.go`
+- [X] T077 [P] [US2] Add renderer unit coverage for provider-level `Rate Source Summary` aggregation across multiple rate values in `internal/report/markdown/renderer_internal_test.go`
 
 ### Implementation for User Story 2
 
@@ -199,7 +199,7 @@ Process units in this order. Units marked as parallel candidates may run concurr
 - [X] T041 [US2] Resolve provider evidence per unique rate key before asset replay in `internal/report/calculate/calculator.go`
 - [X] T042 [US2] Record conversion audit entries during report artifact creation in `internal/report/calculate/artifacts.go`
 - [X] T043 [US2] Add conversion audit and rate source validation to report construction in `internal/report/model/capital_gains_report.go`
-- [ ] T044 [US2] ⚠️ Reopened ~~Render rate source summary in `internal/report/markdown/renderer_currency.go`~~ Render provider-level Rate Source Summary once per report from selected base-currency provider metadata in `internal/report/markdown/renderer.go` (reopened — BUG-003)
+- [X] T044 [US2] ⚠️ Reopened ~~Render rate source summary in `internal/report/markdown/renderer_currency.go`~~ Render provider-level Rate Source Summary once per report from selected base-currency provider metadata in `internal/report/markdown/renderer.go` (reopened — BUG-003)
 - [X] T045 [US2] Render converted activity audit table in `internal/report/markdown/renderer_currency.go`
 - [X] T046 [US2] Wire concrete currency rate service into runtime report generation in `internal/app/runtime/report_service.go`
 - [X] T047 [US2] ⚠️ Reopened Add opt-in live ECB and Federal Reserve client checks against the official provider endpoints in `tests/externalintegration/currency_provider_live_test.go` (reopened — BUG-002)

@@ -4,6 +4,7 @@
 package contract
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -70,6 +71,10 @@ func TestMarkdownReportConversionAuditContract(t *testing.T) {
 	assertContains(t, document.Content, "ECB Data Portal `EXR`")
 	assertContains(t, document.Content, "daily euro foreign exchange reference rate")
 	assertContains(t, document.Content, "most recent previous available ECB observation")
+	assertNotContains(t, rateSourceSummarySection(document.Content), "Quote Direction")
+	assertNotContains(t, rateSourceSummarySection(document.Content), "Rate Value")
+	assertNotContains(t, rateSourceSummarySection(document.Content), "source_per_base")
+	assertNotContains(t, rateSourceSummarySection(document.Content), "1.08")
 	assertContains(t, document.Content, "## Currency Conversion Audit")
 	assertContains(t, document.Content, "| Date | Source ID | Asset | Source Currency | Report Base Currency | Rate Date | Rate Authority | Rate Kind | Quote Direction | Rate Value | Amount Kind | Original Amount | Converted Amount |")
 	assertContains(t, document.Content, "| 2024-01-01 | btc-sell-2024-001 | BTC | USD | EUR | 2023-12-29 | European Central Bank | daily euro foreign exchange reference rate | source_per_base | 1.08 | unit_price | 27000 | 25000 |")
@@ -79,6 +84,45 @@ func TestMarkdownReportConversionAuditContract(t *testing.T) {
 	assertContains(t, document.Content, "2024-01-01")
 	assertContains(t, document.Content, "2023-12-29")
 	assertNotContains(t, document.Content, "secret-token")
+}
+
+// TestMarkdownReportRateSourceSummaryAggregatesByProvider verifies that the
+// provider source summary is rendered once for a selected base-currency provider,
+// while rate-specific evidence remains in the conversion audit table.
+// Authored by: OpenCode
+func TestMarkdownReportRateSourceSummaryAggregatesByProvider(t *testing.T) {
+	t.Parallel()
+
+	var report = contractMarkdownReportFixture(reportmodel.ReportBaseCurrencyEUR.Label())
+	var secondEvidence = report.RateSources[0]
+	secondEvidence.SourceCurrency = "GBP"
+	secondEvidence.ActivityDate = time.Date(2024, time.January, 2, 0, 15, 0, 0, time.Local)
+	secondEvidence.RateDate = time.Date(2024, time.January, 2, 0, 0, 0, 0, time.Local)
+	secondEvidence.RateValue = mustContractDecimal("1.16")
+	report.RateSources = append(report.RateSources, secondEvidence)
+	report.ConversionAuditEntries = append(report.ConversionAuditEntries, contractConversionAuditEntry(
+		"gbp-buy-2024-001",
+		"ETH",
+		"GBP",
+		"1.16",
+		reportmodel.ExchangeRateQuoteDirectionSourcePerBase,
+	))
+
+	var document, err = reportmarkdown.Render(report)
+	if err != nil {
+		t.Fatalf("render markdown report: %v", err)
+	}
+
+	var summary = rateSourceSummarySection(document.Content)
+	if got := countOccurrences(summary, "- Authority: European Central Bank"); got != 1 {
+		t.Fatalf("expected one provider-level ECB summary, got %d in %q", got, summary)
+	}
+	assertNotContains(t, summary, "Quote Direction")
+	assertNotContains(t, summary, "Rate Value")
+	assertNotContains(t, summary, "1.08")
+	assertNotContains(t, summary, "1.16")
+	assertContains(t, document.Content, "| 2024-01-01 | btc-sell-2024-001 | BTC | USD | EUR | 2023-12-29 | European Central Bank | daily euro foreign exchange reference rate | source_per_base | 1.08 | unit_price | 27000 | 25000 |")
+	assertContains(t, document.Content, "| 2024-01-02 | gbp-buy-2024-001 | ETH | GBP | EUR | 2024-01-02 | European Central Bank | daily euro foreign exchange reference rate | source_per_base | 1.16 | gross_value | 116 | 100 |")
 }
 
 // TestMarkdownReportDistinguishesSameCurrencyAndConvertedRows verifies that
@@ -276,6 +320,70 @@ func contractMarkdownReportFixture(reportCalculationCurrency string) reportmodel
 			DatasetReference: "ECB Data Portal `EXR`",
 		}},
 	}
+}
+
+// contractConversionAuditEntry returns one conversion audit fixture with
+// matching amount-level exchange-rate evidence.
+// Authored by: OpenCode
+func contractConversionAuditEntry(sourceID string, assetLabel string, sourceCurrency string, rateValue string, quoteDirection reportmodel.ExchangeRateQuoteDirection) reportmodel.ConversionAuditEntry {
+	var activityDate = time.Date(2024, time.January, 2, 0, 15, 0, 0, time.Local)
+	var evidence = reportmodel.ExchangeRateEvidence{
+		SourceCurrency:   sourceCurrency,
+		BaseCurrency:     reportmodel.ReportBaseCurrencyEUR,
+		ActivityDate:     activityDate,
+		RateDate:         time.Date(2024, time.January, 2, 0, 0, 0, 0, time.Local),
+		Authority:        reportmodel.ExchangeRateAuthorityEuropeanCentralBank,
+		ProviderID:       reportmodel.ExchangeRateProviderIDECBEXR,
+		RateKind:         "daily euro foreign exchange reference rate",
+		QuoteDirection:   quoteDirection,
+		RateValue:        mustContractDecimal(rateValue),
+		DatasetReference: "ECB Data Portal `EXR`",
+	}
+
+	return reportmodel.ConversionAuditEntry{
+		SourceID:           sourceID,
+		AssetLabel:         assetLabel,
+		ActivityDate:       activityDate,
+		SourceCurrency:     sourceCurrency,
+		ReportBaseCurrency: reportmodel.ReportBaseCurrencyEUR,
+		RateDate:           evidence.RateDate,
+		RateAuthority:      evidence.Authority,
+		RateKind:           evidence.RateKind,
+		RateValue:          evidence.RateValue,
+		QuoteDirection:     evidence.QuoteDirection,
+		Amounts: []reportmodel.ConvertedActivityAmount{{
+			SourceID:             sourceID,
+			AmountKind:           reportmodel.ConvertedAmountKindGrossValue,
+			OriginalCurrency:     sourceCurrency,
+			OriginalAmount:       mustContractDecimal("116"),
+			ReportBaseCurrency:   reportmodel.ReportBaseCurrencyEUR,
+			ConvertedAmount:      mustContractDecimal("100"),
+			ExchangeRateEvidence: &evidence,
+			ConversionStatus:     reportmodel.ConversionStatusConverted,
+		}},
+	}
+}
+
+// rateSourceSummarySection extracts the Rate Source Summary block from a
+// rendered Markdown document.
+// Authored by: OpenCode
+func rateSourceSummarySection(content string) string {
+	var start = strings.Index(content, "## Rate Source Summary")
+	if start < 0 {
+		return ""
+	}
+	var rest = content[start:]
+	var next = strings.Index(rest[len("## Rate Source Summary"):], "\n## ")
+	if next < 0 {
+		return rest
+	}
+	return rest[:len("## Rate Source Summary")+next]
+}
+
+// countOccurrences counts non-overlapping occurrences of a substring.
+// Authored by: OpenCode
+func countOccurrences(content string, needle string) int {
+	return strings.Count(content, needle)
 }
 
 // contractConvertedActivityAmount returns one converted amount tied to the

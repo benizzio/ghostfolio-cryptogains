@@ -569,8 +569,8 @@ func TestRenderCoversDetailAndLiquidationBranches(t *testing.T) {
 	})
 }
 
-// TestRendererRateSourceAndConversionAuditSections verifies successful provider
-// disclosure, duplicate rate-source suppression, and audit amount rendering.
+// TestRendererRateSourceAndConversionAuditSections verifies provider-level
+// disclosure, rate-source aggregation, and audit amount rendering.
 // Authored by: OpenCode
 func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 	t.Parallel()
@@ -599,9 +599,9 @@ func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 				Authority:        reportmodel.ExchangeRateAuthorityFederalReserve,
 				ProviderID:       reportmodel.ExchangeRateProviderIDFederalReserveH10,
 				RateKind:         "daily noon buying rate",
-				QuoteDirection:   reportmodel.ExchangeRateQuoteDirectionBasePerSource,
-				RateValue:        *apd.New(10946, -4),
-				DatasetReference: "H10 fixture duplicate",
+				QuoteDirection:   reportmodel.ExchangeRateQuoteDirectionSourcePerBase,
+				RateValue:        *apd.New(78, -1),
+				DatasetReference: "H10 fixture second rate",
 			},
 		},
 		ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{
@@ -629,11 +629,16 @@ func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 	}
 	var summary = builder.String()
 	if strings.Count(summary, "- Authority: Federal Reserve") != 1 {
-		t.Fatalf("expected duplicate equivalent rate source to render once, got %q", summary)
+		t.Fatalf("expected provider-level rate source to render once, got %q", summary)
 	}
-	for _, expected := range []string{"Report Base Currency: USD", "Federal Reserve Board H.10", "most recent previous available H.10 observation", "Rate Value: 1.0946"} {
+	for _, expected := range []string{"Report Base Currency: USD", "Federal Reserve Board H.10", "most recent previous available H.10 observation"} {
 		if !strings.Contains(summary, expected) {
 			t.Fatalf("expected rate source summary to contain %q, got %q", expected, summary)
+		}
+	}
+	for _, excluded := range []string{"Quote Direction", "Rate Value", "1.0946", "7.8", "base_per_source", "source_per_base"} {
+		if strings.Contains(summary, excluded) {
+			t.Fatalf("expected rate source summary to exclude %q, got %q", excluded, summary)
 		}
 	}
 
@@ -642,7 +647,7 @@ func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 		t.Fatalf("write conversion audit section: %v", err)
 	}
 	var audit = builder.String()
-	for _, expected := range []string{"## Currency Conversion Audit", "eur-buy-1", "gross_value", "100", "109.46"} {
+	for _, expected := range []string{"## Currency Conversion Audit", "eur-buy-1", "base_per_source", "Rate Value", "1.0946", "gross_value", "100", "109.46"} {
 		if !strings.Contains(audit, expected) {
 			t.Fatalf("expected conversion audit to contain %q, got %q", expected, audit)
 		}
@@ -657,15 +662,8 @@ func TestRendererRateSourceAndConversionAuditErrors(t *testing.T) {
 
 	var invalid apd.Decimal
 	invalid.Form = apd.Infinite
-	var report = reportmodel.CapitalGainsReport{
-		RateSources: []reportmodel.ExchangeRateEvidence{{RateValue: invalid}},
-	}
+	var report = reportmodel.CapitalGainsReport{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{RateValue: invalid}}}
 	var builder strings.Builder
-	if err := writeRateSourceSummary(&builder, report); err == nil || !strings.Contains(err.Error(), "render rate source 0 rate value") {
-		t.Fatalf("expected rate source invalid-decimal error, got %v", err)
-	}
-
-	report = reportmodel.CapitalGainsReport{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{RateValue: invalid}}}
 	builder.Reset()
 	if err := writeConversionAuditSection(&builder, report); err == nil || !strings.Contains(err.Error(), "render conversion audit entry 0 rate value") {
 		t.Fatalf("expected audit rate invalid-decimal error, got %v", err)
