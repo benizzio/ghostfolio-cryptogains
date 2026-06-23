@@ -4,6 +4,8 @@
 
 This feature extends report-generation runtime models. It does not add a long-lived exchange-rate cache and does not persist rate evidence into protected snapshots. The final Markdown report remains the intentional cleartext audit artifact.
 
+**Bugfix**: 2026-06-24 — BUG-004 Clarified that provider-level authority and rate kind may be retained as evidence but are not rendered as per-amount Currency Conversion Audit columns.
+
 All financial amounts, quantities, exchange rates, converted amounts, basis values, proceeds, gains, and losses are exact decimals. Every monetary value has an explicit currency before and after conversion.
 
 Provider identity, authority metadata, provider DTOs, and provider selection are owned by the currency integration layer. Report models submit base currency, source currency, and activity date to that layer and consume canonical rate evidence.
@@ -335,8 +337,8 @@ Fields:
 | `source_currency` | string | Selected activity currency |
 | `report_base_currency` | string | Selected report base currency |
 | `rate_date` | date | Actual provider observation date |
-| `rate_authority` | string | ECB or Federal Reserve |
-| `rate_kind` | string | Daily reference rate or noon buying rate |
+| `rate_authority` | string | ~~ECB or Federal Reserve~~ Retained provider evidence; rendered in Rate Source Summary, not as a Currency Conversion Audit column |
+| `rate_kind` | string | ~~Daily reference rate or noon buying rate~~ Retained provider evidence; rendered in Rate Source Summary, not as a Currency Conversion Audit column |
 | `rate_value` | decimal | Published rate value |
 | `quote_direction` | string | Canonical quote direction |
 | `amounts` | `ConvertedActivityAmount[]` | Original and converted unit price, gross value, and fee values as applicable |
@@ -352,6 +354,7 @@ Validation rules:
 - Required for every converted priced activity.
 - Not required for same-currency rows, but same-currency rows must remain distinguishable in report detail tables.
 - Must not expose tokens, JWTs, raw protected payloads, or production-mode diagnostic financial values outside the intentional final report content.
+- Rendered Currency Conversion Audit rows must use the compact BUG-004 column order and omit provider-level `Rate Authority` and `Rate Kind` columns.
 
 State transitions:
 
