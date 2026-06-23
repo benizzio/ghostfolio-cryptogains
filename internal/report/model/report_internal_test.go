@@ -910,6 +910,9 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 	if err := entry.Validate(); err != nil {
 		t.Fatalf("expected valid audit entry: %v", err)
 	}
+	if !entry.matchesExchangeRateEvidence(evidence) {
+		t.Fatalf("expected retained provider authority and rate kind to remain part of audit evidence matching")
+	}
 
 	var invalidEvidence = evidence
 	invalidEvidence.SourceCurrency = "USD"
@@ -1106,6 +1109,14 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 		t.Fatalf("expected audit missing rate kind rejection, got %v", err)
 	}
 	invalidEntry = entry
+	invalidEntry.RateKind = "different retained provider rate kind"
+	var mismatchedAmount = amount
+	mismatchedAmount.ExchangeRateEvidence = &evidence
+	invalidEntry.Amounts = []ConvertedActivityAmount{mismatchedAmount}
+	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "exchange-rate evidence mismatch") {
+		t.Fatalf("expected retained audit rate-kind mismatch rejection, got %v", err)
+	}
+	invalidEntry = entry
 	invalidEntry.RateValue = mustReportDecimal(t, "0")
 	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "rate value") {
 		t.Fatalf("expected audit non-positive rate rejection, got %v", err)
@@ -1136,7 +1147,7 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 		t.Fatalf("expected audit same-currency amount rejection, got %v", err)
 	}
 	invalidEntry = entry
-	var mismatchedAmount = amount
+	mismatchedAmount = amount
 	mismatchedAmount.SourceID = "other"
 	invalidEntry.Amounts = []ConvertedActivityAmount{mismatchedAmount}
 	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "source ID mismatch") {

@@ -76,10 +76,13 @@ func TestMarkdownReportConversionAuditContract(t *testing.T) {
 	assertNotContains(t, rateSourceSummarySection(document.Content), "source_per_base")
 	assertNotContains(t, rateSourceSummarySection(document.Content), "1.08")
 	assertContains(t, document.Content, "## Currency Conversion Audit")
-	assertContains(t, document.Content, "| Date | Source ID | Asset | Source Currency | Report Base Currency | Rate Date | Rate Authority | Rate Kind | Quote Direction | Rate Value | Amount Kind | Original Amount | Converted Amount |")
-	assertContains(t, document.Content, "| 2024-01-01 | btc-sell-2024-001 | BTC | USD | EUR | 2023-12-29 | European Central Bank | daily euro foreign exchange reference rate | source_per_base | 1.08 | unit_price | 27000 | 25000 |")
-	assertContains(t, document.Content, "| 2024-01-01 | btc-sell-2024-001 | BTC | USD | EUR | 2023-12-29 | European Central Bank | daily euro foreign exchange reference rate | source_per_base | 1.08 | gross_value | 27000 | 25000 |")
-	assertContains(t, document.Content, "| 2024-01-01 | btc-sell-2024-001 | BTC | USD | EUR | 2023-12-29 | European Central Bank | daily euro foreign exchange reference rate | source_per_base | 1.08 | fee_amount | 0 | 0 |")
+	var audit = currencyConversionAuditSection(document.Content)
+	assertContains(t, audit, "| Date | Source ID | Asset | Amount Kind | Rate Date | Source Currency | Original Amount | Report Base Currency | Converted Amount | Quote Direction | Rate Value |")
+	assertNotContains(t, audit, "Rate Authority")
+	assertNotContains(t, audit, "Rate Kind")
+	assertContains(t, audit, "| 2024-01-01 | btc-sell-2024-001 | BTC | unit_price | 2023-12-29 | USD | 27000 | EUR | 25000 | source_per_base | 1.08 |")
+	assertContains(t, audit, "| 2024-01-01 | btc-sell-2024-001 | BTC | gross_value | 2023-12-29 | USD | 27000 | EUR | 25000 | source_per_base | 1.08 |")
+	assertContains(t, audit, "| 2024-01-01 | btc-sell-2024-001 | BTC | fee_amount | 2023-12-29 | USD | 0 | EUR | 0 | source_per_base | 1.08 |")
 	assertContains(t, document.Content, "btc-sell-2024-001")
 	assertContains(t, document.Content, "2024-01-01")
 	assertContains(t, document.Content, "2023-12-29")
@@ -121,8 +124,32 @@ func TestMarkdownReportRateSourceSummaryAggregatesByProvider(t *testing.T) {
 	assertNotContains(t, summary, "Rate Value")
 	assertNotContains(t, summary, "1.08")
 	assertNotContains(t, summary, "1.16")
-	assertContains(t, document.Content, "| 2024-01-01 | btc-sell-2024-001 | BTC | USD | EUR | 2023-12-29 | European Central Bank | daily euro foreign exchange reference rate | source_per_base | 1.08 | unit_price | 27000 | 25000 |")
-	assertContains(t, document.Content, "| 2024-01-02 | gbp-buy-2024-001 | ETH | GBP | EUR | 2024-01-02 | European Central Bank | daily euro foreign exchange reference rate | source_per_base | 1.16 | gross_value | 116 | 100 |")
+	var audit = currencyConversionAuditSection(document.Content)
+	assertNotContains(t, audit, "Rate Authority")
+	assertNotContains(t, audit, "Rate Kind")
+	assertContains(t, audit, "| 2024-01-01 | btc-sell-2024-001 | BTC | unit_price | 2023-12-29 | USD | 27000 | EUR | 25000 | source_per_base | 1.08 |")
+	assertContains(t, audit, "| 2024-01-02 | gbp-buy-2024-001 | ETH | gross_value | 2024-01-02 | GBP | 116 | EUR | 100 | source_per_base | 1.16 |")
+}
+
+// TestMarkdownReportCurrencyConversionAuditCompactHeaderOrder verifies the
+// BUG-004 compact audit table order from the Markdown report contract.
+// Authored by: OpenCode
+func TestMarkdownReportCurrencyConversionAuditCompactHeaderOrder(t *testing.T) {
+	t.Parallel()
+
+	var document, err = reportmarkdown.Render(contractMarkdownReportFixture(reportmodel.ReportBaseCurrencyEUR.Label()))
+	if err != nil {
+		t.Fatalf("render markdown report: %v", err)
+	}
+
+	var audit = currencyConversionAuditSection(document.Content)
+	var expectedHeader = "| Date | Source ID | Asset | Amount Kind | Rate Date | Source Currency | Original Amount | Report Base Currency | Converted Amount | Quote Direction | Rate Value |"
+	var expectedSeparator = "|------|-----------|-------|-------------|-----------|-----------------|-----------------|----------------------|------------------|-----------------|------------|"
+	assertContains(t, audit, expectedHeader+"\n"+expectedSeparator)
+	assertNotContains(t, audit, "Rate Authority")
+	assertNotContains(t, audit, "Rate Kind")
+	assertContains(t, rateSourceSummarySection(document.Content), "- Authority: European Central Bank")
+	assertContains(t, rateSourceSummarySection(document.Content), "- Rate Kind: daily euro foreign exchange reference rate")
 }
 
 // TestMarkdownReportDistinguishesSameCurrencyAndConvertedRows verifies that
@@ -378,6 +405,22 @@ func rateSourceSummarySection(content string) string {
 		return rest
 	}
 	return rest[:len("## Rate Source Summary")+next]
+}
+
+// currencyConversionAuditSection extracts the Currency Conversion Audit block
+// from a rendered Markdown document.
+// Authored by: OpenCode
+func currencyConversionAuditSection(content string) string {
+	var start = strings.Index(content, "## Currency Conversion Audit")
+	if start < 0 {
+		return ""
+	}
+	var rest = content[start:]
+	var next = strings.Index(rest[len("## Currency Conversion Audit"):], "\n## ")
+	if next < 0 {
+		return rest
+	}
+	return rest[:len("## Currency Conversion Audit")+next]
 }
 
 // countOccurrences counts non-overlapping occurrences of a substring.

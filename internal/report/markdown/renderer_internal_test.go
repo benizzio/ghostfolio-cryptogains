@@ -652,6 +652,16 @@ func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 			t.Fatalf("expected conversion audit to contain %q, got %q", expected, audit)
 		}
 	}
+	for _, excluded := range []string{"Rate Authority", "Rate Kind", "Federal Reserve", "daily noon buying rate"} {
+		if strings.Contains(audit, excluded) {
+			t.Fatalf("expected conversion audit to exclude provider-level field %q, got %q", excluded, audit)
+		}
+	}
+	var expectedHeader = "| Date | Source ID | Asset | Amount Kind | Rate Date | Source Currency | Original Amount | Report Base Currency | Converted Amount | Quote Direction | Rate Value |"
+	var expectedRow = "| 2024-01-05 | eur-buy-1 | BTC | gross_value | 2024-01-05 | EUR | 100 | USD | 109.46 | base_per_source | 1.0946 |"
+	if !strings.Contains(audit, expectedHeader) || !strings.Contains(audit, expectedRow) {
+		t.Fatalf("expected compact conversion audit order, got %q", audit)
+	}
 }
 
 // TestRendererRateSourceAndConversionAuditErrors verifies invalid decimals in

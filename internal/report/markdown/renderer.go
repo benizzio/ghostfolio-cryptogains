@@ -304,8 +304,8 @@ func writeConversionAuditSection(builder *strings.Builder, report reportmodel.Ca
 	}
 
 	builder.WriteString("## Currency Conversion Audit\n\n")
-	builder.WriteString("| Date | Source ID | Asset | Source Currency | Report Base Currency | Rate Date | Rate Authority | Rate Kind | Quote Direction | Rate Value | Amount Kind | Original Amount | Converted Amount |\n")
-	builder.WriteString("|------|-----------|-------|-----------------|----------------------|-----------|----------------|-----------|-----------------|------------|-------------|-----------------|------------------|\n")
+	builder.WriteString("| Date | Source ID | Asset | Amount Kind | Rate Date | Source Currency | Original Amount | Report Base Currency | Converted Amount | Quote Direction | Rate Value |\n")
+	builder.WriteString("|------|-----------|-------|-------------|-----------|-----------------|-----------------|----------------------|------------------|-----------------|------------|\n")
 
 	for entryIndex, entry := range report.ConversionAuditEntries {
 		var rateValue, err = canonicalDecimal(entry.RateValue)
@@ -326,20 +326,18 @@ func writeConversionAuditSection(builder *strings.Builder, report reportmodel.Ca
 			}
 
 			builder.WriteString(fmt.Sprintf(
-				"| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
+				"| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
 				entry.ActivityDate.Local().Format("2006-01-02"),
 				sanitizeInlineText(entry.SourceID),
 				sanitizeInlineText(entry.AssetLabel),
-				sanitizeInlineText(entry.SourceCurrency),
-				sanitizeInlineText(entry.ReportBaseCurrency.Label()),
+				sanitizeInlineText(string(amount.AmountKind)),
 				entry.RateDate.Local().Format("2006-01-02"),
-				rateAuthorityLabel(entry.RateAuthority),
-				sanitizeInlineText(entry.RateKind),
+				sanitizeInlineText(entry.SourceCurrency),
+				originalAmount,
+				sanitizeInlineText(entry.ReportBaseCurrency.Label()),
+				convertedAmount,
 				sanitizeInlineText(string(entry.QuoteDirection)),
 				rateValue,
-				sanitizeInlineText(string(amount.AmountKind)),
-				originalAmount,
-				convertedAmount,
 			))
 		}
 	}
