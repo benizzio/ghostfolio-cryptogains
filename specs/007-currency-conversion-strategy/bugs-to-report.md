@@ -37,7 +37,7 @@ The order of the columns is also not intuitive. We need to change for the follow
 | Date | Source ID | Asset | Amount Kind | Rate Date | Source Currency | Original Amount  | Report Base Currency | Converted Amount | Quote Direction | Rate Value |
 ```
 
-## [ ] 3 - Currency Conversion Audit bloat
+## [X] 3 - Currency Conversion Audit bloat
 
 According to the audit multiple unnecessary conversions are happening. Example extracted from production data:
 
