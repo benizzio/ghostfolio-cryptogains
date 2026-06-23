@@ -24,7 +24,7 @@ The `Rate Source Summary` section is repeating multiple times in a unwanted beha
 
 Since the report has only one base currency, this segment cannot repeat. Also, the `Quote Direction` `Rate Value` fields are unnecessary for this segment and should be removed
 
-## [ ] 2 - Currency Conversion Audit cleanup and fixes:
+## [X] 2 - Currency Conversion Audit cleanup and fixes:
 
 The current `Currency Conversion Audit` table is too large with unnecessary information. We can remove the following columns:
 
