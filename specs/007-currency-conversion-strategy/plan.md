@@ -10,9 +10,11 @@
 
 **Bugfix**: 2026-06-23 — BUG-002 Updated from bugfix patch
 
+**Bugfix**: 2026-06-23 — BUG-003 Updated from bugfix patch
+
 ## Summary
 
-Add a required report base-currency selection to yearly capital gains report generation, limited to `USD` and `EUR`. The report pipeline will keep the existing single-activity monetary-context selection rules, then convert every priced activity whose selected currency differs from the report base currency before cost-basis, proceeds, gain/loss, and report-total calculations consume the values. EUR-base conversions use the ECB Data Portal `EXR` daily reference-rate data. USD-base conversions use the Federal Reserve Board H.10/Data Download Program data. Provider-specific payloads, quote directions, provider selection, and canonicalization stay behind `internal/integration/currency/`, which exposes a public rate lookup service consumed by the report calculator and disclosed in the Markdown report through canonical rate evidence.
+Add a required report base-currency selection to yearly capital gains report generation, limited to `USD` and `EUR`. The report pipeline will keep the existing single-activity monetary-context selection rules, then convert every priced activity whose selected currency differs from the report base currency before cost-basis, proceeds, gain/loss, and report-total calculations consume the values. EUR-base conversions use the ECB Data Portal `EXR` daily reference-rate data. USD-base conversions use the Federal Reserve Board H.10/Data Download Program data. Provider-specific payloads, quote directions, provider selection, and canonicalization stay behind `internal/integration/currency/`, which exposes a public rate lookup service consumed by the report calculator and disclosed in the Markdown report through canonical rate evidence. Markdown rendering derives the `Rate Source Summary` from selected base-currency provider metadata once per report, while `Quote Direction`, `Rate Value`, and other rate-level evidence remain in `Currency Conversion Audit` rows.
 
 ## Technical Context
 
@@ -83,7 +85,7 @@ internal/
 │   ├── model/                # Report request base currency, converted amounts, audit entries, validation
 │   ├── calculate/            # Conversion boundary before basis/proceeds/gain/loss replay
 │   ├── basis/                # Existing cost-basis methods consume converted report-base amounts
-│   ├── markdown/             # Report currency header and conversion audit rendering
+│   ├── markdown/             # Report currency header, provider-level source summary, and per-activity conversion audit rendering
 │   └── output/               # Existing final Markdown write and cleanup rules
 └── tui/
     ├── flow/                 # Base-currency selection state and generation request construction
@@ -139,6 +141,7 @@ tests/
 5. If the selected activity currency differs from the report base currency, resolve canonical rate evidence by source currency, report base currency, and source-calendar activity date.
 6. In the report calculation tier, convert every selected monetary value that can affect cost basis, proceeds, fees, gains, losses, or totals before it enters basis state or liquidation calculations.
 7. Use the existing 16-decimal round-half-up policy only when division or another bounded internal decimal result is required. Preserve provider-published rate precision in audit evidence.
+8. Render report-level source summary content from selected provider metadata once per report; render quote direction, rate value, and converted amount evidence only in per-activity audit details.
 
 ## Performance Validation
 
@@ -156,6 +159,8 @@ Required validation:
 
 Provider adapters must expose a canonical currency integration application service that returns rate evidence independent of provider payload shape. The public lookup request includes source currency, base currency, and activity date. The canonical model includes source currency, base currency, activity date, rate date, authority, provider, rate kind, quote direction, rate value, and source URL or dataset identity. ECB and Federal Reserve DTOs do not cross into `internal/report/calculate/`, `internal/report/basis/`, TUI, Markdown rendering, or report-owned models.
 
+Markdown source-summary rendering consumes provider-level display metadata for the selected base currency and must not iterate canonical rate evidence as repeated provider-summary blocks.
+
 The issue requirement for scalability is handled by keeping provider selection behind the currency integration service's base-currency registry. Adding a future base currency should require adding one provider adapter and registry entry, not changing cost-basis methods or report rendering logic beyond supported currency labels.
 
 ## Failure Handling
@@ -171,6 +176,7 @@ The issue requirement for scalability is handled by keeping provider selection b
 ## Testing Strategy
 
 - Contract tests verify that report selection requires one base currency, only `USD` and `EUR` are selectable, and generated Markdown replaces `NOT APPLICABLE` with the selected base currency.
+- Markdown contract and renderer tests assert that `Rate Source Summary` renders once per selected base-currency provider, excludes `Quote Direction` and `Rate Value`, and keeps those rate-specific fields in `Currency Conversion Audit` or equivalent per-activity audit details.
 - Integration tests run report generation with mocked ECB and Federal Reserve provider responses behind the currency integration service, including same-currency rows, converted rows, mixed source currencies, prior-business-date fallback, provider outage, unsupported currency, malformed currency, and no-partial-file cleanup.
 - Unit tests cover ECB EXR mapping, Federal Reserve H.10 quote-direction mapping, canonical rate evidence validation, conversion formulas, 16-decimal division bounding, in-memory TUI-session rate reuse, and redaction-safe failure construction.
 - External integration tests directly exercise each official-provider HTTP client endpoint with one fixed historical observation and committed expected rate data, avoiding repeated live-provider load and avoiding report-domain setup.
@@ -183,6 +189,8 @@ The issue requirement for scalability is handled by keeping provider selection b
 ## Complexity Tracking
 
 No constitution violations are planned.
+
+BUG-003 adds a rendering edge case where one selected provider can produce many rate evidence values. The simpler approach is to keep provider-level summary rendering separate from per-activity audit rendering rather than adding a new report persistence model.
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|

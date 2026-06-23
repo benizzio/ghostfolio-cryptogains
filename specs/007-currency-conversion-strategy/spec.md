@@ -24,6 +24,7 @@
 ### Session 2026-06-23
 
 - **Bugfix**: 2026-06-23 — BUG-002 Clarified Federal Reserve DDP direct-download and live package CSV dependency assumptions for USD conversions.
+- **Bugfix**: 2026-06-23 — BUG-003 Clarified Rate Source Summary cardinality and provider-level field ownership.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -93,6 +94,7 @@ When an official conversion cannot be obtained or the activity currency is not s
 - Conversion succeeds for many activities and then fails for one later activity in deterministic history order.
 - The report includes only zero-priced holding reductions after the selected year and therefore needs no conversion for those rows.
 - The user generates the same year and method twice with different report base currencies and expects separate results and rate audit details.
+- A report uses one selected base-currency provider but contains multiple converted activities with different rate dates, quote directions, or rate values; the Rate Source Summary remains one provider-level summary and rate-specific evidence remains in the conversion audit.
 
 ## Requirements *(mandatory)*
 
@@ -119,13 +121,13 @@ Each feature specification MUST capture security, persistence, financial precisi
 - **FR-017**: The system MUST fail report generation if the selected authority source is unavailable and the required rate is not defensibly available in the current TUI session's in-memory rate cache.
 - **FR-018**: The system MUST express all cost basis, proceeds, realized gains, realized losses, and cross-activity monetary totals in the selected report base currency for successful converted reports.
 - **FR-019**: The system MUST preserve each priced activity's original selected currency and original selected monetary values in report audit details when conversion occurs.
-- **FR-020**: For each converted priced activity, the generated report MUST include or reference audit details containing source currency, report base currency, activity date, rate date, rate authority, rate kind when applicable, rate value, original amount, and converted amount.
+- **FR-020**: For each converted priced activity, the generated report MUST include or reference audit details containing source currency, report base currency, activity date, rate date, rate authority, rate kind when applicable, rate value, original amount, and converted amount. These rate-specific fields belong to per-activity audit evidence, not the report-level Rate Source Summary.
 - **FR-021**: The report MUST distinguish same-currency activity values from converted activity values so the user can tell whether an exchange rate changed a row's monetary values.
 - **FR-022**: Zero-priced holding reductions that create no proceeds and no acquisition cost MUST NOT require exchange-rate lookup solely because they reduce quantity or preserve explicit zero-valued monetary source fields.
 - **FR-023**: Explicit zero-valued monetary source fields that are valid under existing report rules MUST remain zero after conversion handling and MUST NOT create gains, losses, proceeds, or fees by conversion.
 - **FR-024**: Conversion calculations MUST use exact decimal arithmetic, MUST preserve published rate precision, MUST keep every monetary amount tied to its currency until conversion, and MUST avoid floating-point behavior in financial decisions or assertions.
 - **FR-025**: When a required conversion formula divides or otherwise needs a bounded internal decimal result, the system MUST use the existing report internal precision policy of 16 decimal places with round half up handling before later calculations continue.
-- **FR-026**: The system MUST make successful report calculations reproducible from synced activity inputs, selected report base currency, selected rate source, rate dates, rate values, and documented rounding rules.
+- **FR-026**: The system MUST make successful report calculations and rendered conversion disclosures reproducible from synced activity inputs, selected report base currency, selected rate source, rate dates, rate values, and documented rounding rules while keeping report-level source metadata distinct from per-activity rate evidence.
 - **FR-027**: If conversion fails before the final report file is saved, the system MUST leave no partial cleartext report artifact behind and MUST keep the user inside the unlocked reporting context with an actionable non-secret error.
 - **FR-028**: Conversion failure messages and diagnostics MUST exclude Ghostfolio security tokens, bearer tokens, reusable token verifiers, and raw authentication material.
 - **FR-029**: Outside explicit development mode, diagnostics for conversion failures MUST follow the existing production redaction policy for financial-value fields while still identifying the affected activity by non-secret reference, source currency, report base currency, and activity date.
@@ -145,10 +147,11 @@ Each feature specification MUST capture security, persistence, financial precisi
 
 - **Report Base Currency**: The one user-selected currency, USD or EUR, used for all monetary calculations and totals in a single report run.
 - **Selected Activity Monetary Context**: The one existing activity-level monetary context chosen before conversion, including its source currency and values that may affect basis, proceeds, fees, gains, or losses.
-- **Exchange Rate Evidence**: The authority-backed rate information used to convert one source currency into the report base currency for one activity date, including authority, rate kind, rate date, rate value, and source-to-base direction.
+- **Exchange Rate Evidence**: The authority-backed rate information used to convert one source currency into the report base currency for one activity date, including authority, rate kind, rate date, rate value, and source-to-base direction. It remains rate-level evidence and is not itself a report-level source-summary row.
 - **Converted Activity Amount**: A monetary value produced from a selected activity monetary value and exchange rate evidence, expressed in the report base currency before entering report calculations.
-- **Conversion Audit Entry**: The report-visible evidence that connects an original activity amount, selected currency, activity date, authority source, rate date, rate value, and converted amount.
+- **Conversion Audit Entry**: The report-visible evidence that connects an original activity amount, selected currency, activity date, authority source, rate date, rate value, quote direction, and converted amount. It owns rate-specific fields that are excluded from the provider-level Rate Source Summary.
 - **Conversion Failure**: A report-generation failure caused by missing currency identity, unsupported source currency, unavailable authoritative rate evidence, or unavailable authority source.
+- **Capital Gains Report**: The generated report document that contains the selected report calculation currency, one provider-level Rate Source Summary for the selected base currency when source metadata is shown, and zero or more per-activity Conversion Audit Entries.
 
 ## Success Criteria *(mandatory)*
 
@@ -165,7 +168,7 @@ Each feature specification MUST capture security, persistence, financial precisi
 
 - **SC-001**: In the Mixed-Currency Acceptance Matrix, 100% of successful mixed-currency reports express cost basis, proceeds, realized gains, realized losses, and report totals in the user-selected base currency.
 - **SC-002**: In the Deterministic Conversion Fixture, 100% of converted activities use the expected authority-backed rate date and produce expected converted values under the documented quote-direction and rounding policies.
-- **SC-003**: In the Mixed-Currency Acceptance Matrix and Deterministic Conversion Fixture, 100% of converted priced activities in generated reports include audit details identifying source currency, report base currency, activity date, rate date, rate authority, provider-specific rate kind, rate value, original amount, and converted amount.
+- **SC-003**: In the Mixed-Currency Acceptance Matrix and Deterministic Conversion Fixture, 100% of converted priced activities in generated reports include audit details identifying source currency, report base currency, activity date, rate date, rate authority, provider-specific rate kind, rate value, original amount, and converted amount. The report-level Rate Source Summary renders once per selected base-currency provider and does not include quote direction or rate value.
 - **SC-004**: In the Conversion Failure Matrix, 100% of report attempts fail before final report save and leave no partial cleartext report artifact.
 - **SC-005**: In the 10,000-Activity Responsiveness Fixture, base-currency selection and generation confirmation are accepted before any provider fixture response is made available, and the workflow shows the report-generation busy state instead of blocking in the selection screen.
 - **SC-006**: In the Single-Currency Regression Suite, 100% of cases where the selected activity currency equals the report base currency preserve the same monetary results as the prior no-conversion behavior.
