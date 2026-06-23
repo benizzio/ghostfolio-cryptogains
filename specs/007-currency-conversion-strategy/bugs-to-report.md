@@ -1,4 +1,4 @@
-## [ ] 1 - Rate Source Summary repeating itself:
+## [X] 1 - Rate Source Summary repeating itself:
 
 The `Rate Source Summary` section is repeating multiple times in a unwanted behavior. Here is a production extraction:
 
