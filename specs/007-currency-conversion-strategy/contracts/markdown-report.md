@@ -6,6 +6,8 @@ This contract extends the generated Markdown capital gains report so successful 
 
 **Bugfix**: 2026-06-24 — BUG-004 Updated compact Currency Conversion Audit table contract.
 
+**Bugfix**: 2026-06-24 — BUG-005 Updated Currency Conversion Audit row cardinality and zero-to-zero amount suppression contract.
+
 ## Header
 
 The report header includes:
@@ -33,7 +35,7 @@ Rules:
 - Same-currency activity rows remain distinguishable from converted rows.
 - Activity currency columns continue to show the selected activity currency before conversion.
 - Calculation currency columns show the selected report base currency.
-- Explicit zero monetary values remain `0` after conversion handling.
+- Explicit zero monetary values remain `0` after conversion handling, but zero-to-zero converted amount slots do not render as standalone audit rows or grouped amount items.
 - Zero-priced holding reductions with no proceeds and no acquisition cost do not require conversion audit entries.
 
 ## Conversion Audit Section
@@ -46,13 +48,15 @@ Recommended section heading:
 ## Currency Conversion Audit
 ```
 
-Required table columns or equivalent fields:
+Required grouped table columns or equivalent per-activity fields:
 
 Superseded by BUG-004: ~~Old required columns were `Date`, `Source ID`, `Asset`, `Source Currency`, `Report Base Currency`, `Rate Date`, `Rate Authority`, `Rate Kind`, `Quote Direction`, `Rate Value`, `Amount Kind`, `Original Amount`, and `Converted Amount`.~~ BUG-004 moves provider-level authority and rate kind to `Rate Source Summary` and changes the rendered audit column order.
 
+Superseded by BUG-005: ~~BUG-004 compact per-amount columns were `Date`, `Source ID`, `Asset`, `Amount Kind`, `Rate Date`, `Source Currency`, `Original Amount`, `Report Base Currency`, `Converted Amount`, `Quote Direction`, and `Rate Value`.~~ BUG-005 groups amount-kind conversions by converted source activity.
+
 ```markdown
-| Date | Source ID | Asset | Amount Kind | Rate Date | Source Currency | Original Amount | Report Base Currency | Converted Amount | Quote Direction | Rate Value |
-|------|-----------|-------|-------------|-----------|-----------------|-----------------|----------------------|------------------|-----------------|------------|
+| Date | Source ID | Asset | Rate Date | Source Currency | Report Base Currency | Converted Amounts | Quote Direction | Rate Value |
+|------|-----------|-------|-----------|-----------------|----------------------|-------------------|-----------------|------------|
 ```
 
 Rules:
@@ -60,6 +64,9 @@ Rules:
 - Every converted priced activity must have audit details.
 - ~~Audit details must include source currency, report base currency, activity date, rate date, rate authority, rate kind when applicable, rate value, original amount, and converted amount.~~ Superseded by BUG-004 because provider-level authority and rate kind are disclosed in `Rate Source Summary`.
 - Audit details must include source currency, report base currency, activity date, amount kind, rate date, quote direction, rate value, original amount, and converted amount.
+- The rendered audit must emit one table row or equivalent subsection per converted source activity, not one row per converted amount kind.
+- Multiple amount kinds for the same converted source activity must be grouped in `Converted Amounts` or an equivalent field, using a stable representation such as `unit_price: <original> -> <converted>; gross_value: <original> -> <converted>`.
+- Amount slots where both original amount and converted amount are exactly zero must be omitted from the rendered audit grouping.
 - The audit table must not include `Rate Authority` or `Rate Kind` columns; those provider-level fields are disclosed in `Rate Source Summary`.
 - Audit details must preserve provider-published rate precision.
 - When the rate date differs from the activity date, both dates must be visible.
