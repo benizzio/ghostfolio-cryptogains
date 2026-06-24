@@ -570,7 +570,7 @@ func TestRenderCoversDetailAndLiquidationBranches(t *testing.T) {
 }
 
 // TestRendererRateSourceAndConversionAuditSections verifies provider-level
-// disclosure, rate-source aggregation, and audit amount rendering.
+// disclosure, rate-source aggregation, and grouped audit amount rendering.
 // Authored by: OpenCode
 func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 	t.Parallel()
@@ -615,11 +615,23 @@ func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 			RateKind:           "daily noon buying rate",
 			RateValue:          *apd.New(10946, -4),
 			QuoteDirection:     reportmodel.ExchangeRateQuoteDirectionBasePerSource,
-			Amounts: []reportmodel.ConvertedActivityAmount{{
-				AmountKind:      reportmodel.ConvertedAmountKindGrossValue,
-				OriginalAmount:  *apd.New(100, 0),
-				ConvertedAmount: *apd.New(10946, -2),
-			}},
+			Amounts: []reportmodel.ConvertedActivityAmount{
+				{
+					AmountKind:      reportmodel.ConvertedAmountKindUnitPrice,
+					OriginalAmount:  *apd.New(100, 0),
+					ConvertedAmount: *apd.New(10946, -2),
+				},
+				{
+					AmountKind:      reportmodel.ConvertedAmountKindGrossValue,
+					OriginalAmount:  *apd.New(200, 0),
+					ConvertedAmount: *apd.New(21892, -2),
+				},
+				{
+					AmountKind:      reportmodel.ConvertedAmountKindFeeAmount,
+					OriginalAmount:  *apd.New(0, 0),
+					ConvertedAmount: *apd.New(0, 0),
+				},
+			},
 		}},
 	}
 
@@ -647,20 +659,23 @@ func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 		t.Fatalf("write conversion audit section: %v", err)
 	}
 	var audit = builder.String()
-	for _, expected := range []string{"## Currency Conversion Audit", "eur-buy-1", "base_per_source", "Rate Value", "1.0946", "gross_value", "100", "109.46"} {
+	for _, expected := range []string{"## Currency Conversion Audit", "eur-buy-1", "base_per_source", "Rate Value", "1.0946", "unit_price: 100 -> 109.46; gross_value: 200 -> 218.92"} {
 		if !strings.Contains(audit, expected) {
 			t.Fatalf("expected conversion audit to contain %q, got %q", expected, audit)
 		}
 	}
-	for _, excluded := range []string{"Rate Authority", "Rate Kind", "Federal Reserve", "daily noon buying rate"} {
+	for _, excluded := range []string{"Rate Authority", "Rate Kind", "Federal Reserve", "daily noon buying rate", "fee_amount", "0 -> 0"} {
 		if strings.Contains(audit, excluded) {
 			t.Fatalf("expected conversion audit to exclude provider-level field %q, got %q", excluded, audit)
 		}
 	}
-	var expectedHeader = "| Date | Source ID | Asset | Amount Kind | Rate Date | Source Currency | Original Amount | Report Base Currency | Converted Amount | Quote Direction | Rate Value |"
-	var expectedRow = "| 2024-01-05 | eur-buy-1 | BTC | gross_value | 2024-01-05 | EUR | 100 | USD | 109.46 | base_per_source | 1.0946 |"
+	var expectedHeader = "| Date | Source ID | Asset | Rate Date | Source Currency | Report Base Currency | Converted Amounts | Quote Direction | Rate Value |"
+	var expectedRow = "| 2024-01-05 | eur-buy-1 | BTC | 2024-01-05 | EUR | USD | unit_price: 100 -> 109.46; gross_value: 200 -> 218.92 | base_per_source | 1.0946 |"
 	if !strings.Contains(audit, expectedHeader) || !strings.Contains(audit, expectedRow) {
-		t.Fatalf("expected compact conversion audit order, got %q", audit)
+		t.Fatalf("expected grouped conversion audit order, got %q", audit)
+	}
+	if strings.Count(audit, "| 2024-01-05 | eur-buy-1 |") != 1 {
+		t.Fatalf("expected one grouped audit row for the source activity, got %q", audit)
 	}
 }
 

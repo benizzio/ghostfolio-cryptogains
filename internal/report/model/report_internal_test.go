@@ -913,6 +913,15 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 	if !entry.matchesExchangeRateEvidence(evidence) {
 		t.Fatalf("expected retained provider authority and rate kind to remain part of audit evidence matching")
 	}
+	var zeroAmount = amount
+	zeroAmount.AmountKind = ConvertedAmountKindFeeAmount
+	zeroAmount.OriginalAmount = mustReportDecimal(t, "0")
+	zeroAmount.ConvertedAmount = mustReportDecimal(t, "0")
+	var groupedEntryWithZeroSlot = entry
+	groupedEntryWithZeroSlot.Amounts = []ConvertedActivityAmount{amount, zeroAmount}
+	if err := groupedEntryWithZeroSlot.Validate(); err != nil {
+		t.Fatalf("expected grouped audit entry with retained zero-to-zero amount slot to stay valid: %v", err)
+	}
 
 	var invalidEvidence = evidence
 	invalidEvidence.SourceCurrency = "USD"

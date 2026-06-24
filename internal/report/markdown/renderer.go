@@ -295,8 +295,8 @@ func writeActivityBlock(builder *strings.Builder, section reportmodel.AssetDetai
 	return nil
 }
 
-// writeConversionAuditSection renders one audit row per converted monetary
-// amount disclosed by the report model.
+// writeConversionAuditSection renders one grouped audit row per converted source
+// activity disclosed by the report model.
 // Authored by: OpenCode
 func writeConversionAuditSection(builder *strings.Builder, report reportmodel.CapitalGainsReport) error {
 	if len(report.ConversionAuditEntries) == 0 {
@@ -304,46 +304,67 @@ func writeConversionAuditSection(builder *strings.Builder, report reportmodel.Ca
 	}
 
 	builder.WriteString("## Currency Conversion Audit\n\n")
-	builder.WriteString("| Date | Source ID | Asset | Amount Kind | Rate Date | Source Currency | Original Amount | Report Base Currency | Converted Amount | Quote Direction | Rate Value |\n")
-	builder.WriteString("|------|-----------|-------|-------------|-----------|-----------------|-----------------|----------------------|------------------|-----------------|------------|\n")
+	builder.WriteString("| Date | Source ID | Asset | Rate Date | Source Currency | Report Base Currency | Converted Amounts | Quote Direction | Rate Value |\n")
+	builder.WriteString("|------|-----------|-------|-----------|-----------------|----------------------|-------------------|-----------------|------------|\n")
 
 	for entryIndex, entry := range report.ConversionAuditEntries {
 		var rateValue, err = canonicalDecimal(entry.RateValue)
 		if err != nil {
 			return fmt.Errorf("render conversion audit entry %d rate value: %w", entryIndex, err)
 		}
-
-		for amountIndex, amount := range entry.Amounts {
-			var originalAmount string
-			originalAmount, err = canonicalDecimal(amount.OriginalAmount)
-			if err != nil {
-				return fmt.Errorf("render conversion audit entry %d amount %d original amount: %w", entryIndex, amountIndex, err)
-			}
-			var convertedAmount string
-			convertedAmount, err = canonicalDecimal(amount.ConvertedAmount)
-			if err != nil {
-				return fmt.Errorf("render conversion audit entry %d amount %d converted amount: %w", entryIndex, amountIndex, err)
-			}
-
-			builder.WriteString(fmt.Sprintf(
-				"| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
-				entry.ActivityDate.Local().Format("2006-01-02"),
-				sanitizeInlineText(entry.SourceID),
-				sanitizeInlineText(entry.AssetLabel),
-				sanitizeInlineText(string(amount.AmountKind)),
-				entry.RateDate.Local().Format("2006-01-02"),
-				sanitizeInlineText(entry.SourceCurrency),
-				originalAmount,
-				sanitizeInlineText(entry.ReportBaseCurrency.Label()),
-				convertedAmount,
-				sanitizeInlineText(string(entry.QuoteDirection)),
-				rateValue,
-			))
+		var convertedAmounts string
+		convertedAmounts, err = renderGroupedConvertedAmounts(entryIndex, entry.Amounts)
+		if err != nil {
+			return err
 		}
+
+		builder.WriteString(fmt.Sprintf(
+			"| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
+			entry.ActivityDate.Local().Format("2006-01-02"),
+			sanitizeInlineText(entry.SourceID),
+			sanitizeInlineText(entry.AssetLabel),
+			entry.RateDate.Local().Format("2006-01-02"),
+			sanitizeInlineText(entry.SourceCurrency),
+			sanitizeInlineText(entry.ReportBaseCurrency.Label()),
+			convertedAmounts,
+			sanitizeInlineText(string(entry.QuoteDirection)),
+			rateValue,
+		))
 	}
 
 	builder.WriteString("\n")
 	return nil
+}
+
+// renderGroupedConvertedAmounts formats non-zero conversion amount slots for one
+// source activity and omits zero-to-zero slots from report-visible audit output.
+// Authored by: OpenCode
+func renderGroupedConvertedAmounts(entryIndex int, amounts []reportmodel.ConvertedActivityAmount) (string, error) {
+	var rendered []string
+	for amountIndex, amount := range amounts {
+		if amount.OriginalAmount.Sign() == 0 && amount.ConvertedAmount.Sign() == 0 {
+			continue
+		}
+
+		var originalAmount, err = canonicalDecimal(amount.OriginalAmount)
+		if err != nil {
+			return "", fmt.Errorf("render conversion audit entry %d amount %d original amount: %w", entryIndex, amountIndex, err)
+		}
+		var convertedAmount string
+		convertedAmount, err = canonicalDecimal(amount.ConvertedAmount)
+		if err != nil {
+			return "", fmt.Errorf("render conversion audit entry %d amount %d converted amount: %w", entryIndex, amountIndex, err)
+		}
+
+		rendered = append(rendered, fmt.Sprintf(
+			"%s: %s -> %s",
+			sanitizeInlineText(string(amount.AmountKind)),
+			originalAmount,
+			convertedAmount,
+		))
+	}
+
+	return strings.Join(rendered, "; "), nil
 }
 
 // conversionStatusColumn classifies rendered priced activity rows without

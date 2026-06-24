@@ -865,8 +865,8 @@ func TestApplyReportCurrencyBoundaryResolvesEvidencePerUniqueRateKey(t *testing.
 }
 
 // TestApplyReportCurrencyBoundaryConvertsZeroValuedMonetaryFields verifies that
-// explicit zero unit prices, gross amounts, and fees remain valid zeros after a
-// cross-currency conversion boundary.
+// explicit zero unit prices, gross amounts, and fees remain valid retained audit
+// values after a cross-currency conversion boundary.
 // Authored by: OpenCode
 func TestApplyReportCurrencyBoundaryConvertsZeroValuedMonetaryFields(t *testing.T) {
 	t.Parallel()
@@ -917,7 +917,12 @@ func TestApplyReportCurrencyBoundaryConvertsZeroValuedMonetaryFields(t *testing.
 	assertReportDecimalPointer(t, input.GrossValue, "0")
 	assertReportDecimalPointer(t, input.FeeAmount, "0")
 	if len(result.ConversionAuditEntries) != 1 || len(result.ConversionAuditEntries[0].Amounts) != 3 {
-		t.Fatalf("expected zero-valued fields in conversion audit, got %#v", result.ConversionAuditEntries)
+		t.Fatalf("expected grouped retained zero-valued fields in conversion audit, got %#v", result.ConversionAuditEntries)
+	}
+	for _, amount := range result.ConversionAuditEntries[0].Amounts {
+		if amount.OriginalAmount.Sign() != 0 || amount.ConvertedAmount.Sign() != 0 {
+			t.Fatalf("expected retained zero-to-zero amount slots for calculation integrity, got %#v", result.ConversionAuditEntries[0].Amounts)
+		}
 	}
 }
 
