@@ -3,7 +3,6 @@
 package runtime
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -19,35 +18,6 @@ import (
 // Authored by: OpenCode
 type reportCurrencyRateProviderCategory interface {
 	ProviderCategoryForBaseCurrency(string) string
-}
-
-// reportFailureOutcome builds one runtime report outcome for an ineligible
-// failed attempt.
-// Authored by: OpenCode
-func (s *reportService) reportFailureOutcome(
-	ctx context.Context,
-	request ReportGenerationRequest,
-	attempt SyncAttempt,
-	reason ReportFailureReason,
-	message string,
-	diagnosticContext syncmodel.DiagnosticContext,
-) ReportOutcome {
-	var outcome = reportFailureOutcome(request.Request, reason, message)
-	outcome.Attempt = attempt
-	if !reportDiagnosticEligible(reason) {
-		return outcome
-	}
-
-	var diagnosticRequest = DiagnosticReportRequest{
-		FailureCategory:         reason,
-		ServerOrigin:            request.ServerOrigin,
-		Attempt:                 attempt,
-		Context:                 diagnosticContext,
-		RedactFinancialValues:   !request.ExplicitDevelopmentMode,
-		ExplicitDevelopmentMode: request.ExplicitDevelopmentMode,
-	}
-	outcome.Diagnostic = s.diagnosticReports.PrepareState(ctx, diagnosticRequest)
-	return outcome
 }
 
 // reportFailureOutcome builds one runtime report outcome for a failed attempt.
@@ -107,65 +77,6 @@ func reportDiagnosticContextFromError(err error) syncmodel.DiagnosticContext {
 	}
 
 	return diagnosticContextFromError(err, "")
-}
-
-// reportCalculationFailureMessage formats one actionable calculation failure.
-// Authored by: OpenCode
-func (s *reportService) reportCalculationFailureMessage(request reportmodel.ReportRequest, err error) string {
-	var detail = strings.TrimSpace(err.Error())
-	var conversionContext = s.reportConversionFailureContext(request, err)
-	if conversionContext != "" {
-		detail += "\n\n" + conversionContext
-	}
-
-	return fmt.Sprintf(
-		"Could not generate the %d %s report: %s. Review the referenced synced activity data and try again. No report file was saved.",
-		request.Year,
-		request.CostBasisMethod.Label(),
-		detail,
-	)
-}
-
-// reportConversionFailureContext formats known non-secret conversion lookup
-// context as short lines that survive terminal wrapping.
-// Authored by: OpenCode
-func (s *reportService) reportConversionFailureContext(request reportmodel.ReportRequest, err error) string {
-	var calculationError *reportmodel.CalculationError
-	if !errors.As(err, &calculationError) || calculationError == nil {
-		return ""
-	}
-
-	var parsed = parseReportConversionFailureDetail(calculationError.Error())
-	if parsed.sourceCurrency == "" || parsed.activityDate == "" {
-		return ""
-	}
-	if parsed.reportBaseCurrency == "" {
-		parsed.reportBaseCurrency = request.ReportBaseCurrency.Label()
-	}
-	if parsed.reason == "" && strings.Contains(calculationError.Error(), "could not prepare currency conversion") {
-		parsed.reason = "invalid_activity_currency"
-	}
-	if parsed.provider == "" {
-		parsed.provider = reportConversionProviderCategory(s.currencyRates, parsed.reportBaseCurrency)
-	}
-
-	var lines = []string{"Conversion Failure Context"}
-	if sourceID := strings.TrimSpace(calculationError.SourceID()); sourceID != "" {
-		lines = append(lines, "Source ID: "+sourceID)
-	}
-	lines = append(lines,
-		"Source Currency: "+parsed.sourceCurrency,
-		"Report Base Currency: "+parsed.reportBaseCurrency,
-		"Activity Date: "+parsed.activityDate,
-	)
-	if parsed.reason != "" {
-		lines = append(lines, "Failure Reason: "+parsed.reason)
-	}
-	if parsed.provider != "" && parsed.reason != "invalid_activity_currency" {
-		lines = append(lines, "Provider Category: "+parsed.provider)
-	}
-
-	return strings.Join(lines, "\n")
 }
 
 // reportConversionFailureDetail stores safe fields parsed from report-owned
