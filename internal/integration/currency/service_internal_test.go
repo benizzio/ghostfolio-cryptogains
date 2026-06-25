@@ -139,6 +139,23 @@ func TestRateLookupRequestValidation(t *testing.T) {
 	}
 }
 
+// TestOfficialProviderIdentity verifies concrete provider identity metadata used
+// by diagnostics and provider routing.
+// Authored by: OpenCode
+func TestOfficialProviderIdentity(t *testing.T) {
+	t.Parallel()
+
+	var ecbProvider = newECBEXRClient("https://example.test", nil)
+	if got := ecbProvider.providerCategory(); got != ProviderIDECBEXR {
+		t.Fatalf("expected ECB provider category %q, got %q", ProviderIDECBEXR, got)
+	}
+
+	var federalReserveProvider = newFederalReserveH10Client("https://example.test", "dataset", nil)
+	if got := federalReserveProvider.providerCategory(); got != ProviderIDFederalReserveH10 {
+		t.Fatalf("expected Federal Reserve provider category %q, got %q", ProviderIDFederalReserveH10, got)
+	}
+}
+
 // TestExchangeRateEvidenceValidation verifies canonical evidence consistency rules.
 // Authored by: OpenCode
 func TestExchangeRateEvidenceValidation(t *testing.T) {
@@ -305,6 +322,9 @@ func TestCurrencyRateServiceDefensiveBranches(t *testing.T) {
 	if got := service.SupportedBaseCurrencies(); len(got) != 2 || got[0] != BaseCurrencyUSD || got[1] != BaseCurrencyEUR {
 		t.Fatalf("unexpected service base currencies: %#v", got)
 	}
+	if got := service.ProviderCategoryForBaseCurrency(BaseCurrencyEUR); got != string(ProviderIDECBEXR) {
+		t.Fatalf("unexpected provider category for EUR: %q", got)
+	}
 	if got := SupportedBaseCurrencies(); len(got) != 2 || got[0] != BaseCurrencyUSD || got[1] != BaseCurrencyEUR {
 		t.Fatalf("unexpected package base currencies: %#v", got)
 	}
@@ -315,6 +335,9 @@ func TestCurrencyRateServiceDefensiveBranches(t *testing.T) {
 	var nilService *currencyRateService
 	if _, err = nilService.LookupRate(context.Background(), request); err == nil || !strings.Contains(err.Error(), "currency rate service is required") {
 		t.Fatalf("expected nil service failure, got %v", err)
+	}
+	if got := nilService.ProviderCategoryForBaseCurrency(BaseCurrencyEUR); got != "" {
+		t.Fatalf("expected nil service to return no provider category, got %q", got)
 	}
 	if _, err = service.LookupRate(nil, request); err == nil || !strings.Contains(err.Error(), "rate lookup context is required") {
 		t.Fatalf("expected nil context failure, got %v", err)
@@ -337,6 +360,13 @@ func TestCurrencyRateServiceDefensiveBranches(t *testing.T) {
 	reason, ok = ConversionFailureReasonOf(err)
 	if !ok || reason != ConversionFailureReasonProviderUnavailable {
 		t.Fatalf("expected no-provider unavailable reason, got reason=%q ok=%v err=%v", reason, ok, err)
+	}
+	if got := noProviderService.ProviderCategoryForBaseCurrency(BaseCurrencyEUR); got != "" {
+		t.Fatalf("expected missing provider to return no category, got %q", got)
+	}
+	var nilProviderCategoryService = &currencyRateService{providers: map[string]officialRateProvider{BaseCurrencyEUR: nil}}
+	if got := nilProviderCategoryService.ProviderCategoryForBaseCurrency(BaseCurrencyEUR); got != "" {
+		t.Fatalf("expected nil provider to return no category, got %q", got)
 	}
 
 	_, err = newCurrencyRateService(NewCurrencyRateSessionCache(), nil)

@@ -757,4 +757,7 @@ func TestReportConversionFailureContextRejectsIncompleteDetails(t *testing.T) {
 	if got := reportConversionProviderCategory(reportProviderCategoryRateService{}, "GBP"); got != "" {
 		t.Fatalf("expected unsupported base currency to have no provider category, got %q", got)
 	}
+	if got := reportConversionProviderCategory(nil, "USD"); got != "" {
+		t.Fatalf("expected unavailable provider metadata to have no provider category, got %q", got)
+	}
 }
