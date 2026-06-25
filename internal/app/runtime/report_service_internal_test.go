@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	reportoutput "github.com/benizzio/ghostfolio-cryptogains/internal/report/output"
 	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
@@ -398,14 +399,17 @@ func TestReportServiceHelperFunctionsCoverRemainingBranches(t *testing.T) {
 	t.Parallel()
 
 	var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
-	var service = &reportService{snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache)}
+	var service = &reportService{
+		snapshots:     reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
+		currencyRates: reportProviderCategoryRateService{},
+	}
 
 	var cache, outcome, ok = service.readAvailableCache(request)
 	if !ok || cache.ActivityCount == 0 || outcome.Success || outcome.Message != "" || outcome.FailureReason != ReportFailureNone || outcome.Request != (reportmodel.ReportRequest{}) || outcome.OutputFile != (reportmodel.ReportOutputFile{}) || outcome.Attempt != (SyncAttempt{}) || outcome.Diagnostic.Eligible || outcome.Diagnostic.Path != "" || outcome.Diagnostic.GenerationMessage != "" {
 		t.Fatalf("expected available cache read to succeed, got ok=%v cache=%#v outcome=%#v", ok, cache, outcome)
 	}
 
-	var message = reportCalculationFailureMessage(request, errors.New(" calculation boom "))
+	var message = service.reportCalculationFailureMessage(request, errors.New(" calculation boom "))
 	if !strings.Contains(message, "Could not generate the 2024 FIFO report: calculation boom") {
 		t.Fatalf("expected trimmed calculation failure message, got %q", message)
 	}
@@ -416,7 +420,7 @@ func TestReportServiceHelperFunctionsCoverRemainingBranches(t *testing.T) {
 		"FAIL",
 		nil,
 	)
-	var conversionMessage = reportCalculationFailureMessage(request, conversionErr)
+	var conversionMessage = service.reportCalculationFailureMessage(request, conversionErr)
 	for _, expected := range []string{"Conversion Failure Context", "Source ID: late-gbp-buy", "Source Currency: GBP", "Report Base Currency: USD", "Activity Date: 2024-06-13", "Failure Reason: missing_rate", "Provider Category: federal_reserve_h10"} {
 		if !strings.Contains(conversionMessage, expected) {
 			t.Fatalf("expected conversion failure message to contain %q, got %q", expected, conversionMessage)
@@ -570,6 +574,30 @@ func reportoutputFailure(category reportoutput.FailureCategory, message string) 
 	return reportoutput.NewFailure(category, errors.New(message))
 }
 
+// reportProviderCategoryRateService exposes deterministic provider metadata for
+// runtime report failure tests.
+// Authored by: OpenCode
+type reportProviderCategoryRateService struct{}
+
+// LookupRate satisfies the report currency-rate service seam.
+// Authored by: OpenCode
+func (service reportProviderCategoryRateService) LookupRate(context.Context, currencyintegration.RateLookupRequest) (currencyintegration.ExchangeRateEvidence, error) {
+	return currencyintegration.ExchangeRateEvidence{}, errors.New("lookup is unused in provider-category tests")
+}
+
+// ProviderCategoryForBaseCurrency returns deterministic provider categories.
+// Authored by: OpenCode
+func (service reportProviderCategoryRateService) ProviderCategoryForBaseCurrency(baseCurrency string) string {
+	switch baseCurrency {
+	case currencyintegration.BaseCurrencyUSD:
+		return string(currencyintegration.ProviderIDFederalReserveH10)
+	case currencyintegration.BaseCurrencyEUR:
+		return string(currencyintegration.ProviderIDECBEXR)
+	default:
+		return ""
+	}
+}
+
 // capitalGainsReportFixture returns one minimal valid calculated report for
 // runtime report-service tests.
 // Authored by: OpenCode
@@ -637,6 +665,7 @@ func TestReportConversionFailureContextParsesFallbackAndTokenizedDetails(t *test
 	t.Parallel()
 
 	var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
+	var service = &reportService{currencyRates: reportProviderCategoryRateService{}}
 	var fallbackErr = reportmodel.NewCalculationError(
 		reportmodel.CalculationErrorKindActivityInput,
 		"could not prepare currency conversion from usd to EUR on 2024-01-02T10:00:00Z",
@@ -644,7 +673,7 @@ func TestReportConversionFailureContextParsesFallbackAndTokenizedDetails(t *test
 		"BTC",
 		nil,
 	)
-	var fallbackContext = reportConversionFailureContext(request, fallbackErr)
+	var fallbackContext = service.reportConversionFailureContext(request, fallbackErr)
 	for _, expected := range []string{
 		"Conversion Failure Context",
 		"Source ID: bad-currency",
@@ -668,7 +697,7 @@ func TestReportConversionFailureContextParsesFallbackAndTokenizedDetails(t *test
 		"",
 		nil,
 	)
-	var tokenizedContext = reportConversionFailureContext(request, tokenizedErr)
+	var tokenizedContext = service.reportConversionFailureContext(request, tokenizedErr)
 	for _, expected := range []string{
 		"Source Currency: GBP",
 		"Report Base Currency: USD",
@@ -687,7 +716,7 @@ func TestReportConversionFailureContextParsesFallbackAndTokenizedDetails(t *test
 		"",
 		nil,
 	)
-	var missingBaseContext = reportConversionFailureContext(request, missingBaseErr)
+	var missingBaseContext = service.reportConversionFailureContext(request, missingBaseErr)
 	if !strings.Contains(missingBaseContext, "Report Base Currency: USD") || !strings.Contains(missingBaseContext, "Provider Category: federal_reserve_h10") {
 		t.Fatalf("expected request base-currency fallback context, got %q", missingBaseContext)
 	}
@@ -700,12 +729,13 @@ func TestReportConversionFailureContextRejectsIncompleteDetails(t *testing.T) {
 	t.Parallel()
 
 	var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
-	if got := reportConversionFailureContext(request, errors.New("plain failure")); got != "" {
+	var service = &reportService{currencyRates: reportProviderCategoryRateService{}}
+	if got := service.reportConversionFailureContext(request, errors.New("plain failure")); got != "" {
 		t.Fatalf("expected non-calculation error to produce no context, got %q", got)
 	}
 
 	var incompleteErr = reportmodel.NewCalculationError(reportmodel.CalculationErrorKindActivityInput, "could not resolve currency conversion rate from EUR", "", "", nil)
-	if got := reportConversionFailureContext(request, incompleteErr); got != "" {
+	if got := service.reportConversionFailureContext(request, incompleteErr); got != "" {
 		t.Fatalf("expected incomplete conversion detail to produce no context, got %q", got)
 	}
 
@@ -724,7 +754,7 @@ func TestReportConversionFailureContextRejectsIncompleteDetails(t *testing.T) {
 	if got := reportLeadingDate("bad"); got != "" {
 		t.Fatalf("expected short leading date to be blank, got %q", got)
 	}
-	if got := reportConversionProviderCategory("GBP"); got != "" {
+	if got := reportConversionProviderCategory(reportProviderCategoryRateService{}, "GBP"); got != "" {
 		t.Fatalf("expected unsupported base currency to have no provider category, got %q", got)
 	}
 }

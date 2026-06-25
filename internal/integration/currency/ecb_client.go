@@ -24,6 +24,12 @@ func (client *ecbEXRClient) baseCurrency() string {
 	return BaseCurrencyEUR
 }
 
+// providerCategory returns the canonical provider category for ECB EXR.
+// Authored by: OpenCode
+func (client *ecbEXRClient) providerCategory() ProviderID {
+	return ProviderIDECBEXR
+}
+
 // lookupRate requests ECB EXR CSV data and maps it to canonical evidence.
 // Authored by: OpenCode
 func (client *ecbEXRClient) lookupRate(ctx context.Context, request RateLookupRequest) (ExchangeRateEvidence, error) {

@@ -32,6 +32,12 @@ func (client *federalReserveH10Client) baseCurrency() string {
 	return BaseCurrencyUSD
 }
 
+// providerCategory returns the canonical provider category for Federal Reserve H.10.
+// Authored by: OpenCode
+func (client *federalReserveH10Client) providerCategory() ProviderID {
+	return ProviderIDFederalReserveH10
+}
+
 // lookupRate requests Federal Reserve H.10 CSV data and maps it to canonical evidence.
 // Authored by: OpenCode
 func (client *federalReserveH10Client) lookupRate(ctx context.Context, request RateLookupRequest) (ExchangeRateEvidence, error) {

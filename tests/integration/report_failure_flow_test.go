@@ -17,7 +17,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
-	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
@@ -26,6 +25,7 @@ import (
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeapp"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -659,6 +659,13 @@ func (service *failingIntegrationCurrencyRates) LookupRate(_ context.Context, re
 	return deterministicIntegrationCurrencyRates{}.LookupRate(context.Background(), request)
 }
 
+// ProviderCategoryForBaseCurrency returns deterministic provider metadata for
+// failing conversion integration tests.
+// Authored by: OpenCode
+func (service *failingIntegrationCurrencyRates) ProviderCategoryForBaseCurrency(baseCurrency string) string {
+	return deterministicIntegrationCurrencyRates{}.ProviderCategoryForBaseCurrency(baseCurrency)
+}
+
 // newRuntimeBackedFlowHarnessWithCurrencyRateService creates a runtime-backed
 // TUI harness with a caller-provided currency rate service.
 // Authored by: OpenCode
@@ -677,10 +684,7 @@ func newRuntimeBackedFlowHarnessWithCurrencyRateService(
 	options.ConfigDir = baseDir
 	options.AllowDevHTTP = allowDevHTTP
 
-	var app, err = runtime.NewWithCurrencyRateServiceForTesting(options, currencyRates)
-	if err != nil {
-		t.Fatalf("runtime new: %v", err)
-	}
+	var app = runtimeapp.NewWithReportCurrencyRateService(t, options, currencyRates)
 
 	var store = configstore.NewJSONStore(baseDir)
 	if err := store.Save(context.Background(), config); err != nil {

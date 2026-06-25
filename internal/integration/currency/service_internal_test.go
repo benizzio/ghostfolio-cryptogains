@@ -18,10 +18,11 @@ import (
 // testRateProvider returns deterministic evidence for service scaffold tests.
 // Authored by: OpenCode
 type testRateProvider struct {
-	baseCurrencyValue string
-	evidence          ExchangeRateEvidence
-	err               error
-	calls             int
+	baseCurrencyValue     string
+	providerCategoryValue ProviderID
+	evidence              ExchangeRateEvidence
+	err                   error
+	calls                 int
 }
 
 // contextCheckingProvider records nil-context handling for service tests.
@@ -56,6 +57,12 @@ func (provider contextCheckingProvider) baseCurrency() string {
 	return provider.baseCurrencyValue
 }
 
+// providerCategory returns a deterministic category for context tests.
+// Authored by: OpenCode
+func (provider contextCheckingProvider) providerCategory() ProviderID {
+	return ProviderIDECBEXR
+}
+
 // lookupRate fails when invoked by a defensive branch test.
 // Authored by: OpenCode
 func (provider contextCheckingProvider) lookupRate(context.Context, RateLookupRequest) (ExchangeRateEvidence, error) {
@@ -66,6 +73,16 @@ func (provider contextCheckingProvider) lookupRate(context.Context, RateLookupRe
 // Authored by: OpenCode
 func (provider *testRateProvider) baseCurrency() string {
 	return provider.baseCurrencyValue
+}
+
+// providerCategory returns the configured provider category.
+// Authored by: OpenCode
+func (provider *testRateProvider) providerCategory() ProviderID {
+	if provider.providerCategoryValue != "" {
+		return provider.providerCategoryValue
+	}
+
+	return providerIDForBaseCurrency(provider.baseCurrencyValue)
 }
 
 // lookupRate returns deterministic evidence and tracks provider calls.

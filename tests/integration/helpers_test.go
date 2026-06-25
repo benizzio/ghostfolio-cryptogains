@@ -23,6 +23,7 @@ import (
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeapp"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -90,10 +91,7 @@ func newRuntimeBackedFlowHarness(t *testing.T, baseDir string, config configmode
 	options.ConfigDir = baseDir
 	options.AllowDevHTTP = allowDevHTTP
 
-	var app, err = runtime.NewWithCurrencyRateServiceForTesting(options, deterministicIntegrationCurrencyRates{})
-	if err != nil {
-		t.Fatalf("runtime new: %v", err)
-	}
+	var app = runtimeapp.NewWithReportCurrencyRateService(t, options, deterministicIntegrationCurrencyRates{})
 
 	var store = configstore.NewJSONStore(baseDir)
 	if err := store.Save(context.Background(), config); err != nil {
@@ -145,6 +143,20 @@ func (service deterministicIntegrationCurrencyRates) LookupRate(_ context.Contex
 	}
 
 	return currency.NewExchangeRateEvidence(request, rateDate, authority, providerID, rateKind, quoteDirection, rateValue, datasetReference)
+}
+
+// ProviderCategoryForBaseCurrency returns deterministic provider metadata for
+// runtime-backed integration tests.
+// Authored by: OpenCode
+func (service deterministicIntegrationCurrencyRates) ProviderCategoryForBaseCurrency(baseCurrency string) string {
+	switch baseCurrency {
+	case currency.BaseCurrencyEUR:
+		return string(currency.ProviderIDECBEXR)
+	case currency.BaseCurrencyUSD:
+		return string(currency.ProviderIDFederalReserveH10)
+	default:
+		return ""
+	}
 }
 
 // integrationRateDate returns the deterministic prior-provider date used by

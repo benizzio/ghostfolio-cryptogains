@@ -54,29 +54,29 @@ type App struct {
 // Authored by: OpenCode
 func New(options bootstrap.Options) (*App, error) {
 	var reportCurrencyRates = currency.NewCurrencyRateService(currency.NewCurrencyRateSessionCache())
-	return NewWithCurrencyRateServiceForTesting(options, reportCurrencyRates)
+	return NewWithReportCurrencyRateService(options, reportCurrencyRates)
 }
 
-// NewWithCurrencyRateServiceForTesting assembles runtime dependencies with a
+// NewWithReportCurrencyRateService assembles runtime dependencies with a
 // caller-supplied report currency-rate service.
 //
-// This constructor exists for deterministic integration tests that must avoid
-// live provider calls while still exercising the real runtime snapshot, report,
-// rendering, and output lifecycle. Production code should call New so the
-// runtime uses the fixed official provider service created by
-// currency.NewCurrencyRateService(currency.NewCurrencyRateSessionCache()). The
-// supplied service is passed only to report calculation and is not persisted.
+// Production entrypoints should call New so the runtime uses the fixed official
+// provider service created by currency.NewCurrencyRateService. This constructor
+// exists for callers that already own a report currency-rate service and need
+// runtime to coordinate snapshot, report, rendering, and output lifecycle around
+// that dependency. The supplied service is passed only to report calculation and
+// is not persisted.
 //
 // Example:
 //
-//	app, err := runtime.NewWithCurrencyRateServiceForTesting(options, testRates)
+//	app, err := runtime.NewWithReportCurrencyRateService(options, currencyRates)
 //	if err != nil {
 //		panic(err)
 //	}
 //	_ = app.ReportService
 //
 // Authored by: OpenCode
-func NewWithCurrencyRateServiceForTesting(options bootstrap.Options, reportCurrencyRates reportcalculate.CurrencyRateService) (*App, error) {
+func NewWithReportCurrencyRateService(options bootstrap.Options, reportCurrencyRates reportcalculate.CurrencyRateService) (*App, error) {
 	var baseConfigDir = options.ConfigDir
 	if baseConfigDir == "" {
 		var userConfigDir, err = os.UserConfigDir()

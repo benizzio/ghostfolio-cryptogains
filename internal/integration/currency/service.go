@@ -63,6 +63,7 @@ type RateLookupRequest struct {
 type CurrencyRateService interface {
 	LookupRate(context.Context, RateLookupRequest) (ExchangeRateEvidence, error)
 	SupportedBaseCurrencies() []string
+	ProviderCategoryForBaseCurrency(string) string
 }
 
 // currencyRateService is the cache-aware service scaffold used by later fixed
@@ -87,6 +88,7 @@ type OfficialRateProviderFixtureEndpoints struct {
 // Authored by: OpenCode
 type officialRateProvider interface {
 	baseCurrency() string
+	providerCategory() ProviderID
 	lookupRate(context.Context, RateLookupRequest) (ExchangeRateEvidence, error)
 }
 
@@ -264,6 +266,22 @@ func (service *currencyRateService) LookupRate(ctx context.Context, request Rate
 // Authored by: OpenCode
 func (service *currencyRateService) SupportedBaseCurrencies() []string {
 	return SupportedBaseCurrencies()
+}
+
+// ProviderCategoryForBaseCurrency returns the provider category configured for
+// one supported report base currency.
+// Authored by: OpenCode
+func (service *currencyRateService) ProviderCategoryForBaseCurrency(baseCurrency string) string {
+	if service == nil {
+		return ""
+	}
+
+	var provider, ok = service.providers[trimCurrencyCode(baseCurrency)]
+	if !ok || provider == nil {
+		return ""
+	}
+
+	return string(provider.providerCategory())
 }
 
 // classifyLookupFailure converts provider and mapper failures into the public
