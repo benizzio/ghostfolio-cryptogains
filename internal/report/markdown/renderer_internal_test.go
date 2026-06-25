@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	"github.com/cockroachdb/apd/v3"
 )
@@ -71,31 +72,31 @@ func TestRendererHelperFallbacks(t *testing.T) {
 		t.Fatalf("expected blank status without rendered activity currency, got %q", got)
 	}
 
-	if got := rateAuthorityLabel(reportmodel.ExchangeRateAuthorityEuropeanCentralBank); got != "European Central Bank" {
+	if got := rateAuthorityLabel(currencyintegration.RateAuthorityEuropeanCentralBank); got != "European Central Bank" {
 		t.Fatalf("unexpected ECB authority label %q", got)
 	}
-	if got := rateAuthorityLabel(reportmodel.ExchangeRateAuthorityFederalReserve); got != "Federal Reserve" {
+	if got := rateAuthorityLabel(currencyintegration.RateAuthorityFederalReserve); got != "Federal Reserve" {
 		t.Fatalf("unexpected Federal Reserve authority label %q", got)
 	}
-	if got := rateAuthorityLabel(reportmodel.ExchangeRateAuthority("custom|authority")); got != "custom\\|authority" {
+	if got := rateAuthorityLabel(currencyintegration.RateAuthority("custom|authority")); got != "custom\\|authority" {
 		t.Fatalf("unexpected custom authority fallback %q", got)
 	}
-	if got := rateProviderLabel(reportmodel.ExchangeRateProviderIDECBEXR); !strings.Contains(got, "ECB Data Portal") {
+	if got := rateProviderLabel(currencyintegration.ProviderIDECBEXR); !strings.Contains(got, "ECB Data Portal") {
 		t.Fatalf("unexpected ECB provider label %q", got)
 	}
-	if got := rateProviderLabel(reportmodel.ExchangeRateProviderIDFederalReserveH10); !strings.Contains(got, "Federal Reserve Board") {
+	if got := rateProviderLabel(currencyintegration.ProviderIDFederalReserveH10); !strings.Contains(got, "Federal Reserve Board") {
 		t.Fatalf("unexpected Federal Reserve provider label %q", got)
 	}
-	if got := rateProviderLabel(reportmodel.ExchangeRateProviderID("custom|provider")); got != "custom\\|provider" {
+	if got := rateProviderLabel(currencyintegration.ProviderID("custom|provider")); got != "custom\\|provider" {
 		t.Fatalf("unexpected provider fallback %q", got)
 	}
-	if got := unavailableDateRule(reportmodel.ExchangeRateProviderIDECBEXR); !strings.Contains(got, "ECB observation") {
+	if got := unavailableDateRule(currencyintegration.ProviderIDECBEXR); !strings.Contains(got, "ECB observation") {
 		t.Fatalf("unexpected ECB unavailable-date rule %q", got)
 	}
-	if got := unavailableDateRule(reportmodel.ExchangeRateProviderIDFederalReserveH10); !strings.Contains(got, "H.10 observation") {
+	if got := unavailableDateRule(currencyintegration.ProviderIDFederalReserveH10); !strings.Contains(got, "H.10 observation") {
 		t.Fatalf("unexpected Federal Reserve unavailable-date rule %q", got)
 	}
-	if got := unavailableDateRule(reportmodel.ExchangeRateProviderID("custom")); !strings.Contains(got, "official observation") {
+	if got := unavailableDateRule(currencyintegration.ProviderID("custom")); !strings.Contains(got, "official observation") {
 		t.Fatalf("unexpected fallback unavailable-date rule %q", got)
 	}
 }
@@ -584,10 +585,10 @@ func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 				BaseCurrency:     reportmodel.ReportBaseCurrencyUSD,
 				ActivityDate:     activityDate,
 				RateDate:         activityDate,
-				Authority:        reportmodel.ExchangeRateAuthorityFederalReserve,
-				ProviderID:       reportmodel.ExchangeRateProviderIDFederalReserveH10,
+				Authority:        currencyintegration.RateAuthorityFederalReserve,
+				ProviderID:       currencyintegration.ProviderIDFederalReserveH10,
 				RateKind:         "daily noon buying rate",
-				QuoteDirection:   reportmodel.ExchangeRateQuoteDirectionBasePerSource,
+				QuoteDirection:   currencyintegration.QuoteDirectionBasePerSource,
 				RateValue:        *apd.New(10946, -4),
 				DatasetReference: "H10 fixture",
 			},
@@ -596,10 +597,10 @@ func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 				BaseCurrency:     reportmodel.ReportBaseCurrencyUSD,
 				ActivityDate:     activityDate,
 				RateDate:         activityDate,
-				Authority:        reportmodel.ExchangeRateAuthorityFederalReserve,
-				ProviderID:       reportmodel.ExchangeRateProviderIDFederalReserveH10,
+				Authority:        currencyintegration.RateAuthorityFederalReserve,
+				ProviderID:       currencyintegration.ProviderIDFederalReserveH10,
 				RateKind:         "daily noon buying rate",
-				QuoteDirection:   reportmodel.ExchangeRateQuoteDirectionSourcePerBase,
+				QuoteDirection:   currencyintegration.QuoteDirectionSourcePerBase,
 				RateValue:        *apd.New(78, -1),
 				DatasetReference: "H10 fixture second rate",
 			},
@@ -611,10 +612,10 @@ func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 			SourceCurrency:     "EUR",
 			ReportBaseCurrency: reportmodel.ReportBaseCurrencyUSD,
 			RateDate:           activityDate,
-			RateAuthority:      reportmodel.ExchangeRateAuthorityFederalReserve,
+			RateAuthority:      currencyintegration.RateAuthorityFederalReserve,
 			RateKind:           "daily noon buying rate",
 			RateValue:          *apd.New(10946, -4),
-			QuoteDirection:     reportmodel.ExchangeRateQuoteDirectionBasePerSource,
+			QuoteDirection:     currencyintegration.QuoteDirectionBasePerSource,
 			Amounts: []reportmodel.ConvertedActivityAmount{
 				{
 					AmountKind:      reportmodel.ConvertedAmountKindUnitPrice,

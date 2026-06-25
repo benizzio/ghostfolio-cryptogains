@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
@@ -384,43 +385,22 @@ func conversionStatusColumn(row reportmodel.AssetActivityRow) string {
 // rateAuthorityLabel returns report-facing authority labels for canonical rate
 // evidence.
 // Authored by: OpenCode
-func rateAuthorityLabel(authority reportmodel.ExchangeRateAuthority) string {
-	switch authority {
-	case reportmodel.ExchangeRateAuthorityEuropeanCentralBank:
-		return "European Central Bank"
-	case reportmodel.ExchangeRateAuthorityFederalReserve:
-		return "Federal Reserve"
-	default:
-		return sanitizeInlineText(string(authority))
-	}
+func rateAuthorityLabel(authority currencyintegration.RateAuthority) string {
+	return sanitizeInlineText(currencyintegration.RateAuthorityDisplayLabel(authority))
 }
 
 // rateProviderLabel returns report-facing provider labels for canonical rate
 // evidence.
 // Authored by: OpenCode
-func rateProviderLabel(provider reportmodel.ExchangeRateProviderID) string {
-	switch provider {
-	case reportmodel.ExchangeRateProviderIDECBEXR:
-		return "ECB Data Portal `EXR`"
-	case reportmodel.ExchangeRateProviderIDFederalReserveH10:
-		return "Federal Reserve Board H.10/Data Download Program"
-	default:
-		return sanitizeInlineText(string(provider))
-	}
+func rateProviderLabel(provider currencyintegration.ProviderID) string {
+	return sanitizeInlineText(currencyintegration.ProviderDisplayLabel(provider))
 }
 
 // unavailableDateRule returns the report-facing prior-observation rule for one
 // canonical provider.
 // Authored by: OpenCode
-func unavailableDateRule(provider reportmodel.ExchangeRateProviderID) string {
-	switch provider {
-	case reportmodel.ExchangeRateProviderIDECBEXR:
-		return "most recent previous available ECB observation"
-	case reportmodel.ExchangeRateProviderIDFederalReserveH10:
-		return "most recent previous available H.10 observation"
-	default:
-		return "most recent previous available official observation"
-	}
+func unavailableDateRule(provider currencyintegration.ProviderID) string {
+	return sanitizeInlineText(currencyintegration.ProviderUnavailableDateRule(provider))
 }
 
 // writeLiquidationBlock renders the priced liquidation table when the section

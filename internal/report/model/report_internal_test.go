@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/cockroachdb/apd/v3"
 )
@@ -856,10 +857,10 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 		BaseCurrency:     ReportBaseCurrencyUSD,
 		ActivityDate:     activityDate,
 		RateDate:         activityDate,
-		Authority:        ExchangeRateAuthorityFederalReserve,
-		ProviderID:       ExchangeRateProviderIDFederalReserveH10,
+		Authority:        currencyintegration.RateAuthorityFederalReserve,
+		ProviderID:       currencyintegration.ProviderIDFederalReserveH10,
 		RateKind:         "noon buying rate in New York for cable transfers payable in listed currencies",
-		QuoteDirection:   ExchangeRateQuoteDirectionSourcePerBase,
+		QuoteDirection:   currencyintegration.QuoteDirectionSourcePerBase,
 		RateValue:        mustReportDecimal(t, "2"),
 		DatasetReference: "H10/EUR/2024-01-05",
 	}
@@ -901,10 +902,10 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 		SourceCurrency:     "EUR",
 		ReportBaseCurrency: ReportBaseCurrencyUSD,
 		RateDate:           activityDate,
-		RateAuthority:      ExchangeRateAuthorityFederalReserve,
+		RateAuthority:      currencyintegration.RateAuthorityFederalReserve,
 		RateKind:           evidence.RateKind,
 		RateValue:          mustReportDecimal(t, "2"),
-		QuoteDirection:     ExchangeRateQuoteDirectionSourcePerBase,
+		QuoteDirection:     currencyintegration.QuoteDirectionSourcePerBase,
 		Amounts:            []ConvertedActivityAmount{amount},
 	}
 	if err := entry.Validate(); err != nil {
@@ -965,12 +966,12 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 		t.Fatalf("expected missing evidence rate date rejection, got %v", err)
 	}
 	invalidEvidence = evidence
-	invalidEvidence.Authority = ExchangeRateAuthority("market")
+	invalidEvidence.Authority = currencyintegration.RateAuthority("market")
 	if err := invalidEvidence.Validate(); err == nil || !strings.Contains(err.Error(), "authority") {
 		t.Fatalf("expected unsupported evidence authority rejection, got %v", err)
 	}
 	invalidEvidence = evidence
-	invalidEvidence.ProviderID = ExchangeRateProviderID("market")
+	invalidEvidence.ProviderID = currencyintegration.ProviderID("market")
 	if err := invalidEvidence.Validate(); err == nil || !strings.Contains(err.Error(), "provider") {
 		t.Fatalf("expected unsupported evidence provider rejection, got %v", err)
 	}
@@ -980,7 +981,7 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 		t.Fatalf("expected missing evidence rate kind rejection, got %v", err)
 	}
 	invalidEvidence = evidence
-	invalidEvidence.QuoteDirection = ExchangeRateQuoteDirection("ambiguous")
+	invalidEvidence.QuoteDirection = currencyintegration.QuoteDirection("ambiguous")
 	if err := invalidEvidence.Validate(); err == nil || !strings.Contains(err.Error(), "quote direction") {
 		t.Fatalf("expected unsupported evidence quote direction rejection, got %v", err)
 	}
@@ -1070,8 +1071,8 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 	mismatchedEvidence = evidence
 	mismatchedEvidence.SourceCurrency = "GBP"
 	mismatchedEvidence.BaseCurrency = ReportBaseCurrencyEUR
-	mismatchedEvidence.Authority = ExchangeRateAuthorityEuropeanCentralBank
-	mismatchedEvidence.ProviderID = ExchangeRateProviderIDECBEXR
+	mismatchedEvidence.Authority = currencyintegration.RateAuthorityEuropeanCentralBank
+	mismatchedEvidence.ProviderID = currencyintegration.ProviderIDECBEXR
 	invalidAmount.ExchangeRateEvidence = &mismatchedEvidence
 	if err := invalidAmount.Validate(); err == nil || !strings.Contains(err.Error(), "base currency mismatch") {
 		t.Fatalf("expected valid-evidence amount base mismatch rejection, got %v", err)
@@ -1108,7 +1109,7 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 		t.Fatalf("expected audit missing rate-date rejection, got %v", err)
 	}
 	invalidEntry = entry
-	invalidEntry.RateAuthority = ExchangeRateAuthority("market")
+	invalidEntry.RateAuthority = currencyintegration.RateAuthority("market")
 	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "authority") {
 		t.Fatalf("expected audit unsupported authority rejection, got %v", err)
 	}
@@ -1131,7 +1132,7 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 		t.Fatalf("expected audit non-positive rate rejection, got %v", err)
 	}
 	invalidEntry = entry
-	invalidEntry.QuoteDirection = ExchangeRateQuoteDirection("ambiguous")
+	invalidEntry.QuoteDirection = currencyintegration.QuoteDirection("ambiguous")
 	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "quote direction") {
 		t.Fatalf("expected audit unsupported quote direction rejection, got %v", err)
 	}
@@ -1180,8 +1181,8 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 	mismatchedEvidence = evidence
 	mismatchedEvidence.SourceCurrency = "GBP"
 	mismatchedEvidence.BaseCurrency = ReportBaseCurrencyEUR
-	mismatchedEvidence.Authority = ExchangeRateAuthorityEuropeanCentralBank
-	mismatchedEvidence.ProviderID = ExchangeRateProviderIDECBEXR
+	mismatchedEvidence.Authority = currencyintegration.RateAuthorityEuropeanCentralBank
+	mismatchedEvidence.ProviderID = currencyintegration.ProviderIDECBEXR
 	mismatchedAmount.ExchangeRateEvidence = &mismatchedEvidence
 	invalidEntry.Amounts = []ConvertedActivityAmount{mismatchedAmount}
 	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "report base currency") {

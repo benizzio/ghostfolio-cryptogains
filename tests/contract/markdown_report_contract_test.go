@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
 	reportmarkdown "github.com/benizzio/ghostfolio-cryptogains/internal/report/markdown"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	reportoutput "github.com/benizzio/ghostfolio-cryptogains/internal/report/output"
@@ -111,7 +112,7 @@ func TestMarkdownReportRateSourceSummaryAggregatesByProvider(t *testing.T) {
 		"ETH",
 		"GBP",
 		"1.16",
-		reportmodel.ExchangeRateQuoteDirectionSourcePerBase,
+		currencyintegration.QuoteDirectionSourcePerBase,
 	))
 
 	var document, err = reportmarkdown.Render(report)
@@ -353,10 +354,10 @@ func contractMarkdownReportFixture(reportCalculationCurrency string) reportmodel
 			SourceCurrency:     "USD",
 			ReportBaseCurrency: reportmodel.ReportBaseCurrencyEUR,
 			RateDate:           time.Date(2023, time.December, 29, 0, 0, 0, 0, time.Local),
-			RateAuthority:      reportmodel.ExchangeRateAuthorityEuropeanCentralBank,
+			RateAuthority:      currencyintegration.RateAuthorityEuropeanCentralBank,
 			RateKind:           "daily euro foreign exchange reference rate",
 			RateValue:          mustContractDecimal("1.08"),
-			QuoteDirection:     reportmodel.ExchangeRateQuoteDirectionSourcePerBase,
+			QuoteDirection:     currencyintegration.QuoteDirectionSourcePerBase,
 			Amounts: []reportmodel.ConvertedActivityAmount{
 				contractConvertedActivityAmount(reportmodel.ConvertedAmountKindUnitPrice, "27000", "25000"),
 				contractConvertedActivityAmount(reportmodel.ConvertedAmountKindGrossValue, "27000", "25000"),
@@ -368,10 +369,10 @@ func contractMarkdownReportFixture(reportCalculationCurrency string) reportmodel
 			BaseCurrency:     reportmodel.ReportBaseCurrencyEUR,
 			ActivityDate:     time.Date(2024, time.January, 1, 0, 15, 0, 0, time.Local),
 			RateDate:         time.Date(2023, time.December, 29, 0, 0, 0, 0, time.Local),
-			Authority:        reportmodel.ExchangeRateAuthorityEuropeanCentralBank,
-			ProviderID:       reportmodel.ExchangeRateProviderIDECBEXR,
+			Authority:        currencyintegration.RateAuthorityEuropeanCentralBank,
+			ProviderID:       currencyintegration.ProviderIDECBEXR,
 			RateKind:         "daily euro foreign exchange reference rate",
-			QuoteDirection:   reportmodel.ExchangeRateQuoteDirectionSourcePerBase,
+			QuoteDirection:   currencyintegration.QuoteDirectionSourcePerBase,
 			RateValue:        mustContractDecimal("1.08"),
 			DatasetReference: "ECB Data Portal `EXR`",
 		}},
@@ -381,15 +382,15 @@ func contractMarkdownReportFixture(reportCalculationCurrency string) reportmodel
 // contractConversionAuditEntry returns one conversion audit fixture with
 // matching amount-level exchange-rate evidence.
 // Authored by: OpenCode
-func contractConversionAuditEntry(sourceID string, assetLabel string, sourceCurrency string, rateValue string, quoteDirection reportmodel.ExchangeRateQuoteDirection) reportmodel.ConversionAuditEntry {
+func contractConversionAuditEntry(sourceID string, assetLabel string, sourceCurrency string, rateValue string, quoteDirection currencyintegration.QuoteDirection) reportmodel.ConversionAuditEntry {
 	var activityDate = time.Date(2024, time.January, 2, 0, 15, 0, 0, time.Local)
 	var evidence = reportmodel.ExchangeRateEvidence{
 		SourceCurrency:   sourceCurrency,
 		BaseCurrency:     reportmodel.ReportBaseCurrencyEUR,
 		ActivityDate:     activityDate,
 		RateDate:         time.Date(2024, time.January, 2, 0, 0, 0, 0, time.Local),
-		Authority:        reportmodel.ExchangeRateAuthorityEuropeanCentralBank,
-		ProviderID:       reportmodel.ExchangeRateProviderIDECBEXR,
+		Authority:        currencyintegration.RateAuthorityEuropeanCentralBank,
+		ProviderID:       currencyintegration.ProviderIDECBEXR,
 		RateKind:         "daily euro foreign exchange reference rate",
 		QuoteDirection:   quoteDirection,
 		RateValue:        mustContractDecimal(rateValue),
@@ -467,10 +468,10 @@ func contractConvertedActivityAmount(kind reportmodel.ConvertedAmountKind, origi
 		BaseCurrency:     reportmodel.ReportBaseCurrencyEUR,
 		ActivityDate:     time.Date(2024, time.January, 1, 0, 15, 0, 0, time.Local),
 		RateDate:         time.Date(2023, time.December, 29, 0, 0, 0, 0, time.Local),
-		Authority:        reportmodel.ExchangeRateAuthorityEuropeanCentralBank,
-		ProviderID:       reportmodel.ExchangeRateProviderIDECBEXR,
+		Authority:        currencyintegration.RateAuthorityEuropeanCentralBank,
+		ProviderID:       currencyintegration.ProviderIDECBEXR,
 		RateKind:         "daily euro foreign exchange reference rate",
-		QuoteDirection:   reportmodel.ExchangeRateQuoteDirectionSourcePerBase,
+		QuoteDirection:   currencyintegration.QuoteDirectionSourcePerBase,
 		RateValue:        mustContractDecimal("1.08"),
 		DatasetReference: "ECB Data Portal `EXR`",
 	}
