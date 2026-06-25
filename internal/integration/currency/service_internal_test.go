@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	csvsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/csv"
+	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/cockroachdb/apd/v3"
 )
@@ -388,7 +388,7 @@ func TestCurrencyRateServiceDefensiveBranches(t *testing.T) {
 	if err = validateCurrencyCode(" USD", "source currency"); err == nil || !strings.Contains(err.Error(), "surrounding whitespace") {
 		t.Fatalf("expected whitespace validation failure, got %v", err)
 	}
-	if !canonicalDate(time.Time{}).IsZero() {
+	if !datesupport.CalendarDate(time.Time{}).IsZero() {
 		t.Fatalf("expected zero canonical date to stay zero")
 	}
 	if _, err = parsePositiveRate("0"); err == nil || !strings.Contains(err.Error(), "greater than zero") {
@@ -400,7 +400,7 @@ func TestCurrencyRateServiceDefensiveBranches(t *testing.T) {
 	if err = validateBaseCurrency("usd"); err == nil || !strings.Contains(err.Error(), "uppercase currency code") {
 		t.Fatalf("expected base-currency code validation failure, got %v", err)
 	}
-	if _, err = csvsupport.RequiredColumnIndexes([]string{"DATE", "OTHER"}, "DATE", "VALUE"); err == nil || !strings.Contains(err.Error(), "required columns") {
+	if _, _, err = ecbEXRColumnIndexes([]string{"DATE", "OTHER"}); err == nil || !strings.Contains(err.Error(), "required columns") {
 		t.Fatalf("expected missing CSV column rejection, got %v", err)
 	}
 	if err = validateProviderForBaseCurrency("GBP", ProviderIDECBEXR, RateAuthorityEuropeanCentralBank); err == nil || !strings.Contains(err.Error(), "unsupported base currency") {

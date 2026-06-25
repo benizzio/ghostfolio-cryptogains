@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 )
 
 // CurrencyRateSessionCache stores canonical rate evidence only in memory for
@@ -117,7 +119,7 @@ func (cache *CurrencyRateSessionCache) store(request RateLookupRequest, evidence
 // newRateSessionCacheKey validates and normalizes one public lookup key.
 // Authored by: OpenCode
 func newRateSessionCacheKey(request RateLookupRequest) (rateSessionCacheKey, error) {
-	request.ActivityDate = canonicalDate(request.ActivityDate)
+	request.ActivityDate = datesupport.CalendarDate(request.ActivityDate)
 	if err := request.Validate(); err != nil {
 		return rateSessionCacheKey{}, err
 	}

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -26,7 +27,7 @@ func MapFederalReserveH10CSVToEvidence(request RateLookupRequest, payload []byte
 		return ExchangeRateEvidence{}, fmt.Errorf("parse Federal Reserve H.10 CSV: %w", err)
 	}
 	if len(records) == 0 {
-		return ExchangeRateEvidence{}, fmt.Errorf("no current or prior available observation for %s/%s on %s", request.SourceCurrency, request.BaseCurrency, formatDate(request.ActivityDate))
+		return ExchangeRateEvidence{}, fmt.Errorf("no current or prior available observation for %s/%s on %s", request.SourceCurrency, request.BaseCurrency, datesupport.FormatCalendarDate(request.ActivityDate))
 	}
 
 	return mapFederalReserveH10RecordsToEvidence(request, records, datasetReference)
@@ -123,7 +124,7 @@ func selectFederalReserveH10Observation(request RateLookupRequest, header []stri
 	var found bool
 	for column := firstDateColumn; column < len(header) && column < len(sourceRecord); column++ {
 		var rateDate, dateErr = time.Parse(time.DateOnly, strings.TrimSpace(header[column]))
-		if dateErr != nil || canonicalDate(rateDate).After(request.ActivityDate) {
+		if dateErr != nil || datesupport.CalendarDate(rateDate).After(request.ActivityDate) {
 			continue
 		}
 		var rawRate = strings.TrimSpace(sourceRecord[column])
@@ -134,14 +135,14 @@ func selectFederalReserveH10Observation(request RateLookupRequest, header []stri
 		if parseErr != nil {
 			return time.Time{}, apd.Decimal{}, fmt.Errorf("invalid Federal Reserve observation for %s on %s: %w", request.SourceCurrency, strings.TrimSpace(header[column]), parseErr)
 		}
-		if !found || selectedDate.Before(canonicalDate(rateDate)) {
-			selectedDate = canonicalDate(rateDate)
+		if !found || selectedDate.Before(datesupport.CalendarDate(rateDate)) {
+			selectedDate = datesupport.CalendarDate(rateDate)
 			selectedRate = rate
 			found = true
 		}
 	}
 	if !found {
-		return time.Time{}, apd.Decimal{}, fmt.Errorf("no current or prior available observation for %s/%s on %s", request.SourceCurrency, request.BaseCurrency, formatDate(request.ActivityDate))
+		return time.Time{}, apd.Decimal{}, fmt.Errorf("no current or prior available observation for %s/%s on %s", request.SourceCurrency, request.BaseCurrency, datesupport.FormatCalendarDate(request.ActivityDate))
 	}
 
 	return selectedDate, selectedRate, nil

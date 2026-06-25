@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 )
 
 const (
@@ -80,8 +82,8 @@ func (client *federalReserveH10Client) federalReserveURL(request RateLookupReque
 	query.Set("rel", "H10")
 	query.Set("series", federalReserveH10DDPPackageSeriesID)
 	query.Set("lastobs", "")
-	query.Set("from", formatDate(request.ActivityDate.AddDate(0, 0, -providerLookbackDays)))
-	query.Set("to", formatDate(request.ActivityDate))
+	query.Set("from", datesupport.FormatCalendarDate(request.ActivityDate.AddDate(0, 0, -providerLookbackDays)))
+	query.Set("to", datesupport.FormatCalendarDate(request.ActivityDate))
 	query.Set("filetype", "csv")
 	query.Set("label", "include")
 	query.Set("layout", "seriesrow")

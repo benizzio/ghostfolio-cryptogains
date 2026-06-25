@@ -98,7 +98,7 @@ func NewRateLookupRequest(sourceCurrency string, baseCurrency string, activityDa
 	var request = RateLookupRequest{
 		SourceCurrency: trimCurrencyCode(sourceCurrency),
 		BaseCurrency:   trimCurrencyCode(baseCurrency),
-		ActivityDate:   canonicalDate(activityDate),
+		ActivityDate:   datesupport.CalendarDate(activityDate),
 	}
 
 	if err := request.Validate(); err != nil {
@@ -182,7 +182,7 @@ func (service *currencyRateService) LookupRate(ctx context.Context, request Rate
 		return ExchangeRateEvidence{}, fmt.Errorf("rate lookup context is required")
 	}
 
-	request.ActivityDate = canonicalDate(request.ActivityDate)
+	request.ActivityDate = datesupport.CalendarDate(request.ActivityDate)
 	if err := request.Validate(); err != nil {
 		return ExchangeRateEvidence{}, NewConversionFailure(request, providerIDForBaseCurrency(request.BaseCurrency), conversionFailureReasonForRequestError(err), err.Error())
 	}
@@ -379,18 +379,6 @@ func validateCurrencyCode(currencyCode string, label string) error {
 // Authored by: OpenCode
 func trimCurrencyCode(currencyCode string) string {
 	return strings.TrimSpace(currencyCode)
-}
-
-// canonicalDate strips clock and location fields from a source-calendar date.
-// Authored by: OpenCode
-func canonicalDate(value time.Time) time.Time {
-	return datesupport.CalendarDate(value)
-}
-
-// formatDate returns the canonical YYYY-MM-DD rendering for diagnostics.
-// Authored by: OpenCode
-func formatDate(value time.Time) string {
-	return datesupport.FormatCalendarDate(value)
 }
 
 // fetchProviderPayload performs one fixed-provider HTTP GET and returns the body.

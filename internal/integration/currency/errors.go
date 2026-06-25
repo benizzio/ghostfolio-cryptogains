@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 )
 
 // ConversionFailureReason identifies why official conversion evidence could not
@@ -66,7 +68,7 @@ func NewConversionFailure(request RateLookupRequest, providerID ProviderID, reas
 	var failure = &ConversionFailure{
 		SourceCurrency:     request.SourceCurrency,
 		ReportBaseCurrency: request.BaseCurrency,
-		ActivityDate:       canonicalDate(request.ActivityDate),
+		ActivityDate:       datesupport.CalendarDate(request.ActivityDate),
 		ProviderID:         providerID,
 		Reason:             reason,
 	}
@@ -109,7 +111,7 @@ func (failure *ConversionFailure) SafeMessage() string {
 	var baseCurrency = safeMessageValue(failure.ReportBaseCurrency)
 	var activityDate = "unknown"
 	if !failure.ActivityDate.IsZero() {
-		activityDate = formatDate(failure.ActivityDate)
+		activityDate = datesupport.FormatCalendarDate(failure.ActivityDate)
 	}
 	var provider = "unknown"
 	if failure.ProviderID != "" {

@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 )
 
 // ecbEXRClient resolves EUR-base rates from ECB EXR CSV data.
@@ -70,8 +72,8 @@ func (client *ecbEXRClient) ecbURL(request RateLookupRequest) (string, string, e
 		return "", "", fmt.Errorf("build ECB EXR URL: %w", err)
 	}
 	var query = parsed.Query()
-	query.Set("startPeriod", formatDate(request.ActivityDate.AddDate(0, 0, -providerLookbackDays)))
-	query.Set("endPeriod", formatDate(request.ActivityDate))
+	query.Set("startPeriod", datesupport.FormatCalendarDate(request.ActivityDate.AddDate(0, 0, -providerLookbackDays)))
+	query.Set("endPeriod", datesupport.FormatCalendarDate(request.ActivityDate))
 	query.Set("detail", "dataonly")
 	query.Set("format", "csvdata")
 	parsed.RawQuery = query.Encode()

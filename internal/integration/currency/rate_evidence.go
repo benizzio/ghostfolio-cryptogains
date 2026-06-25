@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	"github.com/cockroachdb/apd/v3"
@@ -123,12 +124,12 @@ func NewExchangeRateEvidence(
 	rateValue apd.Decimal,
 	datasetReference string,
 ) (ExchangeRateEvidence, error) {
-	request.ActivityDate = canonicalDate(request.ActivityDate)
+	request.ActivityDate = datesupport.CalendarDate(request.ActivityDate)
 	var evidence = ExchangeRateEvidence{
 		SourceCurrency:   request.SourceCurrency,
 		BaseCurrency:     request.BaseCurrency,
 		ActivityDate:     request.ActivityDate,
-		RateDate:         canonicalDate(rateDate),
+		RateDate:         datesupport.CalendarDate(rateDate),
 		Authority:        authority,
 		ProviderID:       providerID,
 		RateKind:         strings.TrimSpace(rateKind),
@@ -160,10 +161,10 @@ func (evidence ExchangeRateEvidence) Validate() error {
 		return fmt.Errorf("exchange rate evidence rate date is required")
 	}
 
-	var activityDate = canonicalDate(evidence.ActivityDate)
-	var rateDate = canonicalDate(evidence.RateDate)
+	var activityDate = datesupport.CalendarDate(evidence.ActivityDate)
+	var rateDate = datesupport.CalendarDate(evidence.RateDate)
 	if rateDate.After(activityDate) {
-		return fmt.Errorf("exchange rate evidence rate date %s must not be after activity date %s", formatDate(rateDate), formatDate(activityDate))
+		return fmt.Errorf("exchange rate evidence rate date %s must not be after activity date %s", datesupport.FormatCalendarDate(rateDate), datesupport.FormatCalendarDate(activityDate))
 	}
 	if err := validateRateAuthority(evidence.Authority); err != nil {
 		return fmt.Errorf("exchange rate evidence authority: %w", err)
@@ -196,15 +197,15 @@ func (evidence ExchangeRateEvidence) Validate() error {
 func (evidence ExchangeRateEvidence) matchesRequest(request RateLookupRequest) bool {
 	return evidence.SourceCurrency == request.SourceCurrency &&
 		evidence.BaseCurrency == request.BaseCurrency &&
-		canonicalDate(evidence.ActivityDate).Equal(canonicalDate(request.ActivityDate))
+		datesupport.CalendarDate(evidence.ActivityDate).Equal(datesupport.CalendarDate(request.ActivityDate))
 }
 
 // cloneExchangeRateEvidence returns a defensive copy of canonical rate evidence.
 // Authored by: OpenCode
 func cloneExchangeRateEvidence(evidence ExchangeRateEvidence) ExchangeRateEvidence {
 	var cloned = evidence
-	cloned.ActivityDate = canonicalDate(evidence.ActivityDate)
-	cloned.RateDate = canonicalDate(evidence.RateDate)
+	cloned.ActivityDate = datesupport.CalendarDate(evidence.ActivityDate)
+	cloned.RateDate = datesupport.CalendarDate(evidence.RateDate)
 	cloned.RateValue = decimalsupport.Clone(evidence.RateValue)
 	return cloned
 }
