@@ -63,14 +63,6 @@ func (client *federalReserveH10Client) LookupRate(ctx context.Context, request R
 	return MapFederalReserveH10CSVToEvidence(request, payload, client.datasetID)
 }
 
-// NewFederalReserveH10ClientForTesting creates a Federal Reserve H.10 provider
-// client for deterministic package tests without exposing fixture URLs through
-// production construction.
-// Authored by: OpenCode
-func NewFederalReserveH10ClientForTesting(baseURL string, httpClient *http.Client) *federalReserveH10Client {
-	return newFederalReserveH10Client(baseURL, defaultFederalReserveH10Dataset, httpClient)
-}
-
 // newFederalReserveH10Client creates one Federal Reserve provider client.
 // Authored by: OpenCode
 func newFederalReserveH10Client(baseURL string, datasetID string, httpClient *http.Client) *federalReserveH10Client {

@@ -75,16 +75,6 @@ type currencyRateService struct {
 	providers map[string]officialRateProvider
 }
 
-// OfficialRateProviderFixtureEndpoints configures deterministic local provider
-// endpoints for package and contract tests. Production service construction does
-// not accept this value and uses fixed official HTTPS origins instead.
-// Authored by: OpenCode
-type OfficialRateProviderFixtureEndpoints struct {
-	ECBEXRBaseURL              string
-	FederalReserveH10BaseURL   string
-	FederalReserveH10DatasetID string
-}
-
 // officialRateProvider resolves one base currency through a fixed official provider.
 // Authored by: OpenCode
 type officialRateProvider interface {
@@ -154,46 +144,6 @@ func NewCurrencyRateService(cache *CurrencyRateSessionCache) CurrencyRateService
 		newFederalReserveH10Client(defaultFederalReserveH10BaseURL, defaultFederalReserveH10Dataset, http.DefaultClient),
 	)
 	return service
-}
-
-// NewOfficialCurrencyRateServiceForTesting creates a service backed by local
-// deterministic fixture endpoints. It is intentionally separate from production
-// construction so user-controlled provider URLs do not enter the public runtime
-// API.
-//
-// Example:
-//
-//	service := currency.NewOfficialCurrencyRateServiceForTesting(cache, currency.OfficialRateProviderFixtureEndpoints{})
-//	_ = service.SupportedBaseCurrencies()
-//
-// Authored by: OpenCode
-func NewOfficialCurrencyRateServiceForTesting(cache *CurrencyRateSessionCache, endpoints OfficialRateProviderFixtureEndpoints) CurrencyRateService {
-	var ecbBaseURL = endpoints.ECBEXRBaseURL
-	if strings.TrimSpace(ecbBaseURL) == "" {
-		ecbBaseURL = defaultECBEXRBaseURL
-	}
-	var fedBaseURL = endpoints.FederalReserveH10BaseURL
-	if strings.TrimSpace(fedBaseURL) == "" {
-		fedBaseURL = defaultFederalReserveH10BaseURL
-	}
-	var fedDataset = endpoints.FederalReserveH10DatasetID
-	if strings.TrimSpace(fedDataset) == "" {
-		fedDataset = defaultFederalReserveH10Dataset
-	}
-
-	var service, _ = newCurrencyRateService(
-		cache,
-		newECBEXRClient(ecbBaseURL, http.DefaultClient),
-		newFederalReserveH10Client(fedBaseURL, fedDataset, http.DefaultClient),
-	)
-	return service
-}
-
-// NewECBEXRClientForTesting creates an ECB EXR provider client for deterministic
-// package tests without exposing fixture URLs through production construction.
-// Authored by: OpenCode
-func NewECBEXRClientForTesting(baseURL string, httpClient *http.Client) *ecbEXRClient {
-	return newECBEXRClient(baseURL, httpClient)
 }
 
 // SupportedBaseCurrencies returns the supported report base currencies in UI order.
@@ -468,27 +418,6 @@ func fetchProviderPayload(ctx context.Context, httpClient *http.Client, endpoint
 	}
 
 	return payload, nil
-}
-
-// findCSVColumns locates required CSV header columns.
-// Authored by: OpenCode
-func findCSVColumns(header []string, dateName string, valueName string) (int, int, error) {
-	var dateColumn = -1
-	var valueColumn = -1
-	for index, column := range header {
-		var normalized = strings.TrimSpace(column)
-		if normalized == dateName {
-			dateColumn = index
-		}
-		if normalized == valueName {
-			valueColumn = index
-		}
-	}
-	if dateColumn < 0 || valueColumn < 0 {
-		return 0, 0, fmt.Errorf("required columns %s and %s are missing", dateName, valueName)
-	}
-
-	return dateColumn, valueColumn, nil
 }
 
 // parsePositiveRate parses one positive exact provider rate without float math.

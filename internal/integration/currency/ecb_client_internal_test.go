@@ -35,7 +35,7 @@ func TestECBEXRClientBuildsFixedSeriesRequest(t *testing.T) {
 	}))
 	defer server.Close()
 
-	var client = NewECBEXRClientForTesting(server.URL, http.DefaultClient)
+	var client = newECBEXRClient(server.URL, http.DefaultClient)
 	var request = mustRateLookupRequestOnDate(t, "USD", BaseCurrencyEUR, "2024-01-06")
 	var evidence, err = client.LookupRate(context.Background(), request)
 	if err != nil {
@@ -97,7 +97,7 @@ func TestECBEXRMapperRejectsUnsupportedAndMalformedObservations(t *testing.T) {
 func TestECBEXRClientDefensiveBranches(t *testing.T) {
 	t.Parallel()
 
-	var client = NewECBEXRClientForTesting("%", http.DefaultClient)
+	var client = newECBEXRClient("%", http.DefaultClient)
 	if client.baseCurrency() != BaseCurrencyEUR {
 		t.Fatalf("expected ECB provider to advertise EUR base currency")
 	}
@@ -116,7 +116,7 @@ func TestECBEXRClientDefensiveBranches(t *testing.T) {
 		writer.WriteHeader(http.StatusBadGateway)
 	}))
 	defer server.Close()
-	client = NewECBEXRClientForTesting(server.URL, http.DefaultClient)
+	client = newECBEXRClient(server.URL, http.DefaultClient)
 	if _, err := client.LookupRate(context.Background(), request); err == nil || !strings.Contains(err.Error(), "provider returned HTTP status") {
 		t.Fatalf("expected ECB provider fetch failure, got %v", err)
 	}
@@ -125,7 +125,7 @@ func TestECBEXRClientDefensiveBranches(t *testing.T) {
 		_, _ = writer.Write([]byte("TIME_PERIOD,OBS_VALUE\n"))
 	}))
 	defer malformedServer.Close()
-	client = NewECBEXRClientForTesting(malformedServer.URL, http.DefaultClient)
+	client = newECBEXRClient(malformedServer.URL, http.DefaultClient)
 	if _, err := client.LookupRate(context.Background(), request); err == nil || !strings.Contains(err.Error(), "no current or prior available observation") {
 		t.Fatalf("expected ECB mapper failure through client, got %v", err)
 	}

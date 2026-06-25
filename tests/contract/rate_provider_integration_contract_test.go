@@ -12,6 +12,7 @@ import (
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -19,8 +20,6 @@ import (
 // default contract path for supported official-provider source currencies.
 // Authored by: OpenCode
 func TestOfficialRateProviderContractResolvesDeterministicFixtures(t *testing.T) {
-	t.Parallel()
-
 	var ecbServer = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if !strings.Contains(request.URL.Path, "/service/data/EXR/D.USD.EUR.SP00.A") {
 			t.Fatalf("unexpected ECB path: %s", request.URL.Path)
@@ -42,14 +41,10 @@ func TestOfficialRateProviderContractResolvesDeterministicFixtures(t *testing.T)
 	}))
 	defer fedServer.Close()
 
-	var service = currency.NewOfficialCurrencyRateServiceForTesting(
-		currency.NewCurrencyRateSessionCache(),
-		currency.OfficialRateProviderFixtureEndpoints{
-			ECBEXRBaseURL:              ecbServer.URL,
-			FederalReserveH10BaseURL:   fedServer.URL,
-			FederalReserveH10DatasetID: "H10 deterministic fixture",
-		},
-	)
+	var service = testutil.NewOfficialCurrencyRateServiceFixture(t, testutil.OfficialCurrencyRateServiceFixtureEndpoints{
+		ECBEXRBaseURL:            ecbServer.URL,
+		FederalReserveH10BaseURL: fedServer.URL,
+	})
 
 	var ecbRequest = mustContractRateLookupRequest(t, "USD", currency.BaseCurrencyEUR, "2024-01-06")
 	var ecbEvidence, ecbErr = service.LookupRate(context.Background(), ecbRequest)
@@ -70,21 +65,16 @@ func TestOfficialRateProviderContractResolvesDeterministicFixtures(t *testing.T)
 // the contract failure path for suspended, absent, or unmapped currencies.
 // Authored by: OpenCode
 func TestOfficialRateProviderContractRejectsUnsupportedSourceCurrencies(t *testing.T) {
-	t.Parallel()
-
 	var providerCalls int
 	var fixtureServer = httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		providerCalls++
 	}))
 	defer fixtureServer.Close()
 
-	var service = currency.NewOfficialCurrencyRateServiceForTesting(
-		currency.NewCurrencyRateSessionCache(),
-		currency.OfficialRateProviderFixtureEndpoints{
-			ECBEXRBaseURL:            fixtureServer.URL,
-			FederalReserveH10BaseURL: fixtureServer.URL,
-		},
-	)
+	var service = testutil.NewOfficialCurrencyRateServiceFixture(t, testutil.OfficialCurrencyRateServiceFixtureEndpoints{
+		ECBEXRBaseURL:            fixtureServer.URL,
+		FederalReserveH10BaseURL: fixtureServer.URL,
+	})
 
 	var testCases = []struct {
 		name           string
@@ -99,8 +89,6 @@ func TestOfficialRateProviderContractRejectsUnsupportedSourceCurrencies(t *testi
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-
 			var request, err = currency.NewRateLookupRequest(testCase.sourceCurrency, testCase.baseCurrency, mustContractDate(t, "2024-01-06"))
 			if err == nil {
 				_, err = service.LookupRate(context.Background(), request)

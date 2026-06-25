@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	csvsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/csv"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -29,10 +30,12 @@ func MapECBEXRCSVToEvidence(request RateLookupRequest, payload []byte, datasetRe
 		return ExchangeRateEvidence{}, fmt.Errorf("no current or prior available observation for %s/%s on %s", request.SourceCurrency, request.BaseCurrency, formatDate(request.ActivityDate))
 	}
 
-	var dateColumn, valueColumn, headerErr = findCSVColumns(records[0], "TIME_PERIOD", "OBS_VALUE")
+	var columns, headerErr = csvsupport.RequiredColumnIndexes(records[0], "TIME_PERIOD", "OBS_VALUE")
 	if headerErr != nil {
 		return ExchangeRateEvidence{}, fmt.Errorf("parse ECB EXR CSV: %w", headerErr)
 	}
+	var dateColumn = columns[0]
+	var valueColumn = columns[1]
 
 	var selectedDate time.Time
 	var selectedRate apd.Decimal

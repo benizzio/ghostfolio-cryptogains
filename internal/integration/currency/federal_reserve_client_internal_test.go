@@ -41,7 +41,7 @@ func TestFederalReserveH10ClientBuildsFixedRequest(t *testing.T) {
 	}))
 	defer server.Close()
 
-	var client = NewFederalReserveH10ClientForTesting(server.URL, http.DefaultClient)
+	var client = newFederalReserveH10Client(server.URL, defaultFederalReserveH10Dataset, http.DefaultClient)
 	var request = mustRateLookupRequestOnDate(t, "MXN", BaseCurrencyUSD, "2024-01-06")
 	var evidence, err = client.LookupRate(context.Background(), request)
 	if err != nil {
@@ -133,7 +133,7 @@ func TestFederalReserveH10MapperRejectsUnsupportedAndMalformedObservations(t *te
 func TestFederalReserveH10ClientDefensiveBranches(t *testing.T) {
 	t.Parallel()
 
-	var client = NewFederalReserveH10ClientForTesting("%", http.DefaultClient)
+	var client = newFederalReserveH10Client("%", defaultFederalReserveH10Dataset, http.DefaultClient)
 	if client.baseCurrency() != BaseCurrencyUSD {
 		t.Fatalf("expected Federal Reserve provider to advertise USD base currency")
 	}
@@ -152,7 +152,7 @@ func TestFederalReserveH10ClientDefensiveBranches(t *testing.T) {
 		writer.WriteHeader(http.StatusBadGateway)
 	}))
 	defer server.Close()
-	client = NewFederalReserveH10ClientForTesting(server.URL, http.DefaultClient)
+	client = newFederalReserveH10Client(server.URL, defaultFederalReserveH10Dataset, http.DefaultClient)
 	if _, err := client.LookupRate(context.Background(), request); err == nil || !strings.Contains(err.Error(), "provider returned HTTP status") {
 		t.Fatalf("expected Federal Reserve provider fetch failure, got %v", err)
 	}
@@ -161,7 +161,7 @@ func TestFederalReserveH10ClientDefensiveBranches(t *testing.T) {
 		_, _ = writer.Write([]byte("Currency,Monetary unit,Quote direction,2024-01-05\n"))
 	}))
 	defer malformedServer.Close()
-	client = NewFederalReserveH10ClientForTesting(malformedServer.URL, http.DefaultClient)
+	client = newFederalReserveH10Client(malformedServer.URL, defaultFederalReserveH10Dataset, http.DefaultClient)
 	if _, err := client.LookupRate(context.Background(), request); err == nil || !strings.Contains(err.Error(), "unsupported source currency EUR") {
 		t.Fatalf("expected Federal Reserve mapper failure through client, got %v", err)
 	}
