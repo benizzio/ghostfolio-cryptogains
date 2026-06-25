@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -89,13 +91,13 @@ func buildConversionAuditEntry(
 	var entry = reportmodel.ConversionAuditEntry{
 		SourceID:           input.SourceID,
 		AssetLabel:         conversionAuditAssetLabel(group, input),
-		ActivityDate:       sourceCalendarDate(input.OccurredAt),
+		ActivityDate:       datesupport.CalendarDate(input.OccurredAt),
 		SourceCurrency:     evidence.SourceCurrency,
 		ReportBaseCurrency: evidence.BaseCurrency,
 		RateDate:           evidence.RateDate,
 		RateAuthority:      evidence.Authority,
 		RateKind:           evidence.RateKind,
-		RateValue:          cloneReportDecimal(evidence.RateValue),
+		RateValue:          decimalsupport.Clone(evidence.RateValue),
 		QuoteDirection:     evidence.QuoteDirection,
 		Amounts:            append([]reportmodel.ConvertedActivityAmount(nil), amounts...),
 	}

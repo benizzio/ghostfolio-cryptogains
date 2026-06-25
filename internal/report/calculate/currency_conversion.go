@@ -11,6 +11,8 @@ import (
 
 	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/cockroachdb/apd/v3"
@@ -189,7 +191,7 @@ func (boundary *reportCurrencyBoundaryContext) resolveCrossCurrencyBoundary(
 	sourceCurrency string,
 	baseCurrency string,
 ) (currencyintegration.ExchangeRateEvidence, reportmodel.ExchangeRateEvidence, error) {
-	var lookupRequest, err = currencyintegration.NewRateLookupRequest(sourceCurrency, baseCurrency, sourceCalendarDate(input.OccurredAt))
+	var lookupRequest, err = currencyintegration.NewRateLookupRequest(sourceCurrency, baseCurrency, datesupport.CalendarDate(input.OccurredAt))
 	if err != nil {
 		return currencyintegration.ExchangeRateEvidence{}, reportmodel.ExchangeRateEvidence{}, newInputCalculationError(
 			reportmodel.CalculationErrorKindActivityInput,
@@ -198,7 +200,7 @@ func (boundary *reportCurrencyBoundaryContext) resolveCrossCurrencyBoundary(
 				"could not prepare currency conversion from %s to %s on %s",
 				sourceCurrency,
 				baseCurrency,
-				formatSourceDate(input.OccurredAt),
+				datesupport.FormatCalendarDate(input.OccurredAt),
 			),
 			err,
 		)
@@ -217,7 +219,7 @@ func (boundary *reportCurrencyBoundaryContext) resolveCrossCurrencyBoundary(
 				"currency conversion from %s to %s on %s requires a configured currency rate service",
 				sourceCurrency,
 				baseCurrency,
-				formatSourceDate(input.OccurredAt),
+				datesupport.FormatCalendarDate(input.OccurredAt),
 			),
 			nil,
 		)
@@ -232,7 +234,7 @@ func (boundary *reportCurrencyBoundaryContext) resolveCrossCurrencyBoundary(
 				"could not resolve currency conversion rate from %s to %s on %s",
 				sourceCurrency,
 				baseCurrency,
-				formatSourceDate(input.OccurredAt),
+				datesupport.FormatCalendarDate(input.OccurredAt),
 			),
 			err,
 		)
@@ -248,7 +250,7 @@ func (boundary *reportCurrencyBoundaryContext) resolveCrossCurrencyBoundary(
 				"could not validate currency conversion evidence from %s to %s on %s",
 				sourceCurrency,
 				baseCurrency,
-				formatSourceDate(input.OccurredAt),
+				datesupport.FormatCalendarDate(input.OccurredAt),
 			),
 			err,
 		)
@@ -306,8 +308,8 @@ func convertOptionalInputAmount(
 		return nil, amounts, nil
 	}
 
-	var original = cloneReportDecimal(*amount)
-	var converted, err = currencyintegration.ConvertAmountToBase(original, evidence.RateValue, evidence.QuoteDirection)
+	var original = decimalsupport.Clone(*amount)
+	var converted, err = convertAmountToBase(original, evidence.RateValue, evidence.QuoteDirection)
 	if err != nil {
 		return nil, nil, newInputCalculationError(
 			reportmodel.CalculationErrorKindBasisAllocation,
@@ -324,7 +326,7 @@ func convertOptionalInputAmount(
 		OriginalCurrency:     evidence.SourceCurrency,
 		OriginalAmount:       original,
 		ReportBaseCurrency:   reportBaseCurrency,
-		ConvertedAmount:      cloneReportDecimal(converted),
+		ConvertedAmount:      decimalsupport.Clone(converted),
 		ExchangeRateEvidence: &amountEvidence,
 		ConversionStatus:     reportmodel.ConversionStatusConverted,
 	}
@@ -364,7 +366,7 @@ func mapIntegrationEvidenceToReportEvidence(evidence currencyintegration.Exchang
 		ProviderID:       reportmodel.ExchangeRateProviderID(evidence.ProviderID),
 		RateKind:         evidence.RateKind,
 		QuoteDirection:   reportmodel.ExchangeRateQuoteDirection(evidence.QuoteDirection),
-		RateValue:        cloneReportDecimal(evidence.RateValue),
+		RateValue:        decimalsupport.Clone(evidence.RateValue),
 		DatasetReference: evidence.DatasetReference,
 	}
 	if err := reportEvidence.Validate(); err != nil {
@@ -378,18 +380,4 @@ func mapIntegrationEvidenceToReportEvidence(evidence currencyintegration.Exchang
 // Authored by: OpenCode
 func rateLookupBoundaryKey(request currencyintegration.RateLookupRequest) string {
 	return request.SourceCurrency + "|" + request.BaseCurrency + "|" + request.ActivityDate.Format(time.DateOnly)
-}
-
-// cloneReportDecimal returns a defensive decimal copy for converted values and evidence.
-// Authored by: OpenCode
-func cloneReportDecimal(value apd.Decimal) apd.Decimal {
-	var cloned apd.Decimal
-	cloned.Set(&value)
-	return cloned
-}
-
-// formatSourceDate renders the source-calendar date used for rate lookup.
-// Authored by: OpenCode
-func formatSourceDate(value time.Time) string {
-	return sourceCalendarDate(value).Format(time.DateOnly)
 }

@@ -12,6 +12,7 @@ import (
 	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
 	reportbasis "github.com/benizzio/ghostfolio-cryptogains/internal/report/basis"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/cockroachdb/apd/v3"
@@ -1304,7 +1305,7 @@ func TestCaptureOpeningPositionIfNeededSnapshotsOnce(t *testing.T) {
 		t.Fatalf("expected opening snapshot to stay unchanged, got %#v", state)
 	}
 
-	var normalized = sourceCalendarDate(time.Date(2024, time.May, 21, 22, 3, 4, 0, time.FixedZone("offset", 2*60*60)))
+	var normalized = datesupport.CalendarDate(time.Date(2024, time.May, 21, 22, 3, 4, 0, time.FixedZone("offset", 2*60*60)))
 	if !normalized.Equal(time.Date(2024, time.May, 21, 0, 0, 0, 0, time.UTC)) {
 		t.Fatalf("unexpected source calendar date: %v", normalized)
 	}

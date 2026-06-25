@@ -148,6 +148,31 @@ func TestParseCanonicalStringVerifiesStoredText(t *testing.T) {
 	}
 }
 
+// TestCloneCreatesDefensiveDecimalCopy verifies decimal coefficient storage does
+// not alias the source value after cloning.
+// Authored by: OpenCode
+func TestCloneCreatesDefensiveDecimalCopy(t *testing.T) {
+	t.Parallel()
+
+	var value, _, err = ParseString("10.5")
+	if err != nil {
+		t.Fatalf("parse decimal: %v", err)
+	}
+	var cloned = Clone(value)
+	if _, _, err = value.SetString("99"); err != nil {
+		t.Fatalf("mutate source decimal: %v", err)
+	}
+
+	var canonical string
+	canonical, err = CanonicalString(cloned)
+	if err != nil {
+		t.Fatalf("canonical cloned decimal: %v", err)
+	}
+	if canonical != "10.5" {
+		t.Fatalf("unexpected cloned decimal: got %q want %q", canonical, "10.5")
+	}
+}
+
 // TestInternalDecimalHelpersCoverRemainingBranches verifies the direct helper
 // branches that package-level API calls do not reach naturally.
 // Authored by: OpenCode

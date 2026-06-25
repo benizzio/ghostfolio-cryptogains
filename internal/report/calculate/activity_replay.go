@@ -6,9 +6,9 @@ package calculate
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	"github.com/cockroachdb/apd/v3"
 )
@@ -126,7 +126,7 @@ func applyAcquisition(basisState assetBasisState, scopedInput scopedActivityInpu
 
 	err = basisState.AddAcquisition(basisAcquisitionInput{
 		SourceID:           input.SourceID,
-		AcquiredAt:         sourceCalendarDate(input.OccurredAt),
+		AcquiredAt:         datesupport.CalendarDate(input.OccurredAt),
 		DeterministicOrder: deterministicOrder,
 		Quantity:           input.Quantity,
 		Basis:              acquisitionBasis,
@@ -270,12 +270,4 @@ func buildPricedLiquidationMatches(matches []reportmodel.BasisMatch, disposedQua
 	}
 
 	return enriched, nil
-}
-
-// sourceCalendarDate normalizes one parsed activity timestamp down to its
-// source-calendar date so lot chronology ignores time-of-day precision.
-// Authored by: OpenCode
-func sourceCalendarDate(occurredAt time.Time) time.Time {
-	var year, month, day = occurredAt.Date()
-	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }

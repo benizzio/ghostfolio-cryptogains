@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	"github.com/cockroachdb/apd/v3"
@@ -433,17 +434,13 @@ func trimCurrencyCode(currencyCode string) string {
 // canonicalDate strips clock and location fields from a source-calendar date.
 // Authored by: OpenCode
 func canonicalDate(value time.Time) time.Time {
-	if value.IsZero() {
-		return time.Time{}
-	}
-	var year, month, day = value.Date()
-	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
+	return datesupport.CalendarDate(value)
 }
 
 // formatDate returns the canonical YYYY-MM-DD rendering for diagnostics.
 // Authored by: OpenCode
 func formatDate(value time.Time) string {
-	return canonicalDate(value).Format(time.DateOnly)
+	return datesupport.FormatCalendarDate(value)
 }
 
 // fetchProviderPayload performs one fixed-provider HTTP GET and returns the body.

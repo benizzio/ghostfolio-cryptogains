@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	"github.com/cockroachdb/apd/v3"
 )
@@ -132,7 +133,7 @@ func NewExchangeRateEvidence(
 		ProviderID:       providerID,
 		RateKind:         strings.TrimSpace(rateKind),
 		QuoteDirection:   quoteDirection,
-		RateValue:        cloneDecimal(rateValue),
+		RateValue:        decimalsupport.Clone(rateValue),
 		DatasetReference: strings.TrimSpace(datasetReference),
 	}
 
@@ -204,15 +205,7 @@ func cloneExchangeRateEvidence(evidence ExchangeRateEvidence) ExchangeRateEviden
 	var cloned = evidence
 	cloned.ActivityDate = canonicalDate(evidence.ActivityDate)
 	cloned.RateDate = canonicalDate(evidence.RateDate)
-	cloned.RateValue = cloneDecimal(evidence.RateValue)
-	return cloned
-}
-
-// cloneDecimal returns a defensive copy of one exact decimal coefficient.
-// Authored by: OpenCode
-func cloneDecimal(value apd.Decimal) apd.Decimal {
-	var cloned apd.Decimal
-	cloned.Set(&value)
+	cloned.RateValue = decimalsupport.Clone(evidence.RateValue)
 	return cloned
 }
 
