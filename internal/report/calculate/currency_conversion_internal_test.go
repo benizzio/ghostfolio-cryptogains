@@ -3,6 +3,7 @@
 package calculate
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -76,6 +77,18 @@ func TestConvertAmountRejectsInvalidInputs(t *testing.T) {
 	var _, quoteErr = convertAmountToBase(mustReportDecimal(t, "1"), mustReportDecimal(t, "1"), currencyintegration.QuoteDirection("ambiguous"))
 	if quoteErr == nil {
 		t.Fatalf("expected ambiguous quote direction rejection")
+	}
+}
+
+// TestConvertedAmountResultWrapsDecimalOperationFailure verifies defensive
+// lower-level arithmetic failures keep report-domain context.
+// Authored by: OpenCode
+func TestConvertedAmountResultWrapsDecimalOperationFailure(t *testing.T) {
+	t.Parallel()
+
+	var _, err = convertedAmountResult(apd.Decimal{}, errors.New("decimal boom"), "convert test amount")
+	if err == nil || !strings.Contains(err.Error(), "convert test amount: decimal boom") {
+		t.Fatalf("expected wrapped decimal operation failure, got %v", err)
 	}
 }
 

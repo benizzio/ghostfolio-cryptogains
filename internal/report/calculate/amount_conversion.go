@@ -24,17 +24,22 @@ func convertAmountToBase(amount apd.Decimal, rate apd.Decimal, quoteDirection cu
 	switch quoteDirection {
 	case currencyintegration.QuoteDirectionSourcePerBase:
 		var converted, err = supportmath.DivideFiniteRoundHalfUp(decimalsupport.Clone(amount), decimalsupport.Clone(rate))
-		if err != nil {
-			return apd.Decimal{}, fmt.Errorf("convert source-per-base amount: %w", err)
-		}
-		return converted, nil
+		return convertedAmountResult(converted, err, "convert source-per-base amount")
 	case currencyintegration.QuoteDirectionBasePerSource:
 		var converted, err = supportmath.Multiply(decimalsupport.Clone(amount), decimalsupport.Clone(rate))
-		if err != nil {
-			return apd.Decimal{}, fmt.Errorf("convert base-per-source amount: %w", err)
-		}
-		return converted, nil
+		return convertedAmountResult(converted, err, "convert base-per-source amount")
 	}
 
 	return apd.Decimal{}, fmt.Errorf("conversion quote direction: unsupported quote direction %q", quoteDirection)
+}
+
+// convertedAmountResult adds report-domain context to lower-level decimal
+// operation failures.
+// Authored by: OpenCode
+func convertedAmountResult(converted apd.Decimal, err error, operation string) (apd.Decimal, error) {
+	if err != nil {
+		return apd.Decimal{}, fmt.Errorf("%s: %w", operation, err)
+	}
+
+	return converted, nil
 }
