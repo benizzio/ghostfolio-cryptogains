@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -17,18 +18,28 @@ import (
 func TestECBEXRClientBuildsFixedSeriesRequest(t *testing.T) {
 	t.Parallel()
 
+	var requestMismatch string
+	var requestMismatchMu sync.Mutex
 	var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var mismatch string
 		if request.URL.Path != "/service/data/EXR/D.USD.EUR.SP00.A" {
-			t.Fatalf("unexpected ECB path: %s", request.URL.Path)
+			mismatch = "unexpected ECB path: " + request.URL.Path
 		}
-		if request.URL.Query().Get("startPeriod") != "2023-12-07" {
-			t.Fatalf("unexpected startPeriod: %s", request.URL.RawQuery)
+		if mismatch == "" && request.URL.Query().Get("startPeriod") != "2023-12-07" {
+			mismatch = "unexpected startPeriod: " + request.URL.RawQuery
 		}
-		if request.URL.Query().Get("endPeriod") != "2024-01-06" {
-			t.Fatalf("unexpected endPeriod: %s", request.URL.RawQuery)
+		if mismatch == "" && request.URL.Query().Get("endPeriod") != "2024-01-06" {
+			mismatch = "unexpected endPeriod: " + request.URL.RawQuery
 		}
-		if request.URL.Query().Get("detail") != "dataonly" {
-			t.Fatalf("unexpected detail query: %s", request.URL.RawQuery)
+		if mismatch == "" && request.URL.Query().Get("detail") != "dataonly" {
+			mismatch = "unexpected detail query: " + request.URL.RawQuery
+		}
+		if mismatch != "" {
+			requestMismatchMu.Lock()
+			if requestMismatch == "" {
+				requestMismatch = mismatch
+			}
+			requestMismatchMu.Unlock()
 		}
 		writer.Header().Set("Content-Type", "text/csv")
 		_, _ = writer.Write([]byte("TIME_PERIOD,OBS_VALUE\n2024-01-06,1.0921\n"))
@@ -40,6 +51,12 @@ func TestECBEXRClientBuildsFixedSeriesRequest(t *testing.T) {
 	var evidence, err = client.LookupRate(context.Background(), request)
 	if err != nil {
 		t.Fatalf("lookup ECB rate: %v", err)
+	}
+	requestMismatchMu.Lock()
+	var recordedRequestMismatch = requestMismatch
+	requestMismatchMu.Unlock()
+	if recordedRequestMismatch != "" {
+		t.Fatal(recordedRequestMismatch)
 	}
 
 	assertECBEvidence(t, evidence, request, "2024-01-06", "1.0921")

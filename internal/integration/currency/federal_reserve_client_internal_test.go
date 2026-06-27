@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -17,24 +18,34 @@ import (
 func TestFederalReserveH10ClientBuildsFixedRequest(t *testing.T) {
 	t.Parallel()
 
+	var requestMismatch string
+	var requestMismatchMu sync.Mutex
 	var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var mismatch string
 		if request.URL.Path != "/datadownload/Output.aspx" {
-			t.Fatalf("unexpected Federal Reserve path: %s", request.URL.Path)
+			mismatch = "unexpected Federal Reserve path: " + request.URL.Path
 		}
-		if request.URL.Query().Get("rel") != "H10" {
-			t.Fatalf("unexpected rel query: %s", request.URL.RawQuery)
+		if mismatch == "" && request.URL.Query().Get("rel") != "H10" {
+			mismatch = "unexpected rel query: " + request.URL.RawQuery
 		}
-		if request.URL.Query().Get("series") != federalReserveH10DDPPackageSeriesID {
-			t.Fatalf("unexpected series query: %s", request.URL.RawQuery)
+		if mismatch == "" && request.URL.Query().Get("series") != federalReserveH10DDPPackageSeriesID {
+			mismatch = "unexpected series query: " + request.URL.RawQuery
 		}
-		if request.URL.Query().Get("filetype") != "csv" || request.URL.Query().Get("label") != "include" || request.URL.Query().Get("layout") != "seriesrow" || request.URL.Query().Get("type") != "package" {
-			t.Fatalf("unexpected DDP package query: %s", request.URL.RawQuery)
+		if mismatch == "" && (request.URL.Query().Get("filetype") != "csv" || request.URL.Query().Get("label") != "include" || request.URL.Query().Get("layout") != "seriesrow" || request.URL.Query().Get("type") != "package") {
+			mismatch = "unexpected DDP package query: " + request.URL.RawQuery
 		}
-		if request.URL.Query().Get("from") != "2023-12-07" {
-			t.Fatalf("unexpected from query: %s", request.URL.RawQuery)
+		if mismatch == "" && request.URL.Query().Get("from") != "2023-12-07" {
+			mismatch = "unexpected from query: " + request.URL.RawQuery
 		}
-		if request.URL.Query().Get("to") != "2024-01-06" {
-			t.Fatalf("unexpected to query: %s", request.URL.RawQuery)
+		if mismatch == "" && request.URL.Query().Get("to") != "2024-01-06" {
+			mismatch = "unexpected to query: " + request.URL.RawQuery
+		}
+		if mismatch != "" {
+			requestMismatchMu.Lock()
+			if requestMismatch == "" {
+				requestMismatch = mismatch
+			}
+			requestMismatchMu.Unlock()
 		}
 		writer.Header().Set("Content-Type", "text/csv")
 		_, _ = writer.Write([]byte(federalReserveDDPSeriesRowFixture()))
@@ -46,6 +57,12 @@ func TestFederalReserveH10ClientBuildsFixedRequest(t *testing.T) {
 	var evidence, err = client.LookupRate(context.Background(), request)
 	if err != nil {
 		t.Fatalf("lookup Federal Reserve rate: %v", err)
+	}
+	requestMismatchMu.Lock()
+	var recordedRequestMismatch = requestMismatch
+	requestMismatchMu.Unlock()
+	if recordedRequestMismatch != "" {
+		t.Fatal(recordedRequestMismatch)
 	}
 
 	assertFederalReserveEvidence(t, evidence, request, QuoteDirectionSourcePerBase, "2024-01-05", "16.9141")

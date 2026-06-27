@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -20,21 +21,41 @@ import (
 // default contract path for supported official-provider source currencies.
 // Authored by: OpenCode
 func TestOfficialRateProviderContractResolvesDeterministicFixtures(t *testing.T) {
+	var ecbRequestMismatch string
+	var ecbRequestMismatchMu sync.Mutex
 	var ecbServer = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var mismatch string
 		if !strings.Contains(request.URL.Path, "/service/data/EXR/D.USD.EUR.SP00.A") {
-			t.Fatalf("unexpected ECB path: %s", request.URL.Path)
+			mismatch = "unexpected ECB path: " + request.URL.Path
 		}
-		if request.URL.Query().Get("endPeriod") != "2024-01-06" {
-			t.Fatalf("unexpected ECB endPeriod: %s", request.URL.RawQuery)
+		if mismatch == "" && request.URL.Query().Get("endPeriod") != "2024-01-06" {
+			mismatch = "unexpected ECB endPeriod: " + request.URL.RawQuery
+		}
+		if mismatch != "" {
+			ecbRequestMismatchMu.Lock()
+			if ecbRequestMismatch == "" {
+				ecbRequestMismatch = mismatch
+			}
+			ecbRequestMismatchMu.Unlock()
 		}
 		writer.Header().Set("Content-Type", "text/csv")
 		_, _ = writer.Write([]byte("TIME_PERIOD,OBS_VALUE\n2024-01-05,1.0921\n"))
 	}))
 	defer ecbServer.Close()
 
+	var fedRequestMismatch string
+	var fedRequestMismatchMu sync.Mutex
 	var fedServer = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var mismatch string
 		if request.URL.Path != "/datadownload/Output.aspx" {
-			t.Fatalf("unexpected Federal Reserve path: %s", request.URL.Path)
+			mismatch = "unexpected Federal Reserve path: " + request.URL.Path
+		}
+		if mismatch != "" {
+			fedRequestMismatchMu.Lock()
+			if fedRequestMismatch == "" {
+				fedRequestMismatch = mismatch
+			}
+			fedRequestMismatchMu.Unlock()
 		}
 		writer.Header().Set("Content-Type", "text/csv")
 		_, _ = writer.Write([]byte("\"Descriptions:\",\"Unit:\",\"Multiplier:\",\"Currency:\",\"Unique Identifier:\",\"Series Name:\",2024-01-05,2024-01-06\n\"Euro-Area Euro\",\"Currency\",\"1\",\"EUR\",H10/H10/RXI$US_N.B.EU,RXI$US_N.B.EU,1.0957,ND\n\"Mexican Peso\",\"Currency\",\"1\",\"MXN\",H10/H10/RXI_N.B.MX,RXI_N.B.MX,16.9141,ND\n"))
@@ -51,12 +72,24 @@ func TestOfficialRateProviderContractResolvesDeterministicFixtures(t *testing.T)
 	if ecbErr != nil {
 		t.Fatalf("lookup ECB fixture evidence: %v", ecbErr)
 	}
+	ecbRequestMismatchMu.Lock()
+	var recordedECBRequestMismatch = ecbRequestMismatch
+	ecbRequestMismatchMu.Unlock()
+	if recordedECBRequestMismatch != "" {
+		t.Fatal(recordedECBRequestMismatch)
+	}
 	assertContractEvidence(t, ecbEvidence, currency.ProviderIDECBEXR, currency.RateAuthorityEuropeanCentralBank, currency.QuoteDirectionSourcePerBase, "2024-01-05", "1.0921")
 
 	var fedRequest = mustContractRateLookupRequest(t, "EUR", currency.BaseCurrencyUSD, "2024-01-06")
 	var fedEvidence, fedErr = service.LookupRate(context.Background(), fedRequest)
 	if fedErr != nil {
 		t.Fatalf("lookup Federal Reserve fixture evidence: %v", fedErr)
+	}
+	fedRequestMismatchMu.Lock()
+	var recordedFedRequestMismatch = fedRequestMismatch
+	fedRequestMismatchMu.Unlock()
+	if recordedFedRequestMismatch != "" {
+		t.Fatal(recordedFedRequestMismatch)
 	}
 	assertContractEvidence(t, fedEvidence, currency.ProviderIDFederalReserveH10, currency.RateAuthorityFederalReserve, currency.QuoteDirectionBasePerSource, "2024-01-05", "1.0957")
 }
