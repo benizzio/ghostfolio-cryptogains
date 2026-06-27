@@ -44,7 +44,7 @@
 **Depth**: Standard
 **Actor/Timing**: PR reviewer before implementation review
 
-## Requirement Completeness
+## Addendum Requirement Completeness
 
 - [x] CHK001 Are report base-currency selection requirements complete for selection, supported options, and calculation gating? [Completeness, Spec §FR-001-FR-003]
 - [x] CHK002 Are selected activity monetary-context requirements complete enough to prevent mixing order, asset-profile, and base tiers before conversion? [Completeness, Spec §FR-005-FR-006]

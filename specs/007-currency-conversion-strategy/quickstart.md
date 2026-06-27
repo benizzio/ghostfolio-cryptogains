@@ -25,7 +25,7 @@ Superseded by BUG-001: ~~`go test ./... -covermode=atomic -coverprofile=coverage
 make coverage
 ```
 
-2. If running the coverage commands manually instead of `make coverage`, use the maintained generated-output paths.
+1. If running the coverage commands manually instead of `make coverage`, use the maintained generated-output paths.
 
 ```bash
 mkdir -p dist/coverage
@@ -35,7 +35,7 @@ gocoverageplus -i dist/coverage/coverage.out -o dist/coverage/coverage.xml
 go run ./tools/coveragegate -profile dist/coverage/coverage.out -cobertura dist/coverage/coverage.xml
 ```
 
-3. Confirm contract and integration coverage includes these scenarios:
+1. Confirm contract and integration coverage includes these scenarios:
 
 - report selection requires one base currency before generation
 - only `USD` and `EUR` are selectable as report base currencies
@@ -52,7 +52,7 @@ go run ./tools/coveragegate -profile dist/coverage/coverage.out -cobertura dist/
 - provider outage without current TUI-session evidence fails before final save
 - zero-priced holding reduction does not require exchange-rate lookup solely because explicit zero source fields exist
 - generated Markdown replaces `NOT APPLICABLE` with the selected report base currency
-- converted priced activities include source currency, report base currency, activity date, rate date, authority, rate kind, rate value, original amount, and converted amount
+- converted priced activity audit details include source currency, report base currency, activity date, rate date, rate value, quote direction, amount kind, original amount, and converted amount; provider-level authority and rate kind are disclosed in `Rate Source Summary`
 - conversion failure diagnostics exclude Ghostfolio tokens and redact production-mode financial values
 - existing single-currency cases preserve prior monetary results when activity currency equals selected base currency
 
@@ -72,7 +72,7 @@ Post-implementation validation notes:
 go run ./cmd/ghostfolio-cryptogains
 ```
 
-2. Enter the `Sync and Reports` context and unlock or sync a dataset that contains reportable priced activity in more than one currency.
+1. Enter the `Sync and Reports` context and unlock or sync a dataset that contains reportable priced activity in more than one currency.
 
 Expected result:
 
@@ -80,7 +80,7 @@ Expected result:
 - no report action is available before synced report years exist
 - the unlocked context shows reportable years without exposing protected raw payload data
 
-3. Start report generation.
+1. Start report generation.
 
 Expected result:
 
@@ -88,26 +88,26 @@ Expected result:
 - only `USD` and `EUR` are available as base currencies
 - `Generate Report` cannot start without a selected base currency
 
-4. Generate one report with `EUR` as base currency.
+1. Generate one report with `EUR` as base currency.
 
 Expected result:
 
 - calculation uses ECB-backed EUR conversion for non-EUR priced rows
 - same-EUR rows are not converted
 - the saved Markdown header shows `Report Calculation Currency: EUR`
-- converted rows include conversion audit details with ECB authority and rate dates
+- converted rows include conversion audit details with rate dates and matching ECB provider evidence in `Rate Source Summary`
 
-5. Generate the same year and method with `USD` as base currency.
+1. Generate the same year and method with `USD` as base currency.
 
 Expected result:
 
 - calculation uses Federal Reserve-backed USD conversion for non-USD priced rows
 - same-USD rows are not converted
 - the saved Markdown header shows `Report Calculation Currency: USD`
-- converted rows include conversion audit details with Federal Reserve authority and rate dates
+- converted rows include conversion audit details with rate dates and matching Federal Reserve provider evidence in `Rate Source Summary`
 - the USD and EUR reports are separate saved files
 
-6. Run a fixture or development setup where one required source currency is unsupported by the selected provider.
+1. Run a fixture or development setup where one required source currency is unsupported by the selected provider.
 
 Expected result:
 
