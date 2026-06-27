@@ -5,17 +5,12 @@ package currency
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
 
 	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
-	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
-	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
-	"github.com/cockroachdb/apd/v3"
 )
 
 const (
@@ -27,9 +22,8 @@ const (
 )
 
 const (
-	defaultECBEXRBaseURL   = "https://data-api.ecb.europa.eu"
-	providerLookbackDays   = 30
-	providerRequestTimeout = 15 * time.Second
+	defaultECBEXRBaseURL = "https://data-api.ecb.europa.eu"
+	providerLookbackDays = 30
 )
 
 // RateLookupRequest is the public canonical request for one required official
@@ -236,70 +230,6 @@ func (service *currencyRateService) ProviderCategoryForBaseCurrency(baseCurrency
 	return string(provider.providerCategory())
 }
 
-// classifyLookupFailure converts provider and mapper failures into the public
-// conversion-failure contract.
-// Authored by: OpenCode
-func classifyLookupFailure(request RateLookupRequest, providerID ProviderID, err error) error {
-	var failure *ConversionFailure
-	if errors.As(err, &failure) {
-		return err
-	}
-
-	return NewConversionFailure(request, providerID, conversionFailureReasonForProviderError(err), err.Error())
-}
-
-// classifyEvidenceFailure converts malformed or mismatched canonical evidence
-// into the public conversion-failure contract.
-// Authored by: OpenCode
-func classifyEvidenceFailure(request RateLookupRequest, providerID ProviderID, err error) error {
-	var failure *ConversionFailure
-	if errors.As(err, &failure) {
-		return err
-	}
-	var reason = ConversionFailureReasonMalformedRate
-	var message = strings.ToLower(err.Error())
-	if strings.Contains(message, "quote direction") {
-		reason = ConversionFailureReasonAmbiguousQuote
-	} else if strings.Contains(message, "provider selection") || strings.Contains(message, "requires provider") || strings.Contains(message, "requires authority") || strings.Contains(message, "lookup identity") || strings.Contains(message, "does not match") {
-		reason = ConversionFailureReasonAuthorityMismatch
-	}
-
-	return NewConversionFailure(request, providerID, reason, err.Error())
-}
-
-// conversionFailureReasonForRequestError classifies malformed public lookup
-// requests before provider IO is attempted.
-// Authored by: OpenCode
-func conversionFailureReasonForRequestError(err error) ConversionFailureReason {
-	var message = strings.ToLower(err.Error())
-	if strings.Contains(message, "unsupported base currency") {
-		return ConversionFailureReasonUnsupportedCurrency
-	}
-
-	return ConversionFailureReasonInvalidActivityCurrency
-}
-
-// conversionFailureReasonForProviderError classifies provider lookup and mapper
-// errors without exposing raw provider details to callers.
-// Authored by: OpenCode
-func conversionFailureReasonForProviderError(err error) ConversionFailureReason {
-	var message = strings.ToLower(err.Error())
-	switch {
-	case strings.Contains(message, "unsupported source currency") || strings.Contains(message, "unsupported base currency"):
-		return ConversionFailureReasonUnsupportedCurrency
-	case strings.Contains(message, "no current or prior available observation"):
-		return ConversionFailureReasonMissingRate
-	case strings.Contains(message, "ambiguous quote direction"):
-		return ConversionFailureReasonAmbiguousQuote
-	case strings.Contains(message, "provider returned http status") || strings.Contains(message, "request provider evidence") || strings.Contains(message, "read provider evidence") || strings.Contains(message, "build provider request"):
-		return ConversionFailureReasonProviderUnavailable
-	case strings.Contains(message, "provider") && strings.Contains(message, "context"):
-		return ConversionFailureReasonProviderUnavailable
-	default:
-		return ConversionFailureReasonMalformedRate
-	}
-}
-
 // providerIDForBaseCurrency returns the internally selected provider category
 // when the base currency is supported.
 // Authored by: OpenCode
@@ -380,50 +310,4 @@ func validateCurrencyCode(currencyCode string, label string) error {
 // Authored by: OpenCode
 func trimCurrencyCode(currencyCode string) string {
 	return strings.TrimSpace(currencyCode)
-}
-
-// fetchProviderPayload performs one fixed-provider HTTP GET and returns the body.
-// Authored by: OpenCode
-func fetchProviderPayload(ctx context.Context, httpClient *http.Client, endpoint string) ([]byte, error) {
-	if httpClient == nil {
-		httpClient = http.DefaultClient
-	}
-	if _, ok := ctx.Deadline(); !ok {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, providerRequestTimeout)
-		defer cancel()
-	}
-	var request, err = http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, fmt.Errorf("build provider request: %w", err)
-	}
-	var response, doErr = httpClient.Do(request)
-	if doErr != nil {
-		return nil, fmt.Errorf("request provider evidence: %w", doErr)
-	}
-	defer func() { _ = response.Body.Close() }()
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		_, _ = io.Copy(io.Discard, response.Body)
-		return nil, fmt.Errorf("provider returned HTTP status %d", response.StatusCode)
-	}
-	var payload, readErr = io.ReadAll(response.Body)
-	if readErr != nil {
-		return nil, fmt.Errorf("read provider evidence: %w", readErr)
-	}
-
-	return payload, nil
-}
-
-// parsePositiveRate parses one positive exact provider rate without float math.
-// Authored by: OpenCode
-func parsePositiveRate(rawRate string) (apd.Decimal, error) {
-	var rate, _, err = decimalsupport.ParseString(rawRate)
-	if err != nil {
-		return apd.Decimal{}, err
-	}
-	if err = supportmath.RequirePositive(rate); err != nil {
-		return apd.Decimal{}, err
-	}
-
-	return rate, nil
 }

@@ -362,10 +362,10 @@ func mapIntegrationEvidenceToReportEvidence(evidence currencyintegration.Exchang
 		BaseCurrency:     baseCurrency,
 		ActivityDate:     evidence.ActivityDate,
 		RateDate:         evidence.RateDate,
-		Authority:        evidence.Authority,
-		ProviderID:       evidence.ProviderID,
+		Authority:        reportmodel.RateAuthority(evidence.Authority),
+		ProviderID:       reportmodel.RateProviderID(evidence.ProviderID),
 		RateKind:         evidence.RateKind,
-		QuoteDirection:   evidence.QuoteDirection,
+		QuoteDirection:   reportmodel.QuoteDirection(evidence.QuoteDirection),
 		RateValue:        decimalsupport.Clone(evidence.RateValue),
 		DatasetReference: evidence.DatasetReference,
 	}

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
 	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 	"github.com/cockroachdb/apd/v3"
 )
@@ -42,6 +41,45 @@ const (
 	ConversionStatusConverted ConversionStatus = "converted"
 )
 
+// RateAuthority identifies the report-owned authority concept retained as
+// conversion evidence without depending on integration-layer provider types.
+// Authored by: OpenCode
+type RateAuthority string
+
+const (
+	// RateAuthorityEuropeanCentralBank identifies ECB-authorized rate evidence.
+	RateAuthorityEuropeanCentralBank RateAuthority = "european_central_bank"
+
+	// RateAuthorityFederalReserve identifies Federal Reserve-authorized evidence.
+	RateAuthorityFederalReserve RateAuthority = "federal_reserve"
+)
+
+// RateProviderID identifies the report-owned provider category retained for
+// audit rendering and report validation.
+// Authored by: OpenCode
+type RateProviderID string
+
+const (
+	// RateProviderIDECBEXR identifies ECB Data Portal EXR evidence.
+	RateProviderIDECBEXR RateProviderID = "ecb_exr"
+
+	// RateProviderIDFederalReserveH10 identifies Federal Reserve H.10 evidence.
+	RateProviderIDFederalReserveH10 RateProviderID = "federal_reserve_h10"
+)
+
+// QuoteDirection identifies how a provider-published rate converts source
+// amounts into the report base currency.
+// Authored by: OpenCode
+type QuoteDirection string
+
+const (
+	// QuoteDirectionSourcePerBase divides source amounts by the rate.
+	QuoteDirectionSourcePerBase QuoteDirection = "source_per_base"
+
+	// QuoteDirectionBasePerSource multiplies source amounts by the rate.
+	QuoteDirectionBasePerSource QuoteDirection = "base_per_source"
+)
+
 // ExchangeRateEvidence stores canonical authority-backed rate details used for
 // one source-currency to report-base-currency conversion.
 // Authored by: OpenCode
@@ -50,10 +88,10 @@ type ExchangeRateEvidence struct {
 	BaseCurrency     ReportBaseCurrency
 	ActivityDate     time.Time
 	RateDate         time.Time
-	Authority        currencyintegration.RateAuthority
-	ProviderID       currencyintegration.ProviderID
+	Authority        RateAuthority
+	ProviderID       RateProviderID
 	RateKind         string
-	QuoteDirection   currencyintegration.QuoteDirection
+	QuoteDirection   QuoteDirection
 	RateValue        apd.Decimal
 	DatasetReference string
 }
@@ -82,10 +120,10 @@ type ConversionAuditEntry struct {
 	SourceCurrency     string
 	ReportBaseCurrency ReportBaseCurrency
 	RateDate           time.Time
-	RateAuthority      currencyintegration.RateAuthority
+	RateAuthority      RateAuthority
 	RateKind           string
 	RateValue          apd.Decimal
-	QuoteDirection     currencyintegration.QuoteDirection
+	QuoteDirection     QuoteDirection
 	Amounts            []ConvertedActivityAmount
 }
 
@@ -111,19 +149,19 @@ func (evidence ExchangeRateEvidence) Validate() error {
 	if evidence.RateDate.After(evidence.ActivityDate) {
 		return fmt.Errorf("exchange rate evidence rate date must not be after activity date")
 	}
-	if err := currencyintegration.ValidateRateAuthority(evidence.Authority); err != nil {
+	if err := validateRateAuthority(evidence.Authority); err != nil {
 		return fmt.Errorf("exchange rate evidence authority: %w", err)
 	}
-	if err := currencyintegration.ValidateProviderID(evidence.ProviderID); err != nil {
+	if err := validateRateProviderID(evidence.ProviderID); err != nil {
 		return fmt.Errorf("exchange rate evidence provider: %w", err)
 	}
-	if err := currencyintegration.ValidateProviderForBaseCurrency(evidence.BaseCurrency.Label(), evidence.ProviderID, evidence.Authority); err != nil {
+	if err := validateProviderForBaseCurrency(evidence.BaseCurrency.Label(), evidence.ProviderID, evidence.Authority); err != nil {
 		return fmt.Errorf("exchange rate evidence provider does not match report base currency: %w", err)
 	}
 	if strings.TrimSpace(evidence.RateKind) == "" {
 		return fmt.Errorf("exchange rate evidence rate kind is required")
 	}
-	if err := currencyintegration.ValidateQuoteDirection(evidence.QuoteDirection); err != nil {
+	if err := validateQuoteDirection(evidence.QuoteDirection); err != nil {
 		return fmt.Errorf("exchange rate evidence quote direction: %w", err)
 	}
 	if err := validatePositiveDecimal(evidence.RateValue, "exchange rate evidence rate value"); err != nil {
@@ -173,6 +211,29 @@ func (amount ConvertedActivityAmount) Validate() error {
 // amounts attached to it.
 // Authored by: OpenCode
 func (entry ConversionAuditEntry) Validate() error {
+	if err := entry.validateIdentity(); err != nil {
+		return err
+	}
+	if err := entry.validateRateEvidence(); err != nil {
+		return err
+	}
+	if len(entry.Amounts) == 0 {
+		return fmt.Errorf("conversion audit entry amounts are required")
+	}
+
+	for index, amount := range entry.Amounts {
+		if err := entry.validateAmount(index, amount); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// validateIdentity verifies the source activity identity and currency fields for
+// one conversion audit entry.
+// Authored by: OpenCode
+func (entry ConversionAuditEntry) validateIdentity() error {
 	if strings.TrimSpace(entry.SourceID) == "" {
 		return fmt.Errorf("conversion audit entry source ID is required")
 	}
@@ -191,13 +252,21 @@ func (entry ConversionAuditEntry) Validate() error {
 	if strings.TrimSpace(entry.SourceCurrency) == entry.ReportBaseCurrency.Label() {
 		return fmt.Errorf("conversion audit entry source currency must differ from report base currency")
 	}
+
+	return nil
+}
+
+// validateRateEvidence verifies the provider-level evidence retained by one
+// conversion audit entry.
+// Authored by: OpenCode
+func (entry ConversionAuditEntry) validateRateEvidence() error {
 	if entry.RateDate.IsZero() {
 		return fmt.Errorf("conversion audit entry rate date is required")
 	}
 	if entry.RateDate.After(entry.ActivityDate) {
 		return fmt.Errorf("conversion audit entry rate date must not be after activity date")
 	}
-	if err := currencyintegration.ValidateRateAuthority(entry.RateAuthority); err != nil {
+	if err := validateRateAuthority(entry.RateAuthority); err != nil {
 		return fmt.Errorf("conversion audit entry rate authority: %w", err)
 	}
 	if strings.TrimSpace(entry.RateKind) == "" {
@@ -206,20 +275,104 @@ func (entry ConversionAuditEntry) Validate() error {
 	if err := validatePositiveDecimal(entry.RateValue, "conversion audit entry rate value"); err != nil {
 		return err
 	}
-	if err := currencyintegration.ValidateQuoteDirection(entry.QuoteDirection); err != nil {
+	if err := validateQuoteDirection(entry.QuoteDirection); err != nil {
 		return fmt.Errorf("conversion audit entry quote direction: %w", err)
-	}
-	if len(entry.Amounts) == 0 {
-		return fmt.Errorf("conversion audit entry amounts are required")
-	}
-
-	for index, amount := range entry.Amounts {
-		if err := entry.validateAmount(index, amount); err != nil {
-			return err
-		}
 	}
 
 	return nil
+}
+
+// validateRateAuthority rejects unsupported report-owned provider authorities.
+// Authored by: OpenCode
+func validateRateAuthority(authority RateAuthority) error {
+	switch authority {
+	case RateAuthorityEuropeanCentralBank, RateAuthorityFederalReserve:
+		return nil
+	default:
+		return fmt.Errorf("unsupported rate authority %q", authority)
+	}
+}
+
+// validateRateProviderID rejects unsupported report-owned rate providers.
+// Authored by: OpenCode
+func validateRateProviderID(providerID RateProviderID) error {
+	switch providerID {
+	case RateProviderIDECBEXR, RateProviderIDFederalReserveH10:
+		return nil
+	default:
+		return fmt.Errorf("unsupported rate provider %q", providerID)
+	}
+}
+
+// validateQuoteDirection rejects ambiguous source-to-base rate semantics.
+// Authored by: OpenCode
+func validateQuoteDirection(direction QuoteDirection) error {
+	switch direction {
+	case QuoteDirectionSourcePerBase, QuoteDirectionBasePerSource:
+		return nil
+	default:
+		return fmt.Errorf("unsupported quote direction %q", direction)
+	}
+}
+
+// validateProviderForBaseCurrency verifies report-owned provider evidence is
+// consistent with the selected report base currency.
+// Authored by: OpenCode
+func validateProviderForBaseCurrency(baseCurrency string, providerID RateProviderID, authority RateAuthority) error {
+	switch strings.TrimSpace(baseCurrency) {
+	case ReportBaseCurrencyEUR.Label():
+		if providerID == RateProviderIDECBEXR && authority == RateAuthorityEuropeanCentralBank {
+			return nil
+		}
+	case ReportBaseCurrencyUSD.Label():
+		if providerID == RateProviderIDFederalReserveH10 && authority == RateAuthorityFederalReserve {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("provider %q with authority %q is not valid for base currency %q", providerID, authority, baseCurrency)
+}
+
+// RateAuthorityDisplayLabel returns the report-facing label for a retained rate
+// authority value.
+// Authored by: OpenCode
+func RateAuthorityDisplayLabel(authority RateAuthority) string {
+	switch authority {
+	case RateAuthorityEuropeanCentralBank:
+		return "European Central Bank"
+	case RateAuthorityFederalReserve:
+		return "Federal Reserve"
+	default:
+		return string(authority)
+	}
+}
+
+// RateProviderDisplayLabel returns the report-facing label for retained provider
+// evidence.
+// Authored by: OpenCode
+func RateProviderDisplayLabel(providerID RateProviderID) string {
+	switch providerID {
+	case RateProviderIDECBEXR:
+		return "ECB Data Portal `EXR`"
+	case RateProviderIDFederalReserveH10:
+		return "Federal Reserve Board H.10/Data Download Program"
+	default:
+		return string(providerID)
+	}
+}
+
+// RateProviderUnavailableDateRule returns the report-facing prior-observation
+// disclosure for retained provider evidence.
+// Authored by: OpenCode
+func RateProviderUnavailableDateRule(providerID RateProviderID) string {
+	switch providerID {
+	case RateProviderIDECBEXR:
+		return "most recent previous available ECB observation"
+	case RateProviderIDFederalReserveH10:
+		return "most recent previous available H.10 observation"
+	default:
+		return "most recent previous available official observation"
+	}
 }
 
 // validateConvertedAmountKind rejects unsupported converted amount kinds.
