@@ -26,12 +26,6 @@ type testRateProvider struct {
 	calls                 int
 }
 
-// contextCheckingProvider records nil-context handling for service tests.
-// Authored by: OpenCode
-type contextCheckingProvider struct {
-	baseCurrencyValue string
-}
-
 // errorReadCloser fails reads for provider payload read-error coverage.
 // Authored by: OpenCode
 type errorReadCloser struct{}
@@ -51,24 +45,6 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 // RoundTrip executes the configured transport callback.
 // Authored by: OpenCode
 func (fn roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) { return fn(request) }
-
-// baseCurrency returns the configured provider base currency.
-// Authored by: OpenCode
-func (provider contextCheckingProvider) baseCurrency() string {
-	return provider.baseCurrencyValue
-}
-
-// providerCategory returns a deterministic category for context tests.
-// Authored by: OpenCode
-func (provider contextCheckingProvider) providerCategory() ProviderID {
-	return ProviderIDECBEXR
-}
-
-// lookupRate fails when invoked by a defensive branch test.
-// Authored by: OpenCode
-func (provider contextCheckingProvider) lookupRate(context.Context, RateLookupRequest) (ExchangeRateEvidence, error) {
-	return ExchangeRateEvidence{}, errors.New("provider should not be called")
-}
 
 // baseCurrency returns the configured provider base currency.
 // Authored by: OpenCode
@@ -472,7 +448,7 @@ func TestCurrencyRateServiceFailureClassificationBranches(t *testing.T) {
 			t.Parallel()
 
 			var evidence = mustExchangeRateEvidence(t, request, "1.09")
-			var provider officialRateProvider = &testRateProvider{baseCurrencyValue: BaseCurrencyEUR, evidence: evidence}
+			var provider officialRateProvider
 			if testCase.name == "wrapped conversion failure" {
 				provider = &testRateProvider{baseCurrencyValue: BaseCurrencyEUR, err: NewConversionFailure(request, ProviderIDECBEXR, testCase.wantReason, testCase.wantMessage)}
 			} else {
@@ -551,6 +527,53 @@ func TestFetchProviderPayloadDefensiveBranches(t *testing.T) {
 	})}
 	if _, err := fetchProviderPayload(context.Background(), readErrClient, "http://example.invalid"); err == nil || !strings.Contains(err.Error(), "read provider evidence") {
 		t.Fatalf("expected read failure, got %v", err)
+	}
+}
+
+// TestFetchProviderPayloadAddsDeadlineForUnboundedContext verifies provider IO
+// is bounded when callers pass a context without a deadline.
+// Authored by: OpenCode
+func TestFetchProviderPayloadAddsDeadlineForUnboundedContext(t *testing.T) {
+	t.Parallel()
+
+	var deadlineSeen bool
+	var client = &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		var _, ok = request.Context().Deadline()
+		deadlineSeen = ok
+		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Header: make(http.Header)}, nil
+	})}
+	if _, err := fetchProviderPayload(context.Background(), client, "http://example.invalid"); err != nil {
+		t.Fatalf("expected bounded provider request to succeed: %v", err)
+	}
+	if !deadlineSeen {
+		t.Fatalf("expected provider request context to have a deadline")
+	}
+}
+
+// TestFetchProviderPayloadPreservesCallerDeadline verifies provider IO does not
+// replace an existing caller deadline.
+// Authored by: OpenCode
+func TestFetchProviderPayloadPreservesCallerDeadline(t *testing.T) {
+	t.Parallel()
+
+	var callerDeadline = time.Now().Add(time.Hour).UTC()
+	var ctx, cancel = context.WithDeadline(context.Background(), callerDeadline)
+	defer cancel()
+
+	var seenDeadline time.Time
+	var client = &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+		var ok bool
+		seenDeadline, ok = request.Context().Deadline()
+		if !ok {
+			t.Fatalf("expected provider request context to keep caller deadline")
+		}
+		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Header: make(http.Header)}, nil
+	})}
+	if _, err := fetchProviderPayload(ctx, client, "http://example.invalid"); err != nil {
+		t.Fatalf("expected provider request with caller deadline to succeed: %v", err)
+	}
+	if !seenDeadline.Equal(callerDeadline) {
+		t.Fatalf("expected caller deadline %s, got %s", callerDeadline, seenDeadline)
 	}
 }
 

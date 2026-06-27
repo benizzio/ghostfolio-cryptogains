@@ -120,7 +120,8 @@ func (cache *CurrencyRateSessionCache) store(request RateLookupRequest, evidence
 // Authored by: OpenCode
 func newRateSessionCacheKey(request RateLookupRequest) (rateSessionCacheKey, error) {
 	request.ActivityDate = datesupport.CalendarDate(request.ActivityDate)
-	if err := request.Validate(); err != nil {
+	var err = request.Validate()
+	if err != nil {
 		return rateSessionCacheKey{}, err
 	}
 

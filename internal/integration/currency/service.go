@@ -27,8 +27,9 @@ const (
 )
 
 const (
-	defaultECBEXRBaseURL = "https://data-api.ecb.europa.eu"
-	providerLookbackDays = 30
+	defaultECBEXRBaseURL   = "https://data-api.ecb.europa.eu"
+	providerLookbackDays   = 30
+	providerRequestTimeout = 15 * time.Second
 )
 
 // RateLookupRequest is the public canonical request for one required official
@@ -387,6 +388,11 @@ func fetchProviderPayload(ctx context.Context, httpClient *http.Client, endpoint
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, providerRequestTimeout)
+		defer cancel()
+	}
 	var request, err = http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build provider request: %w", err)
@@ -395,7 +401,7 @@ func fetchProviderPayload(ctx context.Context, httpClient *http.Client, endpoint
 	if doErr != nil {
 		return nil, fmt.Errorf("request provider evidence: %w", doErr)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		_, _ = io.Copy(io.Discard, response.Body)
 		return nil, fmt.Errorf("provider returned HTTP status %d", response.StatusCode)
