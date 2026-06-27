@@ -37,12 +37,25 @@ func MapFederalReserveH10CSVToEvidence(request RateLookupRequest, payload []byte
 // into canonical evidence after detecting the DDP package shape.
 // Authored by: OpenCode
 func mapFederalReserveH10RecordsToEvidence(request RateLookupRequest, records [][]string, datasetReference string) (ExchangeRateEvidence, error) {
-	var header = records[0]
-	if federalReserveH10HeaderIndex(header, "Currency:") >= 0 && federalReserveH10HeaderIndex(header, "Series Name:") >= 0 {
-		return mapFederalReserveDDPSeriesRowRecordsToEvidence(request, records, datasetReference)
+	var ddpHeaderIndex = federalReserveH10DDPSeriesRowHeaderIndex(records)
+	if ddpHeaderIndex >= 0 {
+		return mapFederalReserveDDPSeriesRowRecordsToEvidence(request, records[ddpHeaderIndex:], datasetReference)
 	}
 
 	return mapFederalReserveLegacyFixtureRecordsToEvidence(request, records, datasetReference)
+}
+
+// federalReserveH10DDPSeriesRowHeaderIndex finds the DDP seriesrow header after
+// optional leading metadata records in Federal Reserve package CSV payloads.
+// Authored by: OpenCode
+func federalReserveH10DDPSeriesRowHeaderIndex(records [][]string) int {
+	for index, record := range records {
+		if federalReserveH10HeaderIndex(record, "Currency:") >= 0 && federalReserveH10HeaderIndex(record, "Series Name:") >= 0 {
+			return index
+		}
+	}
+
+	return -1
 }
 
 // mapFederalReserveLegacyFixtureRecordsToEvidence maps the earlier compact test

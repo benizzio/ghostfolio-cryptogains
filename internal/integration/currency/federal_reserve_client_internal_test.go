@@ -91,6 +91,22 @@ func TestFederalReserveH10MapperParsesDDPSeriesRowPackage(t *testing.T) {
 	assertFederalReserveEvidence(t, eurEvidence, eurRequest, QuoteDirectionBasePerSource, "2024-01-05", "1.0957")
 }
 
+// TestFederalReserveH10MapperSkipsLeadingDDPMetadataRows verifies package
+// payloads may include non-series metadata rows before the DDP seriesrow header.
+// Authored by: OpenCode
+func TestFederalReserveH10MapperSkipsLeadingDDPMetadataRows(t *testing.T) {
+	t.Parallel()
+
+	var payload = []byte("Data Download Program,H.10 package\nGenerated,2026-06-27\n" + federalReserveDDPSeriesRowFixture())
+	var request = mustRateLookupRequestOnDate(t, "MXN", BaseCurrencyUSD, "2024-01-06")
+	var evidence, err = MapFederalReserveH10CSVToEvidence(request, payload, "H10 DDP fixture")
+	if err != nil {
+		t.Fatalf("map DDP evidence with leading metadata: %v", err)
+	}
+
+	assertFederalReserveEvidence(t, evidence, request, QuoteDirectionSourcePerBase, "2024-01-05", "16.9141")
+}
+
 // TestFederalReserveH10MapperPreservesQuoteDirection verifies unstarred and
 // starred H.10 rows map to distinct canonical quote directions.
 // Authored by: OpenCode
