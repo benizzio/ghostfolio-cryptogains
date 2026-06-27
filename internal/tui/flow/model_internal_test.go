@@ -1076,6 +1076,14 @@ func TestReportSelectionDefaultsBaseCurrencyAndCanGenerate(t *testing.T) {
 	if model.active != reportSelectionScreenKey || reportService.called {
 		t.Fatalf("expected disabled activation to remain on selection without report service call, active=%s called=%v", model.active, reportService.called)
 	}
+	updated, cmd = model.startReportGeneration()
+	if cmd != nil {
+		t.Fatalf("expected direct start with empty base currency to stay synchronous")
+	}
+	model = assertUpdatedModel(t, updated)
+	if model.active != reportSelectionScreenKey || reportService.called {
+		t.Fatalf("expected direct start with empty base currency to remain on selection without report service call, active=%s called=%v", model.active, reportService.called)
+	}
 }
 
 // TestReportSelectionActivationFallsBackFromInvalidBaseCurrencyIndex verifies
