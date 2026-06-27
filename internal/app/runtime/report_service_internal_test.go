@@ -605,18 +605,19 @@ func capitalGainsReportFixture(t *testing.T, request reportmodel.ReportRequest) 
 	t.Helper()
 
 	var zero apd.Decimal
-	var summaryEntry, err = reportmodel.NewAssetSummaryEntry("asset-btc-001", "Bitcoin", zero, "NOT APPLICABLE")
+	var reportCalculationCurrency = request.ReportBaseCurrency.Label()
+	var summaryEntry, err = reportmodel.NewAssetSummaryEntry("asset-btc-001", "Bitcoin", zero, reportCalculationCurrency)
 	if err != nil {
 		t.Fatalf("new summary entry: %v", err)
 	}
 	var detailSection reportmodel.AssetDetailSection
-	detailSection, err = reportmodel.NewAssetDetailSection("asset-btc-001", "Bitcoin", zero, zero, zero, zero, "NOT APPLICABLE", nil, nil)
+	detailSection, err = reportmodel.NewAssetDetailSection("asset-btc-001", "Bitcoin", zero, zero, zero, zero, reportCalculationCurrency, nil, nil)
 	if err != nil {
 		t.Fatalf("new detail section: %v", err)
 	}
 
 	var report reportmodel.CapitalGainsReport
-	report, err = reportmodel.NewCapitalGainsReport(request, request.RequestedAt, "NOT APPLICABLE", []reportmodel.AssetSummaryEntry{summaryEntry}, zero, nil, []reportmodel.AssetDetailSection{detailSection})
+	report, err = reportmodel.NewCapitalGainsReport(request, request.RequestedAt, reportCalculationCurrency, []reportmodel.AssetSummaryEntry{summaryEntry}, zero, nil, []reportmodel.AssetDetailSection{detailSection})
 	if err != nil {
 		t.Fatalf("new capital gains report: %v", err)
 	}
@@ -750,9 +751,6 @@ func TestReportConversionFailureContextRejectsIncompleteDetails(t *testing.T) {
 	parsed = parseReportConversionFailureDetail("could not resolve currency conversion rate to USD on 2024-01-02")
 	if parsed.sourceCurrency != "" || parsed.reportBaseCurrency != "" {
 		t.Fatalf("expected detail without source marker to remain incomplete, got %#v", parsed)
-	}
-	if got := reportLeadingDate("bad"); got != "" {
-		t.Fatalf("expected short leading date to be blank, got %q", got)
 	}
 	if got := reportConversionProviderCategory(reportProviderCategoryRateService{}, "GBP"); got != "" {
 		t.Fatalf("expected unsupported base currency to have no provider category, got %q", got)

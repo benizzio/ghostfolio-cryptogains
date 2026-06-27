@@ -24,3 +24,35 @@ func TestCalendarDateNormalizesToUTCMidnight(t *testing.T) {
 		t.Fatalf("expected zero time to remain zero")
 	}
 }
+
+// TestLeadingCalendarDateExtractsValidatedToken verifies leading date tokens
+// are trimmed, validated, and boundary checked.
+// Authored by: OpenCode
+func TestLeadingCalendarDateExtractsValidatedToken(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name  string
+		value string
+		want  string
+	}{
+		{name: "exact", value: "2024-01-02", want: "2024-01-02"},
+		{name: "trimmed with suffix", value: "  2024-01-02 conversion failed  ", want: "2024-01-02"},
+		{name: "iso date time", value: "2024-01-02T10:00:00Z", want: "2024-01-02"},
+		{name: "punctuation boundary", value: "2024-01-02)", want: "2024-01-02"},
+		{name: "invalid calendar day", value: "2024-02-31 conversion failed", want: ""},
+		{name: "too short", value: "2024-01", want: ""},
+		{name: "non boundary suffix", value: "2024-01-02x", want: ""},
+		{name: "invalid time delimiter suffix", value: "2024-01-02Tbad", want: ""},
+		{name: "underscore suffix", value: "2024-01-02_extra", want: ""},
+	} {
+		var tc = tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := LeadingCalendarDate(tc.value); got != tc.want {
+				t.Fatalf("unexpected leading calendar date: got %q want %q", got, tc.want)
+			}
+		})
+	}
+}

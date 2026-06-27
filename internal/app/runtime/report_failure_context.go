@@ -10,6 +10,7 @@ import (
 
 	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
 
@@ -120,7 +121,7 @@ func parseReportConversionFailureDetail(detail string) reportConversionFailureDe
 
 	parsed.sourceCurrency = strings.TrimSpace(beforeSource[sourceIndex+len(" from "):])
 	parsed.reportBaseCurrency = strings.TrimSpace(reportBaseCurrency)
-	parsed.activityDate = reportLeadingDate(activityDate)
+	parsed.activityDate = datesupport.LeadingCalendarDate(activityDate)
 	return parsed
 }
 
@@ -140,16 +141,6 @@ func reportValueAfterToken(detail string, token string) string {
 		return ""
 	}
 	return strings.TrimSpace(value)
-}
-
-// reportLeadingDate returns the leading YYYY-MM-DD token when available.
-// Authored by: OpenCode
-func reportLeadingDate(detail string) string {
-	var value = strings.TrimSpace(detail)
-	if len(value) < len(time.DateOnly) {
-		return ""
-	}
-	return value[:len(time.DateOnly)]
 }
 
 // reportConversionProviderCategory asks the configured rate service for the
