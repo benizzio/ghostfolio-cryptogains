@@ -32,7 +32,7 @@ func TestRenderMarkdownIncludesHeaderSectionOrderAndRequiredTables(t *testing.T)
 		"- Year: 2024",
 		"- Cost Basis Method: Average Cost Basis",
 		"- Generated At:",
-		"- Report Calculation Currency: NOT APPLICABLE",
+		"- Report Calculation Currency: USD",
 		"## Gains-And-Losses Summary",
 		"## Reference Section",
 		"## Asset Detail: BTC",
@@ -63,7 +63,7 @@ func TestRenderMarkdownRendersEmptyStates(t *testing.T) {
 	}
 
 	assertContainsString(t, document.Content, "No assets qualified for the main report sections in the selected year.")
-	assertContainsString(t, document.Content, "| Overall Yearly Net Total | 0 | NOT APPLICABLE |")
+	assertContainsString(t, document.Content, "| Overall Yearly Net Total | 0 | USD |")
 	assertContainsString(t, document.Content, "No assets reached full liquidation by year end.")
 	assertNotContainsString(t, document.Content, "## Asset Detail:")
 }
@@ -79,7 +79,7 @@ func TestRenderMarkdownRendersNoInYearActivityAndOmitsLiquidationTable(t *testin
 		AssetIdentityKey:          "asset-btc",
 		DisplayLabel:              "BTC",
 		NetGainOrLoss:             mustMarkdownDecimal(t, "0"),
-		ReportCalculationCurrency: "NOT APPLICABLE",
+		ReportCalculationCurrency: "USD",
 	}}
 	report.DetailSections = []reportmodel.AssetDetailSection{{
 		AssetIdentityKey:    "asset-btc",
@@ -88,7 +88,7 @@ func TestRenderMarkdownRendersNoInYearActivityAndOmitsLiquidationTable(t *testin
 		OpeningCostBasis:    mustMarkdownDecimal(t, "1000"),
 		ClosingQuantity:     mustMarkdownDecimal(t, "1.25"),
 		ClosingCostBasis:    mustMarkdownDecimal(t, "1000"),
-		CalculationCurrency: "NOT APPLICABLE",
+		CalculationCurrency: "USD",
 	}}
 
 	document, err := reportmarkdown.Render(report)
@@ -112,12 +112,12 @@ func TestRenderMarkdownCanonicalDecimalsCurrenciesAndSecretExclusion(t *testing.
 		t.Fatalf("render markdown report: %v", err)
 	}
 
-	assertContainsString(t, document.Content, "| BTC | 1250.5 | NOT APPLICABLE |")
-	assertContainsString(t, document.Content, "| ETH | -10 | NOT APPLICABLE |")
-	assertContainsString(t, document.Content, "| Overall Yearly Net Total | 1240.5 | NOT APPLICABLE |")
-	assertContainsString(t, document.Content, "| btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | USD | 22009 | NOT APPLICABLE | 1 |")
-	assertContainsString(t, document.Content, "| xrp-reduction-2024-001 | SELL | 200 | 0 | 0 | 0 |  | 400 | NOT APPLICABLE | 800 |  | manual custody transfer token=[REDACTED] jwt=[REDACTED] payload=[REDACTED] |")
-	assertContainsString(t, document.Content, "| btc-sell-2024-001 | 1 | USD | 22009 | 25000 | 2991 | NOT APPLICABLE |")
+	assertContainsString(t, document.Content, "| BTC | 1250.5 | USD |")
+	assertContainsString(t, document.Content, "| ETH | -10 | USD |")
+	assertContainsString(t, document.Content, "| Overall Yearly Net Total | 1240.5 | USD |")
+	assertContainsString(t, document.Content, "| btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | USD | 22009 | USD | 1 |")
+	assertContainsString(t, document.Content, "| xrp-reduction-2024-001 | SELL | 200 | 0 | 0 | 0 |  | 400 | USD | 800 |  | manual custody transfer token=[REDACTED] jwt=[REDACTED] payload=[REDACTED] |")
+	assertContainsString(t, document.Content, "| btc-sell-2024-001 | 1 | USD | 22009 | 25000 | 2991 | USD |")
 	assertNotContainsString(t, document.Content, "secret-token")
 	assertNotContainsString(t, document.Content, "secret-jwt")
 	assertNotContainsString(t, document.Content, "opaque-payload")
@@ -131,19 +131,19 @@ func populatedMarkdownReportFixture() reportmodel.CapitalGainsReport {
 		Year:                      2024,
 		CostBasisMethod:           reportmodel.CostBasisMethodAverageCost,
 		GeneratedAt:               time.Date(2026, time.May, 21, 12, 34, 56, 0, time.Local),
-		ReportCalculationCurrency: "",
+		ReportCalculationCurrency: "USD",
 		SummaryEntries: []reportmodel.AssetSummaryEntry{
 			{
 				AssetIdentityKey:          "asset-btc",
 				DisplayLabel:              "BTC",
 				NetGainOrLoss:             mustMarkdownDecimal(nil, "1250.500"),
-				ReportCalculationCurrency: "NOT APPLICABLE",
+				ReportCalculationCurrency: "USD",
 			},
 			{
 				AssetIdentityKey:          "asset-eth",
 				DisplayLabel:              "ETH",
 				NetGainOrLoss:             mustMarkdownDecimal(nil, "-10.000"),
-				ReportCalculationCurrency: "NOT APPLICABLE",
+				ReportCalculationCurrency: "USD",
 			},
 		},
 		YearlyNetTotal: mustMarkdownDecimal(nil, "1240.500"),
@@ -169,7 +169,7 @@ func populatedMarkdownReportFixture() reportmodel.CapitalGainsReport {
 				OpeningCostBasis:    mustMarkdownDecimal(nil, "44018.000"),
 				ClosingQuantity:     mustMarkdownDecimal(nil, "1.000"),
 				ClosingCostBasis:    mustMarkdownDecimal(nil, "22009.000"),
-				CalculationCurrency: "",
+				CalculationCurrency: "USD",
 				ActivityRows: []reportmodel.AssetActivityRow{{
 					SourceID:            "btc-sell-2024-001",
 					OccurredAt:          time.Date(2024, time.January, 1, 0, 15, 0, 0, time.Local),
@@ -180,7 +180,7 @@ func populatedMarkdownReportFixture() reportmodel.CapitalGainsReport {
 					FeeAmount:           markdownDecimalPointer(nil, "0.000"),
 					ActivityCurrency:    "USD",
 					BasisAfterRow:       mustMarkdownDecimal(nil, "22009.000"),
-					CalculationCurrency: "",
+					CalculationCurrency: "USD",
 					QuantityAfterRow:    mustMarkdownDecimal(nil, "1.000"),
 				}},
 				LiquidationSummaries: []reportmodel.LiquidationCalculation{{
@@ -191,7 +191,7 @@ func populatedMarkdownReportFixture() reportmodel.CapitalGainsReport {
 					NetLiquidationProceeds: mustMarkdownDecimal(nil, "25000.000"),
 					GainOrLoss:             mustMarkdownDecimal(nil, "2991.000"),
 					ActivityCurrency:       "USD",
-					CalculationCurrency:    "",
+					CalculationCurrency:    "USD",
 				}},
 			},
 			{
@@ -201,7 +201,7 @@ func populatedMarkdownReportFixture() reportmodel.CapitalGainsReport {
 				OpeningCostBasis:    mustMarkdownDecimal(nil, "500.000"),
 				ClosingQuantity:     mustMarkdownDecimal(nil, "800.000"),
 				ClosingCostBasis:    mustMarkdownDecimal(nil, "400.000"),
-				CalculationCurrency: "NOT APPLICABLE",
+				CalculationCurrency: "USD",
 				ActivityRows: []reportmodel.AssetActivityRow{{
 					SourceID:                    "xrp-reduction-2024-001",
 					OccurredAt:                  time.Date(2024, time.April, 1, 12, 0, 0, 0, time.Local),
@@ -211,7 +211,7 @@ func populatedMarkdownReportFixture() reportmodel.CapitalGainsReport {
 					GrossValue:                  markdownDecimalPointer(nil, "0.000"),
 					FeeAmount:                   markdownDecimalPointer(nil, "0.000"),
 					BasisAfterRow:               mustMarkdownDecimal(nil, "400.000"),
-					CalculationCurrency:         "NOT APPLICABLE",
+					CalculationCurrency:         "USD",
 					QuantityAfterRow:            mustMarkdownDecimal(nil, "800.000"),
 					HoldingReductionExplanation: "manual custody transfer token=secret-token jwt=secret-jwt payload=opaque-payload",
 				}},
@@ -228,7 +228,7 @@ func emptyMarkdownReportFixture() reportmodel.CapitalGainsReport {
 		Year:                      2024,
 		CostBasisMethod:           reportmodel.CostBasisMethodFIFO,
 		GeneratedAt:               time.Date(2026, time.May, 21, 12, 34, 56, 0, time.Local),
-		ReportCalculationCurrency: "NOT APPLICABLE",
+		ReportCalculationCurrency: "USD",
 		YearlyNetTotal:            mustMarkdownDecimal(nil, "0.000"),
 	}
 }

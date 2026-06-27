@@ -5,7 +5,6 @@ package markdown
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -406,18 +405,18 @@ func TestRenderRendersReferenceEmptyState(t *testing.T) {
 
 	var zero apd.Decimal
 	var summaryEntry reportmodel.AssetSummaryEntry
-	summaryEntry, err = reportmodel.NewAssetSummaryEntry("asset-1", "Asset 1", zero, "")
+	summaryEntry, err = reportmodel.NewAssetSummaryEntry("asset-1", "Asset 1", zero, "USD")
 	if err != nil {
 		t.Fatalf("new summary entry: %v", err)
 	}
 	var section reportmodel.AssetDetailSection
-	section, err = reportmodel.NewAssetDetailSection("asset-1", "Asset 1", zero, zero, zero, zero, "", nil, nil)
+	section, err = reportmodel.NewAssetDetailSection("asset-1", "Asset 1", zero, zero, zero, zero, "USD", nil, nil)
 	if err != nil {
 		t.Fatalf("new detail section: %v", err)
 	}
 
 	var report reportmodel.CapitalGainsReport
-	report, err = reportmodel.NewCapitalGainsReport(request, request.RequestedAt, "", []reportmodel.AssetSummaryEntry{summaryEntry}, zero, nil, []reportmodel.AssetDetailSection{section})
+	report, err = reportmodel.NewCapitalGainsReport(request, request.RequestedAt, "USD", []reportmodel.AssetSummaryEntry{summaryEntry}, zero, nil, []reportmodel.AssetDetailSection{section})
 	if err != nil {
 		t.Fatalf("new capital gains report: %v", err)
 	}
@@ -431,7 +430,7 @@ func TestRenderRendersReferenceEmptyState(t *testing.T) {
 	for _, expected := range []string{
 		"## Reference Section",
 		"No assets reached full liquidation by year end.",
-		fmt.Sprintf("| Overall Yearly Net Total | 0 | %s |", notApplicableCalculationCurrency),
+		"| Overall Yearly Net Total | 0 | USD |",
 	} {
 		if !strings.Contains(document.Content, expected) {
 			t.Fatalf("expected rendered document to contain %q", expected)
