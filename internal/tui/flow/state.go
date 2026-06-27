@@ -148,7 +148,7 @@ func newSyncReportsContextState(serverOrigin string, protectedData runtime.Prote
 // newReportState creates the initial report workflow state.
 // Authored by: OpenCode
 func newReportState(years []int) reportState {
-	var state = reportState{FocusArea: 0, MethodIndex: 0, BaseCurrencyIndex: -1}
+	var state = reportState{FocusArea: 0, MethodIndex: 0, BaseCurrencyIndex: 0, SelectedBaseCurrency: reportBaseCurrencyForIndex(0)}
 	if len(years) > 0 {
 		state.SelectedYear = years[0]
 	}

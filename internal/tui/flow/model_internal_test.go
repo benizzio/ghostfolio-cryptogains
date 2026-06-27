@@ -1021,10 +1021,10 @@ func TestReportSelectionFocusIncludesBaseCurrencyPane(t *testing.T) {
 	}
 }
 
-// TestReportSelectionDisablesGenerationBeforeBaseCurrencySelection verifies a
-// report cannot start until the user has selected a report base currency.
+// TestReportSelectionDefaultsBaseCurrencyAndCanGenerate verifies a report can
+// start from the initial selection state because a base currency is preselected.
 // Authored by: OpenCode
-func TestReportSelectionDisablesGenerationBeforeBaseCurrencySelection(t *testing.T) {
+func TestReportSelectionDefaultsBaseCurrencyAndCanGenerate(t *testing.T) {
 	t.Parallel()
 
 	var config = mustSetupConfig(t)
@@ -1034,28 +1034,37 @@ func TestReportSelectionDisablesGenerationBeforeBaseCurrencySelection(t *testing
 	model.active = reportSelectionScreenKey
 	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
 	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
+	if model.report.BaseCurrencyIndex != 0 || model.report.SelectedBaseCurrency != reportmodel.ReportBaseCurrencyUSD {
+		t.Fatalf("expected initial report state to select USD at index 0, got %#v", model.report)
+	}
+	if !model.reportCanGenerate() {
+		t.Fatalf("expected initial report state to be ready to generate, got %#v", model.report)
+	}
 
 	var items = model.reportSelectionMenuItems()
 	if len(items) == 0 || items[0].Label != component.GenerateReportActionLabel {
 		t.Fatalf("expected Generate Report to be the first report-selection action, got %#v", items)
 	}
-	if items[0].Enabled {
-		t.Fatalf("expected Generate Report to be disabled before base-currency selection, got %#v", items[0])
+	if !items[0].Enabled {
+		t.Fatalf("expected Generate Report to be enabled with default base currency, got %#v", items[0])
 	}
 
-	model.report.FocusArea = reportSelectionFocusBaseCurrency
+	model.report.FocusArea = reportSelectionFocusAction
 	model.report.ActionIndex = 0
-	var updated, cmd = model.startReportGeneration()
-	if cmd != nil {
-		t.Fatalf("expected disabled generation attempt to stay synchronous")
+	var updated, cmd = model.activateReportSelection()
+	if cmd == nil {
+		t.Fatalf("expected default generation activation to start asynchronous report generation")
 	}
 	model = updated.(*Model)
-	if model.active != reportSelectionScreenKey {
-		t.Fatalf("expected disabled generation attempt to remain on report selection, got %s", model.active)
+	if model.active != reportBusyScreenKey || !model.report.Busy {
+		t.Fatalf("expected default generation activation to enter report busy state, got active=%s report=%#v", model.active, model.report)
 	}
-	if reportService.called {
-		t.Fatalf("expected disabled generation attempt not to call report service")
-	}
+
+	model = newTestModel(t, &config)
+	model.deps.ReportService = reportService
+	model.active = reportSelectionScreenKey
+	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
+	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
 
 	model.report.FocusArea = reportSelectionFocusAction
 	model.report.SelectedBaseCurrency = ""
