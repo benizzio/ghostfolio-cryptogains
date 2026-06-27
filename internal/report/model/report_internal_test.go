@@ -220,7 +220,7 @@ func TestNewCapitalGainsReportValidatesNestedContent(t *testing.T) {
 	_, err = NewCapitalGainsReport(
 		request,
 		time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC),
-		"",
+		"USD",
 		[]AssetSummaryEntry{{
 			AssetIdentityKey: "",
 			DisplayLabel:     "BTC",
@@ -237,12 +237,12 @@ func TestNewCapitalGainsReportValidatesNestedContent(t *testing.T) {
 	report, err := NewCapitalGainsReport(
 		request,
 		time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC),
-		"NOT APPLICABLE",
+		"USD",
 		[]AssetSummaryEntry{{
 			AssetIdentityKey:          "asset-btc",
 			DisplayLabel:              "BTC",
 			NetGainOrLoss:             mustReportDecimal(t, "1"),
-			ReportCalculationCurrency: "NOT APPLICABLE",
+			ReportCalculationCurrency: "USD",
 		}},
 		mustReportDecimal(t, "1"),
 		[]ReferenceLiquidationEntry{{
@@ -311,6 +311,46 @@ func TestNewCapitalGainsReportValidatesNestedContent(t *testing.T) {
 	}
 	if err = report.Validate(); err != nil {
 		t.Fatalf("validate capital gains report: %v", err)
+	}
+}
+
+// TestNewCapitalGainsReportRequiresSupportedCalculationCurrency verifies that
+// calculated reports always retain the selected report base currency.
+// Authored by: OpenCode
+func TestNewCapitalGainsReportRequiresSupportedCalculationCurrency(t *testing.T) {
+	t.Parallel()
+
+	var request, requestErr = NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
+	if requestErr != nil {
+		t.Fatalf("new report request: %v", requestErr)
+	}
+
+	var testCases = []struct {
+		name     string
+		currency string
+	}{
+		{name: "empty", currency: ""},
+		{name: "not applicable", currency: "NOT APPLICABLE"},
+		{name: "unsupported", currency: "GBP"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var _, err = NewCapitalGainsReport(
+				request,
+				time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC),
+				testCase.currency,
+				nil,
+				mustReportDecimal(t, "0"),
+				nil,
+				nil,
+			)
+			if err == nil || !strings.Contains(err.Error(), "capital gains report calculation currency") {
+				t.Fatalf("expected calculation-currency rejection, got %v", err)
+			}
+		})
 	}
 }
 
@@ -769,10 +809,10 @@ func TestReportConstructorsAndValidationHelpersCoverRemainingBranches(t *testing
 	if err = (CapitalGainsReport{Year: 2024, CostBasisMethod: CostBasisMethod("bad"), GeneratedAt: time.Now(), YearlyNetTotal: mustReportDecimal(t, "0")}).Validate(); err == nil || !strings.Contains(err.Error(), "cost basis method") {
 		t.Fatalf("expected invalid report cost basis method to fail, got %v", err)
 	}
-	if err = (CapitalGainsReport{Year: 2024, CostBasisMethod: CostBasisMethodFIFO, GeneratedAt: time.Now(), YearlyNetTotal: mustReportDecimal(t, "0"), ReferenceEntries: []ReferenceLiquidationEntry{{}}}).Validate(); err == nil || !strings.Contains(err.Error(), "reference entry 0") {
+	if err = (CapitalGainsReport{Year: 2024, CostBasisMethod: CostBasisMethodFIFO, GeneratedAt: time.Now(), ReportCalculationCurrency: "USD", YearlyNetTotal: mustReportDecimal(t, "0"), ReferenceEntries: []ReferenceLiquidationEntry{{}}}).Validate(); err == nil || !strings.Contains(err.Error(), "reference entry 0") {
 		t.Fatalf("expected invalid nested reference entry to fail, got %v", err)
 	}
-	if err = (CapitalGainsReport{Year: 2024, CostBasisMethod: CostBasisMethodFIFO, GeneratedAt: time.Now(), YearlyNetTotal: mustReportDecimal(t, "0"), DetailSections: []AssetDetailSection{{}}}).Validate(); err == nil || !strings.Contains(err.Error(), "detail section 0") {
+	if err = (CapitalGainsReport{Year: 2024, CostBasisMethod: CostBasisMethodFIFO, GeneratedAt: time.Now(), ReportCalculationCurrency: "USD", YearlyNetTotal: mustReportDecimal(t, "0"), DetailSections: []AssetDetailSection{{}}}).Validate(); err == nil || !strings.Contains(err.Error(), "detail section 0") {
 		t.Fatalf("expected invalid nested detail section to fail, got %v", err)
 	}
 
@@ -1234,11 +1274,24 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 		t.Fatalf("expected missing report rate source rejection, got %v", err)
 	}
 
-	report.ReportCalculationCurrency = "NOT APPLICABLE"
+	report.ReportCalculationCurrency = ""
 	report.RateSources = []ExchangeRateEvidence{evidence}
 	report.ConversionAuditEntries = nil
-	if err := report.validateRateSourceCurrency(0, evidence); err != nil {
-		t.Fatalf("expected NOT APPLICABLE report currency to skip rate-source currency validation: %v", err)
+	if err := report.Validate(); err == nil || !strings.Contains(err.Error(), "calculation currency") {
+		t.Fatalf("expected empty report currency rejection, got %v", err)
+	}
+
+	report.ReportCalculationCurrency = "USD"
+	var sameCalendarSource = evidence
+	sameCalendarSource.ActivityDate = time.Date(2024, time.January, 5, 14, 30, 0, 0, time.FixedZone("UTC+2", 2*60*60))
+	sameCalendarSource.RateDate = time.Date(2024, time.January, 5, 8, 15, 0, 0, time.FixedZone("UTC-5", -5*60*60))
+	var sameCalendarEntry = entry
+	sameCalendarEntry.ActivityDate = time.Date(2024, time.January, 5, 9, 0, 0, 0, time.UTC)
+	sameCalendarEntry.RateDate = time.Date(2024, time.January, 5, 7, 0, 0, 0, time.UTC)
+	report.RateSources = []ExchangeRateEvidence{sameCalendarSource}
+	report.ConversionAuditEntries = []ConversionAuditEntry{sameCalendarEntry}
+	if !report.hasMatchingRateSource(sameCalendarEntry) {
+		t.Fatalf("expected same calendar dates in different zones to match rate source")
 	}
 	invalidEntry = entry
 	invalidEntry.SourceCurrency = "GBP"

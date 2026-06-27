@@ -23,10 +23,16 @@ func convertAmountToBase(amount apd.Decimal, rate apd.Decimal, quoteDirection cu
 	}
 	switch quoteDirection {
 	case currencyintegration.QuoteDirectionSourcePerBase:
-		var converted, _ = supportmath.DivideFiniteRoundHalfUp(decimalsupport.Clone(amount), decimalsupport.Clone(rate))
+		var converted, err = supportmath.DivideFiniteRoundHalfUp(decimalsupport.Clone(amount), decimalsupport.Clone(rate))
+		if err != nil {
+			return apd.Decimal{}, fmt.Errorf("convert source-per-base amount: %w", err)
+		}
 		return converted, nil
 	case currencyintegration.QuoteDirectionBasePerSource:
-		var converted, _ = supportmath.Multiply(decimalsupport.Clone(amount), decimalsupport.Clone(rate))
+		var converted, err = supportmath.Multiply(decimalsupport.Clone(amount), decimalsupport.Clone(rate))
+		if err != nil {
+			return apd.Decimal{}, fmt.Errorf("convert base-per-source amount: %w", err)
+		}
 		return converted, nil
 	}
 

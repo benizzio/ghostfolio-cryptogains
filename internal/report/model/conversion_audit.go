@@ -9,6 +9,7 @@ import (
 	"time"
 
 	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
+	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -315,8 +316,8 @@ func (entry ConversionAuditEntry) validateAmount(index int, amount ConvertedActi
 func (entry ConversionAuditEntry) matchesExchangeRateEvidence(evidence ExchangeRateEvidence) bool {
 	return strings.TrimSpace(evidence.SourceCurrency) == strings.TrimSpace(entry.SourceCurrency) &&
 		evidence.BaseCurrency == entry.ReportBaseCurrency &&
-		evidence.ActivityDate.Equal(entry.ActivityDate) &&
-		evidence.RateDate.Equal(entry.RateDate) &&
+		datesupport.CalendarDate(evidence.ActivityDate).Equal(datesupport.CalendarDate(entry.ActivityDate)) &&
+		datesupport.CalendarDate(evidence.RateDate).Equal(datesupport.CalendarDate(entry.RateDate)) &&
 		evidence.Authority == entry.RateAuthority &&
 		strings.TrimSpace(evidence.RateKind) == strings.TrimSpace(entry.RateKind) &&
 		evidence.QuoteDirection == entry.QuoteDirection &&

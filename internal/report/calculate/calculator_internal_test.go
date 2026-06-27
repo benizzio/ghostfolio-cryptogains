@@ -1939,11 +1939,26 @@ func TestBuildAssetCalculationResultCoversReferenceOnlyIncludedAndValidationFail
 		t.Fatalf("expected included asset result with reference entry, got %#v", result)
 	}
 
+	_, err = buildAssetCalculationResult(assetInputGroup{
+		AssetIdentityKey: "asset-mixed",
+		DisplayLabel:     "Mixed",
+		Inputs: []reportmodel.ActivityCalculationInput{
+			{SelectedCurrencyCode: "USD"},
+			{SelectedCurrencyCode: "EUR"},
+		},
+	}, assetReplayState{
+		closingQuantity: mustReportDecimal(t, "1"),
+	})
+	var calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+	if calcErr.Unwrap() == nil || !strings.Contains(calcErr.Unwrap().Error(), "mixed calculation currencies") {
+		t.Fatalf("expected mixed calculation currency failure, got %q cause %v", calcErr.Error(), calcErr.Unwrap())
+	}
+
 	_, err = buildAssetCalculationResult(assetInputGroup{AssetIdentityKey: " ", DisplayLabel: "BTC"}, assetReplayState{
 		closingQuantity:          mustReportDecimal(t, "1"),
 		hadInYearFullLiquidation: true,
 	})
-	var calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+	calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
 	if !strings.Contains(calcErr.Error(), "could not build the summary entry") {
 		t.Fatalf("expected wrapped summary-entry failure, got %q", calcErr.Error())
 	}

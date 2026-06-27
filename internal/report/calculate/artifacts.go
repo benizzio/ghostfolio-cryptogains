@@ -134,7 +134,16 @@ func conversionAuditAssetLabel(group assetInputGroup, input reportmodel.Activity
 // top-level report-section models.
 // Authored by: OpenCode
 func buildAssetCalculationResult(group assetInputGroup, replayState assetReplayState) (assetCalculationResult, error) {
-	var calculationCurrency = groupCalculationCurrency(group)
+	var calculationCurrency, currencyErr = groupCalculationCurrency(group)
+	if currencyErr != nil {
+		return assetCalculationResult{}, reportmodel.NewCalculationError(
+			reportmodel.CalculationErrorKindBasisAllocation,
+			"could not determine the asset calculation currency",
+			"",
+			group.DisplayLabel,
+			currencyErr,
+		)
+	}
 	var result = assetCalculationResult{
 		IncludeInMain: replayState.closingQuantity.Sign() > 0 || replayState.hadInYearFullLiquidation,
 		YearlyNet:     replayState.yearlyNet,
@@ -214,15 +223,25 @@ func buildAssetCalculationResult(group assetInputGroup, replayState assetReplayS
 // groupCalculationCurrency returns the report calculation currency prepared on
 // the group's inputs.
 // Authored by: OpenCode
-func groupCalculationCurrency(group assetInputGroup) string {
+func groupCalculationCurrency(group assetInputGroup) (string, error) {
+	var selectedCurrency string
 	for _, input := range group.Inputs {
 		var currency = inputCalculationCurrency(input)
 		if currency != reportCalculationCurrencyLabel {
-			return currency
+			if selectedCurrency == "" {
+				selectedCurrency = currency
+				continue
+			}
+			if selectedCurrency != currency {
+				return "", fmt.Errorf("mixed calculation currencies %q and %q", selectedCurrency, currency)
+			}
 		}
 	}
+	if selectedCurrency != "" {
+		return selectedCurrency, nil
+	}
 
-	return reportCalculationCurrencyLabel
+	return reportCalculationCurrencyLabel, nil
 }
 
 // inputCalculationCurrency returns the selected report currency prepared by the

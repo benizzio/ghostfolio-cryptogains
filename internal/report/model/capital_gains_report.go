@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -65,6 +66,9 @@ func (report CapitalGainsReport) Validate() error {
 	if report.GeneratedAt.IsZero() {
 		return fmt.Errorf("capital gains report generated-at timestamp is required")
 	}
+	if err := validateReportBaseCurrency(ReportBaseCurrency(strings.TrimSpace(report.ReportCalculationCurrency))); err != nil {
+		return fmt.Errorf("capital gains report calculation currency: %w", err)
+	}
 	if err := validateFiniteDecimal(report.YearlyNetTotal, "capital gains report yearly net total"); err != nil {
 		return err
 	}
@@ -117,13 +121,10 @@ func (report CapitalGainsReport) validateConversionArtifacts() error {
 }
 
 // validateRateSourceCurrency verifies that rate evidence belongs to the report
-// calculation currency when the rendered report declares one.
+// calculation currency.
 // Authored by: OpenCode
 func (report CapitalGainsReport) validateRateSourceCurrency(index int, source ExchangeRateEvidence) error {
 	var reportCurrency = strings.TrimSpace(report.ReportCalculationCurrency)
-	if reportCurrency == "" || reportCurrency == "NOT APPLICABLE" {
-		return nil
-	}
 	if source.BaseCurrency.Label() != reportCurrency {
 		return fmt.Errorf("capital gains report rate source %d: base currency must match report calculation currency", index)
 	}
@@ -138,8 +139,8 @@ func (report CapitalGainsReport) hasMatchingRateSource(entry ConversionAuditEntr
 	for _, source := range report.RateSources {
 		if strings.TrimSpace(source.SourceCurrency) == strings.TrimSpace(entry.SourceCurrency) &&
 			source.BaseCurrency == entry.ReportBaseCurrency &&
-			source.ActivityDate.Equal(entry.ActivityDate) &&
-			source.RateDate.Equal(entry.RateDate) &&
+			datesupport.CalendarDate(source.ActivityDate).Equal(datesupport.CalendarDate(entry.ActivityDate)) &&
+			datesupport.CalendarDate(source.RateDate).Equal(datesupport.CalendarDate(entry.RateDate)) &&
 			source.Authority == entry.RateAuthority &&
 			strings.TrimSpace(source.RateKind) == strings.TrimSpace(entry.RateKind) &&
 			source.QuoteDirection == entry.QuoteDirection &&
