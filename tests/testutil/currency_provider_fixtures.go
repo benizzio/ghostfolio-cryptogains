@@ -1,3 +1,5 @@
+// Package testutil contains shared test fixtures and helpers.
+// Authored by: OpenCode
 package testutil
 
 import (
@@ -155,7 +157,7 @@ func NewOfficialCurrencyRateServiceFixture(t *testing.T, endpoints OfficialCurre
 
 	officialCurrencyRateServiceFixtureTransportMu.Lock()
 	var previousTransport = http.DefaultClient.Transport
-	var baseTransport http.RoundTripper = previousTransport
+	var baseTransport = previousTransport
 	if baseTransport == nil {
 		baseTransport = http.DefaultTransport
 	}

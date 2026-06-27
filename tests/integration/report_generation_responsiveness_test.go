@@ -92,7 +92,7 @@ func responsivenessCurrencyProtectedActivityCache(t *testing.T, activityCount in
 	var currencies = []string{"EUR", "GBP", "USD"}
 	for index := 0; index < activityCount; index++ {
 		var currency = currencies[index%len(currencies)]
-		var day = 1 + index%31
+		var day = 1 + index%28
 		var month = time.Month(1 + index%3)
 		activities = append(activities, roundedReportActivity(t, roundedReportActivityInput{
 			SourceID:         responsivenessSourceID(currency, index),

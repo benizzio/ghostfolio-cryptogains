@@ -6,7 +6,6 @@ package integration
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -313,7 +312,7 @@ func TestReportGenerationConversionFailureMatrixShowsSafeFailure(t *testing.T) {
 			reportBaseCurrency: reportmodel.ReportBaseCurrencyUSD,
 			cache:              conversionFailureProtectedActivityCache(t, "unsupported-rub-buy", "RUB", "2024-02-05T10:00:00Z"),
 			failures: map[string]error{
-				"RUB|USD|2024-02-05": errors.New("unsupported_currency: source currency RUB is not supported by federal_reserve_h10"),
+				"RUB|USD|2024-02-05": mustIntegrationConversionFailure(t, "RUB|USD|2024-02-05", currencyintegration.ProviderIDFederalReserveH10, currencyintegration.ConversionFailureReasonUnsupportedCurrency, "source currency RUB is not supported by federal_reserve_h10"),
 			},
 			expectedSnippets:    []string{"Failure Category: unsupported report calculation", "unsupported-rub-buy", "RUB", "USD", "2024-02-05", "unsupported_currency", "federal_reserve_h10", "No report file was saved."},
 			expectedLookupCount: 1,
@@ -323,7 +322,7 @@ func TestReportGenerationConversionFailureMatrixShowsSafeFailure(t *testing.T) {
 			reportBaseCurrency: reportmodel.ReportBaseCurrencyEUR,
 			cache:              conversionFailureProtectedActivityCache(t, "missing-usd-rate-buy", "USD", "2024-03-09T10:00:00Z"),
 			failures: map[string]error{
-				"USD|EUR|2024-03-09": errors.New("missing_rate: no current or prior ECB EXR observation for USD/EUR on 2024-03-09"),
+				"USD|EUR|2024-03-09": mustIntegrationConversionFailure(t, "USD|EUR|2024-03-09", currencyintegration.ProviderIDECBEXR, currencyintegration.ConversionFailureReasonMissingRate, "no current or prior ECB EXR observation for USD/EUR on 2024-03-09"),
 			},
 			expectedSnippets:    []string{"Failure Category: unsupported report calculation", "missing-usd-rate-buy", "USD", "EUR", "2024-03-09", "missing_rate", "ecb_exr", "No report file was saved."},
 			expectedLookupCount: 1,
@@ -333,7 +332,7 @@ func TestReportGenerationConversionFailureMatrixShowsSafeFailure(t *testing.T) {
 			reportBaseCurrency: reportmodel.ReportBaseCurrencyUSD,
 			cache:              conversionFailureProtectedActivityCache(t, "provider-down-eur-buy", "EUR", "2024-04-10T10:00:00Z"),
 			failures: map[string]error{
-				"EUR|USD|2024-04-10": errors.New("provider_unavailable: federal_reserve_h10 request failed without cached evidence"),
+				"EUR|USD|2024-04-10": mustIntegrationConversionFailure(t, "EUR|USD|2024-04-10", currencyintegration.ProviderIDFederalReserveH10, currencyintegration.ConversionFailureReasonProviderUnavailable, "federal_reserve_h10 request failed without cached evidence"),
 			},
 			expectedSnippets:    []string{"Failure Category: unsupported report calculation", "provider-down-eur-buy", "EUR", "USD", "2024-04-10", "provider_unavailable", "federal_reserve_h10", "No report file was saved."},
 			expectedLookupCount: 1,
@@ -350,7 +349,7 @@ func TestReportGenerationConversionFailureMatrixShowsSafeFailure(t *testing.T) {
 			reportBaseCurrency: reportmodel.ReportBaseCurrencyUSD,
 			cache:              lateConversionFailureProtectedActivityCache(t),
 			failures: map[string]error{
-				"GBP|USD|2024-06-13": errors.New("malformed_rate: Federal Reserve H.10 observation for GBP on 2024-06-13 is not exact-decimal parseable"),
+				"GBP|USD|2024-06-13": mustIntegrationConversionFailure(t, "GBP|USD|2024-06-13", currencyintegration.ProviderIDFederalReserveH10, currencyintegration.ConversionFailureReasonMalformedRate, "Federal Reserve H.10 observation for GBP on 2024-06-13 is not exact-decimal parseable"),
 			},
 			expectedSnippets:    []string{"Failure Category: unsupported report calculation", "late-gbp-buy", "GBP", "USD", "2024-06-13", "malformed_rate", "federal_reserve_h10", "No report file was saved."},
 			expectedLookupCount: 2,
@@ -777,6 +776,29 @@ func conversionFailureActivityRecord(t *testing.T, sourceID string, sourceCurren
 // Authored by: OpenCode
 func integrationFailureRateKey(request currencyintegration.RateLookupRequest) string {
 	return request.SourceCurrency + "|" + request.BaseCurrency + "|" + request.ActivityDate.Format(time.DateOnly)
+}
+
+// mustIntegrationConversionFailure creates one structured matrix failure from a
+// deterministic source|base|date lookup key.
+// Authored by: OpenCode
+func mustIntegrationConversionFailure(t *testing.T, key string, providerID currencyintegration.ProviderID, reason currencyintegration.ConversionFailureReason, detail string) error {
+	t.Helper()
+
+	var parts = strings.Split(key, "|")
+	if len(parts) != 3 {
+		t.Fatalf("expected conversion failure key source|base|date, got %q", key)
+	}
+	var activityDate, err = time.Parse(time.DateOnly, parts[2])
+	if err != nil {
+		t.Fatalf("parse conversion failure date %q: %v", parts[2], err)
+	}
+	var request currencyintegration.RateLookupRequest
+	request, err = currencyintegration.NewRateLookupRequest(parts[0], parts[1], activityDate)
+	if err != nil {
+		t.Fatalf("create conversion failure lookup request from %q: %v", key, err)
+	}
+
+	return currencyintegration.NewConversionFailure(request, providerID, reason, detail)
 }
 
 // mustReportFlowDecimal parses one integration fixture decimal value.
