@@ -8,6 +8,8 @@ This contract extends the generated Markdown capital gains report so successful 
 
 **Bugfix**: 2026-06-24 — BUG-005 Updated Currency Conversion Audit row cardinality and zero-to-zero amount suppression contract.
 
+**Bugfix**: 2026-06-28 — BUG-006 Clarified that audited converted activities must not render as same-currency rows in asset detail sections.
+
 ## Header
 
 The report header includes:
@@ -35,6 +37,8 @@ Rules:
 - Same-currency activity rows remain distinguishable from converted rows.
 - Activity currency columns continue to show the selected activity currency before conversion.
 - Calculation currency columns show the selected report base currency.
+- Asset detail sections must render same-currency versus converted status from the selected activity currency or explicit conversion status preserved before conversion, not from post-conversion report-base amount currency.
+- Any `Source ID` present in `Currency Conversion Audit` must not be labeled `same currency` in asset detail sections.
 - Explicit zero monetary values remain `0` after conversion handling, but zero-to-zero converted amount slots do not render as standalone audit rows or grouped amount items.
 - Zero-priced holding reductions with no proceeds and no acquisition cost do not require conversion audit entries.
 
@@ -72,6 +76,7 @@ Rules:
 - When the rate date differs from the activity date, both dates must be visible.
 - The audit section must be reproducible from synced activity inputs, selected base currency, provider, rate date, rate value, quote direction, and rounding rules.
 - Same-currency rows may be excluded from the conversion audit section if the activity detail tables clearly mark them as same-currency.
+- A `Source ID` included in this section is definitive converted-activity evidence for asset detail rendering and must not be contradicted by a `same currency` label elsewhere in the report.
 
 ## Rate Source Summary
 

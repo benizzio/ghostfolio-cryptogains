@@ -8,6 +8,8 @@ This feature extends report-generation runtime models. It does not add a long-li
 
 **Bugfix**: 2026-06-24 — BUG-005 Clarified that conversion audit rendering groups amount-kind conversions by source activity and omits zero-to-zero amount slots.
 
+**Bugfix**: 2026-06-28 — BUG-006 Clarified that conversion status must be preserved by `Source ID` so asset detail sections cannot label audited converted activities as same-currency.
+
 All financial amounts, quantities, exchange rates, converted amounts, basis values, proceeds, gains, and losses are exact decimals. Every monetary value has an explicit currency before and after conversion.
 
 Provider identity, authority metadata, provider DTOs, and provider selection are owned by the currency integration layer. Report models submit base currency, source currency, and activity date to that layer and consume canonical rate evidence.
@@ -319,6 +321,7 @@ Validation rules:
 - Converted amounts are calculated according to canonical quote direction.
 - Explicit zero amounts remain zero and do not create fees, proceeds, gains, or losses by conversion.
 - Explicit zero-to-zero converted amount slots may be retained for calculation integrity, but they are not report-visible conversion audit amount items.
+- Conversion status must be preserved from calculation through report detail artifacts by `source_id`; renderers must not infer same-currency status from the post-conversion report base currency.
 
 State transitions:
 
@@ -359,6 +362,7 @@ Validation rules:
 - Must not expose tokens, JWTs, raw protected payloads, or production-mode diagnostic financial values outside the intentional final report content.
 - Rendered Currency Conversion Audit output must group amount-kind conversions under one row or equivalent subsection per source activity and omit provider-level `Rate Authority` and `Rate Kind` columns.
 - Rendered Currency Conversion Audit output must omit any amount slot where original amount and converted amount are both zero.
+- Any `source_id` represented by a `ConversionAuditEntry` must be rendered as converted, not `same_currency`, in asset detail sections.
 
 State transitions:
 
