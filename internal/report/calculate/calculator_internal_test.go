@@ -235,6 +235,8 @@ func TestCalculateWrapsCalculatedReportValidationFailure(t *testing.T) {
 		apd.Decimal,
 		[]reportmodel.ReferenceLiquidationEntry,
 		[]reportmodel.AssetDetailSection,
+		[]reportmodel.ConversionAuditEntry,
+		[]reportmodel.ExchangeRateEvidence,
 	) (reportmodel.CapitalGainsReport, error) {
 		return reportmodel.CapitalGainsReport{}, errors.New("report invalid")
 	}
@@ -1107,15 +1109,6 @@ func TestReportCurrencyBoundaryHelperFallbackBranches(t *testing.T) {
 		t.Fatalf("expected nil context calculator path to validate request, got %v", err)
 	}
 
-	if got := safeConversionLookupFallbackMessage("", errors.New("missing_rate: raw detail")); got != "currency conversion lookup failed: reason=missing_rate" {
-		t.Fatalf("unexpected empty fallback conversion message %q", got)
-	}
-	if got := safeConversionLookupFallbackMessage("fallback", nil); got != "fallback" {
-		t.Fatalf("unexpected nil-cause fallback conversion message %q", got)
-	}
-	if got := safeConversionReasonPrefix(errors.New("unknown: raw detail")); got != "" {
-		t.Fatalf("expected unknown conversion reason to be ignored, got %q", got)
-	}
 	var safeCause safeConversionFailureCause
 	if got := safeCause.Error(); got != "conversion failed" {
 		t.Fatalf("unexpected nil safe conversion cause message %q", got)
@@ -1123,6 +1116,27 @@ func TestReportCurrencyBoundaryHelperFallbackBranches(t *testing.T) {
 	var target string
 	if safeCause.As(&target) {
 		t.Fatalf("expected safe conversion cause not to match unrelated target")
+	}
+	var contextCause = conversionFailureContextCause{context: ConversionFailureContext{SourceCurrency: "EUR"}, cause: safeCause}
+	var carrier ConversionFailureContextCarrier
+	if !errors.As(contextCause, &carrier) || carrier.ReportConversionFailureContext().SourceCurrency != "EUR" {
+		t.Fatalf("expected typed conversion failure context carrier")
+	}
+
+	var input = reportmodel.ActivityCalculationInput{SourceID: "lookup-1", OccurredAt: time.Date(2024, time.January, 5, 12, 0, 0, 0, time.UTC)}
+	var prefixedErr = newConversionLookupCalculationError(input, "EUR", "USD", "", errors.New("provider_unavailable: raw provider detail"))
+	if !strings.Contains(prefixedErr.Error(), "reason=provider_unavailable") {
+		t.Fatalf("expected classified prefixed lookup error, got %q", prefixedErr.Error())
+	}
+	if got := conversionFailureReasonFromPrefix(nil); got != "" {
+		t.Fatalf("expected nil prefixed reason to be empty, got %q", got)
+	}
+	if got := conversionFailureReasonFromPrefix(errors.New("unknown: raw detail")); got != "" {
+		t.Fatalf("expected unknown conversion reason to be ignored, got %q", got)
+	}
+	var unclassifiedErr = newConversionLookupCalculationError(input, "EUR", "USD", "fallback", errors.New("raw provider detail"))
+	if unclassifiedErr.Error() != "fallback (source \"lookup-1\")" {
+		t.Fatalf("expected unclassified lookup fallback, got %q", unclassifiedErr.Error())
 	}
 }
 

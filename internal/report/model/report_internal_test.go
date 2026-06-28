@@ -852,6 +852,37 @@ func TestReportConstructorsAndValidationHelpersCoverRemainingBranches(t *testing
 	}
 }
 
+// TestCloneConvertedActivityAmountsCopiesEvidencePointers verifies conversion
+// amount cloning preserves nil evidence and deep-copies non-nil evidence.
+// Authored by: OpenCode
+func TestCloneConvertedActivityAmountsCopiesEvidencePointers(t *testing.T) {
+	var activityDate = time.Date(2024, time.January, 5, 0, 0, 0, 0, time.UTC)
+	var evidence = ExchangeRateEvidence{
+		SourceCurrency:   "EUR",
+		BaseCurrency:     ReportBaseCurrencyUSD,
+		ActivityDate:     activityDate,
+		RateDate:         activityDate,
+		Authority:        RateAuthorityFederalReserve,
+		ProviderID:       RateProviderIDFederalReserveH10,
+		RateKind:         "noon buying rate",
+		QuoteDirection:   QuoteDirectionBasePerSource,
+		RateValue:        mustReportDecimal(t, "1.0957"),
+		DatasetReference: "H10/RXI$US_N.B.EU",
+	}
+	var amounts = []ConvertedActivityAmount{
+		{SourceID: "same", AmountKind: ConvertedAmountKindGrossValue, OriginalCurrency: "USD", OriginalAmount: mustReportDecimal(t, "1"), ReportBaseCurrency: ReportBaseCurrencyUSD, ConvertedAmount: mustReportDecimal(t, "1"), ConversionStatus: ConversionStatusSameCurrency},
+		{SourceID: "converted", AmountKind: ConvertedAmountKindGrossValue, OriginalCurrency: "EUR", OriginalAmount: mustReportDecimal(t, "2"), ReportBaseCurrency: ReportBaseCurrencyUSD, ConvertedAmount: mustReportDecimal(t, "2.1914"), ExchangeRateEvidence: &evidence, ConversionStatus: ConversionStatusConverted},
+	}
+
+	var cloned = cloneConvertedActivityAmounts(amounts)
+	if cloned[0].ExchangeRateEvidence != nil {
+		t.Fatalf("expected nil evidence to remain nil")
+	}
+	if cloned[1].ExchangeRateEvidence == nil || cloned[1].ExchangeRateEvidence == amounts[1].ExchangeRateEvidence {
+		t.Fatalf("expected non-nil evidence to be deep-copied")
+	}
+}
+
 // TestBasisMatchValidationAndCloneOptionalDecimalCoverRemainingBranches
 // verifies the remaining basis-match guardrails and optional-decimal clone
 // branches.

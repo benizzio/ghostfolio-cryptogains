@@ -14,6 +14,7 @@ import (
 	"time"
 
 	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
+	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	reportoutput "github.com/benizzio/ghostfolio-cryptogains/internal/report/output"
 	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
@@ -415,10 +416,16 @@ func TestReportServiceHelperFunctionsCoverRemainingBranches(t *testing.T) {
 	}
 	var conversionErr = reportmodel.NewCalculationError(
 		reportmodel.CalculationErrorKindActivityInput,
-		"could not resolve currency conversion rate from GBP to USD on 2024-06-13: reason=missing_rate",
+		"could not resolve currency conversion rate",
 		"late-gbp-buy",
 		"FAIL",
-		nil,
+		testConversionFailureContextCause{context: reportcalculate.ConversionFailureContext{
+			SourceID:           "late-gbp-buy",
+			SourceCurrency:     "GBP",
+			ReportBaseCurrency: "USD",
+			ActivityDate:       time.Date(2024, time.June, 13, 0, 0, 0, 0, time.UTC),
+			Reason:             "missing_rate",
+		}},
 	)
 	var conversionMessage = service.reportCalculationFailureMessage(request, conversionErr)
 	for _, expected := range []string{"Conversion Failure Context", "Source ID: late-gbp-buy", "Source Currency: GBP", "Report Base Currency: USD", "Activity Date: 2024-06-13", "Failure Reason: missing_rate", "Provider Category: federal_reserve_h10"} {
@@ -659,22 +666,27 @@ func reportFailureActivityRecordFixture(t *testing.T) syncmodel.ActivityRecord {
 	}
 }
 
-// TestReportConversionFailureContextParsesFallbackAndTokenizedDetails verifies
-// non-secret conversion context formatting for both calculation copy formats.
+// TestReportConversionFailureContextFormatsTypedDetails verifies non-secret
+// conversion context formatting from typed calculation context.
 // Authored by: OpenCode
-func TestReportConversionFailureContextParsesFallbackAndTokenizedDetails(t *testing.T) {
+func TestReportConversionFailureContextFormatsTypedDetails(t *testing.T) {
 	t.Parallel()
 
-	var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
 	var service = &reportService{currencyRates: reportProviderCategoryRateService{}}
 	var fallbackErr = reportmodel.NewCalculationError(
 		reportmodel.CalculationErrorKindActivityInput,
-		"could not prepare currency conversion from usd to EUR on 2024-01-02T10:00:00Z",
+		"could not prepare currency conversion",
 		"bad-currency",
 		"BTC",
-		nil,
+		testConversionFailureContextCause{context: reportcalculate.ConversionFailureContext{
+			SourceID:           "bad-currency",
+			SourceCurrency:     "usd",
+			ReportBaseCurrency: "EUR",
+			ActivityDate:       time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
+			Reason:             "invalid_activity_currency",
+		}},
 	)
-	var fallbackContext = service.reportConversionFailureContext(request, fallbackErr)
+	var fallbackContext = service.reportConversionFailureContext(fallbackErr)
 	for _, expected := range []string{
 		"Conversion Failure Context",
 		"Source ID: bad-currency",
@@ -691,35 +703,27 @@ func TestReportConversionFailureContextParsesFallbackAndTokenizedDetails(t *test
 		t.Fatalf("expected invalid activity currency context to suppress provider category, got %q", fallbackContext)
 	}
 
-	var tokenizedErr = reportmodel.NewCalculationError(
+	var providerFallbackErr = reportmodel.NewCalculationError(
 		reportmodel.CalculationErrorKindActivityInput,
-		"reason=unknown provider=unknown source_currency=GBP report_base_currency=USD activity_date=2024-01-03)",
+		"could not resolve currency conversion rate",
 		"",
 		"",
-		nil,
+		testConversionFailureContextCause{context: reportcalculate.ConversionFailureContext{
+			SourceCurrency:     "GBP",
+			ReportBaseCurrency: "USD",
+			ActivityDate:       time.Date(2024, time.January, 3, 0, 0, 0, 0, time.UTC),
+		}},
 	)
-	var tokenizedContext = service.reportConversionFailureContext(request, tokenizedErr)
+	var providerFallbackContext = service.reportConversionFailureContext(providerFallbackErr)
 	for _, expected := range []string{
 		"Source Currency: GBP",
 		"Report Base Currency: USD",
 		"Activity Date: 2024-01-03",
 		"Provider Category: federal_reserve_h10",
 	} {
-		if !strings.Contains(tokenizedContext, expected) {
-			t.Fatalf("expected tokenized context to contain %q, got %q", expected, tokenizedContext)
+		if !strings.Contains(providerFallbackContext, expected) {
+			t.Fatalf("expected provider fallback context to contain %q, got %q", expected, providerFallbackContext)
 		}
-	}
-
-	var missingBaseErr = reportmodel.NewCalculationError(
-		reportmodel.CalculationErrorKindActivityInput,
-		"could not resolve currency conversion rate from GBP to  on 2024-01-04",
-		"",
-		"",
-		nil,
-	)
-	var missingBaseContext = service.reportConversionFailureContext(request, missingBaseErr)
-	if !strings.Contains(missingBaseContext, "Report Base Currency: USD") || !strings.Contains(missingBaseContext, "Provider Category: federal_reserve_h10") {
-		t.Fatalf("expected request base-currency fallback context, got %q", missingBaseContext)
 	}
 }
 
@@ -729,28 +733,14 @@ func TestReportConversionFailureContextParsesFallbackAndTokenizedDetails(t *test
 func TestReportConversionFailureContextRejectsIncompleteDetails(t *testing.T) {
 	t.Parallel()
 
-	var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
 	var service = &reportService{currencyRates: reportProviderCategoryRateService{}}
-	if got := service.reportConversionFailureContext(request, errors.New("plain failure")); got != "" {
+	if got := service.reportConversionFailureContext(errors.New("plain failure")); got != "" {
 		t.Fatalf("expected non-calculation error to produce no context, got %q", got)
 	}
 
-	var incompleteErr = reportmodel.NewCalculationError(reportmodel.CalculationErrorKindActivityInput, "could not resolve currency conversion rate from EUR", "", "", nil)
-	if got := service.reportConversionFailureContext(request, incompleteErr); got != "" {
+	var incompleteErr = reportmodel.NewCalculationError(reportmodel.CalculationErrorKindActivityInput, "could not resolve currency conversion rate", "", "", testConversionFailureContextCause{})
+	if got := service.reportConversionFailureContext(incompleteErr); got != "" {
 		t.Fatalf("expected incomplete conversion detail to produce no context, got %q", got)
-	}
-
-	var parsed = parseReportConversionFailureDetail("detail without date")
-	if parsed.sourceCurrency != "" || parsed.activityDate != "" {
-		t.Fatalf("expected detail without date to remain incomplete, got %#v", parsed)
-	}
-	parsed = parseReportConversionFailureDetail("could not resolve currency conversion rate from EUR on 2024-01-02")
-	if parsed.sourceCurrency != "" || parsed.reportBaseCurrency != "" {
-		t.Fatalf("expected detail without currency pair to remain incomplete, got %#v", parsed)
-	}
-	parsed = parseReportConversionFailureDetail("could not resolve currency conversion rate to USD on 2024-01-02")
-	if parsed.sourceCurrency != "" || parsed.reportBaseCurrency != "" {
-		t.Fatalf("expected detail without source marker to remain incomplete, got %#v", parsed)
 	}
 	if got := reportConversionProviderCategory(reportProviderCategoryRateService{}, "GBP"); got != "" {
 		t.Fatalf("expected unsupported base currency to have no provider category, got %q", got)
@@ -758,4 +748,23 @@ func TestReportConversionFailureContextRejectsIncompleteDetails(t *testing.T) {
 	if got := reportConversionProviderCategory(nil, "USD"); got != "" {
 		t.Fatalf("expected unavailable provider metadata to have no provider category, got %q", got)
 	}
+}
+
+// testConversionFailureContextCause carries typed conversion context in runtime
+// package tests.
+// Authored by: OpenCode
+type testConversionFailureContextCause struct {
+	context reportcalculate.ConversionFailureContext
+}
+
+// Error returns a safe test error message.
+// Authored by: OpenCode
+func (cause testConversionFailureContextCause) Error() string {
+	return "conversion failed"
+}
+
+// ReportConversionFailureContext returns typed test conversion context.
+// Authored by: OpenCode
+func (cause testConversionFailureContextCause) ReportConversionFailureContext() reportcalculate.ConversionFailureContext {
+	return cause.context
 }

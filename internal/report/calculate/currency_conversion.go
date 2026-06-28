@@ -195,9 +195,10 @@ func (boundary *reportCurrencyBoundaryContext) resolveCrossCurrencyBoundary(
 ) (currencyintegration.ExchangeRateEvidence, reportmodel.ExchangeRateEvidence, error) {
 	var lookupRequest, err = currencyintegration.NewRateLookupRequest(sourceCurrency, baseCurrency, datesupport.CalendarDate(input.OccurredAt))
 	if err != nil {
-		return currencyintegration.ExchangeRateEvidence{}, reportmodel.ExchangeRateEvidence{}, newInputCalculationError(
-			reportmodel.CalculationErrorKindActivityInput,
+		return currencyintegration.ExchangeRateEvidence{}, reportmodel.ExchangeRateEvidence{}, newConversionPreparationCalculationError(
 			input,
+			sourceCurrency,
+			baseCurrency,
 			fmt.Sprintf(
 				"could not prepare currency conversion from %s to %s on %s",
 				sourceCurrency,
@@ -232,6 +233,8 @@ func (boundary *reportCurrencyBoundaryContext) resolveCrossCurrencyBoundary(
 	if err != nil {
 		return currencyintegration.ExchangeRateEvidence{}, reportmodel.ExchangeRateEvidence{}, newConversionLookupCalculationError(
 			input,
+			sourceCurrency,
+			baseCurrency,
 			fmt.Sprintf(
 				"could not resolve currency conversion rate from %s to %s on %s",
 				sourceCurrency,

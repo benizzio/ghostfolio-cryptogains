@@ -6,9 +6,11 @@ import (
 	"errors"
 	"slices"
 	"strings"
+	"time"
 
 	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
 
@@ -18,6 +20,25 @@ import (
 type diagnosticCalculationError struct {
 	*reportmodel.CalculationError
 	record *syncmodel.ActivityRecord
+}
+
+// ConversionFailureContext stores non-secret conversion failure fields for
+// runtime copy without requiring runtime to parse formatted error strings.
+// Authored by: OpenCode
+type ConversionFailureContext struct {
+	SourceID           string
+	SourceCurrency     string
+	ReportBaseCurrency string
+	ActivityDate       time.Time
+	Reason             string
+	ProviderCategory   string
+}
+
+// ConversionFailureContextCarrier exposes typed conversion failure context from
+// calculation errors.
+// Authored by: OpenCode
+type ConversionFailureContextCarrier interface {
+	ReportConversionFailureContext() ConversionFailureContext
 }
 
 // As exposes the embedded calculation error for standard error matching.
@@ -58,45 +79,57 @@ func newInputCalculationError(kind reportmodel.CalculationErrorKind, input repor
 // failure into the report calculation error surface without provider DTOs or raw
 // provider detail.
 // Authored by: OpenCode
-func newConversionLookupCalculationError(input reportmodel.ActivityCalculationInput, fallbackMessage string, cause error) error {
+func newConversionLookupCalculationError(input reportmodel.ActivityCalculationInput, sourceCurrency string, baseCurrency string, fallbackMessage string, cause error) error {
 	var failure *currencyintegration.ConversionFailure
 	if errors.As(cause, &failure) && failure != nil {
+		var context = conversionFailureContextFromIntegrationFailure(input, failure)
 		return newInputCalculationError(
 			reportmodel.CalculationErrorKindActivityInput,
 			input,
 			failure.SafeMessage(),
-			safeConversionFailureCause{failure: failure},
+			conversionFailureContextCause{context: context, cause: safeConversionFailureCause{failure: failure}},
+		)
+	}
+	if reason := conversionFailureReasonFromPrefix(cause); reason != "" {
+		var context = ConversionFailureContext{
+			SourceID:           strings.TrimSpace(input.SourceID),
+			SourceCurrency:     strings.TrimSpace(sourceCurrency),
+			ReportBaseCurrency: strings.TrimSpace(baseCurrency),
+			ActivityDate:       datesupport.CalendarDate(input.OccurredAt),
+			Reason:             string(reason),
+		}
+		return newInputCalculationError(
+			reportmodel.CalculationErrorKindBasisAllocation,
+			input,
+			safeConversionLookupMessage(fallbackMessage, reason),
+			conversionFailureContextCause{context: context},
 		)
 	}
 
 	return newInputCalculationError(
 		reportmodel.CalculationErrorKindBasisAllocation,
 		input,
-		safeConversionLookupFallbackMessage(fallbackMessage, cause),
+		strings.TrimSpace(fallbackMessage),
 		nil,
 	)
 }
 
-// safeConversionLookupFallbackMessage carries a known non-secret conversion
-// reason from unclassified lookup errors without raw provider detail.
+// safeConversionLookupMessage carries a classified non-secret reason from a
+// test seam or provider adapter without retaining raw provider detail.
 // Authored by: OpenCode
-func safeConversionLookupFallbackMessage(fallbackMessage string, cause error) string {
+func safeConversionLookupMessage(fallbackMessage string, reason currencyintegration.ConversionFailureReason) string {
 	var message = strings.TrimSpace(fallbackMessage)
-	var reason = safeConversionReasonPrefix(cause)
-	if reason == "" {
-		return message
-	}
 	if message == "" {
-		return "currency conversion lookup failed: reason=" + reason
+		return "currency conversion lookup failed: reason=" + string(reason)
 	}
 
-	return message + ": reason=" + reason
+	return message + ": reason=" + string(reason)
 }
 
-// safeConversionReasonPrefix extracts only stable known conversion reason
-// tokens from unclassified lookup errors.
+// conversionFailureReasonFromPrefix recognizes stable conversion failure reason
+// prefixes from legacy test seams and adapters that do not return typed failures.
 // Authored by: OpenCode
-func safeConversionReasonPrefix(cause error) string {
+func conversionFailureReasonFromPrefix(cause error) currencyintegration.ConversionFailureReason {
 	if cause == nil {
 		return ""
 	}
@@ -111,10 +144,74 @@ func safeConversionReasonPrefix(cause error) string {
 		currencyintegration.ConversionFailureReasonAmbiguousQuote,
 		currencyintegration.ConversionFailureReasonInvalidActivityCurrency,
 		currencyintegration.ConversionFailureReasonAuthorityMismatch:
-		return strings.TrimSpace(prefix)
+		return currencyintegration.ConversionFailureReason(strings.TrimSpace(prefix))
 	default:
 		return ""
 	}
+}
+
+// newConversionPreparationCalculationError creates one activity-input error with
+// typed conversion context for invalid lookup request construction.
+// Authored by: OpenCode
+func newConversionPreparationCalculationError(input reportmodel.ActivityCalculationInput, sourceCurrency string, baseCurrency string, message string, cause error) error {
+	var context = ConversionFailureContext{
+		SourceID:           strings.TrimSpace(input.SourceID),
+		SourceCurrency:     strings.TrimSpace(sourceCurrency),
+		ReportBaseCurrency: strings.TrimSpace(baseCurrency),
+		ActivityDate:       datesupport.CalendarDate(input.OccurredAt),
+		Reason:             string(currencyintegration.ConversionFailureReasonInvalidActivityCurrency),
+	}
+
+	return newInputCalculationError(
+		reportmodel.CalculationErrorKindActivityInput,
+		input,
+		strings.TrimSpace(message),
+		conversionFailureContextCause{context: context, cause: cause},
+	)
+}
+
+// conversionFailureContextFromIntegrationFailure maps integration failure
+// identity into a calculate-owned context value.
+// Authored by: OpenCode
+func conversionFailureContextFromIntegrationFailure(input reportmodel.ActivityCalculationInput, failure *currencyintegration.ConversionFailure) ConversionFailureContext {
+	return ConversionFailureContext{
+		SourceID:           strings.TrimSpace(input.SourceID),
+		SourceCurrency:     strings.TrimSpace(failure.SourceCurrency),
+		ReportBaseCurrency: strings.TrimSpace(failure.ReportBaseCurrency),
+		ActivityDate:       datesupport.CalendarDate(failure.ActivityDate),
+		Reason:             string(failure.Reason),
+		ProviderCategory:   string(failure.ProviderID),
+	}
+}
+
+// conversionFailureContextCause carries typed conversion context through the
+// calculation error cause chain.
+// Authored by: OpenCode
+type conversionFailureContextCause struct {
+	context ConversionFailureContext
+	cause   error
+}
+
+// Error returns the wrapped safe cause text.
+// Authored by: OpenCode
+func (cause conversionFailureContextCause) Error() string {
+	if cause.cause == nil {
+		return "conversion failed"
+	}
+
+	return cause.cause.Error()
+}
+
+// Unwrap exposes the wrapped safe cause for existing classification tests.
+// Authored by: OpenCode
+func (cause conversionFailureContextCause) Unwrap() error {
+	return cause.cause
+}
+
+// ReportConversionFailureContext returns non-secret conversion failure fields.
+// Authored by: OpenCode
+func (cause conversionFailureContextCause) ReportConversionFailureContext() ConversionFailureContext {
+	return cause.context
 }
 
 // safeConversionFailureCause preserves classified conversion-failure matching

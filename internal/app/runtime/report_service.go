@@ -12,6 +12,7 @@ import (
 	reportmarkdown "github.com/benizzio/ghostfolio-cryptogains/internal/report/markdown"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	reportoutput "github.com/benizzio/ghostfolio-cryptogains/internal/report/output"
+	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
 
@@ -239,7 +240,7 @@ func (s *reportService) reportFailureOutcome(
 // Authored by: OpenCode
 func (s *reportService) reportCalculationFailureMessage(request reportmodel.ReportRequest, err error) string {
 	var detail = strings.TrimSpace(err.Error())
-	var conversionContext = s.reportConversionFailureContext(request, err)
+	var conversionContext = s.reportConversionFailureContext(err)
 	if conversionContext != "" {
 		detail += "\n\n" + conversionContext
 	}
@@ -255,40 +256,34 @@ func (s *reportService) reportCalculationFailureMessage(request reportmodel.Repo
 // reportConversionFailureContext formats known non-secret conversion lookup
 // context as short lines that survive terminal wrapping.
 // Authored by: OpenCode
-func (s *reportService) reportConversionFailureContext(request reportmodel.ReportRequest, err error) string {
-	var calculationError *reportmodel.CalculationError
-	if !errors.As(err, &calculationError) || calculationError == nil {
+func (s *reportService) reportConversionFailureContext(err error) string {
+	var carrier reportcalculate.ConversionFailureContextCarrier
+	if !errors.As(err, &carrier) {
 		return ""
 	}
 
-	var parsed = parseReportConversionFailureDetail(calculationError.Error())
-	if parsed.sourceCurrency == "" || parsed.activityDate == "" {
+	var context = carrier.ReportConversionFailureContext()
+	if strings.TrimSpace(context.SourceCurrency) == "" || context.ActivityDate.IsZero() {
 		return ""
 	}
-	if parsed.reportBaseCurrency == "" {
-		parsed.reportBaseCurrency = request.ReportBaseCurrency.Label()
-	}
-	if parsed.reason == "" && strings.Contains(calculationError.Error(), "could not prepare currency conversion") {
-		parsed.reason = "invalid_activity_currency"
-	}
-	if parsed.provider == "" {
-		parsed.provider = reportConversionProviderCategory(s.currencyRates, parsed.reportBaseCurrency)
+	if strings.TrimSpace(context.ProviderCategory) == "" {
+		context.ProviderCategory = reportConversionProviderCategory(s.currencyRates, context.ReportBaseCurrency)
 	}
 
 	var lines = []string{"Conversion Failure Context"}
-	if sourceID := strings.TrimSpace(calculationError.SourceID()); sourceID != "" {
+	if sourceID := strings.TrimSpace(context.SourceID); sourceID != "" {
 		lines = append(lines, "Source ID: "+sourceID)
 	}
 	lines = append(lines,
-		"Source Currency: "+parsed.sourceCurrency,
-		"Report Base Currency: "+parsed.reportBaseCurrency,
-		"Activity Date: "+parsed.activityDate,
+		"Source Currency: "+strings.TrimSpace(context.SourceCurrency),
+		"Report Base Currency: "+strings.TrimSpace(context.ReportBaseCurrency),
+		"Activity Date: "+datesupport.FormatCalendarDate(context.ActivityDate),
 	)
-	if parsed.reason != "" {
-		lines = append(lines, "Failure Reason: "+parsed.reason)
+	if strings.TrimSpace(context.Reason) != "" {
+		lines = append(lines, "Failure Reason: "+strings.TrimSpace(context.Reason))
 	}
-	if parsed.provider != "" && parsed.reason != "invalid_activity_currency" {
-		lines = append(lines, "Provider Category: "+parsed.provider)
+	if strings.TrimSpace(context.ProviderCategory) != "" && strings.TrimSpace(context.Reason) != "invalid_activity_currency" {
+		lines = append(lines, "Provider Category: "+strings.TrimSpace(context.ProviderCategory))
 	}
 
 	return strings.Join(lines, "\n")

@@ -10,7 +10,6 @@ import (
 
 	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
-	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
 
@@ -78,69 +77,6 @@ func reportDiagnosticContextFromError(err error) syncmodel.DiagnosticContext {
 	}
 
 	return diagnosticContextFromError(err, "")
-}
-
-// reportConversionFailureDetail stores safe fields parsed from report-owned
-// calculation error copy.
-// Authored by: OpenCode
-type reportConversionFailureDetail struct {
-	sourceCurrency     string
-	reportBaseCurrency string
-	activityDate       string
-	reason             string
-	provider           string
-}
-
-// parseReportConversionFailureDetail extracts stable conversion context from
-// safe report-calculation copy without using raw provider detail.
-// Authored by: OpenCode
-func parseReportConversionFailureDetail(detail string) reportConversionFailureDetail {
-	var parsed reportConversionFailureDetail
-	var normalized = strings.TrimSpace(detail)
-	parsed.reason = reportValueAfterToken(normalized, "reason=")
-	parsed.provider = reportValueAfterToken(normalized, "provider=")
-	parsed.sourceCurrency = reportValueAfterToken(normalized, "source_currency=")
-	parsed.reportBaseCurrency = reportValueAfterToken(normalized, "report_base_currency=")
-	parsed.activityDate = reportValueAfterToken(normalized, "activity_date=")
-	if parsed.sourceCurrency != "" && parsed.reportBaseCurrency != "" && parsed.activityDate != "" {
-		return parsed
-	}
-
-	var beforeDate, activityDate, ok = strings.Cut(normalized, " on ")
-	if !ok {
-		return parsed
-	}
-	var beforeSource, reportBaseCurrency, hasCurrencyPair = strings.Cut(beforeDate, " to ")
-	if !hasCurrencyPair {
-		return parsed
-	}
-	var sourceIndex = strings.LastIndex(beforeSource, " from ")
-	if sourceIndex < 0 {
-		return parsed
-	}
-
-	parsed.sourceCurrency = strings.TrimSpace(beforeSource[sourceIndex+len(" from "):])
-	parsed.reportBaseCurrency = strings.TrimSpace(reportBaseCurrency)
-	parsed.activityDate = datesupport.LeadingCalendarDate(activityDate)
-	return parsed
-}
-
-// reportValueAfterToken reads one unquoted token value from safe diagnostic
-// copy.
-// Authored by: OpenCode
-func reportValueAfterToken(detail string, token string) string {
-	var index = strings.Index(detail, token)
-	if index < 0 {
-		return ""
-	}
-	var value = detail[index+len(token):]
-	if separator := strings.IndexAny(value, " \n\t)"); separator >= 0 {
-		value = value[:separator]
-	}
-	if value == "unknown" {
-		return ""
-	}
-	return strings.TrimSpace(value)
 }
 
 // reportConversionProviderCategory asks the configured rate service for the

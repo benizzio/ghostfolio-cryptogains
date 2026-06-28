@@ -12,7 +12,8 @@ import (
 	"github.com/cockroachdb/apd/v3"
 )
 
-// NewCapitalGainsReport creates one validated calculated report model.
+// NewCapitalGainsReport creates one validated calculated report model without
+// conversion artifacts.
 //
 // Example:
 //
@@ -32,6 +33,42 @@ func NewCapitalGainsReport(
 	referenceEntries []ReferenceLiquidationEntry,
 	detailSections []AssetDetailSection,
 ) (CapitalGainsReport, error) {
+	return NewCapitalGainsReportWithConversionArtifacts(
+		request,
+		generatedAt,
+		reportCalculationCurrency,
+		summaryEntries,
+		yearlyNetTotal,
+		referenceEntries,
+		detailSections,
+		nil,
+		nil,
+	)
+}
+
+// NewCapitalGainsReportWithConversionArtifacts creates one validated calculated
+// report model including conversion audit entries and retained rate evidence.
+//
+// Example:
+//
+//	report, err := model.NewCapitalGainsReportWithConversionArtifacts(request, time.Now(), "USD", nil, total, nil, nil, nil, nil)
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = report.ReportCalculationCurrency
+//
+// Authored by: OpenCode
+func NewCapitalGainsReportWithConversionArtifacts(
+	request ReportRequest,
+	generatedAt time.Time,
+	reportCalculationCurrency string,
+	summaryEntries []AssetSummaryEntry,
+	yearlyNetTotal apd.Decimal,
+	referenceEntries []ReferenceLiquidationEntry,
+	detailSections []AssetDetailSection,
+	conversionAuditEntries []ConversionAuditEntry,
+	rateSources []ExchangeRateEvidence,
+) (CapitalGainsReport, error) {
 	if err := request.Validate(); err != nil {
 		return CapitalGainsReport{}, fmt.Errorf("capital gains report request: %w", err)
 	}
@@ -45,6 +82,8 @@ func NewCapitalGainsReport(
 		YearlyNetTotal:            yearlyNetTotal,
 		ReferenceEntries:          append([]ReferenceLiquidationEntry(nil), referenceEntries...),
 		DetailSections:            cloneAssetDetailSections(detailSections),
+		ConversionAuditEntries:    cloneConversionAuditEntries(conversionAuditEntries),
+		RateSources:               cloneExchangeRateEvidence(rateSources),
 	}
 
 	if err := report.Validate(); err != nil {

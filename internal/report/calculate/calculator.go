@@ -21,7 +21,7 @@ const reportCalculationCurrencyLabel = "NOT APPLICABLE"
 // Authored by: OpenCode
 var (
 	calculateAssetGroupFunc   = calculateAssetGroup
-	newCapitalGainsReport     = reportmodel.NewCapitalGainsReport
+	newCapitalGainsReport     = reportmodel.NewCapitalGainsReportWithConversionArtifacts
 	newLotMethodState         = reportbasis.NewLotMethodState
 	newAssetBasisStateFunc    = newAssetBasisState
 	resolveScopedInputsFunc   = resolveScopedAssetInputs
@@ -133,6 +133,8 @@ func calculateReport(
 		yearlyNetTotal,
 		referenceEntries,
 		detailSections,
+		currencyBoundaryResult.ConversionAuditEntries,
+		currencyBoundaryResult.RateSources,
 	)
 	if reportErr != nil {
 		return reportmodel.CapitalGainsReport{}, reportmodel.NewCalculationError(
@@ -143,9 +145,6 @@ func calculateReport(
 			reportErr,
 		)
 	}
-	report.ConversionAuditEntries = currencyBoundaryResult.ConversionAuditEntries
-	report.RateSources = currencyBoundaryResult.RateSources
-
 	return report, nil
 }
 
