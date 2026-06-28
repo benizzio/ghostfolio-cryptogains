@@ -109,6 +109,8 @@ type ActivityCalculationInput struct {
 	UnitPrice                    *apd.Decimal
 	SelectedCurrencyContext      SelectedCurrencyContext
 	SelectedCurrencyCode         string
+	ActivityCurrencyCode         string
+	ConversionStatus             ConversionStatus
 	SourceScope                  *SourceScope
 	IsZeroPricedHoldingReduction bool
 	Comment                      string

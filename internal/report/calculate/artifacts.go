@@ -23,6 +23,7 @@ func buildInYearArtifacts(
 	application basisApplicationResult,
 ) (*reportmodel.AssetActivityRow, *reportmodel.LiquidationCalculation, apd.Decimal, error) {
 	var calculationCurrency = inputCalculationCurrency(input)
+	var activityCurrency = inputActivityCurrency(input)
 	var row = &reportmodel.AssetActivityRow{
 		SourceID:                    input.SourceID,
 		OccurredAt:                  input.OccurredAt,
@@ -34,11 +35,12 @@ func buildInYearArtifacts(
 		BasisAfterRow:               basisAfter,
 		CalculationCurrency:         calculationCurrency,
 		QuantityAfterRow:            quantityAfter,
+		ConversionStatus:            input.ConversionStatus,
 		HoldingReductionExplanation: strings.TrimSpace(input.Comment),
 	}
 
 	if !input.IsZeroPricedHoldingReduction {
-		row.ActivityCurrency = input.SelectedCurrencyCode
+		row.ActivityCurrency = activityCurrency
 		row.HoldingReductionExplanation = ""
 	}
 
@@ -254,4 +256,16 @@ func inputCalculationCurrency(input reportmodel.ActivityCalculationInput) string
 	}
 
 	return currency
+}
+
+// inputActivityCurrency returns the original selected activity currency when the
+// conversion boundary preserved it separately from report calculation currency.
+// Authored by: OpenCode
+func inputActivityCurrency(input reportmodel.ActivityCalculationInput) string {
+	var currency = strings.TrimSpace(input.ActivityCurrencyCode)
+	if currency != "" {
+		return currency
+	}
+
+	return strings.TrimSpace(input.SelectedCurrencyCode)
 }

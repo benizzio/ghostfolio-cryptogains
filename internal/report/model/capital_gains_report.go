@@ -115,9 +115,28 @@ func (report CapitalGainsReport) validateConversionArtifacts() error {
 		if !report.hasMatchingRateSource(entry) {
 			return fmt.Errorf("capital gains report conversion audit entry %d: matching rate source is required", index)
 		}
+		if report.hasContradictingSameCurrencyDetailRow(entry.SourceID) {
+			return fmt.Errorf("capital gains report conversion audit entry %d: matching detail row must not be same-currency", index)
+		}
 	}
 
 	return nil
+}
+
+// hasContradictingSameCurrencyDetailRow reports whether an audited converted
+// source activity is contradicted by a same-currency asset detail row.
+// Authored by: OpenCode
+func (report CapitalGainsReport) hasContradictingSameCurrencyDetailRow(sourceID string) bool {
+	var wanted = strings.TrimSpace(sourceID)
+	for _, section := range report.DetailSections {
+		for _, row := range section.ActivityRows {
+			if strings.TrimSpace(row.SourceID) == wanted && row.ConversionStatus == ConversionStatusSameCurrency {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // validateRateSourceCurrency verifies that rate evidence belongs to the report

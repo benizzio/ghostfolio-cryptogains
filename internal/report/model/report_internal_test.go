@@ -704,6 +704,9 @@ func TestReportConstructorsAndValidationHelpersCoverRemainingBranches(t *testing
 	if err = (AssetActivityRow{SourceID: "sell-1", OccurredAt: time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC), ActivityType: ActivityTypeSell, Quantity: mustReportDecimal(t, "1"), BasisAfterRow: mustReportDecimal(t, "0"), QuantityAfterRow: mustReportDecimal(t, "-1")}).Validate(); err == nil || !strings.Contains(err.Error(), "quantity after row") {
 		t.Fatalf("expected negative quantity-after-row to fail, got %v", err)
 	}
+	if err = (AssetActivityRow{SourceID: "sell-1", OccurredAt: time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC), ActivityType: ActivityTypeSell, Quantity: mustReportDecimal(t, "1"), BasisAfterRow: mustReportDecimal(t, "0"), QuantityAfterRow: mustReportDecimal(t, "0"), ConversionStatus: ConversionStatus("unknown")}).Validate(); err == nil || !strings.Contains(err.Error(), "conversion status") {
+		t.Fatalf("expected unsupported row conversion status to fail, got %v", err)
+	}
 
 	if err = (LiquidationCalculation{SourceID: "sell-1", OccurredAt: time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC), DisposedQuantity: mustReportDecimal(t, "1"), AllocatedBasis: mustReportDecimal(t, "-1"), NetLiquidationProceeds: mustReportDecimal(t, "1"), GainOrLoss: mustReportDecimal(t, "0"), ActivityCurrency: "USD"}).Validate(); err == nil || !strings.Contains(err.Error(), "allocated basis") {
 		t.Fatalf("expected negative allocated basis to fail, got %v", err)
@@ -1273,9 +1276,41 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 		t.Fatalf("expected missing report rate source rejection, got %v", err)
 	}
 
+	report.RateSources = []ExchangeRateEvidence{evidence}
+	report.ConversionAuditEntries = []ConversionAuditEntry{entry}
+	report.DetailSections = []AssetDetailSection{{
+		AssetIdentityKey:    "asset-btc",
+		DisplayLabel:        "BTC",
+		OpeningQuantity:     mustReportDecimal(t, "1"),
+		OpeningCostBasis:    mustReportDecimal(t, "100"),
+		ClosingQuantity:     mustReportDecimal(t, "0"),
+		ClosingCostBasis:    mustReportDecimal(t, "0"),
+		CalculationCurrency: "USD",
+		ActivityRows: []AssetActivityRow{{
+			SourceID:            "eur-buy-1",
+			OccurredAt:          activityDate,
+			ActivityType:        ActivityTypeSell,
+			Quantity:            mustReportDecimal(t, "1"),
+			GrossValue:          decimalPointer(t, "50"),
+			ActivityCurrency:    "EUR",
+			BasisAfterRow:       mustReportDecimal(t, "0"),
+			CalculationCurrency: "USD",
+			QuantityAfterRow:    mustReportDecimal(t, "0"),
+			ConversionStatus:    ConversionStatusSameCurrency,
+		}},
+	}}
+	if err := report.Validate(); err == nil || !strings.Contains(err.Error(), "must not be same-currency") {
+		t.Fatalf("expected audited same-currency detail row contradiction rejection, got %v", err)
+	}
+	report.DetailSections[0].ActivityRows[0].ConversionStatus = ConversionStatusConverted
+	if err := report.Validate(); err != nil {
+		t.Fatalf("expected audited converted detail row to validate: %v", err)
+	}
+
 	report.ReportCalculationCurrency = ""
 	report.RateSources = []ExchangeRateEvidence{evidence}
 	report.ConversionAuditEntries = nil
+	report.DetailSections = nil
 	if err := report.Validate(); err == nil || !strings.Contains(err.Error(), "calculation currency") {
 		t.Fatalf("expected empty report currency rejection, got %v", err)
 	}

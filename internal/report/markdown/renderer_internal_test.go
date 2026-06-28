@@ -65,6 +65,10 @@ func TestRendererHelperFallbacks(t *testing.T) {
 	if got := conversionStatusColumn(convertedRow); got != string(reportmodel.ConversionStatusConverted) {
 		t.Fatalf("expected converted status, got %q", got)
 	}
+	var explicitlyConvertedRow = reportmodel.AssetActivityRow{GrossValue: apdDecimalPointer(1), ActivityCurrency: "USD", CalculationCurrency: "USD", ConversionStatus: reportmodel.ConversionStatusConverted}
+	if got := conversionStatusColumn(explicitlyConvertedRow); got != string(reportmodel.ConversionStatusConverted) {
+		t.Fatalf("expected explicit converted status to override currency inference, got %q", got)
+	}
 	var blankRow = reportmodel.AssetActivityRow{ActivityCurrency: "EUR", CalculationCurrency: "USD"}
 	if got := conversionStatusColumn(blankRow); got != "" {
 		t.Fatalf("expected blank status without rendered activity currency, got %q", got)
@@ -675,6 +679,47 @@ func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 	}
 	if strings.Count(audit, "| 2024-01-05 | eur-buy-1 |") != 1 {
 		t.Fatalf("expected one grouped audit row for the source activity, got %q", audit)
+	}
+}
+
+// TestRendererUsesPreservedConversionStatusForAssetDetails verifies BUG-006
+// rendering does not infer same-currency from post-conversion report currency.
+// Authored by: OpenCode
+func TestRendererUsesPreservedConversionStatusForAssetDetails(t *testing.T) {
+	t.Parallel()
+
+	var builder strings.Builder
+	var section = reportmodel.AssetDetailSection{
+		AssetIdentityKey:    "asset-btc",
+		DisplayLabel:        "BTC",
+		OpeningQuantity:     *apd.New(1, 0),
+		OpeningCostBasis:    *apd.New(10, 0),
+		ClosingQuantity:     *apd.New(0, 0),
+		ClosingCostBasis:    *apd.New(0, 0),
+		CalculationCurrency: "USD",
+		ActivityRows: []reportmodel.AssetActivityRow{{
+			SourceID:            "audited-converted-row",
+			OccurredAt:          time.Date(2024, time.January, 2, 3, 4, 5, 0, time.UTC),
+			ActivityType:        reportmodel.ActivityTypeSell,
+			Quantity:            *apd.New(1, 0),
+			GrossValue:          apdDecimalPointer(12),
+			ActivityCurrency:    "USD",
+			BasisAfterRow:       *apd.New(0, 0),
+			CalculationCurrency: "USD",
+			QuantityAfterRow:    *apd.New(0, 0),
+			ConversionStatus:    reportmodel.ConversionStatusConverted,
+		}},
+	}
+
+	if err := writeDetailSection(&builder, section, "USD"); err != nil {
+		t.Fatalf("write detail section: %v", err)
+	}
+	var rendered = builder.String()
+	if !strings.Contains(rendered, "| audited-converted-row | SELL | 1 |  | 12 |  | USD | 0 | USD | 0 | converted |  |") {
+		t.Fatalf("expected preserved converted status in detail row, got %q", rendered)
+	}
+	if strings.Contains(rendered, "| audited-converted-row | SELL | 1 |  | 12 |  | USD | 0 | USD | 0 | same_currency |  |") {
+		t.Fatalf("expected audited converted row not to render as same-currency, got %q", rendered)
 	}
 }
 

@@ -113,6 +113,18 @@ func TestMarkdownReportRateSourceSummaryAggregatesByProvider(t *testing.T) {
 		"1.16",
 		reportmodel.QuoteDirectionSourcePerBase,
 	))
+	report.DetailSections[1].ActivityRows = append(report.DetailSections[1].ActivityRows, reportmodel.AssetActivityRow{
+		SourceID:            "gbp-buy-2024-001",
+		OccurredAt:          time.Date(2024, time.January, 2, 0, 15, 0, 0, time.Local),
+		ActivityType:        reportmodel.ActivityTypeBuy,
+		Quantity:            mustContractDecimal("1"),
+		GrossValue:          contractDecimalPointer("100"),
+		ActivityCurrency:    "GBP",
+		BasisAfterRow:       mustContractDecimal("100"),
+		CalculationCurrency: reportmodel.ReportBaseCurrencyEUR.Label(),
+		QuantityAfterRow:    mustContractDecimal("4"),
+		ConversionStatus:    reportmodel.ConversionStatusConverted,
+	})
 
 	var document, err = reportmarkdown.Render(report)
 	if err != nil {
@@ -200,6 +212,23 @@ func TestMarkdownReportDistinguishesSameCurrencyAndConvertedRows(t *testing.T) {
 	assertNotContains(t, document.Content, "secret-token")
 }
 
+// TestMarkdownReportAuditSourceIDsDoNotRenderAsSameCurrency cross-checks BUG-006
+// audit evidence against asset detail conversion labels.
+// Authored by: OpenCode
+func TestMarkdownReportAuditSourceIDsDoNotRenderAsSameCurrency(t *testing.T) {
+	t.Parallel()
+
+	var document, err = reportmarkdown.Render(contractMarkdownReportFixture(reportmodel.ReportBaseCurrencyEUR.Label()))
+	if err != nil {
+		t.Fatalf("render markdown report: %v", err)
+	}
+
+	var audit = currencyConversionAuditSection(document.Content)
+	assertContains(t, audit, "| 2024-01-01 | btc-sell-2024-001 | BTC |")
+	assertContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | USD | 22009 | EUR | 1 | converted |")
+	assertNotContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | USD | 22009 | EUR | 1 | same_currency |")
+}
+
 // TestMarkdownReportOutputFileContract verifies the visible output-file
 // contract points that are direct consequences of successful Markdown
 // rendering.
@@ -280,6 +309,7 @@ func contractMarkdownReportFixture(reportCalculationCurrency string) reportmodel
 				BasisAfterRow:               mustContractDecimal("22009"),
 				CalculationCurrency:         reportCalculationCurrency,
 				QuantityAfterRow:            mustContractDecimal("1"),
+				ConversionStatus:            reportmodel.ConversionStatusConverted,
 				HoldingReductionExplanation: "note token=secret-token",
 			}},
 			LiquidationSummaries: []reportmodel.LiquidationCalculation{{
@@ -312,6 +342,7 @@ func contractMarkdownReportFixture(reportCalculationCurrency string) reportmodel
 				BasisAfterRow:               mustContractDecimal("1000"),
 				CalculationCurrency:         reportCalculationCurrency,
 				QuantityAfterRow:            mustContractDecimal("3"),
+				ConversionStatus:            reportmodel.ConversionStatusSameCurrency,
 				HoldingReductionExplanation: "same-currency priced sale",
 			}},
 			LiquidationSummaries: []reportmodel.LiquidationCalculation{{

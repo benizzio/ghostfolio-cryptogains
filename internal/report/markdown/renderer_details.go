@@ -202,6 +202,9 @@ func conversionStatusColumn(row reportmodel.AssetActivityRow) string {
 	if activityCurrencyColumn(row) == "" {
 		return ""
 	}
+	if strings.TrimSpace(string(row.ConversionStatus)) != "" {
+		return sanitizeInlineText(string(row.ConversionStatus))
+	}
 	if strings.TrimSpace(row.ActivityCurrency) == strings.TrimSpace(row.CalculationCurrency) {
 		return sanitizeInlineText(string(reportmodel.ConversionStatusSameCurrency))
 	}

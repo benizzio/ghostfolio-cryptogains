@@ -159,6 +159,8 @@ func (boundary *reportCurrencyBoundaryContext) applyInputReportCurrencyBoundary(
 
 	var sourceCurrency = strings.TrimSpace(input.SelectedCurrencyCode)
 	if sourceCurrency == baseCurrency {
+		input.ConversionStatus = reportmodel.ConversionStatusSameCurrency
+		input.ActivityCurrencyCode = sourceCurrency
 		return input, nil, nil
 	}
 
@@ -289,6 +291,8 @@ func convertInputMonetaryAmounts(
 	}
 
 	convertedInput.SelectedCurrencyCode = reportBaseCurrency.Label()
+	convertedInput.ActivityCurrencyCode = evidence.SourceCurrency
+	convertedInput.ConversionStatus = reportmodel.ConversionStatusConverted
 	return convertedInput, amounts, nil
 }
 

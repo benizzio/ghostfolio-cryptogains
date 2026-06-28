@@ -25,6 +25,7 @@ type AssetActivityRow struct {
 	BasisAfterRow               apd.Decimal
 	CalculationCurrency         string
 	QuantityAfterRow            apd.Decimal
+	ConversionStatus            ConversionStatus
 	HoldingReductionExplanation string
 	LiquidationCalculation      *LiquidationCalculation
 }
@@ -58,6 +59,11 @@ func (row AssetActivityRow) Validate() error {
 	}
 	if err := validateNonNegativeDecimal(row.QuantityAfterRow, "asset activity row quantity after row"); err != nil {
 		return err
+	}
+	if strings.TrimSpace(string(row.ConversionStatus)) != "" {
+		if err := validateConversionStatus(row.ConversionStatus); err != nil {
+			return fmt.Errorf("asset activity row conversion status: %w", err)
+		}
 	}
 	if row.LiquidationCalculation != nil {
 		if err := row.LiquidationCalculation.Validate(); err != nil {
