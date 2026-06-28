@@ -80,7 +80,7 @@ The integration layer defines a typed `ConversionFailure` with source currency, 
 
 ## Notes
 
-- The active feature directory was resolved with `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` as `/home/benizzio/src-workspace-opencode/ghostfolio-cryptogains/specs/007-currency-conversion-strategy`.
+- The active feature directory was resolved with `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` as `specs/007-currency-conversion-strategy`.
 - `spec.md`, `plan.md`, `tasks.md`, `research.md`, `data-model.md`, `quickstart.md`, and `contracts/` were reviewed for implementation-surface scope.
 - No unchecked task syntax was found in `tasks.md`. Checked `Reopened` annotations were treated as historical bugfix markers rather than open task state.
 - The previous report contained `CODE-STAND-DRIFT-001` through `CODE-STAND-DRIFT-004`. Those findings were not carried forward because the current tree no longer contains the same substantive drift: report model and Markdown packages no longer import `internal/integration/currency`, currency service responsibilities are split across cohesive files, Markdown rendering is split across section files, and `gocognit` reported no production functions over threshold.
