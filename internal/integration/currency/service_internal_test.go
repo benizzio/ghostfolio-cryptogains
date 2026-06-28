@@ -494,6 +494,10 @@ func TestCurrencyRateServiceRemainingFailureBranches(t *testing.T) {
 	if !ok || reason != ConversionFailureReasonUnsupportedCurrency {
 		t.Fatalf("expected unsupported base request reason, got reason=%q ok=%v err=%v", reason, ok, err)
 	}
+	reason = conversionFailureReasonForRequestError(errors.New("rate lookup request: unsupported source currency RUB"))
+	if reason != ConversionFailureReasonUnsupportedCurrency {
+		t.Fatalf("expected unsupported source request reason, got %q", reason)
+	}
 }
 
 // TestFetchProviderPayloadDefensiveBranches verifies HTTP transport failures

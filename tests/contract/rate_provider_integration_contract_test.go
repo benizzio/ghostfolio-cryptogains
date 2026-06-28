@@ -50,6 +50,22 @@ func TestOfficialRateProviderContractResolvesDeterministicFixtures(t *testing.T)
 		if request.URL.Path != "/datadownload/Output.aspx" {
 			mismatch = "unexpected Federal Reserve path: " + request.URL.Path
 		}
+		var query = request.URL.Query()
+		if mismatch == "" && query.Get("rel") != "H10" {
+			mismatch = "unexpected Federal Reserve rel query: " + request.URL.RawQuery
+		}
+		if mismatch == "" && query.Get("series") != "60f32914ab61dfab590e0e470153e3ae" {
+			mismatch = "unexpected Federal Reserve series query: " + request.URL.RawQuery
+		}
+		if mismatch == "" && (query.Get("from") != "2023-12-07" || query.Get("to") != "2024-01-06") {
+			mismatch = "unexpected Federal Reserve date query: " + request.URL.RawQuery
+		}
+		if mismatch == "" && (query.Get("filetype") != "csv" || query.Get("label") != "include" || query.Get("layout") != "seriesrow" || query.Get("type") != "package") {
+			mismatch = "unexpected Federal Reserve DDP package query: " + request.URL.RawQuery
+		}
+		if _, ok := query["lastobs"]; mismatch == "" && !ok {
+			mismatch = "missing Federal Reserve lastobs query: " + request.URL.RawQuery
+		}
 		if mismatch != "" {
 			fedRequestMismatchMu.Lock()
 			if fedRequestMismatch == "" {

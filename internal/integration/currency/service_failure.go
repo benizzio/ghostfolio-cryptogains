@@ -44,7 +44,8 @@ func classifyEvidenceFailure(request RateLookupRequest, providerID ProviderID, e
 // Authored by: OpenCode
 func conversionFailureReasonForRequestError(err error) ConversionFailureReason {
 	var message = strings.ToLower(err.Error())
-	if strings.Contains(message, "unsupported base currency") {
+	if strings.Contains(message, "unsupported source currency") ||
+		strings.Contains(message, "unsupported base currency") {
 		return ConversionFailureReasonUnsupportedCurrency
 	}
 

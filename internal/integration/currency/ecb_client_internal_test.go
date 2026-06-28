@@ -91,6 +91,7 @@ func TestECBEXRMapperRejectsUnsupportedAndMalformedObservations(t *testing.T) {
 	}{
 		{name: "suspended RUB", sourceCurrency: "RUB", payload: "TIME_PERIOD,OBS_VALUE\n2024-01-05,99.99\n", want: "unsupported source currency RUB"},
 		{name: "missing observation", sourceCurrency: "USD", payload: "TIME_PERIOD,OBS_VALUE\n", want: "no current or prior available observation"},
+		{name: "malformed date", sourceCurrency: "USD", payload: "TIME_PERIOD,OBS_VALUE\nnot-a-date,1.09\n", want: "invalid ECB observation date"},
 		{name: "ND observation", sourceCurrency: "USD", payload: "TIME_PERIOD,OBS_VALUE\n2024-01-05,ND\n", want: "invalid ECB observation"},
 		{name: "malformed decimal", sourceCurrency: "USD", payload: "TIME_PERIOD,OBS_VALUE\n2024-01-05,not-a-decimal\n", want: "invalid ECB observation"},
 	}

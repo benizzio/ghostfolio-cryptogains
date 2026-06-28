@@ -92,7 +92,10 @@ func parseECBEXRObservation(request RateLookupRequest, record []string, dateColu
 	}
 	var rawDate = strings.TrimSpace(record[dateColumn])
 	var rateDate, dateErr = time.Parse(time.DateOnly, rawDate)
-	if dateErr != nil || datesupport.CalendarDate(rateDate).After(request.ActivityDate) {
+	if dateErr != nil {
+		return ecbEXRObservation{}, false, fmt.Errorf("invalid ECB observation date %q: %w", rawDate, dateErr)
+	}
+	if datesupport.CalendarDate(rateDate).After(request.ActivityDate) {
 		return ecbEXRObservation{}, false, nil
 	}
 	var rate, parseErr = parsePositiveRate(strings.TrimSpace(record[valueColumn]))
