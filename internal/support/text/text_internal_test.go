@@ -133,3 +133,16 @@ func TestContainsASCIIDigit(t *testing.T) {
 		})
 	}
 }
+
+// TestRedactedSingleLine verifies redaction and generic whitespace
+// normalization without presentation-format escaping.
+// Authored by: OpenCode
+func TestRedactedSingleLine(t *testing.T) {
+	t.Parallel()
+
+	var got = RedactedSingleLine(" Bearer secret-value\r\nlabel\t| token=abc  ")
+	var want = "Bearer [REDACTED] label | token=[REDACTED]"
+	if got != want {
+		t.Fatalf("RedactedSingleLine() = %q, want %q", got, want)
+	}
+}

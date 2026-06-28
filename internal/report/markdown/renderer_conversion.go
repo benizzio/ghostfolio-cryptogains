@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 )
 
 // writeRateSourceSummary renders the official rate-provider summary disclosed
@@ -62,7 +64,7 @@ func writeConversionAuditSection(builder *strings.Builder, report reportmodel.Ca
 // writeConversionAuditRow renders one grouped activity-level conversion audit row.
 // Authored by: OpenCode
 func writeConversionAuditRow(builder *strings.Builder, entryIndex int, entry reportmodel.ConversionAuditEntry) error {
-	var rateValue, err = canonicalDecimal(entry.RateValue)
+	var rateValue, err = decimalsupport.CanonicalString(entry.RateValue)
 	if err != nil {
 		return fmt.Errorf("render conversion audit entry %d rate value: %w", entryIndex, err)
 	}
@@ -74,10 +76,10 @@ func writeConversionAuditRow(builder *strings.Builder, entryIndex int, entry rep
 
 	builder.WriteString(fmt.Sprintf(
 		"| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
-		entry.ActivityDate.Local().Format("2006-01-02"),
+		datesupport.FormatCalendarDate(entry.ActivityDate),
 		sanitizeInlineText(entry.SourceID),
 		sanitizeInlineText(entry.AssetLabel),
-		entry.RateDate.Local().Format("2006-01-02"),
+		datesupport.FormatCalendarDate(entry.RateDate),
 		sanitizeInlineText(entry.SourceCurrency),
 		sanitizeInlineText(entry.ReportBaseCurrency.Label()),
 		convertedAmounts,
@@ -96,12 +98,12 @@ func renderGroupedConvertedAmounts(entryIndex int, amounts []reportmodel.Convert
 		if amount.OriginalAmount.Sign() == 0 && amount.ConvertedAmount.Sign() == 0 {
 			continue
 		}
-		var originalAmount, err = canonicalDecimal(amount.OriginalAmount)
+		var originalAmount, err = decimalsupport.CanonicalString(amount.OriginalAmount)
 		if err != nil {
 			return "", fmt.Errorf("render conversion audit entry %d amount %d original amount: %w", entryIndex, amountIndex, err)
 		}
 		var convertedAmount string
-		convertedAmount, err = canonicalDecimal(amount.ConvertedAmount)
+		convertedAmount, err = decimalsupport.CanonicalString(amount.ConvertedAmount)
 		if err != nil {
 			return "", fmt.Errorf("render conversion audit entry %d amount %d converted amount: %w", entryIndex, amountIndex, err)
 		}
@@ -122,6 +124,10 @@ func rateAuthorityLabel(authority reportmodel.RateAuthority) string {
 // evidence.
 // Authored by: OpenCode
 func rateProviderLabel(provider reportmodel.RateProviderID) string {
+	if provider == reportmodel.RateProviderIDECBEXR {
+		return sanitizeInlineText("ECB Data Portal `EXR`")
+	}
+
 	return sanitizeInlineText(reportmodel.RateProviderDisplayLabel(provider))
 }
 

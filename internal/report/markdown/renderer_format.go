@@ -7,23 +7,8 @@ import (
 	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
-	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
-	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
-	"github.com/cockroachdb/apd/v3"
+	textsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/text"
 )
-
-// canonicalDecimal renders one exact decimal in canonical fixed-point form.
-// Authored by: OpenCode
-func canonicalDecimal(value apd.Decimal) (string, error) {
-	return decimalsupport.CanonicalString(value)
-}
-
-// canonicalDecimalPointer renders one optional exact decimal in canonical
-// fixed-point form.
-// Authored by: OpenCode
-func canonicalDecimalPointer(value *apd.Decimal) (string, error) {
-	return decimalsupport.CanonicalStringPointer(value)
-}
 
 // calculationCurrencyLabel normalizes the report calculation-currency label.
 // Authored by: OpenCode
@@ -79,11 +64,7 @@ func activityCurrencyColumn(row reportmodel.AssetActivityRow) string {
 // line of text for safe Markdown output.
 // Authored by: OpenCode
 func sanitizeInlineText(raw string) string {
-	var sanitized = redact.Text(raw)
-	sanitized = strings.ReplaceAll(sanitized, "\r", " ")
-	sanitized = strings.ReplaceAll(sanitized, "\n", " ")
-	sanitized = strings.ReplaceAll(sanitized, "\t", " ")
-	sanitized = strings.Join(strings.Fields(strings.TrimSpace(sanitized)), " ")
+	var sanitized = textsupport.RedactedSingleLine(raw)
 	sanitized = strings.ReplaceAll(sanitized, "|", "\\|")
 	return sanitized
 }

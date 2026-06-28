@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -46,12 +47,12 @@ func writeDetailSection(builder *strings.Builder, section reportmodel.AssetDetai
 // writePositionBlock renders one opening or closing position bullet block.
 // Authored by: OpenCode
 func writePositionBlock(builder *strings.Builder, heading string, quantity apd.Decimal, basis apd.Decimal, sectionCurrency string, fallbackCurrency string) error {
-	var quantityText, err = canonicalDecimal(quantity)
+	var quantityText, err = decimalsupport.CanonicalString(quantity)
 	if err != nil {
 		return fmt.Errorf("render quantity: %w", err)
 	}
 	var basisText string
-	basisText, err = canonicalDecimal(basis)
+	basisText, err = decimalsupport.CanonicalString(basis)
 	if err != nil {
 		return fmt.Errorf("render cost basis: %w", err)
 	}
@@ -88,39 +89,39 @@ func writeActivityBlock(builder *strings.Builder, section reportmodel.AssetDetai
 // writeActivityRow renders one priced or explanatory activity row.
 // Authored by: OpenCode
 func writeActivityRow(builder *strings.Builder, row reportmodel.AssetActivityRow) error {
-	var quantityText, err = canonicalDecimal(row.Quantity)
+	var quantityText, err = decimalsupport.CanonicalString(row.Quantity)
 	if err != nil {
 		return fmt.Errorf("render activity row %q quantity: %w", row.SourceID, err)
 	}
 	var unitPriceText string
-	unitPriceText, err = canonicalDecimalPointer(row.UnitPrice)
+	unitPriceText, err = decimalsupport.CanonicalStringPointer(row.UnitPrice)
 	if err != nil {
 		return fmt.Errorf("render activity row %q unit price: %w", row.SourceID, err)
 	}
 	var grossValueText string
-	grossValueText, err = canonicalDecimalPointer(row.GrossValue)
+	grossValueText, err = decimalsupport.CanonicalStringPointer(row.GrossValue)
 	if err != nil {
 		return fmt.Errorf("render activity row %q gross value: %w", row.SourceID, err)
 	}
 	var feeText string
-	feeText, err = canonicalDecimalPointer(row.FeeAmount)
+	feeText, err = decimalsupport.CanonicalStringPointer(row.FeeAmount)
 	if err != nil {
 		return fmt.Errorf("render activity row %q fee: %w", row.SourceID, err)
 	}
 	var basisAfterRowText string
-	basisAfterRowText, err = canonicalDecimal(row.BasisAfterRow)
+	basisAfterRowText, err = decimalsupport.CanonicalString(row.BasisAfterRow)
 	if err != nil {
 		return fmt.Errorf("render activity row %q basis after row: %w", row.SourceID, err)
 	}
 	var quantityAfterRowText string
-	quantityAfterRowText, err = canonicalDecimal(row.QuantityAfterRow)
+	quantityAfterRowText, err = decimalsupport.CanonicalString(row.QuantityAfterRow)
 	if err != nil {
 		return fmt.Errorf("render activity row %q quantity after row: %w", row.SourceID, err)
 	}
 
 	builder.WriteString(fmt.Sprintf(
 		"| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
-		row.OccurredAt.Local().Format("2006-01-02 15:04:05"),
+		row.OccurredAt.UTC().Format("2006-01-02 15:04:05"),
 		sanitizeInlineText(row.SourceID),
 		sanitizeInlineText(string(row.ActivityType)),
 		quantityText,
@@ -161,29 +162,29 @@ func writeLiquidationBlock(builder *strings.Builder, section reportmodel.AssetDe
 // writeLiquidationRow renders one liquidation calculation row.
 // Authored by: OpenCode
 func writeLiquidationRow(builder *strings.Builder, liquidation reportmodel.LiquidationCalculation, fallbackCurrency string) error {
-	var disposedQuantityText, err = canonicalDecimal(liquidation.DisposedQuantity)
+	var disposedQuantityText, err = decimalsupport.CanonicalString(liquidation.DisposedQuantity)
 	if err != nil {
 		return fmt.Errorf("render liquidation %q disposed quantity: %w", liquidation.SourceID, err)
 	}
 	var allocatedBasisText string
-	allocatedBasisText, err = canonicalDecimal(liquidation.AllocatedBasis)
+	allocatedBasisText, err = decimalsupport.CanonicalString(liquidation.AllocatedBasis)
 	if err != nil {
 		return fmt.Errorf("render liquidation %q allocated basis: %w", liquidation.SourceID, err)
 	}
 	var proceedsText string
-	proceedsText, err = canonicalDecimal(liquidation.NetLiquidationProceeds)
+	proceedsText, err = decimalsupport.CanonicalString(liquidation.NetLiquidationProceeds)
 	if err != nil {
 		return fmt.Errorf("render liquidation %q net proceeds: %w", liquidation.SourceID, err)
 	}
 	var gainOrLossText string
-	gainOrLossText, err = canonicalDecimal(liquidation.GainOrLoss)
+	gainOrLossText, err = decimalsupport.CanonicalString(liquidation.GainOrLoss)
 	if err != nil {
 		return fmt.Errorf("render liquidation %q gain or loss: %w", liquidation.SourceID, err)
 	}
 
 	builder.WriteString(fmt.Sprintf(
 		"| %s | %s | %s | %s | %s | %s | %s |\n",
-		liquidation.OccurredAt.Local().Format("2006-01-02 15:04:05"),
+		liquidation.OccurredAt.UTC().Format("2006-01-02 15:04:05"),
 		sanitizeInlineText(liquidation.SourceID),
 		disposedQuantityText,
 		allocatedBasisText,

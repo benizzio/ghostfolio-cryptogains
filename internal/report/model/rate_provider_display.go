@@ -22,7 +22,7 @@ func RateAuthorityDisplayLabel(authority RateAuthority) string {
 func RateProviderDisplayLabel(providerID RateProviderID) string {
 	switch providerID {
 	case RateProviderIDECBEXR:
-		return "ECB Data Portal `EXR`"
+		return "ECB Data Portal EXR"
 	case RateProviderIDFederalReserveH10:
 		return "Federal Reserve Board H.10/Data Download Program"
 	default:

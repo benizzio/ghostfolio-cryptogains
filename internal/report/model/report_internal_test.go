@@ -104,6 +104,20 @@ func TestCalculationErrorHandlesFallbacks(t *testing.T) {
 	}
 }
 
+// TestRateProviderDisplayLabelsRemainPlainText verifies model display helpers do
+// not include presentation-format markup.
+// Authored by: OpenCode
+func TestRateProviderDisplayLabelsRemainPlainText(t *testing.T) {
+	t.Parallel()
+
+	if got := RateProviderDisplayLabel(RateProviderIDECBEXR); got != "ECB Data Portal EXR" {
+		t.Fatalf("unexpected ECB provider label: %q", got)
+	}
+	if got := RateProviderDisplayLabel(RateProviderID("custom-provider")); got != "custom-provider" {
+		t.Fatalf("unexpected custom provider label: %q", got)
+	}
+}
+
 // TestCalculationErrorHelpersCoverRemainingBranches verifies blank wrapped
 // causes, duplicate suppression, blank outer detail fallback, and nil unwrap
 // handling for diagnostics helper paths.

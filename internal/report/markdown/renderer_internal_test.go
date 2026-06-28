@@ -86,6 +86,9 @@ func TestRendererHelperFallbacks(t *testing.T) {
 	if got := rateProviderLabel(reportmodel.RateProviderIDECBEXR); !strings.Contains(got, "ECB Data Portal") {
 		t.Fatalf("unexpected ECB provider label %q", got)
 	}
+	if got := rateProviderLabel(reportmodel.RateProviderIDECBEXR); !strings.Contains(got, "`EXR`") {
+		t.Fatalf("expected Markdown-specific ECB provider label, got %q", got)
+	}
 	if got := rateProviderLabel(reportmodel.RateProviderIDFederalReserveH10); !strings.Contains(got, "Federal Reserve Board") {
 		t.Fatalf("unexpected Federal Reserve provider label %q", got)
 	}
@@ -581,7 +584,7 @@ func TestRenderCoversDetailAndLiquidationBranches(t *testing.T) {
 func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 	t.Parallel()
 
-	var activityDate = time.Date(2024, time.January, 5, 0, 0, 0, 0, time.UTC)
+	var activityDate = time.Date(2024, time.January, 5, 0, 30, 0, 0, time.FixedZone("UTC+14", 14*60*60))
 	var report = reportmodel.CapitalGainsReport{
 		ReportCalculationCurrency: "USD",
 		RateSources: []reportmodel.ExchangeRateEvidence{
