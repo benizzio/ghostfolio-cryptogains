@@ -34,6 +34,7 @@
 ### Session 2026-06-28
 
 - **Bugfix**: 2026-06-28 — BUG-006 Clarified that audited converted activities must not render as same-currency rows in asset detail sections.
+- **Bugfix**: 2026-06-28 — BUG-007 Clarified Asset Detail currency column naming, ordering, and liquidation-column omission.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -52,6 +53,7 @@ When generating a yearly capital gains and losses report, the user can choose on
 3. **Given** a priced activity's selected activity currency already matches the report base currency, **When** the report is calculated, **Then** the activity's monetary values enter cost basis, proceeds, gains, and losses without exchange-rate conversion.
 4. **Given** a priced activity's selected activity currency differs from the report base currency, **When** the report is calculated, **Then** the activity's monetary values are converted to the report base currency before they enter cost basis, proceeds, gains, or losses.
 5. **Given** the report completes successfully, **When** the user reads the generated report, **Then** the report identifies the selected base currency and all cross-activity monetary totals use that currency instead of `NOT APPLICABLE`.
+6. **Given** a generated report includes an `Asset Detail` `In-Year Activity` table, **When** the user reviews that table, **Then** it renders `Original Activity Currency` and `Calculation Currency` columns in the exact order `Date`, `Source ID`, `Type`, `Quantity`, `Unit Price`, `Gross Value`, `Fee`, `Quantity After Row`, `Basis After Row`, `Original Activity Currency`, `Calculation Currency`, `Conversion Status`, and `Note`.
 
 ---
 
@@ -71,6 +73,7 @@ The user receives a report whose conversions use an official or officially trust
 4. **Given** the authority provider publishes one daily rate for the activity date, such as the ECB daily euro foreign exchange reference rate or the Federal Reserve H.10 noon buying rate, **When** the rate is selected, **Then** that daily rate is used and the report identifies the provider-specific rate kind.
 5. **Given** the official source publishes no rate for the activity date, **When** a prior business date has a rate available from the authorized provider, **Then** the most recent previous business-date rate from that provider is used and the report discloses both the activity date and the rate date.
 6. **Given** a report contains converted monetary values, **When** the user reviews conversion details, **Then** the report shows the source currency, report base currency, activity date, rate date, ~~rate authority,~~ rate value, original amount, and converted amount for each converted priced activity or for an equivalent per-activity audit section. BUG-004 supersedes repeating provider-level authority in per-amount audit rows; rate authority and rate kind are disclosed once in `Rate Source Summary`, and ~~the `Currency Conversion Audit` table uses the compact column order `Date`, `Source ID`, `Asset`, `Amount Kind`, `Rate Date`, `Source Currency`, `Original Amount`, `Report Base Currency`, `Converted Amount`, `Quote Direction`, and `Rate Value`.~~ BUG-005 supersedes per-amount rendered audit rows: `Currency Conversion Audit` must render one grouped row or equivalent subsection per converted source activity, list all non-zero calculation-relevant converted amount kinds for that activity together, and omit zero-to-zero amount slots from the rendered audit evidence.
+7. **Given** a generated report includes an `Asset Detail` `Liquidation Calculations` table, **When** the user reviews liquidation evidence, **Then** the table omits `Activity Currency` because original selected activity currency is already disclosed in the preceding `In-Year Activity` table.
 
 ---
 
@@ -106,6 +109,7 @@ When an official conversion cannot be obtained or the activity currency is not s
 - A report uses one selected base-currency provider but contains multiple converted activities with different rate dates, quote directions, or rate values; the Rate Source Summary remains one provider-level summary and rate-specific evidence remains in the conversion audit.
 - A converted source activity has multiple amount kinds sharing the same rate evidence; the rendered conversion audit groups those amount kinds under one activity row or equivalent subsection and omits zero-to-zero converted amount slots.
 - A converted source activity appears in `Currency Conversion Audit`; every asset detail row for that same `Source ID` must still be identified as converted rather than same-currency.
+- An `Asset Detail` section contains both `In-Year Activity` and `Liquidation Calculations`; only `In-Year Activity` renders the original selected activity currency, and liquidation rows avoid repeating an ambiguous `Activity Currency` column.
 
 ## Requirements *(mandatory)*
 
@@ -146,6 +150,8 @@ Each feature specification MUST capture security, persistence, financial precisi
 - **FR-031**: The system MUST treat the existing no-conversion `NOT APPLICABLE` report calculation currency behavior as superseded for reports generated under this feature.
 - **FR-032**: If an official authority revises a historical exchange rate after an earlier report was generated and no same-key evidence is defensibly available in the current TUI-session cache, a regenerated report MUST use the currently published authorized rate and disclose the rate authority, rate date, and rate value used for the regenerated report.
 - **FR-033**: Final feature coverage verification MUST write generated coverage artifacts to the maintained repository coverage-output paths `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`, and MUST NOT create root-level `coverage.cov` or `coverage.xml` artifacts.
+- **FR-034**: Each generated report `Asset Detail` `In-Year Activity` table MUST render columns in this exact order: `Date`, `Source ID`, `Type`, `Quantity`, `Unit Price`, `Gross Value`, `Fee`, `Quantity After Row`, `Basis After Row`, `Original Activity Currency`, `Calculation Currency`, `Conversion Status`, and `Note`.
+- **FR-035**: Each generated report `Asset Detail` `Liquidation Calculations` table MUST NOT render an `Activity Currency` column because original selected activity currency evidence is disclosed in the preceding `In-Year Activity` table.
 
 ### Financial Calculation Evidence *(include when feature affects financial calculations)*
 
@@ -185,6 +191,7 @@ Each feature specification MUST capture security, persistence, financial precisi
 - **SC-006**: In the Single-Currency Regression Suite, 100% of cases where the selected activity currency equals the report base currency preserve the same monetary results as the prior no-conversion behavior.
 - **SC-007**: In the Production Diagnostic Redaction Fixture Set, 100% of conversion failure diagnostics exclude Ghostfolio security tokens, bearer tokens, reusable token verifiers, and unredacted financial-value fields.
 - **SC-008**: Final coverage validation produces and checks `dist/coverage/coverage.out` and `dist/coverage/coverage.xml` through the maintained repository coverage gate without leaving root-level `coverage.cov` or `coverage.xml` generated artifacts.
+- **SC-009**: In the Mixed-Currency Acceptance Matrix, 100% of generated `Asset Detail` sections render the exact `In-Year Activity` header order with `Original Activity Currency` and render no `Activity Currency` column in `Liquidation Calculations`.
 
 ## Assumptions
 

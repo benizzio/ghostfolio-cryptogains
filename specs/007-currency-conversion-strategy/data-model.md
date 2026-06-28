@@ -10,6 +10,8 @@ This feature extends report-generation runtime models. It does not add a long-li
 
 **Bugfix**: 2026-06-28 — BUG-006 Clarified that conversion status must be preserved by `Source ID` so asset detail sections cannot label audited converted activities as same-currency.
 
+**Bugfix**: 2026-06-28 — BUG-007 Clarified that original selected currency maps to `Original Activity Currency` in Asset Detail activity rows and is not repeated in liquidation rows.
+
 All financial amounts, quantities, exchange rates, converted amounts, basis values, proceeds, gains, and losses are exact decimals. Every monetary value has an explicit currency before and after conversion.
 
 Provider identity, authority metadata, provider DTOs, and provider selection are owned by the currency integration layer. Report models submit base currency, source currency, and activity date to that layer and consume canonical rate evidence.
@@ -301,7 +303,7 @@ Fields:
 |-------|------|-------|
 | `source_id` | string | Activity reference |
 | `amount_kind` | enum | `unit_price`, `gross_value`, or `fee_amount` |
-| `original_currency` | string | Selected activity currency |
+| `original_currency` | string | Selected activity currency; rendered as `Original Activity Currency` in `Asset Detail` `In-Year Activity` rows |
 | `original_amount` | decimal | Selected exact amount before conversion |
 | `report_base_currency` | string | `USD` or `EUR` |
 | `converted_amount` | decimal | Amount used by basis/proceeds/gain/loss calculation |
@@ -424,6 +426,7 @@ Validation rules:
 - `report_calculation_currency` must equal the request base currency.
 - Successful mixed-currency reports express cost basis, proceeds, gains, losses, and totals in `report_calculation_currency`.
 - Converted activity audit details must be complete enough to reproduce conversion from synced activity inputs, selected base currency, provider, rate date, rate value, quote direction, and rounding rules.
+- `Asset Detail` `In-Year Activity` rows must expose original selected currency as `Original Activity Currency`; `Liquidation Calculations` rows must not repeat that value as `Activity Currency`.
 
 State transitions:
 

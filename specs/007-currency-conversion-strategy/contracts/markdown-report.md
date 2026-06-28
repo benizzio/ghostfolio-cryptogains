@@ -10,6 +10,8 @@ This contract extends the generated Markdown capital gains report so successful 
 
 **Bugfix**: 2026-06-28 — BUG-006 Clarified that audited converted activities must not render as same-currency rows in asset detail sections.
 
+**Bugfix**: 2026-06-28 — BUG-007 Clarified Asset Detail table currency-column naming, ordering, and liquidation-column omission.
+
 ## Header
 
 The report header includes:
@@ -38,6 +40,9 @@ Rules:
 - Activity currency columns continue to show the selected activity currency before conversion.
 - Calculation currency columns show the selected report base currency.
 - Asset detail sections must render same-currency versus converted status from the selected activity currency or explicit conversion status preserved before conversion, not from post-conversion report-base amount currency.
+- `Asset Detail` `In-Year Activity` tables must render columns in this exact order: `Date`, `Source ID`, `Type`, `Quantity`, `Unit Price`, `Gross Value`, `Fee`, `Quantity After Row`, `Basis After Row`, `Original Activity Currency`, `Calculation Currency`, `Conversion Status`, and `Note`.
+- `Asset Detail` `In-Year Activity` tables must use `Original Activity Currency`, not `Activity Currency`, for the selected activity currency before conversion.
+- `Asset Detail` `Liquidation Calculations` tables must not include an `Activity Currency` column.
 - Any `Source ID` present in `Currency Conversion Audit` must not be labeled `same currency` in asset detail sections.
 - Explicit zero monetary values remain `0` after conversion handling, but zero-to-zero converted amount slots do not render as standalone audit rows or grouped amount items.
 - Zero-priced holding reductions with no proceeds and no acquisition cost do not require conversion audit entries.
