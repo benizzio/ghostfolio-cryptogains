@@ -73,8 +73,8 @@ func writeActivityBlock(builder *strings.Builder, section reportmodel.AssetDetai
 		return nil
 	}
 
-	builder.WriteString("| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency | Basis After Row | Calculation Currency | Quantity After Row | Conversion Status | Note |\n")
-	builder.WriteString("|------|-----------|------|----------|------------|-------------|-----|-------------------|-----------------|----------------------|--------------------|-------------------|------|\n")
+	builder.WriteString("| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |\n")
+	builder.WriteString("|------|-----------|------|----------|------------|-------------|-----|--------------------|-----------------|----------------------------|----------------------|-------------------|------|\n")
 	for _, row := range section.ActivityRows {
 		if err := writeActivityRow(builder, row); err != nil {
 			return err
@@ -127,10 +127,10 @@ func writeActivityRow(builder *strings.Builder, row reportmodel.AssetActivityRow
 		unitPriceText,
 		grossValueText,
 		feeText,
-		activityCurrencyColumn(row),
-		basisAfterRowText,
-		calculationCurrencyLabel(row.CalculationCurrency),
 		quantityAfterRowText,
+		basisAfterRowText,
+		activityCurrencyColumn(row),
+		calculationCurrencyLabel(row.CalculationCurrency),
 		conversionStatusColumn(row),
 		sanitizeInlineText(row.HoldingReductionExplanation),
 	))
@@ -146,8 +146,8 @@ func writeLiquidationBlock(builder *strings.Builder, section reportmodel.AssetDe
 	}
 
 	builder.WriteString("### Liquidation Calculations\n\n")
-	builder.WriteString("| Date | Source ID | Disposed Quantity | Activity Currency | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |\n")
-	builder.WriteString("|------|-----------|-------------------|-------------------|-----------------|--------------------------|--------------|----------------------|\n")
+	builder.WriteString("| Date | Source ID | Disposed Quantity | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |\n")
+	builder.WriteString("|------|-----------|-------------------|-----------------|--------------------------|--------------|----------------------|\n")
 	for _, liquidation := range section.LiquidationSummaries {
 		if err := writeLiquidationRow(builder, liquidation, fallbackCurrency); err != nil {
 			return err
@@ -182,11 +182,10 @@ func writeLiquidationRow(builder *strings.Builder, liquidation reportmodel.Liqui
 	}
 
 	builder.WriteString(fmt.Sprintf(
-		"| %s | %s | %s | %s | %s | %s | %s | %s |\n",
+		"| %s | %s | %s | %s | %s | %s | %s |\n",
 		liquidation.OccurredAt.Local().Format("2006-01-02 15:04:05"),
 		sanitizeInlineText(liquidation.SourceID),
 		disposedQuantityText,
-		sanitizeInlineText(liquidation.ActivityCurrency),
 		allocatedBasisText,
 		proceedsText,
 		gainOrLossText,

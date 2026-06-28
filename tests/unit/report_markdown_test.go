@@ -44,9 +44,9 @@ func TestRenderMarkdownIncludesHeaderSectionOrderAndRequiredTables(t *testing.T)
 		"| Asset | Net Gain Or Loss | Report Calculation Currency |",
 		"| Asset | Full Liquidation Count Through Year End | Main Section Status |",
 		"### In-Year Activity",
-		"| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency | Basis After Row | Calculation Currency | Quantity After Row | Conversion Status | Note |",
+		"| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |",
 		"### Liquidation Calculations",
-		"| Date | Source ID | Disposed Quantity | Activity Currency | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |",
+		"| Date | Source ID | Disposed Quantity | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |",
 	)
 }
 
@@ -115,9 +115,9 @@ func TestRenderMarkdownCanonicalDecimalsCurrenciesAndSecretExclusion(t *testing.
 	assertContainsString(t, document.Content, "| BTC | 1250.5 | USD |")
 	assertContainsString(t, document.Content, "| ETH | -10 | USD |")
 	assertContainsString(t, document.Content, "| Overall Yearly Net Total | 1240.5 | USD |")
-	assertContainsString(t, document.Content, "| btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | USD | 22009 | USD | 1 |")
-	assertContainsString(t, document.Content, "| xrp-reduction-2024-001 | SELL | 200 | 0 | 0 | 0 |  | 400 | USD | 800 |  | manual custody transfer token=[REDACTED] jwt=[REDACTED] payload=[REDACTED] |")
-	assertContainsString(t, document.Content, "| btc-sell-2024-001 | 1 | USD | 22009 | 25000 | 2991 | USD |")
+	assertContainsString(t, document.Content, "| btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | 1 | 22009 | USD | USD |")
+	assertContainsString(t, document.Content, "| xrp-reduction-2024-001 | SELL | 200 | 0 | 0 | 0 | 800 | 400 |  | USD |  | manual custody transfer token=[REDACTED] jwt=[REDACTED] payload=[REDACTED] |")
+	assertContainsString(t, document.Content, "| btc-sell-2024-001 | 1 | 22009 | 25000 | 2991 | USD |")
 	assertNotContainsString(t, document.Content, "secret-token")
 	assertNotContainsString(t, document.Content, "secret-jwt")
 	assertNotContainsString(t, document.Content, "opaque-payload")

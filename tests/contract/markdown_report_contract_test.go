@@ -44,12 +44,14 @@ func TestMarkdownReportDocumentContract(t *testing.T) {
 	assertContains(t, document.Content, "| Asset | Full Liquidation Count Through Year End | Main Section Status |")
 	assertContains(t, document.Content, "### Opening Position")
 	assertContains(t, document.Content, "### In-Year Activity")
-	assertContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency | Basis After Row | Calculation Currency | Quantity After Row | Conversion Status | Note |")
+	assertContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |")
 	assertContains(t, document.Content, "### Liquidation Calculations")
 	assertContains(t, document.Content, "### Closing Position")
-	assertContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | USD | 22009 | EUR | 1 | converted | note token=[REDACTED] |")
-	assertContains(t, document.Content, "| 2024-04-01 12:00:00 | xrp-reduction-2024-001 | SELL | 200 | 0 | 0 | 0 |  | 400 | EUR | 800 |  | custody transfer |")
-	assertContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | 1 | USD | 22009 | 25000 | 1240.5 | EUR |")
+	assertContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | 1 | 22009 | USD | EUR | converted | note token=[REDACTED] |")
+	assertContains(t, document.Content, "| 2024-04-01 12:00:00 | xrp-reduction-2024-001 | SELL | 200 | 0 | 0 | 0 | 800 | 400 |  | EUR |  | custody transfer |")
+	assertContains(t, document.Content, "| Date | Source ID | Disposed Quantity | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |")
+	assertContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | 1 | 22009 | 25000 | 1240.5 | EUR |")
+	assertNotContains(t, document.Content, "| Date | Source ID | Disposed Quantity | Activity Currency |")
 	assertNotContains(t, document.Content, "NOT APPLICABLE")
 	assertNotContains(t, document.Content, "secret-token")
 }
@@ -205,9 +207,10 @@ func TestMarkdownReportDistinguishesSameCurrencyAndConvertedRows(t *testing.T) {
 		t.Fatalf("render markdown report: %v", err)
 	}
 
-	assertContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency | Basis After Row | Calculation Currency | Quantity After Row | Conversion Status | Note |")
-	assertContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | USD | 22009 | EUR | 1 | converted | note token=[REDACTED] |")
-	assertContains(t, document.Content, "| 2024-02-01 09:30:00 | eth-sell-2024-001 | SELL | 2 | 1000 | 2000 | 0 | EUR | 1000 | EUR | 3 | same_currency | same-currency priced sale |")
+	assertContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |")
+	assertNotContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency |")
+	assertContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | 1 | 22009 | USD | EUR | converted | note token=[REDACTED] |")
+	assertContains(t, document.Content, "| 2024-02-01 09:30:00 | eth-sell-2024-001 | SELL | 2 | 1000 | 2000 | 0 | 3 | 1000 | EUR | EUR | same_currency | same-currency priced sale |")
 	assertNotContains(t, document.Content, "| 2024-02-01 | eth-sell-2024-001 | ETH | EUR | EUR |")
 	assertNotContains(t, document.Content, "secret-token")
 }
@@ -225,8 +228,27 @@ func TestMarkdownReportAuditSourceIDsDoNotRenderAsSameCurrency(t *testing.T) {
 
 	var audit = currencyConversionAuditSection(document.Content)
 	assertContains(t, audit, "| 2024-01-01 | btc-sell-2024-001 | BTC |")
-	assertContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | USD | 22009 | EUR | 1 | converted |")
-	assertNotContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | USD | 22009 | EUR | 1 | same_currency |")
+	assertContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | 1 | 22009 | USD | EUR | converted |")
+	assertNotContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | 1 | 22009 | USD | EUR | same_currency |")
+}
+
+// TestMarkdownReportAssetDetailCurrencyColumnContracts verifies BUG-007 asset
+// detail activity and liquidation currency-column contracts.
+// Authored by: OpenCode
+func TestMarkdownReportAssetDetailCurrencyColumnContracts(t *testing.T) {
+	t.Parallel()
+
+	var document, err = reportmarkdown.Render(contractMarkdownReportFixture(reportmodel.ReportBaseCurrencyEUR.Label()))
+	if err != nil {
+		t.Fatalf("render markdown report: %v", err)
+	}
+
+	assertContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |")
+	assertContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | 1 | 22009 | USD | EUR | converted | note token=[REDACTED] |")
+	assertNotContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency |")
+	assertContains(t, document.Content, "| Date | Source ID | Disposed Quantity | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |")
+	assertContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | 1 | 22009 | 25000 | 1240.5 | EUR |")
+	assertNotContains(t, document.Content, "| Date | Source ID | Disposed Quantity | Activity Currency | Allocated Basis |")
 }
 
 // TestMarkdownReportOutputFileContract verifies the visible output-file

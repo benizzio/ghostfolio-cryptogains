@@ -514,7 +514,10 @@ func TestRenderCoversDetailAndLiquidationBranches(t *testing.T) {
 			"### In-Year Activity",
 			"### Liquidation Calculations",
 			"### Closing Position",
-			"| sell-1 | SELL | 1 |  | 12 | 2 | USD | 0 | USD | 0 | same_currency |  |",
+			"| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |",
+			"| Date | Source ID | Disposed Quantity | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |",
+			"| sell-1 | SELL | 1 |  | 12 | 2 | 0 | 0 | USD | USD | same_currency |  |",
+			"| sell-1 | 1 | 10 | 10 | 0 | USD |",
 		} {
 			if !strings.Contains(document.Content, expected) {
 				t.Fatalf("expected rendered report to contain %q", expected)
@@ -715,11 +718,82 @@ func TestRendererUsesPreservedConversionStatusForAssetDetails(t *testing.T) {
 		t.Fatalf("write detail section: %v", err)
 	}
 	var rendered = builder.String()
-	if !strings.Contains(rendered, "| audited-converted-row | SELL | 1 |  | 12 |  | USD | 0 | USD | 0 | converted |  |") {
+	if !strings.Contains(rendered, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |") {
+		t.Fatalf("expected BUG-007 activity header, got %q", rendered)
+	}
+	if strings.Contains(rendered, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency |") {
+		t.Fatalf("expected old activity currency header to be absent, got %q", rendered)
+	}
+	if !strings.Contains(rendered, "| audited-converted-row | SELL | 1 |  | 12 |  | 0 | 0 | USD | USD | converted |  |") {
 		t.Fatalf("expected preserved converted status in detail row, got %q", rendered)
 	}
-	if strings.Contains(rendered, "| audited-converted-row | SELL | 1 |  | 12 |  | USD | 0 | USD | 0 | same_currency |  |") {
+	if strings.Contains(rendered, "| audited-converted-row | SELL | 1 |  | 12 |  | 0 | 0 | USD | USD | same_currency |  |") {
 		t.Fatalf("expected audited converted row not to render as same-currency, got %q", rendered)
+	}
+}
+
+// TestRendererAssetDetailCurrencyColumnContracts verifies BUG-007 activity and
+// liquidation table currency-column placement.
+// Authored by: OpenCode
+func TestRendererAssetDetailCurrencyColumnContracts(t *testing.T) {
+	t.Parallel()
+
+	var builder strings.Builder
+	var section = reportmodel.AssetDetailSection{
+		AssetIdentityKey:    "asset-eth",
+		DisplayLabel:        "ETH",
+		OpeningQuantity:     *apd.New(1, 0),
+		OpeningCostBasis:    *apd.New(10, 0),
+		ClosingQuantity:     *apd.New(0, 0),
+		ClosingCostBasis:    *apd.New(0, 0),
+		CalculationCurrency: "EUR",
+		ActivityRows: []reportmodel.AssetActivityRow{{
+			SourceID:            "eth-sell",
+			OccurredAt:          time.Date(2024, time.March, 2, 3, 4, 5, 0, time.UTC),
+			ActivityType:        reportmodel.ActivityTypeSell,
+			Quantity:            *apd.New(2, 0),
+			UnitPrice:           apdDecimalPointer(100),
+			GrossValue:          apdDecimalPointer(200),
+			FeeAmount:           apdDecimalPointer(1),
+			ActivityCurrency:    "USD",
+			BasisAfterRow:       *apd.New(50, 0),
+			CalculationCurrency: "EUR",
+			QuantityAfterRow:    *apd.New(3, 0),
+			ConversionStatus:    reportmodel.ConversionStatusConverted,
+		}},
+		LiquidationSummaries: []reportmodel.LiquidationCalculation{{
+			SourceID:               "eth-sell",
+			OccurredAt:             time.Date(2024, time.March, 2, 3, 4, 5, 0, time.UTC),
+			DisposedQuantity:       *apd.New(2, 0),
+			AllocatedBasis:         *apd.New(50, 0),
+			NetLiquidationProceeds: *apd.New(199, 0),
+			GainOrLoss:             *apd.New(149, 0),
+			ActivityCurrency:       "USD",
+			CalculationCurrency:    "EUR",
+		}},
+	}
+
+	if err := writeDetailSection(&builder, section, "EUR"); err != nil {
+		t.Fatalf("write detail section: %v", err)
+	}
+	var rendered = builder.String()
+	for _, expected := range []string{
+		"| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |",
+		"| eth-sell | SELL | 2 | 100 | 200 | 1 | 3 | 50 | USD | EUR | converted |  |",
+		"| Date | Source ID | Disposed Quantity | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |",
+		"| eth-sell | 2 | 50 | 199 | 149 | EUR |",
+	} {
+		if !strings.Contains(rendered, expected) {
+			t.Fatalf("expected rendered detail section to contain %q, got %q", expected, rendered)
+		}
+	}
+	for _, excluded := range []string{
+		"| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency |",
+		"| Date | Source ID | Disposed Quantity | Activity Currency | Allocated Basis |",
+	} {
+		if strings.Contains(rendered, excluded) {
+			t.Fatalf("expected rendered detail section to exclude %q, got %q", excluded, rendered)
+		}
 	}
 }
 
