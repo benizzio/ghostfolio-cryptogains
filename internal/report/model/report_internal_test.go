@@ -897,6 +897,34 @@ func TestCloneConvertedActivityAmountsCopiesEvidencePointers(t *testing.T) {
 	}
 }
 
+// TestCloneExchangeRateEvidenceCopiesRateValues verifies retained rate evidence
+// cloning does not share decimal coefficient storage between copies.
+// Authored by: OpenCode
+func TestCloneExchangeRateEvidenceCopiesRateValues(t *testing.T) {
+	t.Parallel()
+
+	var activityDate = time.Date(2024, time.January, 5, 0, 0, 0, 0, time.UTC)
+	var sources = []ExchangeRateEvidence{{
+		SourceCurrency:   "EUR",
+		BaseCurrency:     ReportBaseCurrencyUSD,
+		ActivityDate:     activityDate,
+		RateDate:         activityDate,
+		Authority:        RateAuthorityFederalReserve,
+		ProviderID:       RateProviderIDFederalReserveH10,
+		RateKind:         "noon buying rate",
+		QuoteDirection:   QuoteDirectionBasePerSource,
+		RateValue:        mustReportDecimal(t, "123456789.987654321"),
+		DatasetReference: "H10/RXI$US_N.B.EU",
+	}}
+
+	var cloned = cloneExchangeRateEvidence(sources)
+	cloned[0].RateValue.SetInt64(2)
+
+	if sources[0].RateValue.Cmp(&cloned[0].RateValue) == 0 {
+		t.Fatalf("expected cloned rate value mutation not to affect source")
+	}
+}
+
 // TestBasisMatchValidationAndCloneOptionalDecimalCoverRemainingBranches
 // verifies the remaining basis-match guardrails and optional-decimal clone
 // branches.
@@ -1232,6 +1260,12 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 	invalidEntry.RateDate = activityDate.AddDate(0, 0, 1)
 	if err := invalidEntry.Validate(); err == nil || !strings.Contains(err.Error(), "must not be after") {
 		t.Fatalf("expected audit future rate-date rejection, got %v", err)
+	}
+	var sameCalendarLaterInstantEntry = entry
+	sameCalendarLaterInstantEntry.ActivityDate = time.Date(2024, time.January, 5, 9, 0, 0, 0, time.UTC)
+	sameCalendarLaterInstantEntry.RateDate = time.Date(2024, time.January, 5, 17, 0, 0, 0, time.UTC)
+	if err := sameCalendarLaterInstantEntry.validateRateEvidence(); err != nil {
+		t.Fatalf("expected audit same-calendar later instant rate date to validate: %v", err)
 	}
 	invalidEntry = entry
 	invalidEntry.Amounts = nil

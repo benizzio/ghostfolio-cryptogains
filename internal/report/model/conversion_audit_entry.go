@@ -96,7 +96,7 @@ func (entry ConversionAuditEntry) validateRateEvidence() error {
 	if entry.RateDate.IsZero() {
 		return fmt.Errorf("conversion audit entry rate date is required")
 	}
-	if entry.RateDate.After(entry.ActivityDate) {
+	if datesupport.CalendarDate(entry.RateDate).After(datesupport.CalendarDate(entry.ActivityDate)) {
 		return fmt.Errorf("conversion audit entry rate date must not be after activity date")
 	}
 	if err := validateRateAuthority(entry.RateAuthority); err != nil {

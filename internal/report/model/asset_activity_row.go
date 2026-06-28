@@ -61,7 +61,8 @@ func (row AssetActivityRow) Validate() error {
 		return err
 	}
 	if strings.TrimSpace(string(row.ConversionStatus)) != "" {
-		if err := validateConversionStatus(row.ConversionStatus); err != nil {
+		var err = validateConversionStatus(row.ConversionStatus)
+		if err != nil {
 			return fmt.Errorf("asset activity row conversion status: %w", err)
 		}
 	}

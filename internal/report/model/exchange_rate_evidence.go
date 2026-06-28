@@ -117,7 +117,12 @@ func (evidence ExchangeRateEvidence) Validate() error {
 // construction.
 // Authored by: OpenCode
 func cloneExchangeRateEvidence(sources []ExchangeRateEvidence) []ExchangeRateEvidence {
-	return append([]ExchangeRateEvidence(nil), sources...)
+	var cloned = append([]ExchangeRateEvidence(nil), sources...)
+	for index := range cloned {
+		cloned[index].RateValue.Set(&sources[index].RateValue)
+	}
+
+	return cloned
 }
 
 // validateRateAuthority rejects unsupported report-owned provider authorities.

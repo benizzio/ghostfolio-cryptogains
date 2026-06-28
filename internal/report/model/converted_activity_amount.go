@@ -60,22 +60,27 @@ func (amount ConvertedActivityAmount) Validate() error {
 	if strings.TrimSpace(amount.SourceID) == "" {
 		return fmt.Errorf("converted activity amount source ID is required")
 	}
-	if err := validateConvertedAmountKind(amount.AmountKind); err != nil {
+	var err = validateConvertedAmountKind(amount.AmountKind)
+	if err != nil {
 		return fmt.Errorf("converted activity amount kind: %w", err)
 	}
 	if strings.TrimSpace(amount.OriginalCurrency) == "" {
 		return fmt.Errorf("converted activity amount original currency is required")
 	}
-	if err := validateReportBaseCurrency(amount.ReportBaseCurrency); err != nil {
+	err = validateReportBaseCurrency(amount.ReportBaseCurrency)
+	if err != nil {
 		return fmt.Errorf("converted activity amount report base currency: %w", err)
 	}
-	if err := validateNonNegativeDecimal(amount.OriginalAmount, "converted activity amount original amount"); err != nil {
+	err = validateNonNegativeDecimal(amount.OriginalAmount, "converted activity amount original amount")
+	if err != nil {
 		return err
 	}
-	if err := validateNonNegativeDecimal(amount.ConvertedAmount, "converted activity amount converted amount"); err != nil {
+	err = validateNonNegativeDecimal(amount.ConvertedAmount, "converted activity amount converted amount")
+	if err != nil {
 		return err
 	}
-	if err := validateConversionStatus(amount.ConversionStatus); err != nil {
+	err = validateConversionStatus(amount.ConversionStatus)
+	if err != nil {
 		return fmt.Errorf("converted activity amount status: %w", err)
 	}
 
@@ -151,7 +156,8 @@ func validateConvertedAmount(amount ConvertedActivityAmount) error {
 	if amount.ExchangeRateEvidence == nil {
 		return fmt.Errorf("converted amount exchange-rate evidence is required")
 	}
-	if err := amount.ExchangeRateEvidence.Validate(); err != nil {
+	var err = amount.ExchangeRateEvidence.Validate()
+	if err != nil {
 		return fmt.Errorf("converted amount exchange-rate evidence: %w", err)
 	}
 	if strings.TrimSpace(amount.ExchangeRateEvidence.SourceCurrency) != strings.TrimSpace(amount.OriginalCurrency) {
