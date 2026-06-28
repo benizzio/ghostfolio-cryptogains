@@ -16,9 +16,11 @@
 
 **Bugfix**: 2026-06-24 — BUG-005 Updated from bugfix patch
 
+**Bugfix**: 2026-06-28 — BUG-006 Updated from bugfix patch
+
 ## Summary
 
-Add a required report base-currency selection to yearly capital gains report generation, limited to `USD` and `EUR`. The report pipeline will keep the existing single-activity monetary-context selection rules, then convert every priced activity whose selected currency differs from the report base currency before cost-basis, proceeds, gain/loss, and report-total calculations consume the values. EUR-base conversions use the ECB Data Portal `EXR` daily reference-rate data. USD-base conversions use the Federal Reserve Board H.10/Data Download Program data. Provider-specific payloads, quote directions, provider selection, and canonicalization stay behind `internal/integration/currency/`, which exposes a public rate lookup service consumed by the report calculator and disclosed in the Markdown report through canonical rate evidence. ~~Markdown rendering derives the `Rate Source Summary` from selected base-currency provider metadata once per report, while `Quote Direction`, `Rate Value`, and other rate-level evidence remain in `Currency Conversion Audit` rows.~~ BUG-004 clarifies that Markdown rendering derives the `Rate Source Summary` from selected base-currency provider metadata once per report, while ~~the compact `Currency Conversion Audit` renders only per-amount conversion-specific fields in BUG-004 order and does not repeat `Rate Authority` or `Rate Kind` columns.~~ BUG-005 clarifies that the rendered `Currency Conversion Audit` groups non-zero conversion-relevant amount kinds under one row or equivalent subsection per converted source activity, omits zero-to-zero amount slots, and does not repeat `Rate Authority` or `Rate Kind` columns.
+Add a required report base-currency selection to yearly capital gains report generation, limited to `USD` and `EUR`. The report pipeline will keep the existing single-activity monetary-context selection rules, then convert every priced activity whose selected currency differs from the report base currency before cost-basis, proceeds, gain/loss, and report-total calculations consume the values. EUR-base conversions use the ECB Data Portal `EXR` daily reference-rate data. USD-base conversions use the Federal Reserve Board H.10/Data Download Program data. Provider-specific payloads, quote directions, provider selection, and canonicalization stay behind `internal/integration/currency/`, which exposes a public rate lookup service consumed by the report calculator and disclosed in the Markdown report through canonical rate evidence. ~~Markdown rendering derives the `Rate Source Summary` from selected base-currency provider metadata once per report, while `Quote Direction`, `Rate Value`, and other rate-level evidence remain in `Currency Conversion Audit` rows.~~ BUG-004 clarifies that Markdown rendering derives the `Rate Source Summary` from selected base-currency provider metadata once per report, while ~~the compact `Currency Conversion Audit` renders only per-amount conversion-specific fields in BUG-004 order and does not repeat `Rate Authority` or `Rate Kind` columns.~~ BUG-005 clarifies that the rendered `Currency Conversion Audit` groups non-zero conversion-relevant amount kinds under one row or equivalent subsection per converted source activity, omits zero-to-zero amount slots, and does not repeat `Rate Authority` or `Rate Kind` columns. BUG-006 clarifies that asset detail sections must render same-currency versus converted status from the original selected activity currency or explicit conversion status, not from the post-conversion report-base currency.
 
 ## Technical Context
 
@@ -146,6 +148,7 @@ tests/
 6. In the report calculation tier, convert every selected monetary value that can affect cost basis, proceeds, fees, gains, losses, or totals before it enters basis state or liquidation calculations.
 7. Use the existing 16-decimal round-half-up policy only when division or another bounded internal decimal result is required. Preserve provider-published rate precision in audit evidence.
 8. ~~Render report-level source summary content from selected provider metadata once per report; render quote direction, rate value, and converted amount evidence only in per-activity audit details.~~ BUG-004 clarifies that report-level source summary content comes from selected provider metadata once per report, and ~~compact per-amount audit rows use the BUG-004 column order with `Amount Kind`, `Rate Date`, source/original amount, report base/converted amount, `Quote Direction`, and `Rate Value`, without repeating `Rate Authority` or `Rate Kind` columns.~~ BUG-005 supersedes per-amount rendered audit rows: render one grouped activity-level row or equivalent subsection containing non-zero amount-kind conversions, `Rate Date`, source/original amounts, report base/converted amounts, `Quote Direction`, and `Rate Value`, without repeating `Rate Authority`, `Rate Kind`, or zero-to-zero amount slots.
+9. Render asset detail same-currency versus converted labels from the selected activity currency or explicit conversion status preserved before conversion; any `Source ID` included in `Currency Conversion Audit` must not render as `same currency` in asset detail sections.
 
 ## Performance Validation
 
@@ -170,6 +173,8 @@ Canonical rate evidence may retain authority and rate-kind fields for validation
 
 Report calculation may retain converted amount records at amount-kind granularity for calculation integrity, but Markdown rendering must preserve the `ConversionAuditEntry` activity grouping instead of exposing that internal granularity as one rendered row per amount kind. Explicit zero-to-zero amount slots are not report-visible audit evidence.
 
+Asset detail rendering must consume the same preserved conversion classification used to create `ConversionAuditEntry`; it must not infer same-currency status from converted report-base amounts.
+
 The issue requirement for scalability is handled by keeping provider selection behind the currency integration service's base-currency registry. Adding a future base currency should require adding one provider adapter and registry entry, not changing cost-basis methods or report rendering logic beyond supported currency labels.
 
 ## Failure Handling
@@ -191,6 +196,7 @@ The issue requirement for scalability is handled by keeping provider selection b
 - External integration tests directly exercise each official-provider HTTP client endpoint with one fixed historical observation and committed expected rate data, avoiding repeated live-provider load and avoiding report-domain setup.
 - Federal Reserve external integration tests must call the DDP `Output.aspx` direct CSV package endpoint and commit expected values from that same current DDP package source; BUG-002 updates the EUR `2024-01-05` expectation to `1.0957`.
 - Regression tests verify existing single-currency report cases produce the same monetary results when selected activity currency equals the chosen report base currency.
+- Regression tests cross-check asset detail sections against `Currency Conversion Audit` by `Source ID` so audited converted activities cannot render with a `same currency` label.
 - Performance validation uses the 10,000-activity responsiveness fixture to assert asynchronous TUI behavior, bounded provider lookups by unique rate key, no per-monetary-field network requests, and successful calculation at scale with deterministic provider fixtures.
 - Final coverage-gate validation uses the maintained repository output paths `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`; root-level `coverage.cov` and `coverage.xml` are not valid final verification artifacts for this feature.
 - Existing empirical tests remain unchanged and continue to guard cost-basis methods without conversion.
@@ -204,6 +210,8 @@ BUG-003 adds a rendering edge case where one selected provider can produce many 
 BUG-004 adds a rendering contract edge case where retained provider metadata must not become repeated per-amount audit columns. The simpler approach is to keep authority and rate kind in retained evidence and the provider-level source summary, while changing only Markdown audit table rendering and tests.
 
 BUG-005 adds a rendering contract edge case where retained amount-kind conversion records must not become one rendered audit row per amount kind. The simpler approach is to keep amount-level records for calculation integrity, then group non-zero displayable amount conversions by `ConversionAuditEntry` during Markdown rendering.
+
+BUG-006 adds a rendering consistency edge case where converted report-base amounts can be mistaken for same-currency asset detail rows. The simpler approach is to preserve and render explicit conversion classification instead of inferring status from rendered amount currency.
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
