@@ -16,6 +16,16 @@ import (
 	"github.com/cockroachdb/apd/v3"
 )
 
+// contractMarkdownFixtureLocation fixes source timestamps so UTC rendering
+// expectations do not depend on the host timezone.
+// Authored by: OpenCode
+var contractMarkdownFixtureLocation = time.FixedZone("contract-markdown-fixture", 60*60)
+
+// contractMarkdownFixtureSummerLocation fixes source timestamps for fixture rows
+// that intentionally exercise a summer-offset UTC rendering contract.
+// Authored by: OpenCode
+var contractMarkdownFixtureSummerLocation = time.FixedZone("contract-markdown-fixture-summer", 2*60*60)
+
 // TestMarkdownReportDocumentContract verifies the required Markdown document
 // shape from the contract.
 // Authored by: OpenCode
@@ -117,7 +127,7 @@ func TestMarkdownReportRateSourceSummaryAggregatesByProvider(t *testing.T) {
 	))
 	report.DetailSections[1].ActivityRows = append(report.DetailSections[1].ActivityRows, reportmodel.AssetActivityRow{
 		SourceID:            "gbp-buy-2024-001",
-		OccurredAt:          time.Date(2024, time.January, 2, 0, 15, 0, 0, time.Local),
+		OccurredAt:          time.Date(2024, time.January, 2, 0, 15, 0, 0, contractMarkdownFixtureLocation),
 		ActivityType:        reportmodel.ActivityTypeBuy,
 		Quantity:            mustContractDecimal("1"),
 		GrossValue:          contractDecimalPointer("100"),
@@ -321,7 +331,7 @@ func contractMarkdownReportFixture(reportCalculationCurrency string) reportmodel
 			CalculationCurrency: reportCalculationCurrency,
 			ActivityRows: []reportmodel.AssetActivityRow{{
 				SourceID:                    "btc-sell-2024-001",
-				OccurredAt:                  time.Date(2024, time.January, 1, 0, 15, 0, 0, time.Local),
+				OccurredAt:                  time.Date(2024, time.January, 1, 0, 15, 0, 0, contractMarkdownFixtureLocation),
 				ActivityType:                reportmodel.ActivityTypeSell,
 				Quantity:                    mustContractDecimal("1"),
 				UnitPrice:                   contractDecimalPointer("25000"),
@@ -336,7 +346,7 @@ func contractMarkdownReportFixture(reportCalculationCurrency string) reportmodel
 			}},
 			LiquidationSummaries: []reportmodel.LiquidationCalculation{{
 				SourceID:               "btc-sell-2024-001",
-				OccurredAt:             time.Date(2024, time.January, 1, 0, 15, 0, 0, time.Local),
+				OccurredAt:             time.Date(2024, time.January, 1, 0, 15, 0, 0, contractMarkdownFixtureLocation),
 				DisposedQuantity:       mustContractDecimal("1"),
 				AllocatedBasis:         mustContractDecimal("22009"),
 				NetLiquidationProceeds: mustContractDecimal("25000"),
@@ -354,7 +364,7 @@ func contractMarkdownReportFixture(reportCalculationCurrency string) reportmodel
 			CalculationCurrency: reportCalculationCurrency,
 			ActivityRows: []reportmodel.AssetActivityRow{{
 				SourceID:                    "eth-sell-2024-001",
-				OccurredAt:                  time.Date(2024, time.February, 1, 9, 30, 0, 0, time.Local),
+				OccurredAt:                  time.Date(2024, time.February, 1, 9, 30, 0, 0, contractMarkdownFixtureLocation),
 				ActivityType:                reportmodel.ActivityTypeSell,
 				Quantity:                    mustContractDecimal("2"),
 				UnitPrice:                   contractDecimalPointer("1000"),
@@ -369,7 +379,7 @@ func contractMarkdownReportFixture(reportCalculationCurrency string) reportmodel
 			}},
 			LiquidationSummaries: []reportmodel.LiquidationCalculation{{
 				SourceID:               "eth-sell-2024-001",
-				OccurredAt:             time.Date(2024, time.February, 1, 9, 30, 0, 0, time.Local),
+				OccurredAt:             time.Date(2024, time.February, 1, 9, 30, 0, 0, contractMarkdownFixtureLocation),
 				DisposedQuantity:       mustContractDecimal("2"),
 				AllocatedBasis:         mustContractDecimal("1000"),
 				NetLiquidationProceeds: mustContractDecimal("2000"),
@@ -387,7 +397,7 @@ func contractMarkdownReportFixture(reportCalculationCurrency string) reportmodel
 			CalculationCurrency: reportCalculationCurrency,
 			ActivityRows: []reportmodel.AssetActivityRow{{
 				SourceID:                    "xrp-reduction-2024-001",
-				OccurredAt:                  time.Date(2024, time.April, 1, 12, 0, 0, 0, time.Local),
+				OccurredAt:                  time.Date(2024, time.April, 1, 12, 0, 0, 0, contractMarkdownFixtureSummerLocation),
 				ActivityType:                reportmodel.ActivityTypeSell,
 				Quantity:                    mustContractDecimal("200"),
 				UnitPrice:                   contractDecimalPointer("0"),
