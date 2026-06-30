@@ -47,27 +47,33 @@ func TestReportGenerationWorkflowContract(t *testing.T) {
 	assertContains(t, selection, "Average Cost Basis")
 	assertContains(t, selection, "Scope-Local Exact Unit Matching")
 	assertContains(t, selection, "Oldest-Acquired")
+	assertContains(t, selection, "Report Base Currency")
+	assertContains(t, selection, "USD")
+	assertContains(t, selection, "EUR")
+	assertNotContains(t, selection, "GBP")
 	assertContains(t, selection, "Method Explanation")
 	assertContains(t, selection, reportmodel.CostBasisMethodFIFO.Explanation())
 	assertContains(t, selection, "Generate Report")
 	assertContains(t, selection, "Back")
 
 	var busy = screen.ReportBusyScreenView(screen.ReportBusyScreenParams{
-		Theme:        component.DefaultTheme(),
-		Width:        100,
-		Height:       32,
-		SelectedYear: 2024,
-		MethodLabel:  "FIFO",
-		BusyText:     "Generating capital gains report...",
-		SpinnerFrame: "*",
+		Theme:              component.DefaultTheme(),
+		Width:              100,
+		Height:             32,
+		SelectedYear:       2024,
+		MethodLabel:        "FIFO",
+		ReportBaseCurrency: reportmodel.ReportBaseCurrencyUSD,
+		BusyText:           "Generating capital gains report...",
+		SpinnerFrame:       "*",
 	})
 	assertContains(t, busy, "Report Generation")
 	assertContains(t, busy, "Generating capital gains report")
 	assertContains(t, busy, "Selected Year: 2024")
 	assertContains(t, busy, "Cost Basis Method: FIFO")
+	assertContains(t, busy, "Report Base Currency: USD")
 	assertNotContains(t, busy, "# Ghostfolio Capital Gains And Losses Report")
 
-	request, err := reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
+	request, err := reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
@@ -94,6 +100,7 @@ func TestReportGenerationWorkflowContract(t *testing.T) {
 	assertContains(t, result, "Saved Markdown Path: /tmp/Documents/ghostfolio-capital-gains-2024-fifo.md")
 	assertContains(t, result, "Selected Year: 2024")
 	assertContains(t, result, "Cost Basis Method: FIFO")
+	assertContains(t, result, "Report Base Currency: USD")
 	assertContains(t, result, "Back To Sync and Reports")
 	assertContains(t, result, "Generate Another Report")
 
@@ -110,15 +117,17 @@ func TestReportGenerationWorkflowContract(t *testing.T) {
 			Message:       "Could not generate the selected report because the synced activity history is not supported for safe calculation.",
 			Diagnostic:    runtime.DiagnosticReportState{Eligible: true},
 			Request: reportmodel.ReportRequest{
-				Year:            2025,
-				CostBasisMethod: reportmodel.CostBasisMethodHIFO,
-				RequestedAt:     time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC),
+				Year:               2025,
+				CostBasisMethod:    reportmodel.CostBasisMethodHIFO,
+				ReportBaseCurrency: reportmodel.ReportBaseCurrencyEUR,
+				RequestedAt:        time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC),
 			},
 		},
 	})
 	assertContains(t, failure, "Failure Category: unsupported report calculation")
 	assertContains(t, failure, "Selected Year: 2025")
 	assertContains(t, failure, "Cost Basis Method: HIFO")
+	assertContains(t, failure, "Report Base Currency: EUR")
 	assertContains(t, failure, "Generate Diagnostic Report")
 	assertContains(t, failure, "Generate Diagnostic Report is available for this failure from this screen.")
 	assertContains(t, failure, "Back To Sync and Reports")
@@ -144,4 +153,27 @@ func TestReportGenerationWorkflowContract(t *testing.T) {
 	})
 	assertContains(t, devFailure, "Diagnostic report generated successfully.")
 	assertContains(t, devFailure, "Diagnostic Report Path: /tmp/example.diagnostic.json")
+}
+
+// TestReportBaseCurrencyChoiceContract verifies the supported report base
+// currency set used by report generation requests.
+// Authored by: OpenCode
+func TestReportBaseCurrencyChoiceContract(t *testing.T) {
+	t.Parallel()
+
+	var currencies = reportmodel.SupportedReportBaseCurrencies()
+	if len(currencies) != 2 {
+		t.Fatalf("expected exactly two report base currencies, got %#v", currencies)
+	}
+	if currencies[0] != reportmodel.ReportBaseCurrencyUSD || currencies[1] != reportmodel.ReportBaseCurrencyEUR {
+		t.Fatalf("expected USD and EUR report base currencies in stable order, got %#v", currencies)
+	}
+
+	var err error
+	for _, unsupported := range []reportmodel.ReportBaseCurrency{"", "GBP"} {
+		_, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, unsupported, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
+		if err == nil {
+			t.Fatalf("expected unsupported report base currency %q to fail request validation", unsupported)
+		}
+	}
 }

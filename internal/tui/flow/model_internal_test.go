@@ -934,6 +934,11 @@ func TestUpdateReportCoversSelectionBusyAndResultBranches(t *testing.T) {
 	model = updated.(*Model)
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*Model)
+	if cmd != nil || model.report.FocusArea != reportSelectionFocusAction {
+		t.Fatalf("expected base-currency activation to advance to actions, got cmd=%v report=%#v", cmd, model.report)
+	}
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = updated.(*Model)
 	if model.active != reportBusyScreenKey || !model.report.Busy {
 		t.Fatalf("expected report generation busy state, got active=%s report=%#v", model.active, model.report)
 	}
@@ -956,7 +961,7 @@ func TestUpdateReportCoversSelectionBusyAndResultBranches(t *testing.T) {
 	if !reportService.called {
 		t.Fatalf("expected report service Generate to be called")
 	}
-	if reportService.request.Request.Year != 2025 || reportService.request.Request.CostBasisMethod != reportmodel.CostBasisMethodLIFO {
+	if reportService.request.Request.Year != 2025 || reportService.request.Request.CostBasisMethod != reportmodel.CostBasisMethodLIFO || reportService.request.Request.ReportBaseCurrency != reportmodel.ReportBaseCurrencyUSD {
 		t.Fatalf("expected report service request to use selected year and method, got %#v", reportService.request.Request)
 	}
 
@@ -986,6 +991,126 @@ func TestUpdateReportCoversSelectionBusyAndResultBranches(t *testing.T) {
 	}
 }
 
+// TestReportSelectionFocusIncludesBaseCurrencyPane verifies keyboard focus
+// moves through year, method, base currency, and action panes before wrapping.
+// Authored by: OpenCode
+func TestReportSelectionFocusIncludesBaseCurrencyPane(t *testing.T) {
+	t.Parallel()
+
+	var config = mustSetupConfig(t)
+	var model = newTestModel(t, &config)
+	model.active = reportSelectionScreenKey
+	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
+	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
+
+	model.advanceReportSelectionFocus()
+	if model.report.FocusArea != 1 {
+		t.Fatalf("expected first focus move to reach method pane, got %d", model.report.FocusArea)
+	}
+	model.advanceReportSelectionFocus()
+	if model.report.FocusArea != 2 {
+		t.Fatalf("expected second focus move to reach base-currency pane, got %d", model.report.FocusArea)
+	}
+	model.advanceReportSelectionFocus()
+	if model.report.FocusArea != 3 {
+		t.Fatalf("expected third focus move to reach action pane after base-currency pane, got %d", model.report.FocusArea)
+	}
+	model.advanceReportSelectionFocus()
+	if model.report.FocusArea != 0 {
+		t.Fatalf("expected focus to wrap to year pane after actions, got %d", model.report.FocusArea)
+	}
+}
+
+// TestReportSelectionDefaultsBaseCurrencyAndCanGenerate verifies a report can
+// start from the initial selection state because a base currency is preselected.
+// Authored by: OpenCode
+func TestReportSelectionDefaultsBaseCurrencyAndCanGenerate(t *testing.T) {
+	t.Parallel()
+
+	var config = mustSetupConfig(t)
+	var reportService = &testReportService{}
+	var model = newTestModel(t, &config)
+	model.deps.ReportService = reportService
+	model.active = reportSelectionScreenKey
+	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
+	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
+	if model.report.BaseCurrencyIndex != 0 || model.report.SelectedBaseCurrency != reportmodel.ReportBaseCurrencyUSD {
+		t.Fatalf("expected initial report state to select USD at index 0, got %#v", model.report)
+	}
+	if !model.reportCanGenerate() {
+		t.Fatalf("expected initial report state to be ready to generate, got %#v", model.report)
+	}
+
+	var items = model.reportSelectionMenuItems()
+	if len(items) == 0 || items[0].Label != component.GenerateReportActionLabel {
+		t.Fatalf("expected Generate Report to be the first report-selection action, got %#v", items)
+	}
+	if !items[0].Enabled {
+		t.Fatalf("expected Generate Report to be enabled with default base currency, got %#v", items[0])
+	}
+
+	model.report.FocusArea = reportSelectionFocusAction
+	model.report.ActionIndex = 0
+	var updated, cmd = model.activateReportSelection()
+	if cmd == nil {
+		t.Fatalf("expected default generation activation to start asynchronous report generation")
+	}
+	model = updated.(*Model)
+	if model.active != reportBusyScreenKey || !model.report.Busy {
+		t.Fatalf("expected default generation activation to enter report busy state, got active=%s report=%#v", model.active, model.report)
+	}
+
+	model = newTestModel(t, &config)
+	model.deps.ReportService = reportService
+	model.active = reportSelectionScreenKey
+	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
+	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
+
+	model.report.FocusArea = reportSelectionFocusAction
+	model.report.SelectedBaseCurrency = ""
+	updated, cmd = model.activateReportSelection()
+	if cmd != nil {
+		t.Fatalf("expected disabled activation to stay synchronous")
+	}
+	model = assertUpdatedModel(t, updated)
+	if model.active != reportSelectionScreenKey || reportService.called {
+		t.Fatalf("expected disabled activation to remain on selection without report service call, active=%s called=%v", model.active, reportService.called)
+	}
+	updated, cmd = model.startReportGeneration()
+	if cmd != nil {
+		t.Fatalf("expected direct start with empty base currency to stay synchronous")
+	}
+	model = assertUpdatedModel(t, updated)
+	if model.active != reportSelectionScreenKey || reportService.called {
+		t.Fatalf("expected direct start with empty base currency to remain on selection without report service call, active=%s called=%v", model.active, reportService.called)
+	}
+}
+
+// TestReportSelectionActivationFallsBackFromInvalidBaseCurrencyIndex verifies
+// activating a stale base-currency index restores the first supported currency.
+// Authored by: OpenCode
+func TestReportSelectionActivationFallsBackFromInvalidBaseCurrencyIndex(t *testing.T) {
+	t.Parallel()
+
+	var config = mustSetupConfig(t)
+	var model = newTestModel(t, &config)
+	model.active = reportSelectionScreenKey
+	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
+	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
+	model.report.FocusArea = reportSelectionFocusBaseCurrency
+	model.report.BaseCurrencyIndex = 99
+	model.report.SelectedBaseCurrency = ""
+
+	var updated, cmd = model.activateReportSelection()
+	if cmd != nil {
+		t.Fatalf("expected base-currency fallback activation to stay synchronous")
+	}
+	model = assertUpdatedModel(t, updated)
+	if model.report.BaseCurrencyIndex != 0 || model.report.SelectedBaseCurrency != reportmodel.ReportBaseCurrencyUSD || model.report.FocusArea != reportSelectionFocusAction {
+		t.Fatalf("expected invalid base-currency index to fall back to USD and actions, got %#v", model.report)
+	}
+}
+
 func TestUpdateReportCoversIgnoredAndFallbackBranches(t *testing.T) {
 	t.Parallel()
 
@@ -1001,7 +1126,7 @@ func TestUpdateReportCoversIgnoredAndFallbackBranches(t *testing.T) {
 	}
 
 	model = updated.(*Model)
-	model.report.FocusArea = 2
+	model.report.FocusArea = reportSelectionFocusAction
 	model.report.ActionIndex = 1
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	if cmd != nil {
@@ -1037,7 +1162,7 @@ func TestUpdateReportCoversIgnoredAndFallbackBranches(t *testing.T) {
 	model.active = reportSelectionScreenKey
 	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024, 2025}}
 	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
-	model.report.FocusArea = 2
+	model.report.FocusArea = reportSelectionFocusAction
 	model.report.ActionIndex = 0
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyUp}))
 	if cmd != nil {
@@ -1064,7 +1189,7 @@ func TestUpdateReportCoversIgnoredAndFallbackBranches(t *testing.T) {
 		t.Fatalf("expected method selection to move upward, got %#v", model.report)
 	}
 
-	model.report.FocusArea = 2
+	model.report.FocusArea = reportSelectionFocusAction
 	model.report.ActionIndex = 0
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 	model = updated.(*Model)
@@ -1082,8 +1207,9 @@ func TestUpdateReportCoversIgnoredAndFallbackBranches(t *testing.T) {
 	model.active = reportSelectionScreenKey
 	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
 	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
-	model.report.SelectedYear = 0
-	model.report.FocusArea = 2
+	model.report.MethodIndex = 99
+	model.report.FocusArea = reportSelectionFocusAction
+	model.report.SelectedBaseCurrency = reportmodel.ReportBaseCurrencyUSD
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	if cmd != nil {
 		t.Fatalf("expected invalid request failure to stay synchronous")
@@ -1097,7 +1223,8 @@ func TestUpdateReportCoversIgnoredAndFallbackBranches(t *testing.T) {
 	model.active = reportSelectionScreenKey
 	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
 	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
-	model.report.FocusArea = 2
+	model.report.FocusArea = reportSelectionFocusAction
+	model.report.SelectedBaseCurrency = reportmodel.ReportBaseCurrencyUSD
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	if cmd != nil {
 		t.Fatalf("expected missing report service failure to stay synchronous")
@@ -1746,7 +1873,7 @@ func TestGenerateDiagnosticReportAndServerReplacementIgnoreBranches(t *testing.T
 	model.active = reportSelectionScreenKey
 	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
 	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
-	model.report.FocusArea = 2
+	model.report.FocusArea = reportSelectionFocusAction
 	model.report.ActionIndex = 99
 	updated, cmd = model.activateReportSelection()
 	if cmd != nil || updated.(*Model).active != reportSelectionScreenKey {
@@ -1857,7 +1984,7 @@ func TestUpdateReportAndSyncHelperBranches(t *testing.T) {
 	model.active = reportSelectionScreenKey
 	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024, 2025}}
 	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
-	model.report.FocusArea = 2
+	model.report.FocusArea = reportSelectionFocusAction
 	model.report.ActionIndex = 1
 
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyUp}))
@@ -1867,6 +1994,7 @@ func TestUpdateReportAndSyncHelperBranches(t *testing.T) {
 
 	model = updated.(*Model)
 	model.report.MethodIndex = 99
+	model.report.SelectedBaseCurrency = reportmodel.ReportBaseCurrencyUSD
 
 	updated, cmd = model.startReportGeneration()
 	model = updated.(*Model)
@@ -1887,8 +2015,9 @@ func TestUpdateReportAndSyncHelperBranches(t *testing.T) {
 	model.active = reportSelectionScreenKey
 	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
 	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
-	model.report.FocusArea = 2
+	model.report.FocusArea = reportSelectionFocusAction
 	model.report.SelectedYear = 0
+	model.report.SelectedBaseCurrency = reportmodel.ReportBaseCurrencyUSD
 	model.deps.ReportService = &testReportService{}
 	updated, cmd = model.startReportGeneration()
 	if cmd != nil {

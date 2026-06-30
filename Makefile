@@ -6,7 +6,7 @@ MODULE_PATH = $(shell $(GO) list -m)
 ALL_PACKAGES = $(shell $(GO) list ./...)
 NON_EMPIRICAL_PACKAGES = $(filter-out $(MODULE_PATH)/tests/empirical,$(ALL_PACKAGES))
 
-.PHONY: run run-dev test test-empirical regenerate-empirical-fixtures coverage
+.PHONY: run run-dev test test-empirical test-external-integration regenerate-empirical-fixtures coverage
 
 run:
 	$(GO) run ./cmd/ghostfolio-cryptogains $(ARGS)
@@ -19,6 +19,9 @@ test: test-empirical
 
 test-empirical:
 	$(GO) test ./tests/empirical -count=1 -v
+
+test-external-integration:
+	GHOSTFOLIO_CRYPTOGAINS_RUN_EXTERNAL_INTEGRATION=1 $(GO) test ./tests/externalintegration -count=1 -v
 
 regenerate-empirical-fixtures:
 	$(GO) run ./tools/empiricaloracle --regenerate

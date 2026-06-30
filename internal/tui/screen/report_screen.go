@@ -16,31 +16,34 @@ import (
 // selection workflow.
 // Authored by: OpenCode
 type ReportSelectionScreenParams struct {
-	Theme             component.Theme
-	Width             int
-	Height            int
-	AvailableYears    []int
-	SelectedYearIndex int
-	MethodItems       []component.MenuItem
-	SelectedMethod    int
-	MethodExplanation string
-	MenuItems         []component.MenuItem
-	SelectedAction    int
-	HelpText          string
+	Theme                     component.Theme
+	Width                     int
+	Height                    int
+	AvailableYears            []int
+	SelectedYearIndex         int
+	MethodItems               []component.MenuItem
+	SelectedMethod            int
+	BaseCurrencyItems         []component.MenuItem
+	SelectedBaseCurrencyIndex int
+	MethodExplanation         string
+	MenuItems                 []component.MenuItem
+	SelectedAction            int
+	HelpText                  string
 }
 
 // ReportBusyScreenParams contains the render state for one report-generation
 // busy screen.
 // Authored by: OpenCode
 type ReportBusyScreenParams struct {
-	Theme        component.Theme
-	Width        int
-	Height       int
-	SelectedYear int
-	MethodLabel  string
-	BusyText     string
-	SpinnerFrame string
-	HelpText     string
+	Theme              component.Theme
+	Width              int
+	Height             int
+	SelectedYear       int
+	MethodLabel        string
+	ReportBaseCurrency reportmodel.ReportBaseCurrency
+	BusyText           string
+	SpinnerFrame       string
+	HelpText           string
 }
 
 // ReportResultScreenParams contains the render state for the report result
@@ -57,7 +60,8 @@ type ReportResultScreenParams struct {
 	HelpText      string
 }
 
-// ReportSelectionScreenView renders the year and method selection workflow.
+// ReportSelectionScreenView renders the year, method, and base-currency
+// selection workflow.
 //
 // Example:
 //
@@ -67,10 +71,12 @@ type ReportResultScreenParams struct {
 // Authored by: OpenCode
 func ReportSelectionScreenView(params ReportSelectionScreenParams) string {
 	var body = fmt.Sprintf(
-		"Select one report year and one cost basis method.\n\nAvailable Years\n%s\n\nCost Basis Methods\n%s\n\n%s\n\n%s",
+		"Select one report year, one cost basis method, and one report base currency.\n\nAvailable Years\n%s\n\nCost Basis Methods\n%s\n\nReport Base Currency\n%s\n\n%s\n\n%s\n\n%s",
 		renderReportYears(params.Theme, params.AvailableYears, params.SelectedYearIndex),
 		component.RenderMenu(params.Theme, params.MethodItems, params.SelectedMethod),
+		component.RenderMenu(params.Theme, reportBaseCurrencyItems(params.BaseCurrencyItems), params.SelectedBaseCurrencyIndex),
 		reportMethodExplanation(params.MethodExplanation),
+		reportBaseCurrencyExplanation(),
 		component.RenderMenu(params.Theme, params.MenuItems, params.SelectedAction),
 	)
 
@@ -79,7 +85,7 @@ func ReportSelectionScreenView(params ReportSelectionScreenParams) string {
 		params.Width,
 		params.Height,
 		"Generate Capital Gains Report",
-		"Choose one year and one supported cost basis method.",
+		"Choose one year, one supported cost basis method, and one report base currency.",
 		body,
 		"Selections are transient. The report content is not previewed in the TUI before save.",
 		params.HelpText,
@@ -96,11 +102,12 @@ func ReportSelectionScreenView(params ReportSelectionScreenParams) string {
 // Authored by: OpenCode
 func ReportBusyScreenView(params ReportBusyScreenParams) string {
 	var body = fmt.Sprintf(
-		"%s %s\n\nSelected Year: %d\nCost Basis Method: %s",
+		"%s %s\n\nSelected Year: %d\nCost Basis Method: %s\nReport Base Currency: %s",
 		params.SpinnerFrame,
 		params.BusyText,
 		params.SelectedYear,
 		params.MethodLabel,
+		reportBusyBaseCurrencyLabel(params.ReportBaseCurrency),
 	)
 
 	return component.RenderScreen(
@@ -134,10 +141,11 @@ func ReportResultScreenView(params ReportResultScreenParams) string {
 	}
 
 	var body = fmt.Sprintf(
-		"%s\n\nSelected Year: %d\nCost Basis Method: %s\n\n%s\n\n%s",
+		"%s\n\nSelected Year: %d\nCost Basis Method: %s\nReport Base Currency: %s\n\n%s\n\n%s",
 		resultLine,
 		params.Outcome.Request.Year,
 		params.MethodLabel,
+		reportResultBaseCurrencyLabel(params.Outcome),
 		reportResultSummary(params.Outcome),
 		component.RenderMenu(params.Theme, params.MenuItems, params.SelectedIndex),
 	)
@@ -178,6 +186,50 @@ func reportMethodExplanation(explanation string) string {
 		normalized = reportmodel.CostBasisMethod("").Explanation()
 	}
 	return fmt.Sprintf("Method Explanation\n%s", normalized)
+}
+
+// reportBaseCurrencyItems returns the explicit base-currency menu or the
+// default USD/EUR report base-currency menu.
+// Authored by: OpenCode
+func reportBaseCurrencyItems(items []component.MenuItem) []component.MenuItem {
+	if len(items) > 0 {
+		return items
+	}
+
+	var currencies = reportmodel.SupportedReportBaseCurrencies()
+	var defaultItems = make([]component.MenuItem, 0, len(currencies))
+	for _, currency := range currencies {
+		defaultItems = append(defaultItems, component.MenuItem{Label: currency.Label(), Enabled: true})
+	}
+	return defaultItems
+}
+
+// reportBaseCurrencyExplanation formats the static base-currency explanation.
+// Authored by: OpenCode
+func reportBaseCurrencyExplanation() string {
+	return "Base Currency Explanation\nThe generated report uses the selected base currency; all monetary report calculations and totals will use the selected base currency."
+}
+
+// reportBusyBaseCurrencyLabel formats the selected base currency for busy-state
+// rendering.
+// Authored by: OpenCode
+func reportBusyBaseCurrencyLabel(currency reportmodel.ReportBaseCurrency) string {
+	var label = strings.TrimSpace(currency.Label())
+	if label != "" {
+		return label
+	}
+	return "not selected"
+}
+
+// reportResultBaseCurrencyLabel formats the selected base currency for both
+// successful and failed report-result screens.
+// Authored by: OpenCode
+func reportResultBaseCurrencyLabel(outcome runtime.ReportOutcome) string {
+	var label = strings.TrimSpace(outcome.Request.ReportBaseCurrency.Label())
+	if label != "" {
+		return label
+	}
+	return "not selected"
 }
 
 // reportResultSummary formats the user-visible report result message.

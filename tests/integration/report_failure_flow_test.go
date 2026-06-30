@@ -4,6 +4,7 @@
 package integration
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -14,15 +15,22 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
+	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
+	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
+	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
+	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeapp"
 	"github.com/cockroachdb/apd/v3"
 )
 
 // TestReportGenerationEmptyMainSectionWritesEmptyMarkdownReport verifies that a
 // valid empty-main-section report still saves a Markdown document with the
-// required empty-state and NOT APPLICABLE currency contract.
+// required empty-state and selected report-currency contract.
 // Authored by: OpenCode
 func TestReportGenerationEmptyMainSectionWritesEmptyMarkdownReport(t *testing.T) {
 	var reportIO = testutil.NewReportIOFixture(t)
@@ -34,6 +42,7 @@ func TestReportGenerationEmptyMainSectionWritesEmptyMarkdownReport(t *testing.T)
 	var model = unlockSyncReportsContext(t, harness.Model, "token-123")
 	model = openReportSelectionFromContext(t, model)
 	model = selectReportYear(t, model, 2024)
+	model = selectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
 	model, cmd := startReportGenerationFromSelection(t, model)
 	model = applyBatchCmd(t, model, cmd)
 
@@ -54,9 +63,9 @@ func TestReportGenerationEmptyMainSectionWritesEmptyMarkdownReport(t *testing.T)
 	}
 	var reportText = string(reportBytes)
 	for _, expected := range []string{
-		"- Report Calculation Currency: NOT APPLICABLE",
+		"- Report Calculation Currency: USD",
 		"No assets qualified for the main report sections in the selected year.",
-		"| Overall Yearly Net Total | 0 | NOT APPLICABLE |",
+		"| Overall Yearly Net Total | 0 | USD |",
 		"## Reference Section",
 		"reference only",
 	} {
@@ -112,6 +121,7 @@ func TestReportGenerationIncompleteMonetaryContextShowsFailure(t *testing.T) {
 	var model = unlockSyncReportsContext(t, harness.Model, "token-123")
 	model = openReportSelectionFromContext(t, model)
 	model = selectReportYear(t, model, fixture.IncompleteContextReportYear)
+	model = selectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
 	model, cmd := startReportGenerationFromSelection(t, model)
 	model = applyBatchCmd(t, model, cmd)
 
@@ -183,6 +193,7 @@ func TestReportGenerationIncompleteMonetaryContextAutoGeneratesDiagnosticsInExpl
 	var model = unlockSyncReportsContext(t, harness.Model, "token-123")
 	model = openReportSelectionFromContext(t, model)
 	model = selectReportYear(t, model, fixture.IncompleteContextReportYear)
+	model = selectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
 	model, cmd := startReportGenerationFromSelection(t, model)
 	model = applyBatchCmd(t, model, cmd)
 
@@ -250,6 +261,7 @@ func TestReportGenerationIncompleteMonetaryContextFailsAfterAllExplicitCurrencyT
 	var model = unlockSyncReportsContext(t, harness.Model, "token-123")
 	model = openReportSelectionFromContext(t, model)
 	model = selectReportYear(t, model, 2026)
+	model = selectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
 	model, cmd := startReportGenerationFromSelection(t, model)
 	model = applyBatchCmd(t, model, cmd)
 
@@ -281,6 +293,114 @@ func TestReportGenerationIncompleteMonetaryContextFailsAfterAllExplicitCurrencyT
 	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
 }
 
+// TestReportGenerationConversionFailureMatrixShowsSafeFailure verifies US3
+// conversion failures stop before final save and disclose only non-secret lookup
+// context in the report-result screen.
+// Authored by: OpenCode
+func TestReportGenerationConversionFailureMatrixShowsSafeFailure(t *testing.T) {
+	var cases = []struct {
+		name                string
+		reportBaseCurrency  reportmodel.ReportBaseCurrency
+		cache               syncmodel.ProtectedActivityCache
+		failures            map[string]error
+		expectedSnippets    []string
+		unexpectedSnippets  []string
+		expectedLookupCount int
+	}{
+		{
+			name:               "unsupported source currency",
+			reportBaseCurrency: reportmodel.ReportBaseCurrencyUSD,
+			cache:              conversionFailureProtectedActivityCache(t, "unsupported-rub-buy", "RUB", "2024-02-05T10:00:00Z"),
+			failures: map[string]error{
+				"RUB|USD|2024-02-05": mustIntegrationConversionFailure(t, "RUB|USD|2024-02-05", currencyintegration.ProviderIDFederalReserveH10, currencyintegration.ConversionFailureReasonUnsupportedCurrency, "source currency RUB is not supported by federal_reserve_h10"),
+			},
+			expectedSnippets:    []string{"Failure Category: unsupported report calculation", "unsupported-rub-buy", "RUB", "USD", "2024-02-05", "unsupported_currency", "federal_reserve_h10", "No report file was saved."},
+			expectedLookupCount: 1,
+		},
+		{
+			name:               "missing authoritative rate",
+			reportBaseCurrency: reportmodel.ReportBaseCurrencyEUR,
+			cache:              conversionFailureProtectedActivityCache(t, "missing-usd-rate-buy", "USD", "2024-03-09T10:00:00Z"),
+			failures: map[string]error{
+				"USD|EUR|2024-03-09": mustIntegrationConversionFailure(t, "USD|EUR|2024-03-09", currencyintegration.ProviderIDECBEXR, currencyintegration.ConversionFailureReasonMissingRate, "no current or prior ECB EXR observation for USD/EUR on 2024-03-09"),
+			},
+			expectedSnippets:    []string{"Failure Category: unsupported report calculation", "missing-usd-rate-buy", "USD", "EUR", "2024-03-09", "missing_rate", "ecb_exr", "No report file was saved."},
+			expectedLookupCount: 1,
+		},
+		{
+			name:               "provider unavailable without cache",
+			reportBaseCurrency: reportmodel.ReportBaseCurrencyUSD,
+			cache:              conversionFailureProtectedActivityCache(t, "provider-down-eur-buy", "EUR", "2024-04-10T10:00:00Z"),
+			failures: map[string]error{
+				"EUR|USD|2024-04-10": mustIntegrationConversionFailure(t, "EUR|USD|2024-04-10", currencyintegration.ProviderIDFederalReserveH10, currencyintegration.ConversionFailureReasonProviderUnavailable, "federal_reserve_h10 request failed without cached evidence"),
+			},
+			expectedSnippets:    []string{"Failure Category: unsupported report calculation", "provider-down-eur-buy", "EUR", "USD", "2024-04-10", "provider_unavailable", "federal_reserve_h10", "No report file was saved."},
+			expectedLookupCount: 1,
+		},
+		{
+			name:                "malformed selected activity currency",
+			reportBaseCurrency:  reportmodel.ReportBaseCurrencyUSD,
+			cache:               conversionFailureProtectedActivityCache(t, "malformed-currency-buy", "EU", "2024-05-11T10:00:00Z"),
+			expectedSnippets:    []string{"Failure Category: unsupported report calculation", "malformed-currency-buy", "EU", "USD", "2024-05-11", "invalid_activity_currency", "No report file was saved."},
+			expectedLookupCount: 0,
+		},
+		{
+			name:               "late failure after earlier conversion",
+			reportBaseCurrency: reportmodel.ReportBaseCurrencyUSD,
+			cache:              lateConversionFailureProtectedActivityCache(t),
+			failures: map[string]error{
+				"GBP|USD|2024-06-13": mustIntegrationConversionFailure(t, "GBP|USD|2024-06-13", currencyintegration.ProviderIDFederalReserveH10, currencyintegration.ConversionFailureReasonMalformedRate, "Federal Reserve H.10 observation for GBP on 2024-06-13 is not exact-decimal parseable"),
+			},
+			expectedSnippets:    []string{"Failure Category: unsupported report calculation", "late-gbp-buy", "GBP", "USD", "2024-06-13", "malformed_rate", "federal_reserve_h10", "No report file was saved."},
+			expectedLookupCount: 2,
+		},
+	}
+
+	for _, testCase := range cases {
+		var testCase = testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			var reportIO = testutil.NewReportIOFixture(t)
+			var openLogPath = installOpenCommandRecorder(t, 0)
+			var rateService = &failingIntegrationCurrencyRates{failures: testCase.failures}
+			var harness = newRuntimeBackedFlowHarnessWithCurrencyRateService(t, t.TempDir(), mustCloudSetupConfig(t), false, rateService)
+
+			seedProtectedSnapshot(t, harness, "token-123", testCase.cache)
+
+			var model = unlockSyncReportsContext(t, harness.Model, "token-123")
+			model = openReportSelectionFromContext(t, model)
+			model = selectReportYear(t, model, 2024)
+			model = selectReportBaseCurrency(t, model, testCase.reportBaseCurrency)
+			model, cmd := startReportGenerationAfterBaseCurrencySelection(t, model)
+			model = applyBatchCmd(t, model, cmd)
+
+			if model.ActiveScreen() != "report_result" {
+				t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
+			}
+			var content = normalizeRenderedText(model.View().Content)
+			for _, expected := range testCase.expectedSnippets {
+				if !strings.Contains(content, expected) {
+					t.Fatalf("expected conversion failure result to contain %q, got %q", expected, content)
+				}
+			}
+			for _, unexpected := range append(testCase.unexpectedSnippets, "token-123", "Bearer") {
+				if strings.Contains(content, unexpected) {
+					t.Fatalf("expected conversion failure result to exclude %q, got %q", unexpected, content)
+				}
+			}
+			if len(rateService.requests) != testCase.expectedLookupCount {
+				t.Fatalf("expected %d lookup requests, got %#v", testCase.expectedLookupCount, rateService.requests)
+			}
+			if files := mustMarkdownFiles(t, reportIO.DocumentsDir); len(files) != 0 {
+				t.Fatalf("expected no saved Markdown report after conversion failure, got %#v", files)
+			}
+			if openerRequests := readOpenCommandRequests(t, openLogPath); len(openerRequests) != 0 {
+				t.Fatalf("expected no opener request after conversion failure, got %#v", openerRequests)
+			}
+			assertNoCleartextReportInAppStorage(t, harness.BaseDir)
+		})
+	}
+}
+
 // TestReportGenerationDocumentsUnavailableShowsFailure verifies the save
 // failure path when the resolved Documents directory is missing.
 // Authored by: OpenCode
@@ -298,6 +418,7 @@ func TestReportGenerationDocumentsUnavailableShowsFailure(t *testing.T) {
 	var model = unlockSyncReportsContext(t, harness.Model, "token-123")
 	model = openReportSelectionFromContext(t, model)
 	model = selectReportYear(t, model, fixture.PrimaryReportYear)
+	model = selectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
 	model, cmd := startReportGenerationFromSelection(t, model)
 	model = applyBatchCmd(t, model, cmd)
 
@@ -361,6 +482,7 @@ func runReportGenerationWriteFailureScenario(t *testing.T) {
 	var model = unlockSyncReportsContext(t, harness.Model, "token-123")
 	model = openReportSelectionFromContext(t, model)
 	model = selectReportYear(t, model, fixture.PrimaryReportYear)
+	model = selectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
 	model, cmd := startReportGenerationFromSelection(t, model)
 	model = applyBatchCmd(t, model, cmd)
 
@@ -420,6 +542,7 @@ func runReportGenerationWriteFailureDiagnosticScenario(t *testing.T) {
 	var model = unlockSyncReportsContext(t, harness.Model, "token-123")
 	model = openReportSelectionFromContext(t, model)
 	model = selectReportYear(t, model, fixture.PrimaryReportYear)
+	model = selectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
 	model, cmd := startReportGenerationFromSelection(t, model)
 	model = applyBatchCmd(t, model, cmd)
 
@@ -510,6 +633,172 @@ func referenceOnlyProtectedActivityCache(t *testing.T) syncmodel.ProtectedActivi
 		AvailableReportYears: []int{2024},
 		Activities:           activities,
 	}
+}
+
+// failingIntegrationCurrencyRates records lookup requests and returns configured
+// conversion failures for fail-first US3 integration fixtures.
+// Authored by: OpenCode
+type failingIntegrationCurrencyRates struct {
+	failures map[string]error
+	requests []currencyintegration.RateLookupRequest
+}
+
+// LookupRate returns configured failure evidence or deterministic successful
+// evidence for conversion attempts before a later matrix failure.
+// Authored by: OpenCode
+func (service *failingIntegrationCurrencyRates) LookupRate(_ context.Context, request currencyintegration.RateLookupRequest) (currencyintegration.ExchangeRateEvidence, error) {
+	service.requests = append(service.requests, request)
+	if service.failures != nil {
+		var failure, ok = service.failures[integrationFailureRateKey(request)]
+		if ok {
+			return currencyintegration.ExchangeRateEvidence{}, failure
+		}
+	}
+
+	return deterministicIntegrationCurrencyRates{}.LookupRate(context.Background(), request)
+}
+
+// ProviderCategoryForBaseCurrency returns deterministic provider metadata for
+// failing conversion integration tests.
+// Authored by: OpenCode
+func (service *failingIntegrationCurrencyRates) ProviderCategoryForBaseCurrency(baseCurrency string) string {
+	return deterministicIntegrationCurrencyRates{}.ProviderCategoryForBaseCurrency(baseCurrency)
+}
+
+// newRuntimeBackedFlowHarnessWithCurrencyRateService creates a runtime-backed
+// TUI harness with a caller-provided currency rate service.
+// Authored by: OpenCode
+func newRuntimeBackedFlowHarnessWithCurrencyRateService(
+	t *testing.T,
+	baseDir string,
+	config configmodel.AppSetupConfig,
+	allowDevHTTP bool,
+	currencyRates interface {
+		LookupRate(context.Context, currencyintegration.RateLookupRequest) (currencyintegration.ExchangeRateEvidence, error)
+	},
+) runtimeBackedFlowHarness {
+	t.Helper()
+
+	var options = bootstrap.DefaultOptions()
+	options.ConfigDir = baseDir
+	options.AllowDevHTTP = allowDevHTTP
+
+	var app = runtimeapp.NewWithReportCurrencyRateService(t, options, currencyRates)
+
+	var store = configstore.NewJSONStore(baseDir)
+	if err := store.Save(context.Background(), config); err != nil {
+		t.Fatalf("save setup config: %v", err)
+	}
+
+	var model = flow.NewModel(flow.Dependencies{
+		Options:       options,
+		Startup:       bootstrap.StartupState{ActiveConfig: &config},
+		SetupService:  app.SetupService,
+		SyncService:   app.SyncService,
+		ReportService: app.ReportService,
+	})
+
+	return runtimeBackedFlowHarness{
+		BaseDir: baseDir,
+		App:     app,
+		Config:  config,
+		Store:   store,
+		Model:   model,
+	}
+}
+
+// conversionFailureProtectedActivityCache returns one priced cross-currency row
+// that must request a conversion rate for the selected report base currency.
+// Authored by: OpenCode
+func conversionFailureProtectedActivityCache(t *testing.T, sourceID string, sourceCurrency string, occurredAt string) syncmodel.ProtectedActivityCache {
+	t.Helper()
+
+	return syncmodel.ProtectedActivityCache{
+		SyncedAt:             time.Date(2026, time.May, 20, 15, 4, 5, 0, time.UTC),
+		RetrievedCount:       1,
+		ActivityCount:        1,
+		AvailableReportYears: []int{2024},
+		Activities: []syncmodel.ActivityRecord{conversionFailureActivityRecord(
+			t,
+			sourceID,
+			sourceCurrency,
+			occurredAt,
+			"1",
+			"1000.25",
+		)},
+	}
+}
+
+// lateConversionFailureProtectedActivityCache returns a deterministic history
+// where one conversion succeeds before a later conversion fails.
+// Authored by: OpenCode
+func lateConversionFailureProtectedActivityCache(t *testing.T) syncmodel.ProtectedActivityCache {
+	t.Helper()
+
+	return syncmodel.ProtectedActivityCache{
+		SyncedAt:             time.Date(2026, time.May, 20, 15, 4, 5, 0, time.UTC),
+		RetrievedCount:       2,
+		ActivityCount:        2,
+		AvailableReportYears: []int{2024},
+		Activities: []syncmodel.ActivityRecord{
+			conversionFailureActivityRecord(t, "late-eur-buy", "EUR", "2024-06-12T10:00:00Z", "1", "100"),
+			conversionFailureActivityRecord(t, "late-gbp-buy", "GBP", "2024-06-13T10:00:00Z", "1", "200"),
+		},
+	}
+}
+
+// conversionFailureActivityRecord builds one priced buy fixture for conversion
+// failure tests.
+// Authored by: OpenCode
+func conversionFailureActivityRecord(t *testing.T, sourceID string, sourceCurrency string, occurredAt string, quantity string, grossValue string) syncmodel.ActivityRecord {
+	t.Helper()
+
+	return syncmodel.ActivityRecord{
+		SourceID:         sourceID,
+		OccurredAt:       occurredAt,
+		ActivityType:     syncmodel.ActivityTypeBuy,
+		AssetIdentityKey: "asset-conversion-failure-001",
+		AssetSymbol:      "FAIL",
+		AssetName:        "Failure Fixture",
+		Quantity:         mustReportFlowDecimal(t, quantity),
+		OrderCurrency:    sourceCurrency,
+		OrderUnitPrice:   reportFlowDecimalPointer(t, grossValue),
+		OrderGrossValue:  reportFlowDecimalPointer(t, grossValue),
+		OrderFeeAmount:   reportFlowDecimalPointer(t, "0"),
+		DataSource:       "integration-report-failure-fixture",
+		RawHash:          sourceID,
+		Comment:          "non-secret conversion failure fixture",
+	}
+}
+
+// integrationFailureRateKey returns the deterministic lookup key used by the
+// failure matrix rate-service stub.
+// Authored by: OpenCode
+func integrationFailureRateKey(request currencyintegration.RateLookupRequest) string {
+	return request.SourceCurrency + "|" + request.BaseCurrency + "|" + request.ActivityDate.Format(time.DateOnly)
+}
+
+// mustIntegrationConversionFailure creates one structured matrix failure from a
+// deterministic source|base|date lookup key.
+// Authored by: OpenCode
+func mustIntegrationConversionFailure(t *testing.T, key string, providerID currencyintegration.ProviderID, reason currencyintegration.ConversionFailureReason, detail string) error {
+	t.Helper()
+
+	var parts = strings.Split(key, "|")
+	if len(parts) != 3 {
+		t.Fatalf("expected conversion failure key source|base|date, got %q", key)
+	}
+	var activityDate, err = time.Parse(time.DateOnly, parts[2])
+	if err != nil {
+		t.Fatalf("parse conversion failure date %q: %v", parts[2], err)
+	}
+	var request currencyintegration.RateLookupRequest
+	request, err = currencyintegration.NewRateLookupRequest(parts[0], parts[1], activityDate)
+	if err != nil {
+		t.Fatalf("create conversion failure lookup request from %q: %v", key, err)
+	}
+
+	return currencyintegration.NewConversionFailure(request, providerID, reason, detail)
 }
 
 // mustReportFlowDecimal parses one integration fixture decimal value.

@@ -4,6 +4,7 @@
 package contract
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -15,13 +16,24 @@ import (
 	"github.com/cockroachdb/apd/v3"
 )
 
+// contractMarkdownFixtureLocation fixes source timestamps so UTC rendering
+// expectations do not depend on the host timezone.
+// Authored by: OpenCode
+var contractMarkdownFixtureLocation = time.FixedZone("contract-markdown-fixture", 60*60)
+
+// contractMarkdownFixtureSummerLocation fixes source timestamps for fixture rows
+// that intentionally exercise a summer-offset UTC rendering contract.
+// Authored by: OpenCode
+var contractMarkdownFixtureSummerLocation = time.FixedZone("contract-markdown-fixture-summer", 2*60*60)
+
 // TestMarkdownReportDocumentContract verifies the required Markdown document
 // shape from the contract.
 // Authored by: OpenCode
 func TestMarkdownReportDocumentContract(t *testing.T) {
 	t.Parallel()
 
-	document, err := reportmarkdown.Render(contractMarkdownReportFixture())
+	var reportCalculationCurrency = reportmodel.ReportBaseCurrencyEUR.Label()
+	document, err := reportmarkdown.Render(contractMarkdownReportFixture(reportCalculationCurrency))
 	if err != nil {
 		t.Fatalf("render markdown report: %v", err)
 	}
@@ -30,23 +42,223 @@ func TestMarkdownReportDocumentContract(t *testing.T) {
 	assertContains(t, document.Content, "- Year: 2024")
 	assertContains(t, document.Content, "- Cost Basis Method: FIFO")
 	assertContains(t, document.Content, "- Generated At:")
-	assertContains(t, document.Content, "- Report Calculation Currency: NOT APPLICABLE")
+	assertContains(t, document.Content, "- Report Calculation Currency: EUR")
+	assertNotContains(t, document.Content, "- Report Calculation Currency: NOT APPLICABLE")
 	assertContains(t, document.Content, "## Gains-And-Losses Summary")
 	assertContains(t, document.Content, "## Reference Section")
 	assertContains(t, document.Content, "## Asset Detail: BTC")
+	assertContains(t, document.Content, "## Asset Detail: ETH")
 	assertContains(t, document.Content, "## Asset Detail: XRP")
 	assertContains(t, document.Content, "| Asset | Net Gain Or Loss | Report Calculation Currency |")
-	assertContains(t, document.Content, "| Overall Yearly Net Total | 1240.5 | NOT APPLICABLE |")
+	assertContains(t, document.Content, "| Overall Yearly Net Total | 2240.5 | EUR |")
 	assertContains(t, document.Content, "| Asset | Full Liquidation Count Through Year End | Main Section Status |")
 	assertContains(t, document.Content, "### Opening Position")
 	assertContains(t, document.Content, "### In-Year Activity")
-	assertContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency | Basis After Row | Calculation Currency | Quantity After Row | Note |")
+	assertContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |")
 	assertContains(t, document.Content, "### Liquidation Calculations")
 	assertContains(t, document.Content, "### Closing Position")
-	assertContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | USD | 22009 | NOT APPLICABLE | 1 | note token=[REDACTED] |")
-	assertContains(t, document.Content, "| 2024-04-01 12:00:00 | xrp-reduction-2024-001 | SELL | 200 | 0 | 0 | 0 |  | 400 | NOT APPLICABLE | 800 | custody transfer |")
-	assertContains(t, document.Content, "| 2024-01-01 00:15:00 | btc-sell-2024-001 | 1 | USD | 22009 | 25000 | 1240.5 | NOT APPLICABLE |")
+	assertContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | 1 | 22009 | USD | EUR | converted | note token=[REDACTED] |")
+	assertContains(t, document.Content, "| 2024-04-01 10:00:00 | xrp-reduction-2024-001 | SELL | 200 | 0 | 0 | 0 | 800 | 400 |  | EUR |  | custody transfer |")
+	assertContains(t, document.Content, "| Date | Source ID | Disposed Quantity | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |")
+	assertContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | 1 | 22009 | 25000 | 1240.5 | EUR |")
+	assertNotContains(t, document.Content, "| Date | Source ID | Disposed Quantity | Activity Currency |")
+	assertNotContains(t, document.Content, "NOT APPLICABLE")
 	assertNotContains(t, document.Content, "secret-token")
+}
+
+// TestMarkdownReportConversionAuditContract verifies the report-visible audit
+// fields required for converted priced activities and their rate source summary.
+// Authored by: OpenCode
+func TestMarkdownReportConversionAuditContract(t *testing.T) {
+	t.Parallel()
+
+	var reportCalculationCurrency = reportmodel.ReportBaseCurrencyEUR.Label()
+	document, err := reportmarkdown.Render(contractMarkdownReportFixture(reportCalculationCurrency))
+	if err != nil {
+		t.Fatalf("render markdown report: %v", err)
+	}
+
+	assertContains(t, document.Content, "## Rate Source Summary")
+	assertContains(t, document.Content, "European Central Bank")
+	assertContains(t, document.Content, "ECB Data Portal `EXR`")
+	assertContains(t, document.Content, "daily euro foreign exchange reference rate")
+	assertContains(t, document.Content, "most recent previous available ECB observation")
+	assertNotContains(t, rateSourceSummarySection(document.Content), "Quote Direction")
+	assertNotContains(t, rateSourceSummarySection(document.Content), "Rate Value")
+	assertNotContains(t, rateSourceSummarySection(document.Content), "source_per_base")
+	assertNotContains(t, rateSourceSummarySection(document.Content), "1.08")
+	assertContains(t, document.Content, "## Currency Conversion Audit")
+	var audit = currencyConversionAuditSection(document.Content)
+	assertContains(t, audit, "| Date | Source ID | Asset | Rate Date | Source Currency | Report Base Currency | Converted Amounts | Quote Direction | Rate Value |")
+	assertNotContains(t, audit, "Rate Authority")
+	assertNotContains(t, audit, "Rate Kind")
+	assertContains(t, audit, "| 2024-01-01 | btc-sell-2024-001 | BTC | 2023-12-29 | USD | EUR | unit_price: 27000 -> 25000; gross_value: 27000 -> 25000 | source_per_base | 1.08 |")
+	assertNotContains(t, audit, "fee_amount")
+	assertNotContains(t, audit, "0 -> 0")
+	if got := countOccurrences(audit, "| 2024-01-01 | btc-sell-2024-001 |"); got != 1 {
+		t.Fatalf("expected one grouped audit row for btc-sell-2024-001, got %d in %q", got, audit)
+	}
+	assertContains(t, document.Content, "btc-sell-2024-001")
+	assertContains(t, document.Content, "2024-01-01")
+	assertContains(t, document.Content, "2023-12-29")
+	assertNotContains(t, document.Content, "secret-token")
+}
+
+// TestMarkdownReportRateSourceSummaryAggregatesByProvider verifies that the
+// provider source summary is rendered once for a selected base-currency provider,
+// while rate-specific evidence remains in the conversion audit table.
+// Authored by: OpenCode
+func TestMarkdownReportRateSourceSummaryAggregatesByProvider(t *testing.T) {
+	t.Parallel()
+
+	var report = contractMarkdownReportFixture(reportmodel.ReportBaseCurrencyEUR.Label())
+	var secondEvidence = report.RateSources[0]
+	secondEvidence.SourceCurrency = "GBP"
+	secondEvidence.ActivityDate = time.Date(2024, time.January, 2, 0, 15, 0, 0, time.Local)
+	secondEvidence.RateDate = time.Date(2024, time.January, 2, 0, 0, 0, 0, time.Local)
+	secondEvidence.RateValue = mustContractDecimal("1.16")
+	report.RateSources = append(report.RateSources, secondEvidence)
+	report.ConversionAuditEntries = append(report.ConversionAuditEntries, contractConversionAuditEntry(
+		"gbp-buy-2024-001",
+		"ETH",
+		"GBP",
+		"1.16",
+		reportmodel.QuoteDirectionSourcePerBase,
+	))
+	report.DetailSections[1].ActivityRows = append(report.DetailSections[1].ActivityRows, reportmodel.AssetActivityRow{
+		SourceID:            "gbp-buy-2024-001",
+		OccurredAt:          time.Date(2024, time.January, 2, 0, 15, 0, 0, contractMarkdownFixtureLocation),
+		ActivityType:        reportmodel.ActivityTypeBuy,
+		Quantity:            mustContractDecimal("1"),
+		GrossValue:          contractDecimalPointer("100"),
+		ActivityCurrency:    "GBP",
+		BasisAfterRow:       mustContractDecimal("100"),
+		CalculationCurrency: reportmodel.ReportBaseCurrencyEUR.Label(),
+		QuantityAfterRow:    mustContractDecimal("4"),
+		ConversionStatus:    reportmodel.ConversionStatusConverted,
+	})
+
+	var document, err = reportmarkdown.Render(report)
+	if err != nil {
+		t.Fatalf("render markdown report: %v", err)
+	}
+
+	var summary = rateSourceSummarySection(document.Content)
+	if got := countOccurrences(summary, "- Authority: European Central Bank"); got != 1 {
+		t.Fatalf("expected one provider-level ECB summary, got %d in %q", got, summary)
+	}
+	assertNotContains(t, summary, "Quote Direction")
+	assertNotContains(t, summary, "Rate Value")
+	assertNotContains(t, summary, "1.08")
+	assertNotContains(t, summary, "1.16")
+	var audit = currencyConversionAuditSection(document.Content)
+	assertNotContains(t, audit, "Rate Authority")
+	assertNotContains(t, audit, "Rate Kind")
+	assertContains(t, audit, "| 2024-01-01 | btc-sell-2024-001 | BTC | 2023-12-29 | USD | EUR | unit_price: 27000 -> 25000; gross_value: 27000 -> 25000 | source_per_base | 1.08 |")
+	assertContains(t, audit, "| 2024-01-02 | gbp-buy-2024-001 | ETH | 2024-01-02 | GBP | EUR | gross_value: 116 -> 100 | source_per_base | 1.16 |")
+}
+
+// TestMarkdownReportCurrencyConversionAuditGroupedHeaderOrder verifies the
+// BUG-005 grouped audit table order from the Markdown report contract.
+// Authored by: OpenCode
+func TestMarkdownReportCurrencyConversionAuditGroupedHeaderOrder(t *testing.T) {
+	t.Parallel()
+
+	var document, err = reportmarkdown.Render(contractMarkdownReportFixture(reportmodel.ReportBaseCurrencyEUR.Label()))
+	if err != nil {
+		t.Fatalf("render markdown report: %v", err)
+	}
+
+	var audit = currencyConversionAuditSection(document.Content)
+	var expectedHeader = "| Date | Source ID | Asset | Rate Date | Source Currency | Report Base Currency | Converted Amounts | Quote Direction | Rate Value |"
+	var expectedSeparator = "|------|-----------|-------|-----------|-----------------|----------------------|-------------------|-----------------|------------|"
+	assertContains(t, audit, expectedHeader+"\n"+expectedSeparator)
+	assertContains(t, audit, "Converted Amounts")
+	assertContains(t, audit, "unit_price: 27000 -> 25000; gross_value: 27000 -> 25000")
+	assertNotContains(t, audit, "Amount Kind")
+	assertNotContains(t, audit, "Original Amount")
+	assertNotContains(t, audit, "Converted Amount |")
+	assertNotContains(t, audit, "Rate Authority")
+	assertNotContains(t, audit, "Rate Kind")
+	assertContains(t, rateSourceSummarySection(document.Content), "- Authority: European Central Bank")
+	assertContains(t, rateSourceSummarySection(document.Content), "- Rate Kind: daily euro foreign exchange reference rate")
+}
+
+// TestMarkdownReportConversionAuditGroupsAmountsAndSuppressesZeroSlots verifies
+// BUG-005 row cardinality and zero-to-zero amount omission.
+// Authored by: OpenCode
+func TestMarkdownReportConversionAuditGroupsAmountsAndSuppressesZeroSlots(t *testing.T) {
+	t.Parallel()
+
+	var document, err = reportmarkdown.Render(contractMarkdownReportFixture(reportmodel.ReportBaseCurrencyEUR.Label()))
+	if err != nil {
+		t.Fatalf("render markdown report: %v", err)
+	}
+
+	var audit = currencyConversionAuditSection(document.Content)
+	if got := countOccurrences(audit, "| 2024-01-01 | btc-sell-2024-001 |"); got != 1 {
+		t.Fatalf("expected one audit row for the converted source activity, got %d in %q", got, audit)
+	}
+	assertContains(t, audit, "unit_price: 27000 -> 25000; gross_value: 27000 -> 25000")
+	assertNotContains(t, audit, "| fee_amount |")
+	assertNotContains(t, audit, "fee_amount: 0 -> 0")
+	assertNotContains(t, audit, "0 | EUR | 0")
+}
+
+// TestMarkdownReportDistinguishesSameCurrencyAndConvertedRows verifies that
+// priced activity rows expose whether conversion changed their monetary values.
+// Authored by: OpenCode
+func TestMarkdownReportDistinguishesSameCurrencyAndConvertedRows(t *testing.T) {
+	t.Parallel()
+
+	var reportCalculationCurrency = reportmodel.ReportBaseCurrencyEUR.Label()
+	document, err := reportmarkdown.Render(contractMarkdownReportFixture(reportCalculationCurrency))
+	if err != nil {
+		t.Fatalf("render markdown report: %v", err)
+	}
+
+	assertContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |")
+	assertNotContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency |")
+	assertContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | 1 | 22009 | USD | EUR | converted | note token=[REDACTED] |")
+	assertContains(t, document.Content, "| 2024-02-01 08:30:00 | eth-sell-2024-001 | SELL | 2 | 1000 | 2000 | 0 | 3 | 1000 | EUR | EUR | same_currency | same-currency priced sale |")
+	assertNotContains(t, document.Content, "| 2024-02-01 | eth-sell-2024-001 | ETH | EUR | EUR |")
+	assertNotContains(t, document.Content, "secret-token")
+}
+
+// TestMarkdownReportAuditSourceIDsDoNotRenderAsSameCurrency cross-checks BUG-006
+// audit evidence against asset detail conversion labels.
+// Authored by: OpenCode
+func TestMarkdownReportAuditSourceIDsDoNotRenderAsSameCurrency(t *testing.T) {
+	t.Parallel()
+
+	var document, err = reportmarkdown.Render(contractMarkdownReportFixture(reportmodel.ReportBaseCurrencyEUR.Label()))
+	if err != nil {
+		t.Fatalf("render markdown report: %v", err)
+	}
+
+	var audit = currencyConversionAuditSection(document.Content)
+	assertContains(t, audit, "| 2024-01-01 | btc-sell-2024-001 | BTC |")
+	assertContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | 1 | 22009 | USD | EUR | converted |")
+	assertNotContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | 1 | 22009 | USD | EUR | same_currency |")
+}
+
+// TestMarkdownReportAssetDetailCurrencyColumnContracts verifies BUG-007 asset
+// detail activity and liquidation currency-column contracts.
+// Authored by: OpenCode
+func TestMarkdownReportAssetDetailCurrencyColumnContracts(t *testing.T) {
+	t.Parallel()
+
+	var document, err = reportmarkdown.Render(contractMarkdownReportFixture(reportmodel.ReportBaseCurrencyEUR.Label()))
+	if err != nil {
+		t.Fatalf("render markdown report: %v", err)
+	}
+
+	assertContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |")
+	assertContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | 1 | 22009 | USD | EUR | converted | note token=[REDACTED] |")
+	assertNotContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency |")
+	assertContains(t, document.Content, "| Date | Source ID | Disposed Quantity | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |")
+	assertContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | 1 | 22009 | 25000 | 1240.5 | EUR |")
+	assertNotContains(t, document.Content, "| Date | Source ID | Disposed Quantity | Activity Currency | Allocated Basis |")
 }
 
 // TestMarkdownReportOutputFileContract verifies the visible output-file
@@ -55,7 +267,7 @@ func TestMarkdownReportDocumentContract(t *testing.T) {
 // Authored by: OpenCode
 func TestMarkdownReportOutputFileContract(t *testing.T) {
 	var fixture = testutil.NewReportIOFixture(t)
-	var report = contractMarkdownReportFixture()
+	var report = contractMarkdownReportFixture(reportmodel.ReportBaseCurrencyEUR.Label())
 	var document, err = reportmarkdown.Render(report)
 	if err != nil {
 		t.Fatalf("render markdown report: %v", err)
@@ -77,27 +289,32 @@ func TestMarkdownReportOutputFileContract(t *testing.T) {
 	assertNotContains(t, outputFile.Path, "secret-token")
 }
 
-// contractMarkdownReportFixture returns one deterministic calculated report used
-// by the Markdown contract tests.
+// contractMarkdownReportFixture returns one deterministic calculated report with
+// the selected calculation currency used by the Markdown contract tests.
 // Authored by: OpenCode
-func contractMarkdownReportFixture() reportmodel.CapitalGainsReport {
+func contractMarkdownReportFixture(reportCalculationCurrency string) reportmodel.CapitalGainsReport {
 	return reportmodel.CapitalGainsReport{
 		Year:                      2024,
 		CostBasisMethod:           reportmodel.CostBasisMethodFIFO,
 		GeneratedAt:               time.Date(2026, time.May, 21, 12, 34, 56, 0, time.Local),
-		ReportCalculationCurrency: "NOT APPLICABLE",
+		ReportCalculationCurrency: reportCalculationCurrency,
 		SummaryEntries: []reportmodel.AssetSummaryEntry{{
 			AssetIdentityKey:          "asset-btc",
 			DisplayLabel:              "BTC",
 			NetGainOrLoss:             mustContractDecimal("1240.5"),
-			ReportCalculationCurrency: "NOT APPLICABLE",
+			ReportCalculationCurrency: reportCalculationCurrency,
+		}, {
+			AssetIdentityKey:          "asset-eth",
+			DisplayLabel:              "ETH",
+			NetGainOrLoss:             mustContractDecimal("1000"),
+			ReportCalculationCurrency: reportCalculationCurrency,
 		}, {
 			AssetIdentityKey:          "asset-xrp",
 			DisplayLabel:              "XRP",
 			NetGainOrLoss:             mustContractDecimal("0"),
-			ReportCalculationCurrency: "NOT APPLICABLE",
+			ReportCalculationCurrency: reportCalculationCurrency,
 		}},
-		YearlyNetTotal: mustContractDecimal("1240.5"),
+		YearlyNetTotal: mustContractDecimal("2240.5"),
 		ReferenceEntries: []reportmodel.ReferenceLiquidationEntry{{
 			AssetIdentityKey:                   "asset-btc",
 			DisplayLabel:                       "BTC",
@@ -111,10 +328,10 @@ func contractMarkdownReportFixture() reportmodel.CapitalGainsReport {
 			OpeningCostBasis:    mustContractDecimal("44018"),
 			ClosingQuantity:     mustContractDecimal("1"),
 			ClosingCostBasis:    mustContractDecimal("22009"),
-			CalculationCurrency: "NOT APPLICABLE",
+			CalculationCurrency: reportCalculationCurrency,
 			ActivityRows: []reportmodel.AssetActivityRow{{
 				SourceID:                    "btc-sell-2024-001",
-				OccurredAt:                  time.Date(2024, time.January, 1, 0, 15, 0, 0, time.Local),
+				OccurredAt:                  time.Date(2024, time.January, 1, 0, 15, 0, 0, contractMarkdownFixtureLocation),
 				ActivityType:                reportmodel.ActivityTypeSell,
 				Quantity:                    mustContractDecimal("1"),
 				UnitPrice:                   contractDecimalPointer("25000"),
@@ -122,19 +339,53 @@ func contractMarkdownReportFixture() reportmodel.CapitalGainsReport {
 				FeeAmount:                   contractDecimalPointer("0"),
 				ActivityCurrency:            "USD",
 				BasisAfterRow:               mustContractDecimal("22009"),
-				CalculationCurrency:         "NOT APPLICABLE",
+				CalculationCurrency:         reportCalculationCurrency,
 				QuantityAfterRow:            mustContractDecimal("1"),
+				ConversionStatus:            reportmodel.ConversionStatusConverted,
 				HoldingReductionExplanation: "note token=secret-token",
 			}},
 			LiquidationSummaries: []reportmodel.LiquidationCalculation{{
 				SourceID:               "btc-sell-2024-001",
-				OccurredAt:             time.Date(2024, time.January, 1, 0, 15, 0, 0, time.Local),
+				OccurredAt:             time.Date(2024, time.January, 1, 0, 15, 0, 0, contractMarkdownFixtureLocation),
 				DisposedQuantity:       mustContractDecimal("1"),
 				AllocatedBasis:         mustContractDecimal("22009"),
 				NetLiquidationProceeds: mustContractDecimal("25000"),
 				GainOrLoss:             mustContractDecimal("1240.5"),
 				ActivityCurrency:       "USD",
-				CalculationCurrency:    "NOT APPLICABLE",
+				CalculationCurrency:    reportCalculationCurrency,
+			}},
+		}, {
+			AssetIdentityKey:    "asset-eth",
+			DisplayLabel:        "ETH",
+			OpeningQuantity:     mustContractDecimal("5"),
+			OpeningCostBasis:    mustContractDecimal("2500"),
+			ClosingQuantity:     mustContractDecimal("3"),
+			ClosingCostBasis:    mustContractDecimal("1500"),
+			CalculationCurrency: reportCalculationCurrency,
+			ActivityRows: []reportmodel.AssetActivityRow{{
+				SourceID:                    "eth-sell-2024-001",
+				OccurredAt:                  time.Date(2024, time.February, 1, 9, 30, 0, 0, contractMarkdownFixtureLocation),
+				ActivityType:                reportmodel.ActivityTypeSell,
+				Quantity:                    mustContractDecimal("2"),
+				UnitPrice:                   contractDecimalPointer("1000"),
+				GrossValue:                  contractDecimalPointer("2000"),
+				FeeAmount:                   contractDecimalPointer("0"),
+				ActivityCurrency:            "EUR",
+				BasisAfterRow:               mustContractDecimal("1000"),
+				CalculationCurrency:         reportCalculationCurrency,
+				QuantityAfterRow:            mustContractDecimal("3"),
+				ConversionStatus:            reportmodel.ConversionStatusSameCurrency,
+				HoldingReductionExplanation: "same-currency priced sale",
+			}},
+			LiquidationSummaries: []reportmodel.LiquidationCalculation{{
+				SourceID:               "eth-sell-2024-001",
+				OccurredAt:             time.Date(2024, time.February, 1, 9, 30, 0, 0, contractMarkdownFixtureLocation),
+				DisposedQuantity:       mustContractDecimal("2"),
+				AllocatedBasis:         mustContractDecimal("1000"),
+				NetLiquidationProceeds: mustContractDecimal("2000"),
+				GainOrLoss:             mustContractDecimal("1000"),
+				ActivityCurrency:       "EUR",
+				CalculationCurrency:    reportCalculationCurrency,
 			}},
 		}, {
 			AssetIdentityKey:    "asset-xrp",
@@ -143,21 +394,159 @@ func contractMarkdownReportFixture() reportmodel.CapitalGainsReport {
 			OpeningCostBasis:    mustContractDecimal("500"),
 			ClosingQuantity:     mustContractDecimal("800"),
 			ClosingCostBasis:    mustContractDecimal("400"),
-			CalculationCurrency: "NOT APPLICABLE",
+			CalculationCurrency: reportCalculationCurrency,
 			ActivityRows: []reportmodel.AssetActivityRow{{
 				SourceID:                    "xrp-reduction-2024-001",
-				OccurredAt:                  time.Date(2024, time.April, 1, 12, 0, 0, 0, time.Local),
+				OccurredAt:                  time.Date(2024, time.April, 1, 12, 0, 0, 0, contractMarkdownFixtureSummerLocation),
 				ActivityType:                reportmodel.ActivityTypeSell,
 				Quantity:                    mustContractDecimal("200"),
 				UnitPrice:                   contractDecimalPointer("0"),
 				GrossValue:                  contractDecimalPointer("0"),
 				FeeAmount:                   contractDecimalPointer("0"),
 				BasisAfterRow:               mustContractDecimal("400"),
-				CalculationCurrency:         "NOT APPLICABLE",
+				CalculationCurrency:         reportCalculationCurrency,
 				QuantityAfterRow:            mustContractDecimal("800"),
 				HoldingReductionExplanation: "custody transfer",
 			}},
 		}},
+		ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{
+			SourceID:           "btc-sell-2024-001",
+			AssetLabel:         "BTC",
+			ActivityDate:       time.Date(2024, time.January, 1, 0, 15, 0, 0, time.Local),
+			SourceCurrency:     "USD",
+			ReportBaseCurrency: reportmodel.ReportBaseCurrencyEUR,
+			RateDate:           time.Date(2023, time.December, 29, 0, 0, 0, 0, time.Local),
+			RateAuthority:      reportmodel.RateAuthorityEuropeanCentralBank,
+			RateKind:           "daily euro foreign exchange reference rate",
+			RateValue:          mustContractDecimal("1.08"),
+			QuoteDirection:     reportmodel.QuoteDirectionSourcePerBase,
+			Amounts: []reportmodel.ConvertedActivityAmount{
+				contractConvertedActivityAmount(reportmodel.ConvertedAmountKindUnitPrice, "27000", "25000"),
+				contractConvertedActivityAmount(reportmodel.ConvertedAmountKindGrossValue, "27000", "25000"),
+				contractConvertedActivityAmount(reportmodel.ConvertedAmountKindFeeAmount, "0", "0"),
+			},
+		}},
+		RateSources: []reportmodel.ExchangeRateEvidence{{
+			SourceCurrency:   "USD",
+			BaseCurrency:     reportmodel.ReportBaseCurrencyEUR,
+			ActivityDate:     time.Date(2024, time.January, 1, 0, 15, 0, 0, time.Local),
+			RateDate:         time.Date(2023, time.December, 29, 0, 0, 0, 0, time.Local),
+			Authority:        reportmodel.RateAuthorityEuropeanCentralBank,
+			ProviderID:       reportmodel.RateProviderIDECBEXR,
+			RateKind:         "daily euro foreign exchange reference rate",
+			QuoteDirection:   reportmodel.QuoteDirectionSourcePerBase,
+			RateValue:        mustContractDecimal("1.08"),
+			DatasetReference: "ECB Data Portal `EXR`",
+		}},
+	}
+}
+
+// contractConversionAuditEntry returns one conversion audit fixture with
+// matching amount-level exchange-rate evidence.
+// Authored by: OpenCode
+func contractConversionAuditEntry(sourceID string, assetLabel string, sourceCurrency string, rateValue string, quoteDirection reportmodel.QuoteDirection) reportmodel.ConversionAuditEntry {
+	var activityDate = time.Date(2024, time.January, 2, 0, 15, 0, 0, time.Local)
+	var evidence = reportmodel.ExchangeRateEvidence{
+		SourceCurrency:   sourceCurrency,
+		BaseCurrency:     reportmodel.ReportBaseCurrencyEUR,
+		ActivityDate:     activityDate,
+		RateDate:         time.Date(2024, time.January, 2, 0, 0, 0, 0, time.Local),
+		Authority:        reportmodel.RateAuthorityEuropeanCentralBank,
+		ProviderID:       reportmodel.RateProviderIDECBEXR,
+		RateKind:         "daily euro foreign exchange reference rate",
+		QuoteDirection:   quoteDirection,
+		RateValue:        mustContractDecimal(rateValue),
+		DatasetReference: "ECB Data Portal `EXR`",
+	}
+
+	return reportmodel.ConversionAuditEntry{
+		SourceID:           sourceID,
+		AssetLabel:         assetLabel,
+		ActivityDate:       activityDate,
+		SourceCurrency:     sourceCurrency,
+		ReportBaseCurrency: reportmodel.ReportBaseCurrencyEUR,
+		RateDate:           evidence.RateDate,
+		RateAuthority:      evidence.Authority,
+		RateKind:           evidence.RateKind,
+		RateValue:          evidence.RateValue,
+		QuoteDirection:     evidence.QuoteDirection,
+		Amounts: []reportmodel.ConvertedActivityAmount{{
+			SourceID:             sourceID,
+			AmountKind:           reportmodel.ConvertedAmountKindGrossValue,
+			OriginalCurrency:     sourceCurrency,
+			OriginalAmount:       mustContractDecimal("116"),
+			ReportBaseCurrency:   reportmodel.ReportBaseCurrencyEUR,
+			ConvertedAmount:      mustContractDecimal("100"),
+			ExchangeRateEvidence: &evidence,
+			ConversionStatus:     reportmodel.ConversionStatusConverted,
+		}},
+	}
+}
+
+// rateSourceSummarySection extracts the Rate Source Summary block from a
+// rendered Markdown document.
+// Authored by: OpenCode
+func rateSourceSummarySection(content string) string {
+	var start = strings.Index(content, "## Rate Source Summary")
+	if start < 0 {
+		return ""
+	}
+	var rest = content[start:]
+	var next = strings.Index(rest[len("## Rate Source Summary"):], "\n## ")
+	if next < 0 {
+		return rest
+	}
+	return rest[:len("## Rate Source Summary")+next]
+}
+
+// currencyConversionAuditSection extracts the Currency Conversion Audit block
+// from a rendered Markdown document.
+// Authored by: OpenCode
+func currencyConversionAuditSection(content string) string {
+	var start = strings.Index(content, "## Currency Conversion Audit")
+	if start < 0 {
+		return ""
+	}
+	var rest = content[start:]
+	var next = strings.Index(rest[len("## Currency Conversion Audit"):], "\n## ")
+	if next < 0 {
+		return rest
+	}
+	return rest[:len("## Currency Conversion Audit")+next]
+}
+
+// countOccurrences counts non-overlapping occurrences of a substring.
+// Authored by: OpenCode
+func countOccurrences(content string, needle string) int {
+	return strings.Count(content, needle)
+}
+
+// contractConvertedActivityAmount returns one converted amount tied to the
+// canonical BTC conversion audit fixture.
+// Authored by: OpenCode
+func contractConvertedActivityAmount(kind reportmodel.ConvertedAmountKind, original string, converted string) reportmodel.ConvertedActivityAmount {
+	var evidence = reportmodel.ExchangeRateEvidence{
+		SourceCurrency:   "USD",
+		BaseCurrency:     reportmodel.ReportBaseCurrencyEUR,
+		ActivityDate:     time.Date(2024, time.January, 1, 0, 15, 0, 0, time.Local),
+		RateDate:         time.Date(2023, time.December, 29, 0, 0, 0, 0, time.Local),
+		Authority:        reportmodel.RateAuthorityEuropeanCentralBank,
+		ProviderID:       reportmodel.RateProviderIDECBEXR,
+		RateKind:         "daily euro foreign exchange reference rate",
+		QuoteDirection:   reportmodel.QuoteDirectionSourcePerBase,
+		RateValue:        mustContractDecimal("1.08"),
+		DatasetReference: "ECB Data Portal `EXR`",
+	}
+
+	return reportmodel.ConvertedActivityAmount{
+		SourceID:             "btc-sell-2024-001",
+		AmountKind:           kind,
+		OriginalCurrency:     "USD",
+		OriginalAmount:       mustContractDecimal(original),
+		ReportBaseCurrency:   reportmodel.ReportBaseCurrencyEUR,
+		ConvertedAmount:      mustContractDecimal(converted),
+		ExchangeRateEvidence: &evidence,
+		ConversionStatus:     reportmodel.ConversionStatusConverted,
 	}
 }
 

@@ -45,6 +45,8 @@ type CapitalGainsReport struct {
 	YearlyNetTotal            apd.Decimal
 	ReferenceEntries          []ReferenceLiquidationEntry
 	DetailSections            []AssetDetailSection
+	ConversionAuditEntries    []ConversionAuditEntry
+	RateSources               []ExchangeRateEvidence
 }
 
 // AssetSummaryEntry stores one row in the summary section of the report.

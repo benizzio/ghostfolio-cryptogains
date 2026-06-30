@@ -188,6 +188,23 @@ func DivideExact(dividend apd.Decimal, divisor apd.Decimal) (apd.Decimal, string
 	return ParseString(canonical)
 }
 
+// Clone returns a defensive copy of one exact decimal value, including its
+// coefficient storage. Use Clone before passing decimal values into code paths
+// that call apd pointer-receiver arithmetic and may mutate the receiver.
+//
+// Example:
+//
+//	value, _, _ := decimal.ParseString("10.5")
+//	copy := decimal.Clone(value)
+//	_ = copy
+//
+// Authored by: OpenCode
+func Clone(value apd.Decimal) apd.Decimal {
+	var cloned apd.Decimal
+	cloned.Set(&value)
+	return cloned
+}
+
 // CanonicalString converts one exact decimal into its canonical persisted
 // string form.
 //

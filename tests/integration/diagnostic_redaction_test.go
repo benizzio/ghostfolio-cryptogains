@@ -13,8 +13,11 @@ import (
 	"time"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
+	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
+	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 )
 
 func TestApplicationOwnedDiagnosticsRedactSecrets(t *testing.T) {
@@ -64,6 +67,81 @@ func TestGeneratedDiagnosticsRedactSecretBearingFailureCauseChain(t *testing.T) 
 	} {
 		if !strings.Contains(text, expected) {
 			t.Fatalf("expected persisted cause chain to contain %q, got %q", expected, text)
+		}
+	}
+}
+
+// TestProductionConversionFailureDiagnosticsRedactFinancialValues verifies that
+// US3 conversion failures preserve non-secret activity lookup context while
+// removing secrets and financial values from persisted production diagnostics.
+// Authored by: OpenCode
+func TestProductionConversionFailureDiagnosticsRedactFinancialValues(t *testing.T) {
+	var rateService = &failingIntegrationCurrencyRates{failures: map[string]error{
+		"EUR|USD|2024-07-15": errors.New("provider_unavailable: Federal Reserve H.10 failed with Bearer jwt-secret and token token-123 for amount 1000.25"),
+	}}
+	var harness = newRuntimeBackedFlowHarnessWithCurrencyRateService(t, t.TempDir(), mustCloudSetupConfig(t), false, rateService)
+	var token = "token-123"
+	var cache = conversionFailureProtectedActivityCache(t, "redaction-eur-buy", currencyintegration.BaseCurrencyEUR, "2024-07-15T10:00:00Z")
+	cache.Activities[0].Comment = "Bearer jwt-secret reusable verifier token-123"
+	cache.Activities[0].Quantity = mustReportFlowDecimal(t, "42.123")
+	cache.Activities[0].OrderGrossValue = reportFlowDecimalPointer(t, "1000.25")
+	cache.Activities[0].OrderUnitPrice = reportFlowDecimalPointer(t, "1000.25")
+
+	seedProtectedSnapshot(t, harness, token, cache)
+	var unlock = harness.App.SyncService.UnlockSelectedServerSnapshot(context.Background(), harness.Config, token)
+	if !unlock.ProtectedData.HasReadableSnapshot {
+		t.Fatalf("expected readable snapshot after unlock, got %#v", unlock)
+	}
+
+	var request, requestErr = reportmodel.NewReportRequest(
+		2024,
+		reportmodel.CostBasisMethodFIFO,
+		reportmodel.ReportBaseCurrencyUSD,
+		time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
+	)
+	if requestErr != nil {
+		t.Fatalf("new report request: %v", requestErr)
+	}
+	var outcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{
+		Request:                 request,
+		ServerOrigin:            harness.Config.ServerOrigin,
+		AttemptID:               "attempt-conversion-redaction",
+		ExplicitDevelopmentMode: false,
+	})
+	if outcome.Success || outcome.FailureReason != runtime.ReportFailureUnsupportedReportCalculation {
+		t.Fatalf("expected conversion failure outcome, got %#v", outcome)
+	}
+	if !outcome.Diagnostic.Eligible || !outcome.Diagnostic.Request.RedactFinancialValues {
+		t.Fatalf("expected production diagnostic eligibility with financial redaction, got %#v", outcome.Diagnostic)
+	}
+
+	var path, err = harness.App.SyncService.GenerateDiagnosticReport(context.Background(), outcome.Diagnostic.Request)
+	if err != nil {
+		t.Fatalf("generate conversion failure diagnostic report: %v", err)
+	}
+	testutil.AssertRegularFile(t, path)
+	var raw, readErr = os.ReadFile(path)
+	if readErr != nil {
+		t.Fatalf("read conversion failure diagnostic report: %v", readErr)
+	}
+	var text = string(raw)
+	for _, forbidden := range []string{"token-123", "jwt-secret", "1000.25", "42.123", "Bearer jwt-secret"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("expected production conversion diagnostics to exclude %q, got %q", forbidden, text)
+		}
+	}
+	for _, expected := range []string{
+		`"financial_values_redacted": true`,
+		`"failure_category": "unsupported report calculation"`,
+		`"source_id": "redaction-eur-buy"`,
+		`"order_currency": "EUR"`,
+		`provider_unavailable`,
+		`EUR`,
+		`USD`,
+		`2024-07-15`,
+	} {
+		if !strings.Contains(text, expected) {
+			t.Fatalf("expected production conversion diagnostics to contain %q, got %q", expected, text)
 		}
 	}
 }

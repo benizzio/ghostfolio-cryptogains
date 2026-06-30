@@ -17,11 +17,14 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
 	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeapp"
+	"github.com/cockroachdb/apd/v3"
 )
 
 var ansiEscapePattern = regexp.MustCompile(`\x1b\[[0-9;]*m`)
@@ -88,10 +91,7 @@ func newRuntimeBackedFlowHarness(t *testing.T, baseDir string, config configmode
 	options.ConfigDir = baseDir
 	options.AllowDevHTTP = allowDevHTTP
 
-	var app, err = runtime.New(options)
-	if err != nil {
-		t.Fatalf("runtime new: %v", err)
-	}
+	var app = runtimeapp.NewWithReportCurrencyRateService(t, options, deterministicIntegrationCurrencyRates{})
 
 	var store = configstore.NewJSONStore(baseDir)
 	if err := store.Save(context.Background(), config); err != nil {
@@ -113,6 +113,62 @@ func newRuntimeBackedFlowHarness(t *testing.T, baseDir string, config configmode
 		Store:   store,
 		Model:   model,
 	}
+}
+
+// deterministicIntegrationCurrencyRates returns canonical official-rate-shaped
+// evidence without calling live providers.
+// Authored by: OpenCode
+type deterministicIntegrationCurrencyRates struct{}
+
+// LookupRate returns deterministic evidence for runtime-backed integration
+// tests.
+// Authored by: OpenCode
+func (service deterministicIntegrationCurrencyRates) LookupRate(_ context.Context, request currency.RateLookupRequest) (currency.ExchangeRateEvidence, error) {
+	var rateDate = integrationRateDate(request.ActivityDate)
+	var rateValue = *apd.New(11, -1)
+	var authority = currency.RateAuthorityFederalReserve
+	var providerID = currency.ProviderIDFederalReserveH10
+	var rateKind = currency.RateKindFederalReserveH10NoonBuying
+	var quoteDirection = currency.QuoteDirectionSourcePerBase
+	var datasetReference = "integration deterministic Federal Reserve H.10 fixture"
+
+	if request.BaseCurrency == currency.BaseCurrencyEUR {
+		authority = currency.RateAuthorityEuropeanCentralBank
+		providerID = currency.ProviderIDECBEXR
+		rateKind = currency.RateKindECBEXRDailyReference
+		datasetReference = "EXR/D." + request.SourceCurrency + ".EUR.SP00.A integration deterministic fixture"
+	}
+	if request.BaseCurrency == currency.BaseCurrencyUSD && request.SourceCurrency == currency.BaseCurrencyEUR {
+		quoteDirection = currency.QuoteDirectionBasePerSource
+	}
+
+	return currency.NewExchangeRateEvidence(request, rateDate, authority, providerID, rateKind, quoteDirection, rateValue, datasetReference)
+}
+
+// ProviderCategoryForBaseCurrency returns deterministic provider metadata for
+// runtime-backed integration tests.
+// Authored by: OpenCode
+func (service deterministicIntegrationCurrencyRates) ProviderCategoryForBaseCurrency(baseCurrency string) string {
+	switch baseCurrency {
+	case currency.BaseCurrencyEUR:
+		return string(currency.ProviderIDECBEXR)
+	case currency.BaseCurrencyUSD:
+		return string(currency.ProviderIDFederalReserveH10)
+	default:
+		return ""
+	}
+}
+
+// integrationRateDate returns the deterministic prior-provider date used by
+// conversion integration fixtures.
+// Authored by: OpenCode
+func integrationRateDate(activityDate time.Time) time.Time {
+	var candidate = time.Date(activityDate.Year(), activityDate.Month(), activityDate.Day(), 0, 0, 0, 0, time.UTC)
+	if candidate.Format(time.DateOnly) == "2024-01-06" {
+		return candidate.AddDate(0, 0, -1)
+	}
+
+	return candidate
 }
 
 // seedProtectedSnapshot persists one encrypted snapshot for the supplied token

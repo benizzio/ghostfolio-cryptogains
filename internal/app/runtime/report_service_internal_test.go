@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
+	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	reportoutput "github.com/benizzio/ghostfolio-cryptogains/internal/report/output"
 	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
@@ -101,7 +103,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
-			calculate: func(request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
 			render: func(reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
@@ -135,7 +137,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		var savedPath string
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
-			calculate: func(request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
 			render: func(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
@@ -170,7 +172,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		var savedPath = filepath.Join(fixture.DocumentsDir, "report.md")
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
-			calculate: func(request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
 			render: func(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
@@ -203,7 +205,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		var savedPath = filepath.Join(fixture.DocumentsDir, "report.md")
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
-			calculate: func(request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
 			render: func(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
@@ -231,7 +233,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
-			calculate: func(request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
 			render: func(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
@@ -265,7 +267,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
-			calculate: func(request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
 			render: func(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
@@ -292,7 +294,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
-			calculate: func(request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
 			render: func(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
@@ -328,7 +330,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		var service = &reportService{
 			snapshots:         reportSnapshotLifecycleWithCache(syncmodel.ProtectedActivityCache{ActivityCount: 1, AvailableReportYears: []int{2025}, Activities: []syncmodel.ActivityRecord{offendingRecord}}),
 			diagnosticReports: newDiagnosticReportService(t.TempDir()),
-			calculate: func(reportmodel.ReportRequest, syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			calculate: func(context.Context, reportmodel.ReportRequest, syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return reportmodel.CapitalGainsReport{}, runtimeDiagnosticCarrierError{
 					context: syncmodel.DiagnosticContext{
 						FailureDetail:           "incomplete context (asset \"BTC\", source \"report-failure-buy-1\")",
@@ -359,7 +361,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 			snapshots:         reportSnapshotLifecycleWithCache(syncmodel.ProtectedActivityCache{ActivityCount: 1, AvailableReportYears: []int{2025}, Activities: []syncmodel.ActivityRecord{offendingRecord}}),
 			allowDevHTTP:      true,
 			diagnosticReports: newDiagnosticReportService(baseDir),
-			calculate: func(reportmodel.ReportRequest, syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			calculate: func(context.Context, reportmodel.ReportRequest, syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return reportmodel.CapitalGainsReport{}, runtimeDiagnosticCarrierError{
 					context: syncmodel.DiagnosticContext{
 						FailureDetail:           "incomplete context (asset \"BTC\", source \"report-failure-buy-1\")",
@@ -398,16 +400,38 @@ func TestReportServiceHelperFunctionsCoverRemainingBranches(t *testing.T) {
 	t.Parallel()
 
 	var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
-	var service = &reportService{snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache)}
+	var service = &reportService{
+		snapshots:     reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
+		currencyRates: reportProviderCategoryRateService{},
+	}
 
 	var cache, outcome, ok = service.readAvailableCache(request)
 	if !ok || cache.ActivityCount == 0 || outcome.Success || outcome.Message != "" || outcome.FailureReason != ReportFailureNone || outcome.Request != (reportmodel.ReportRequest{}) || outcome.OutputFile != (reportmodel.ReportOutputFile{}) || outcome.Attempt != (SyncAttempt{}) || outcome.Diagnostic.Eligible || outcome.Diagnostic.Path != "" || outcome.Diagnostic.GenerationMessage != "" {
 		t.Fatalf("expected available cache read to succeed, got ok=%v cache=%#v outcome=%#v", ok, cache, outcome)
 	}
 
-	var message = reportCalculationFailureMessage(request, errors.New(" calculation boom "))
+	var message = service.reportCalculationFailureMessage(request, errors.New(" calculation boom "))
 	if !strings.Contains(message, "Could not generate the 2024 FIFO report: calculation boom") {
 		t.Fatalf("expected trimmed calculation failure message, got %q", message)
+	}
+	var conversionErr = reportmodel.NewCalculationError(
+		reportmodel.CalculationErrorKindActivityInput,
+		"could not resolve currency conversion rate",
+		"late-gbp-buy",
+		"FAIL",
+		testConversionFailureContextCause{context: reportcalculate.ConversionFailureContext{
+			SourceID:           "late-gbp-buy",
+			SourceCurrency:     "GBP",
+			ReportBaseCurrency: "USD",
+			ActivityDate:       time.Date(2024, time.June, 13, 0, 0, 0, 0, time.UTC),
+			Reason:             "missing_rate",
+		}},
+	)
+	var conversionMessage = service.reportCalculationFailureMessage(request, conversionErr)
+	for _, expected := range []string{"Conversion Failure Context", "Source ID: late-gbp-buy", "Source Currency: GBP", "Report Base Currency: USD", "Activity Date: 2024-06-13", "Failure Reason: missing_rate", "Provider Category: federal_reserve_h10"} {
+		if !strings.Contains(conversionMessage, expected) {
+			t.Fatalf("expected conversion failure message to contain %q, got %q", expected, conversionMessage)
+		}
 	}
 	if !reportDiagnosticEligible(ReportFailureUnsupportedReportCalculation) {
 		t.Fatalf("expected unsupported calculation to remain diagnostic eligible")
@@ -538,7 +562,12 @@ func reportSnapshotLifecycleWithCache(cache syncmodel.ProtectedActivityCache) *s
 func reportRequestFixture(t *testing.T, year int, method reportmodel.CostBasisMethod) reportmodel.ReportRequest {
 	t.Helper()
 
-	var request, err = reportmodel.NewReportRequest(year, method, time.Date(2026, time.May, 20, 15, 4, 5, 0, time.UTC))
+	var request, err = reportmodel.NewReportRequest(
+		year,
+		method,
+		reportmodel.ReportBaseCurrencyUSD,
+		time.Date(2026, time.May, 20, 15, 4, 5, 0, time.UTC),
+	)
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
@@ -552,6 +581,30 @@ func reportoutputFailure(category reportoutput.FailureCategory, message string) 
 	return reportoutput.NewFailure(category, errors.New(message))
 }
 
+// reportProviderCategoryRateService exposes deterministic provider metadata for
+// runtime report failure tests.
+// Authored by: OpenCode
+type reportProviderCategoryRateService struct{}
+
+// LookupRate satisfies the report currency-rate service seam.
+// Authored by: OpenCode
+func (service reportProviderCategoryRateService) LookupRate(context.Context, currencyintegration.RateLookupRequest) (currencyintegration.ExchangeRateEvidence, error) {
+	return currencyintegration.ExchangeRateEvidence{}, errors.New("lookup is unused in provider-category tests")
+}
+
+// ProviderCategoryForBaseCurrency returns deterministic provider categories.
+// Authored by: OpenCode
+func (service reportProviderCategoryRateService) ProviderCategoryForBaseCurrency(baseCurrency string) string {
+	switch baseCurrency {
+	case currencyintegration.BaseCurrencyUSD:
+		return string(currencyintegration.ProviderIDFederalReserveH10)
+	case currencyintegration.BaseCurrencyEUR:
+		return string(currencyintegration.ProviderIDECBEXR)
+	default:
+		return ""
+	}
+}
+
 // capitalGainsReportFixture returns one minimal valid calculated report for
 // runtime report-service tests.
 // Authored by: OpenCode
@@ -559,18 +612,19 @@ func capitalGainsReportFixture(t *testing.T, request reportmodel.ReportRequest) 
 	t.Helper()
 
 	var zero apd.Decimal
-	var summaryEntry, err = reportmodel.NewAssetSummaryEntry("asset-btc-001", "Bitcoin", zero, "NOT APPLICABLE")
+	var reportCalculationCurrency = request.ReportBaseCurrency.Label()
+	var summaryEntry, err = reportmodel.NewAssetSummaryEntry("asset-btc-001", "Bitcoin", zero, reportCalculationCurrency)
 	if err != nil {
 		t.Fatalf("new summary entry: %v", err)
 	}
 	var detailSection reportmodel.AssetDetailSection
-	detailSection, err = reportmodel.NewAssetDetailSection("asset-btc-001", "Bitcoin", zero, zero, zero, zero, "NOT APPLICABLE", nil, nil)
+	detailSection, err = reportmodel.NewAssetDetailSection("asset-btc-001", "Bitcoin", zero, zero, zero, zero, reportCalculationCurrency, nil, nil)
 	if err != nil {
 		t.Fatalf("new detail section: %v", err)
 	}
 
 	var report reportmodel.CapitalGainsReport
-	report, err = reportmodel.NewCapitalGainsReport(request, request.RequestedAt, "NOT APPLICABLE", []reportmodel.AssetSummaryEntry{summaryEntry}, zero, nil, []reportmodel.AssetDetailSection{detailSection})
+	report, err = reportmodel.NewCapitalGainsReport(request, request.RequestedAt, reportCalculationCurrency, []reportmodel.AssetSummaryEntry{summaryEntry}, zero, nil, []reportmodel.AssetDetailSection{detailSection})
 	if err != nil {
 		t.Fatalf("new capital gains report: %v", err)
 	}
@@ -610,4 +664,107 @@ func reportFailureActivityRecordFixture(t *testing.T) syncmodel.ActivityRecord {
 		Quantity:         quantity,
 		RawHash:          "doge-buy-2025-incomplete-001",
 	}
+}
+
+// TestReportConversionFailureContextFormatsTypedDetails verifies non-secret
+// conversion context formatting from typed calculation context.
+// Authored by: OpenCode
+func TestReportConversionFailureContextFormatsTypedDetails(t *testing.T) {
+	t.Parallel()
+
+	var service = &reportService{currencyRates: reportProviderCategoryRateService{}}
+	var fallbackErr = reportmodel.NewCalculationError(
+		reportmodel.CalculationErrorKindActivityInput,
+		"could not prepare currency conversion",
+		"bad-currency",
+		"BTC",
+		testConversionFailureContextCause{context: reportcalculate.ConversionFailureContext{
+			SourceID:           "bad-currency",
+			SourceCurrency:     "usd",
+			ReportBaseCurrency: "EUR",
+			ActivityDate:       time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
+			Reason:             "invalid_activity_currency",
+		}},
+	)
+	var fallbackContext = service.reportConversionFailureContext(fallbackErr)
+	for _, expected := range []string{
+		"Conversion Failure Context",
+		"Source ID: bad-currency",
+		"Source Currency: usd",
+		"Report Base Currency: EUR",
+		"Activity Date: 2024-01-02",
+		"Failure Reason: invalid_activity_currency",
+	} {
+		if !strings.Contains(fallbackContext, expected) {
+			t.Fatalf("expected fallback context to contain %q, got %q", expected, fallbackContext)
+		}
+	}
+	if strings.Contains(fallbackContext, "Provider Category") {
+		t.Fatalf("expected invalid activity currency context to suppress provider category, got %q", fallbackContext)
+	}
+
+	var providerFallbackErr = reportmodel.NewCalculationError(
+		reportmodel.CalculationErrorKindActivityInput,
+		"could not resolve currency conversion rate",
+		"",
+		"",
+		testConversionFailureContextCause{context: reportcalculate.ConversionFailureContext{
+			SourceCurrency:     "GBP",
+			ReportBaseCurrency: "USD",
+			ActivityDate:       time.Date(2024, time.January, 3, 0, 0, 0, 0, time.UTC),
+		}},
+	)
+	var providerFallbackContext = service.reportConversionFailureContext(providerFallbackErr)
+	for _, expected := range []string{
+		"Source Currency: GBP",
+		"Report Base Currency: USD",
+		"Activity Date: 2024-01-03",
+		"Provider Category: federal_reserve_h10",
+	} {
+		if !strings.Contains(providerFallbackContext, expected) {
+			t.Fatalf("expected provider fallback context to contain %q, got %q", expected, providerFallbackContext)
+		}
+	}
+}
+
+// TestReportConversionFailureContextRejectsIncompleteDetails verifies helpers do
+// not manufacture conversion context from unrelated or incomplete errors.
+// Authored by: OpenCode
+func TestReportConversionFailureContextRejectsIncompleteDetails(t *testing.T) {
+	t.Parallel()
+
+	var service = &reportService{currencyRates: reportProviderCategoryRateService{}}
+	if got := service.reportConversionFailureContext(errors.New("plain failure")); got != "" {
+		t.Fatalf("expected non-calculation error to produce no context, got %q", got)
+	}
+
+	var incompleteErr = reportmodel.NewCalculationError(reportmodel.CalculationErrorKindActivityInput, "could not resolve currency conversion rate", "", "", testConversionFailureContextCause{})
+	if got := service.reportConversionFailureContext(incompleteErr); got != "" {
+		t.Fatalf("expected incomplete conversion detail to produce no context, got %q", got)
+	}
+	if got := reportConversionProviderCategory(reportProviderCategoryRateService{}, "GBP"); got != "" {
+		t.Fatalf("expected unsupported base currency to have no provider category, got %q", got)
+	}
+	if got := reportConversionProviderCategory(nil, "USD"); got != "" {
+		t.Fatalf("expected unavailable provider metadata to have no provider category, got %q", got)
+	}
+}
+
+// testConversionFailureContextCause carries typed conversion context in runtime
+// package tests.
+// Authored by: OpenCode
+type testConversionFailureContextCause struct {
+	context reportcalculate.ConversionFailureContext
+}
+
+// Error returns a safe test error message.
+// Authored by: OpenCode
+func (cause testConversionFailureContextCause) Error() string {
+	return "conversion failed"
+}
+
+// ReportConversionFailureContext returns typed test conversion context.
+// Authored by: OpenCode
+func (cause testConversionFailureContextCause) ReportConversionFailureContext() reportcalculate.ConversionFailureContext {
+	return cause.context
 }

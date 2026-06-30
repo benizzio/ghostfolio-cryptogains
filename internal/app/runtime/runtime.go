@@ -10,6 +10,8 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	ghostfolioclient "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/client"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
+	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
 	snapshotenvelope "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/envelope"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
@@ -51,6 +53,30 @@ type App struct {
 // the setup and sync application services used by the terminal workflow.
 // Authored by: OpenCode
 func New(options bootstrap.Options) (*App, error) {
+	var reportCurrencyRates = currency.NewCurrencyRateService(currency.NewCurrencyRateSessionCache())
+	return NewWithReportCurrencyRateService(options, reportCurrencyRates)
+}
+
+// NewWithReportCurrencyRateService assembles runtime dependencies with a
+// caller-supplied report currency-rate service.
+//
+// Production entrypoints should call New so the runtime uses the fixed official
+// provider service created by currency.NewCurrencyRateService. This constructor
+// exists for callers that already own a report currency-rate service and need
+// runtime to coordinate snapshot, report, rendering, and output lifecycle around
+// that dependency. The supplied service is passed only to report calculation and
+// is not persisted.
+//
+// Example:
+//
+//	app, err := runtime.NewWithReportCurrencyRateService(options, currencyRates)
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = app.ReportService
+//
+// Authored by: OpenCode
+func NewWithReportCurrencyRateService(options bootstrap.Options, reportCurrencyRates reportcalculate.CurrencyRateService) (*App, error) {
 	var baseConfigDir = options.ConfigDir
 	if baseConfigDir == "" {
 		var userConfigDir, err = os.UserConfigDir()
@@ -78,7 +104,7 @@ func New(options bootstrap.Options) (*App, error) {
 		syncValidator,
 		sharedSnapshots,
 	)
-	var reportService = newReportService(sharedSnapshots, baseConfigDir, options.AllowDevHTTP)
+	var reportService = newReportService(sharedSnapshots, baseConfigDir, options.AllowDevHTTP, reportCurrencyRates)
 
 	return &App{
 		Options:        options,
