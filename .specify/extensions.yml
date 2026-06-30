@@ -167,14 +167,6 @@ hooks:
     prompt: Run bugfix consistency check after implementation?
     description: Verify spec artifact consistency after implementation completes
     condition: null
-  - extension: coding-standards-drift-control
-    command: speckit.coding-standards-drift-control.report
-    enabled: true
-    optional: true
-    prompt: Run Coding Standards Drift Control after implementation?
-    description: Generate or refresh the coding-standards drift report for the active
-      feature
-    condition: null
   - extension: test-coverage-drift-control
     command: speckit.test-coverage-drift-control.report
     enabled: true
@@ -182,6 +174,15 @@ hooks:
     prompt: Run test coverage drift control after implementation?
     description: Generate or refresh the test coverage drift report for the active
       feature
+    condition: null
+  - extension: coding-standards-drift-control
+    command: speckit.coding-standards-drift-control.report
+    enabled: true
+    optional: true
+    priority: 10
+    prompt: Run Coding Standards Drift Control after implementation?
+    description: Generate or incrementally refresh the coding-standards drift report
+      for the active feature
     condition: null
   after_checklist:
   - extension: git

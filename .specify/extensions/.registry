@@ -48,29 +48,6 @@
       "registered_skills": [],
       "installed_at": "2026-05-26T18:29:23.776328+00:00"
     },
-    "coding-standards-drift-control": {
-      "version": "0.3.1",
-      "source": "local",
-      "manifest_hash": "sha256:0011e340d2ccf60f62a93fe05f4c183f0d9ae8d415ad64cedc7ade62d863ab57",
-      "enabled": true,
-      "priority": 10,
-      "registered_commands": {
-        "agy": [
-          "speckit.coding-standards-drift-control.report",
-          "speckit.coding-standards-drift-control.remediation-plan"
-        ],
-        "codex": [
-          "speckit.coding-standards-drift-control.report",
-          "speckit.coding-standards-drift-control.remediation-plan"
-        ],
-        "opencode": [
-          "speckit.coding-standards-drift-control.report",
-          "speckit.coding-standards-drift-control.remediation-plan"
-        ]
-      },
-      "registered_skills": [],
-      "installed_at": "2026-05-31T18:56:11.919512+00:00"
-    },
     "test-coverage-drift-control": {
       "version": "0.2.1",
       "source": "local",
@@ -167,6 +144,33 @@
       },
       "registered_skills": [],
       "installed_at": "2026-06-20T11:50:15.714629+00:00"
+    },
+    "coding-standards-drift-control": {
+      "version": "0.4.0",
+      "source": "local",
+      "manifest_hash": "sha256:1f894b864ac118da7800cec9605e09fa1d46a5e9dcfe6a567a6f51a4be716c5b",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "agy": [
+          "speckit.coding-standards-drift-control.report",
+          "speckit.coding-standards-drift-control.remediation-plan"
+        ],
+        "codex": [
+          "speckit.coding-standards-drift-control.report",
+          "speckit.coding-standards-drift-control.remediation-plan"
+        ],
+        "opencode": [
+          "speckit.coding-standards-drift-control.report",
+          "speckit.coding-standards-drift-control.remediation-plan"
+        ],
+        "zed": [
+          "speckit.coding-standards-drift-control.report",
+          "speckit.coding-standards-drift-control.remediation-plan"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-06-30T19:26:47.350008+00:00"
     }
   }
 }

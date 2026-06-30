@@ -11,8 +11,8 @@ Track and fix code that moves away from technical definitions while adding the s
 - Uses `AGENTS.md`, `.specify/memory/constitution.md`, and other known agent-instruction files as the review baseline when present
 - Focuses on coding standards and engineering practices rather than feature-domain correctness
 - Blocks report generation and remediation planning while the active feature has open or pending tasks
-- Uses `CODE-STAND-DRIFT-###` finding identifiers and migrates legacy `DRIFT-###` findings to the new format on rerun
-- Appends remediation tasks to `tasks.md` so `/speckit.implement` can execute them
+- Uses `CODE-STAND-DRIFT-###` finding identifiers, preserves historical findings with `Pending`/`Resolved` status, and migrates legacy `DRIFT-###` findings to the new format on rerun
+- Records concise per-finding remediation plans in the drift report before appending tasks to `tasks.md` so `/speckit.implement` can execute them
 
 ## Requirements
 
@@ -25,7 +25,7 @@ Track and fix code that moves away from technical definitions while adding the s
 ### Release Install
 
 ```bash
-specify extension add coding-standards-drift-control --from https://github.com/benizzio/spec-kit-coding-standards-drift-control/archive/refs/tags/v0.3.1.zip
+specify extension add coding-standards-drift-control --from https://github.com/benizzio/spec-kit-coding-standards-drift-control/archive/refs/tags/v0.4.0.zip
 ```
 
 ### Development Install
@@ -37,15 +37,15 @@ specify extension add --dev /path/to/spec-kit-coding-standards-drift-control
 ## Workflow
 
 1. Finish the active feature's normal implementation tasks.
-2. Run `/speckit.coding-standards-drift-control.report` to generate or refresh `coding-standards-drift-report.md`.
-3. Run `/speckit.coding-standards-drift-control.remediation-plan` to append a drift remediation phase to `tasks.md`.
-4. Run `/speckit.implement` to execute the generated remediation tasks.
+2. Run `/speckit.coding-standards-drift-control.report` to generate or incrementally refresh `coding-standards-drift-report.md`.
+3. Run `/speckit.coding-standards-drift-control.remediation-plan` to record remediation plans in the report and append a drift remediation phase to `tasks.md`.
+4. Execute the generated remediation tasks with `/speckit.implement`.
 
 ## Commands
 
 ### `/speckit.coding-standards-drift-control.report`
 
-Generates or refreshes `specs/{feature}/coding-standards-drift-report.md` for the active feature after implementation is complete.
+Generates or incrementally refreshes `specs/{feature}/coding-standards-drift-report.md` for the active feature after implementation is complete.
 
 Example:
 
@@ -55,7 +55,7 @@ Example:
 
 ### `/speckit.coding-standards-drift-control.remediation-plan`
 
-Appends a final remediation phase to `specs/{feature}/tasks.md` from the current drift report.
+Adds or updates per-finding remediation plans in `specs/{feature}/coding-standards-drift-report.md`, then appends a final remediation phase to `specs/{feature}/tasks.md` from those plans.
 
 Example:
 
@@ -69,7 +69,9 @@ Example:
 - Loads `AGENTS.md`, `.specify/memory/constitution.md`, and known agent-instruction files such as `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`, `.cursorrules`, `.cursor/rules/**`, `.windsurfrules`, and `.clinerules` when present
 - Falls back to a conservative baseline derived from the local codebase when those files do not define concrete standards
 - Keeps findings grounded in exact file references and explicit policy evidence
-- Skips remediation task generation when the report has no findings or when a matching `CODE-STAND-DRIFT-###` task, or a legacy `DRIFT-###` task for the same finding, already exists in `tasks.md`
+- On rerun, keeps prior report findings, appends newly discovered drift as `Pending`, and leaves `Resolved` transitions to the final generated remediation task
+- The remediation-plan command reasons from the report evidence and coding-standards baseline references before recording a surgical `Remediation plan` for each selected pending finding
+- Skips remediation task generation when the report has no pending findings or when a matching `CODE-STAND-DRIFT-###` task, or a legacy `DRIFT-###` task for the same finding, already exists in `tasks.md`
 
 ## Configuration
 
@@ -77,7 +79,7 @@ No additional extension configuration file is required. The commands inspect the
 
 ## Output
 
-- `specs/{feature}/coding-standards-drift-report.md`
+- `specs/{feature}/coding-standards-drift-report.md` with optional per-finding remediation plans
 - `specs/{feature}/tasks.md` with an appended drift remediation phase
 
 ## Troubleshooting
@@ -88,7 +90,7 @@ Complete the remaining open or pending tasks in the active feature's `tasks.md`,
 
 ### No Remediation Tasks Were Added
 
-The report may contain no findings, or matching `CODE-STAND-DRIFT-###` tasks, or legacy `DRIFT-###` tasks for the same findings, may already exist in `tasks.md`.
+Either the report contains no pending findings, or matching `CODE-STAND-DRIFT-###` tasks (or legacy `DRIFT-###` tasks for the same pending findings) already exist in `tasks.md`.
 
 ### `specify extension` Commands Are Missing
 
@@ -104,13 +106,13 @@ uv tool install specify-cli --force --from git+https://github.com/github/spec-ki
 - Documentation: `README.md`
 - Changelog: `CHANGELOG.md`
 - License: `MIT`
-- Current beta version: `0.3.1`
+- Current beta version: `0.4.0`
 
 ## Catalog Submission Metadata
 
 - Extension ID: `coding-standards-drift-control`
 - Extension Name: `Coding Standards Drift Control`
-- Version: `0.3.1`
+- Version: `0.4.0`
 - Commands: `2`
 - Hooks: `1`
 - Suggested tags: `analysis`, `standards`, `quality`, `maintenance`
