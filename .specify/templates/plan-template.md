@@ -49,6 +49,9 @@ or NEEDS CLARIFICATION]
   conversion boundaries, rounding rules, and auditability requirements.
 - [ ] Testing: Define integration coverage, coverage-gate verification, and any
   justified targeted unit tests.
+- [ ] Quality gate: Define the changed-source quality verification path, the
+  expected `QUALITY_BASE_REF`, and whether the feature changes `*.go`, `go.mod`,
+  or `go.sum` source inputs.
 - [ ] Empirical financial validation: If the feature changes financial
   calculations and an `empirical solidified financial tests` suite exists or is
   introduced, identify the dataset path and format, confirm the `empirical

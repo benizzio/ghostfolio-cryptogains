@@ -59,6 +59,7 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
 - For changed-source quality checks, run `make quality QUALITY_BASE_REF=origin/main`.
 - The quality gate runs `golangci-lint`, `govulncheck`, and `gitleaks` only against source inputs changed from the base ref: `*.go`, `go.mod`, and `go.sum`.
 - If no source inputs changed, `make quality` must exit `0` with skip messages.
+- Every new feature must pass this changed-source quality gate before completion or cite the successful `Quality` GitHub Actions check.
 - The changed-source gate does not mean the full historical `golangci-lint run ./...` baseline is clean.
 - For full project validation, still run `make test` and `make coverage` when relevant to the change.
 - Do not introduce Sonar, Qodana, Semgrep, or CodeQL tooling for issue #40 unless a later issue explicitly asks for it.

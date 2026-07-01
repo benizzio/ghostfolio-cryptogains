@@ -9,13 +9,14 @@ description: "Task list template for feature implementation"
 
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: Automated tests are mandatory for project-owned code. Task lists MUST
-include integration coverage and coverage verification. Targeted unit tests
-should be added only when justified by complexity or by gaps that integration
-tests cannot cover realistically. `Empirical solidified financial tests` are
-optional and apply only when the feature touches financial calculations covered
-by an existing read-only `empirical external dataset` or by a dedicated
-dataset-maintenance spec.
+**Tests and Quality Gates**: Automated tests are mandatory for project-owned
+code. Task lists MUST include integration coverage, coverage verification, and
+changed-source quality-gate verification. Targeted unit tests should be added
+only when justified by complexity or by gaps that integration tests cannot cover
+realistically. `Empirical solidified financial tests` are optional and apply
+only when the feature touches financial calculations covered by an existing
+read-only `empirical external dataset` or by a dedicated dataset-maintenance
+spec.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -165,6 +166,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX Performance optimization across all stories
 - [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
 - [ ] TXXX [P] Coverage verification and any applicable empirical financial integration verification
+- [ ] TXXX Run changed-source quality gate with `make quality QUALITY_BASE_REF=<base-ref>`
 - [ ] TXXX Security hardening
 - [ ] TXXX Run quickstart.md validation
 
@@ -257,6 +259,7 @@ With multiple developers:
 - [Story] label maps task to specific user story for traceability
 - Each user story should be independently completable and testable
 - Verify required tests fail before implementing
+- Run `make quality QUALITY_BASE_REF=<base-ref>` before completion and fix any findings
 - Treat the empirical external dataset as read-only unless the feature is a dedicated dataset-maintenance spec
 - Commit after each task or logical group
 - Stop at any checkpoint to validate story independently

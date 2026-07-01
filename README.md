@@ -21,11 +21,13 @@ Supported runtime flags:
 ```bash
 make test
 make coverage
+make quality QUALITY_BASE_REF=origin/main
 GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1 go test ./tests/integration -run TestReportPerformanceFlowLargeHistoryFixture -count=1 -v
 ```
 
 `make coverage` writes `dist/coverage/coverage.out` and `dist/coverage/coverage.xml` using the maintained coverage gate configuration in `.cov.json`.
 The coverage run instruments project-owned packages from `cmd/` and `internal/` so execution driven by contract and integration tests counts toward the repository coverage gate.
+`make quality` runs the changed-source quality gate for `*.go`, `go.mod`, and `go.sum` changes using `golangci-lint`, `govulncheck`, and `gitleaks`. It must pass for every feature, including the explicit skip path when no source inputs changed.
 The explicit performance command runs the deterministic `SC-007` verification path for one 10,000-activity yearly report generation from protected synced data, including request validation, calculation, Markdown rendering, final save, and opener invocation.
 
 ## Local Storage
