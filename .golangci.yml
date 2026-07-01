@@ -1,0 +1,41 @@
+# Repository quality-gate configuration for golangci-lint.
+# Authored by: OpenAI gpt-5.5
+version: "2"
+
+run:
+  modules-download-mode: readonly
+
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - dupl
+    - errcheck
+    - errorlint
+    - gocognit
+    - gocritic
+    - gomoddirectives
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - nilerr
+    - nilnil
+    - noctx
+    - nolintlint
+    - revive
+    - staticcheck
+    - unparam
+    - unused
+  settings:
+    gocognit:
+      min-complexity: 16
+  exclusions:
+    rules:
+      - path: '(.+)_test\.go'
+        linters:
+          - gocognit
+
+formatters:
+  enable:
+    - gofmt

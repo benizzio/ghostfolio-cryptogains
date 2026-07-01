@@ -1,0 +1,61 @@
+name: Quality
+
+permissions:
+  contents: read
+
+env:
+  GOCACHE: ${{ github.workspace }}/.cache/go-build
+  GOMODCACHE: ${{ github.workspace }}/.cache/go-mod
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  push:
+    branches-ignore:
+      - main
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Cache Go modules and build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.GOCACHE }}
+            ${{ env.GOMODCACHE }}
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          install-only: true
+          version: v2.12.2
+
+      - name: Resolve quality base ref
+        run: |
+          if [ -n "${{ github.base_ref }}" ]; then
+            printf 'QUALITY_BASE_REF=origin/%s\n' "${{ github.base_ref }}" >> "$GITHUB_ENV"
+          else
+            printf 'QUALITY_BASE_REF=origin/%s\n' "${{ github.event.repository.default_branch }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Run changed-source quality gate
+        run: make quality QUALITY_BASE_REF="$QUALITY_BASE_REF"
