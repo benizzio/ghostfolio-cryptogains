@@ -9,7 +9,9 @@ PRODUCTION_PACKAGES = $(shell $(GO) run ./tools/coverpkg -go $(GO) ./cmd/... ./i
 MODULE_PATH = $(shell $(GO) list -m)
 ALL_PACKAGES = $(shell $(GO) list ./...)
 NON_EMPIRICAL_PACKAGES = $(filter-out $(MODULE_PATH)/tests/empirical,$(ALL_PACKAGES))
-CHANGED_SOURCE_FILES = $$({ git diff --name-only --diff-filter=ACMR $(QUALITY_BASE_REF)...HEAD -- '*.go' 'go.mod' 'go.sum'; git diff --name-only --diff-filter=ACMR -- '*.go' 'go.mod' 'go.sum'; git ls-files --others --exclude-standard -- '*.go' 'go.mod' 'go.sum'; } | sort -u)
+CHANGED_SOURCE_FILES = $$({ git diff --name-only --diff-filter=ACMR $(QUALITY_BASE_REF)...HEAD -- '*.go' 'go.mod' 'go.sum'; git diff --name-only --diff-filter=ACMR -- '*.go' 'go.mod' 'go.sum'; git diff --cached --name-only --diff-filter=ACMR -- '*.go' 'go.mod' 'go.sum'; git ls-files --others --exclude-standard -- '*.go' 'go.mod' 'go.sum'; } | sort -u)
+QUALITY_CHANGED_SOURCE_CACHE ?=
+READ_CHANGED_SOURCE_FILES = $$(if [ -n "$(QUALITY_CHANGED_SOURCE_CACHE)" ] && [ -f "$(QUALITY_CHANGED_SOURCE_CACHE)" ]; then while IFS= read -r file; do printf '%s\n' "$$file"; done < "$(QUALITY_CHANGED_SOURCE_CACHE)"; else printf '%s\n' "$(CHANGED_SOURCE_FILES)"; fi)
 
 .PHONY: run run-dev test test-empirical test-external-integration regenerate-empirical-fixtures coverage quality quality-changed-source-files lint-changed vuln-changed secrets-changed
 
@@ -37,10 +39,23 @@ coverage:
 	$(GOCOVERAGEPLUS) -i dist/coverage/coverage.out -o dist/coverage/coverage.xml
 	$(GO) run ./tools/coveragegate -profile dist/coverage/coverage.out -cobertura dist/coverage/coverage.xml
 
-quality: lint-changed vuln-changed secrets-changed
+quality:
+	@tmp=$$(mktemp) || exit 1; \
+	trap 'rm -f "$$tmp"' EXIT; \
+	changed="$(CHANGED_SOURCE_FILES)"; \
+	if [ -n "$$changed" ]; then \
+		printf '%s\n' "$$changed" > "$$tmp"; \
+	else \
+		: > "$$tmp"; \
+	fi; \
+	quality_status=0; \
+	$(MAKE) --no-print-directory QUALITY_CHANGED_SOURCE_CACHE="$$tmp" lint-changed || quality_status=1; \
+	$(MAKE) --no-print-directory QUALITY_CHANGED_SOURCE_CACHE="$$tmp" vuln-changed || quality_status=1; \
+	$(MAKE) --no-print-directory QUALITY_CHANGED_SOURCE_CACHE="$$tmp" secrets-changed || quality_status=1; \
+	exit $$quality_status
 
 quality-changed-source-files:
-	@changed="$(CHANGED_SOURCE_FILES)"; \
+	@changed="$(READ_CHANGED_SOURCE_FILES)"; \
 	if [ -z "$$changed" ]; then \
 		printf '%s\n' "No changed source files."; \
 	else \
@@ -48,7 +63,7 @@ quality-changed-source-files:
 	fi
 
 lint-changed:
-	@changed="$(CHANGED_SOURCE_FILES)"; \
+	@changed="$(READ_CHANGED_SOURCE_FILES)"; \
 	if [ -z "$$changed" ]; then \
 		printf '%s\n' "No changed source files. Skipping golangci-lint."; \
 		exit 0; \
@@ -56,7 +71,7 @@ lint-changed:
 	$(GOLANGCI_LINT) run --new-from-merge-base $(QUALITY_BASE_REF) --whole-files ./...
 
 vuln-changed:
-	@changed="$(CHANGED_SOURCE_FILES)"; \
+	@changed="$(READ_CHANGED_SOURCE_FILES)"; \
 	if [ -z "$$changed" ]; then \
 		printf '%s\n' "No changed source files. Skipping govulncheck."; \
 		exit 0; \
@@ -88,7 +103,7 @@ vuln-changed:
 	esac
 
 secrets-changed:
-	@changed="$(CHANGED_SOURCE_FILES)"; \
+	@changed="$(READ_CHANGED_SOURCE_FILES)"; \
 	if [ -z "$$changed" ]; then \
 		printf '%s\n' "No changed source files. Skipping gitleaks."; \
 		exit 0; \
