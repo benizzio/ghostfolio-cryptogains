@@ -109,6 +109,12 @@
 - **Empirical Solidified Financial Tests**: [List applicable existing suite coverage, or state N/A]
 - **Empirical External Dataset Changes**: [State that the dataset remains read-only for this feature, or reference the isolated dataset-maintenance spec that owns the change]
 
+### Quality Gate Evidence *(mandatory)*
+
+- **Changed Source Inputs**: [List expected `*.go`, `go.mod`, or `go.sum` impacts, or state that no source inputs are expected to change]
+- **Quality Gate Command**: [`make quality QUALITY_BASE_REF=<base-ref>` must pass locally or through the `Quality` GitHub Actions check]
+- **No-Source-Change Behavior**: [If no source inputs are expected, state that the gate must still pass with explicit skip messages]
+
 ### Key Entities *(include if feature involves data)*
 
 - **[Entity 1]**: [What it represents, key attributes without implementation]

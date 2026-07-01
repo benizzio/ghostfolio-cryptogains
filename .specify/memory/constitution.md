@@ -1,11 +1,10 @@
 <!--
 Sync Impact Report
-Version change: 2.2.0 -> 2.3.0
+Version change: 2.3.0 -> 2.4.0
 Modified principles:
-- II. Deterministic Financial Precision
+- III. Testability with Full Coverage -> III. Testability, Coverage, and Quality Gates
 Modified sections:
-- II. Deterministic Financial Precision
-- III. Testability with Full Coverage
+- III. Testability, Coverage, and Quality Gates
 - Operational Constraints
 - Delivery Workflow & Quality Gates
 Added sections:
@@ -16,6 +15,9 @@ Templates requiring updates:
 - ✅ .specify/templates/spec-template.md
 - ✅ .specify/templates/plan-template.md
 - ✅ .specify/templates/tasks-template.md
+Runtime guidance requiring updates:
+- ✅ README.md
+- ✅ AGENTS.md
 Follow-up TODOs:
 - None
 -->
@@ -106,7 +108,7 @@ Rationale: Floating-point behavior is not acceptable for tax and portfolio
 reporting, and externally solidified empirical baselines can detect financial
 calculation drift that synthetic cases may miss.
 
-### III. Testability with Full Coverage
+### III. Testability, Coverage, and Quality Gates
 - Project-owned code MUST maintain 100% automated test coverage. When the
   selected tooling distinguishes line and branch coverage, both MUST remain at
   100%.
@@ -127,8 +129,19 @@ calculation drift that synthetic cases may miss.
 - A feature is incomplete until required tests, coverage gates, and relevant
   regressions pass in CI or in the local verification path when CI is
   unavailable.
-Rationale: High-confidence financial software requires full behavioral evidence,
-not partial sampling.
+- Every feature MUST pass the repository changed-source quality gate before
+  merge. The required command is `make quality QUALITY_BASE_REF=<base-ref>` or
+  the equivalent `Quality` GitHub Actions check for the feature branch or pull
+  request.
+- The changed-source quality gate MUST cover every changed source input defined
+  by repository policy. At minimum, `*.go`, `go.mod`, and `go.sum` changes are
+  source inputs.
+- If a feature changes no source inputs, the quality gate MUST still run and
+  pass with explicit skip messages instead of leaving a required check pending.
+- Quality gate failures are blockers. Findings MUST be fixed, or the
+  constitution MUST be amended before the feature can be accepted.
+Rationale: High-confidence financial software requires full behavioral evidence
+and automated quality evidence, not partial sampling or advisory-only checks.
 
 ### IV. Minimal Dependencies and External Integrations
 - Third-party libraries MUST NOT be added unless the standard library or a core
@@ -185,15 +198,17 @@ the codebase maintainable.
 - Unsupported practices include plaintext local caches, cloud persistence of
   sensitive data, floating-point ledger math, storing currency-denominated
   values without an explicit currency, cross-currency conversion before a
-   documented feature-defined boundary, mutating the empirical external dataset
-   during ordinary feature implementation, unreviewed dependency additions, and
-   undocumented API version assumptions.
+  documented feature-defined boundary, mutating the empirical external dataset
+  during ordinary feature implementation, unreviewed dependency additions,
+  undocumented API version assumptions, and merging a feature with a failing or
+  unexecuted changed-source quality gate.
 
 ## Delivery Workflow & Quality Gates
 
 - Every feature specification MUST capture the feature's impacts on persistence,
   token handling, financial precision and currency handling, testing strategy,
-  dependency choices, and external integrations when applicable.
+  changed-source quality-gate expectations, dependency choices, and external
+  integrations when applicable.
 - Every feature that changes financial calculations MUST state whether existing
   `empirical solidified financial tests` apply and MUST explicitly record that
   empirical dataset changes are out of scope unless the spec is dedicated to
@@ -205,12 +220,18 @@ the codebase maintainable.
 - Every implementation plan MUST pass a constitution check before research and
   again before implementation.
 - Every task list MUST include work for automated integration testing, coverage
-  verification, security review, and any required dependency or API research.
+  verification, changed-source quality-gate verification, security review, and
+  any required dependency or API research.
 - Task lists MUST treat `empirical external dataset` changes as isolated work in
   dedicated dataset-maintenance specs and MUST NOT bundle dataset mutations into
   ordinary implementation tasks.
 - Pull requests MUST run the repository test workflow automatically on each push
   while the change is under review.
+- Pull requests MUST run the repository `Quality` workflow automatically on each
+  push while the change is under review. The workflow MUST pass before merge.
+- Local completion evidence for every feature MUST include
+  `make quality QUALITY_BASE_REF=<base-ref>` unless the successful `Quality`
+  workflow result is cited instead.
 - Code review MUST block changes that violate a core principle or omit the
   evidence required to prove compliance.
 - If the tooling cannot measure a required gate yet, adding that measurement is a
@@ -238,4 +259,4 @@ the codebase maintainable.
   review notes, or equivalent artifacts. Missing evidence counts as
   non-compliance.
 
-**Version**: 2.3.0 | **Ratified**: 2026-05-01 | **Last Amended**: 2026-06-01
+**Version**: 2.4.0 | **Ratified**: 2026-05-01 | **Last Amended**: 2026-07-02
