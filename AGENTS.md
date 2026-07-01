@@ -62,7 +62,7 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
 - Every new feature must pass this changed-source quality gate before completion or cite the successful `Quality` GitHub Actions check.
 - The changed-source gate does not mean the full historical `golangci-lint run ./...` baseline is clean.
 - For full project validation, still run `make test` and `make coverage` when relevant to the change.
-- Do not introduce Sonar, Qodana, Semgrep, or CodeQL tooling for issue #40 unless a later issue explicitly asks for it.
+- Document the current changed-source quality gate here; keep scanner/tool selection open until issue #40's evaluation is complete.
 
 ### Project/repo structure and extended agent instructions
 
