@@ -18,18 +18,25 @@ on:
     branches-ignore:
       - main
 
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        # actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Cache Go modules and build cache
-        uses: actions/cache@v4
+        # actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: |
             ${{ env.GOCACHE }}
@@ -39,22 +46,27 @@ jobs:
             ${{ runner.os }}-go-
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        # actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
         with:
           go-version-file: go.mod
 
       - name: Install golangci-lint
-        uses: golangci/golangci-lint-action@v9
+        # golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a
         with:
           install-only: true
           version: v2.12.2
 
       - name: Resolve quality base ref
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          if [ -n "${{ github.base_ref }}" ]; then
-            printf 'QUALITY_BASE_REF=origin/%s\n' "${{ github.base_ref }}" >> "$GITHUB_ENV"
+          if [ -n "$BASE_REF" ]; then
+            printf 'QUALITY_BASE_REF=origin/%s\n' "$BASE_REF" >> "$GITHUB_ENV"
           else
-            printf 'QUALITY_BASE_REF=origin/%s\n' "${{ github.event.repository.default_branch }}" >> "$GITHUB_ENV"
+            printf 'QUALITY_BASE_REF=origin/%s\n' "$DEFAULT_BRANCH" >> "$GITHUB_ENV"
           fi
 
       - name: Run changed-source quality gate
