@@ -31,4 +31,4 @@
 
 ## Notes
 
-- Validation passed after adding explicit security, persistence, and integration impact evidence. No clarification markers remain.
+- Validation passed after adding explicit security, persistence, and integration impact evidence. Rechecked after clarifying that Annex 1 includes all activity through report year end and excludes later activity. No clarification markers remain.
