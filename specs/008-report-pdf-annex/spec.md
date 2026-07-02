@@ -8,6 +8,16 @@
 
 **Input**: User description: "Specify GitHub issue #39, Capital Gains And Losses Report - new format and fixes, including GitHub issue #34, Audit report."
 
+## Clarifications
+
+### Session 2026-07-02
+
+- Q: Where should detailed Currency Conversion Audit evidence appear after introducing Annex 1? → A: Move Currency Conversion Audit to Annex 1 only.
+- Q: What report scale should PDF and Annex 1 generation support? → A: Support the existing 10,000 cached-activity report scale.
+- Q: What filename contract should PDF output use? → A: Preserve the main report filename pattern and use `.pdf`.
+- Q: What text accessibility contract should PDF output satisfy? → A: Generate a text-based searchable PDF with selectable report text.
+- Q: Where may PDF generation run? → A: PDF generation must be local-only with no remote document service.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Choose Report Output Format (Priority: P1)
@@ -32,7 +42,7 @@ As a user reviewing the main capital gains and losses report, I want labels and 
 
 **Why this priority**: The requested fixes reduce report bloat and make existing report information easier to interpret.
 
-**Independent Test**: Can be tested by generating reports that include zero net gain or loss summary rows, rate-source disclosures, assets with and without report-year activity, zero-priced sell activities, and currency conversion statuses, then verifying the rendered report content.
+**Independent Test**: Can be tested by generating reports that include zero net gain or loss summary rows, rate-source disclosures, assets with and without report-year activity, zero-priced sell activities, and currency conversion statuses, then verifying the rendered main report content.
 
 **Acceptance Scenarios**:
 
@@ -43,7 +53,6 @@ As a user reviewing the main capital gains and losses report, I want labels and 
 5. **Given** an asset has no activity registered during the report year, **When** the Asset Detail section is rendered, **Then** the report shows the closing-position information under the title `Historical Position` and omits the separate `Opening Position`, `In-Year Activity`, and `Closing Position` subsections for that asset.
 6. **Given** an In-Year Activity row includes a conversion status, **When** the row is rendered, **Then** the status is shown as a user-friendly label and does not expose code-style or snake_case values.
 7. **Given** an In-Year Activity row represents a zero-priced SELL activity, **When** the row is rendered, **Then** the Type value is `BLOCKCHAIN OP` instead of `SELL`.
-8. **Given** a Currency Conversion Audit row includes quote direction, **When** the row is rendered, **Then** quote direction is shown as a user-friendly label and does not expose code-style or snake_case values.
 
 ---
 
@@ -62,6 +71,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 3. **Given** the per-asset audit section is rendered, **When** asset activity is inspected, **Then** every activity recorded on or before the report year end is included, every activity after the report year end is excluded, and each included activity shows the activity details, post-activity held quantity, cost-basis effects after the activity, full liquidation events, and gains or losses triggered by the activity.
 4. **Given** the Markdown format is selected, **When** the report is generated, **Then** Annex 1 is written as a separate Markdown file whose name preserves the main report filename pattern and inserts `-annex-1-` immediately before the date segment.
 5. **Given** the PDF format is selected, **When** the report is generated, **Then** Annex 1 appears in the same PDF file after a page break.
+6. **Given** a Currency Conversion Audit row includes quote direction, **When** Annex 1 is rendered, **Then** quote direction is shown as a user-friendly label and does not expose code-style or snake_case values.
 
 ### Edge Cases
 
@@ -96,13 +106,15 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **FR-017**: Annex 1 MUST contain the detailed per-asset audit report as its first section.
 - **FR-018**: The detailed per-asset audit report MUST list all activity for each reported asset from the beginning of available history through the end of the selected report year, including report-year activity and excluding activity after the report year end.
 - **FR-019**: Each per-asset audit activity row MUST disclose activity details, held quantity after the activity, cost-basis effects after the activity, any full liquidation event, and gains or losses from that activity.
-- **FR-020**: Annex 1 MUST contain Currency Conversion Audit as its second section.
+- **FR-020**: Annex 1 MUST contain Currency Conversion Audit as its second section, and the main report MUST NOT include detailed Currency Conversion Audit rows.
 - **FR-021**: When Markdown output is selected, the system MUST write Annex 1 as a separate Markdown file whose name preserves the main report filename pattern and inserts `-annex-1-` immediately before the date segment.
 - **FR-022**: When PDF output is selected, the system MUST include Annex 1 in the same PDF file after a page break.
-- **FR-023**: If report generation fails before final output completion, the system MUST not present a partial report file as successfully generated.
-- **FR-024**: Successful report generation MUST communicate all generated output files to the user, including the separate Markdown annex file when Markdown is selected.
-- **FR-025**: Generated reports and report-generation failure messages MUST NOT include Ghostfolio tokens, security tokens, bearer tokens, reusable authentication material, or other secrets.
-- **FR-026**: The system MUST NOT send report data, financial data, tokens, or generated report files to any remote storage, telemetry destination, or external document-generation service as part of this feature.
+- **FR-023**: When PDF output is selected, the system MUST preserve the main report filename pattern and use the `.pdf` file extension.
+- **FR-024**: PDF output MUST be text-based and searchable, with generated report text selectable by PDF readers that support text selection.
+- **FR-025**: If report generation fails before final output completion, the system MUST not present a partial report file as successfully generated.
+- **FR-026**: Successful report generation MUST communicate all generated output files to the user, including the separate Markdown annex file when Markdown is selected.
+- **FR-027**: Generated reports and report-generation failure messages MUST NOT include Ghostfolio tokens, security tokens, bearer tokens, reusable authentication material, or other secrets.
+- **FR-028**: PDF generation and report rendering MUST run locally and MUST NOT send report data, financial data, tokens, or generated report files to any remote storage, telemetry destination, or external document-generation service as part of this feature.
 
 ### Financial Calculation Evidence *(include when feature affects financial calculations)*
 
@@ -115,7 +127,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 
 - **Persistence Impact**: This feature creates user-requested report output files only. It does not add synced-data persistence, protected snapshot persistence, remote persistence, or background storage of generated reports.
 - **Token Handling Impact**: Ghostfolio tokens and security tokens remain runtime-only secrets and must not appear in generated reports, annexes, errors, diagnostics, examples, or fixtures.
-- **External Integration Impact**: This feature does not require a new external data provider or external document-generation service. Any optional dependency choice for producing PDF files must be justified during planning before implementation.
+- **External Integration Impact**: This feature does not require a new external data provider or external document-generation service. PDF generation must run locally; any optional local dependency choice for producing PDF files must be justified during planning before implementation.
 - **Security Review Scope**: The feature must be reviewed for secret disclosure in cleartext reports, local report-file handling, path or filename safety, output-generation failure handling, dependency risk if any PDF dependency is proposed, and injection risk in rendered report content.
 
 ### Quality Gate Evidence *(mandatory)*
@@ -145,9 +157,11 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **SC-003**: For Markdown output, every successful generation produces exactly one main report file and exactly one Annex 1 file; for PDF output, every successful generation produces exactly one PDF file containing both the main report and Annex 1.
 - **SC-004**: In test reports containing assets without report-year activity, 100% of those assets render as `Historical Position` and omit `Opening Position`, `In-Year Activity`, and `Closing Position` from the main Asset Detail.
 - **SC-005**: In test reports containing zero and non-zero Net Gain Or Loss summary rows, 100% of zero rows are omitted and 100% of non-zero rows remain visible.
-- **SC-006**: In generated reports, 100% of visible conversion status and quote direction values use user-friendly labels with no snake_case or internal code-style values.
+- **SC-006**: In generated reports, 100% of visible conversion status values in the main report and quote direction values in Annex 1 use user-friendly labels with no snake_case or internal code-style values.
 - **SC-007**: In generated reports, 100% of zero-priced SELL activities shown in In-Year Activity use `BLOCKCHAIN OP` as the Type value.
 - **SC-008**: Annex 1 allows a reviewer to trace 100% of each reported asset's activities on or before the report year end to post-activity held quantity, cost-basis effect, full liquidation status, and gain or loss effect, while excluding activities after the report year end.
+- **SC-009**: PDF output generation and Annex 1 rendering support the existing 10,000 cached-activity report scale and do not introduce a lower activity-count limit than Markdown output.
+- **SC-010**: In generated PDF reports, 100% of required report text is emitted as selectable text rather than rasterized page images.
 
 ## Assumptions
 
