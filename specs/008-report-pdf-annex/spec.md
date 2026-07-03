@@ -18,6 +18,13 @@
 - Q: What text accessibility contract should PDF output satisfy? → A: Generate a text-based searchable PDF with selectable report text.
 - Q: Where may PDF generation run? → A: PDF generation must be local-only with no remote document service.
 
+### Session 2026-07-03
+
+- Q: When may PDF page breaks and page titles differ from Markdown? → A: Annex 1 always starts on a new page; additional PDF page breaks are allowed only when the next section, table row, or content block would not fit in the remaining printable page area, and continuation pages must repeat visible section or table context.
+- Q: What exact user-facing labels are allowed for conversion status and quote direction? → A: `same_currency` renders as `Same currency`, `converted` renders as `Converted`, `source_per_base` renders as `Source currency per base currency`, and `base_per_source` renders as `Base currency per source currency`.
+- Q: Do assets that appear only in the Reference Section belong in Annex 1 per-asset audit evidence? → A: Yes. A reported asset is any asset identity selected by the existing report inclusion or reference-section rules for the selected year, including reference-only assets and assets whose zero net summary rows are hidden.
+- Q: What platform and font boundary must PDF output satisfy? → A: PDF generation must work on supported Linux, macOS, and Windows installations without requiring user-installed fonts, platform-specific font paths, a browser, or operating-system print-to-PDF support.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Choose Report Output Format (Priority: P1)
@@ -91,7 +98,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **FR-002**: The system MUST keep Markdown output available as a report output option.
 - **FR-003**: The system MUST generate PDF reports on A4-sized pages.
 - **FR-004**: The system MUST keep the PDF and Markdown main report layouts as close as practical while preserving the same output data, explanatory text blocks, table content, and section intent.
-- **FR-005**: The system MUST allow PDF-specific page breaks and page titles when needed for readable multi-page reports.
+- **FR-005**: The system MUST start Annex 1 on a new PDF page, MUST allow additional PDF page breaks only before a top-level section, per-asset annex section, table row, or content block that would not fit in the remaining printable page area, and MUST repeat visible section or table context on continuation pages.
 - **FR-006**: The system MUST render information classifier labels in the initial report details block in bold.
 - **FR-007**: The system MUST omit Gains-And-Losses Summary rows whose Net Gain Or Loss is zero.
 - **FR-008**: The system MUST render a clear empty-state message when all Gains-And-Losses Summary rows are omitted because their Net Gain Or Loss is zero.
@@ -99,12 +106,12 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **FR-010**: The system MUST rename the Reference Section header `Full Liquidation Count Through Year End` to `Historical Full Liquidation Count`.
 - **FR-011**: The system MUST render `Historical Position` for assets with no activity registered during the report year.
 - **FR-012**: For assets with no activity registered during the report year, the system MUST omit the separate `Opening Position`, `In-Year Activity`, and `Closing Position` subsections and show the same facts from Closing Position under `Historical Position`.
-- **FR-013**: The system MUST render In-Year Activity conversion statuses as user-friendly labels and MUST NOT expose code-style or snake_case values.
+- **FR-013**: The system MUST render In-Year Activity conversion statuses using only the allowed user-facing labels `Same currency` for `same_currency` and `Converted` for `converted`, and MUST NOT expose code-style or snake_case values.
 - **FR-014**: The system MUST render zero-priced SELL activities in the In-Year Activity Type column as `BLOCKCHAIN OP`.
-- **FR-015**: The system MUST render Currency Conversion Audit quote directions as user-friendly labels and MUST NOT expose code-style or snake_case values.
+- **FR-015**: The system MUST render Currency Conversion Audit quote directions using only the allowed user-facing labels `Source currency per base currency` for `source_per_base` and `Base currency per source currency` for `base_per_source`, and MUST NOT expose code-style or snake_case values.
 - **FR-016**: The system MUST add Annex 1 with the title `Annex 1 - Audit` to every successful capital gains and losses report output.
 - **FR-017**: Annex 1 MUST contain the detailed per-asset audit report as its first section.
-- **FR-018**: The detailed per-asset audit report MUST list all activity for each reported asset from the beginning of available history through the end of the selected report year, including report-year activity and excluding activity after the report year end.
+- **FR-018**: The detailed per-asset audit report MUST list all activity for each reported asset from the beginning of available history through the end of the selected report year, including report-year activity, including assets that appear only in the Reference Section, including assets whose zero net summary rows are hidden from the visible summary, and excluding activity after the report year end.
 - **FR-019**: Each per-asset audit activity row MUST disclose activity details, held quantity after the activity, cost-basis effects after the activity, any full liquidation event, and gains or losses from that activity.
 - **FR-020**: Annex 1 MUST contain Currency Conversion Audit as its second section, and the main report MUST NOT include detailed Currency Conversion Audit rows.
 - **FR-021**: When Markdown output is selected, the system MUST write Annex 1 as a separate Markdown file whose name preserves the main report filename pattern and inserts `-annex-1-` immediately before the date segment.
@@ -115,6 +122,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **FR-026**: Successful report generation MUST communicate all generated output files to the user, including the separate Markdown annex file when Markdown is selected.
 - **FR-027**: Generated reports and report-generation failure messages MUST NOT include Ghostfolio tokens, security tokens, bearer tokens, reusable authentication material, or other secrets.
 - **FR-028**: PDF generation and report rendering MUST run locally and MUST NOT send report data, financial data, tokens, or generated report files to any remote storage, telemetry destination, or external document-generation service as part of this feature.
+- **FR-029**: PDF generation MUST work on supported Linux, macOS, and Windows installations without requiring platform-specific font paths, user-installed fonts, a browser, or operating-system print-to-PDF support; required report text MUST use application-supplied local font data.
 
 ### Financial Calculation Evidence *(include when feature affects financial calculations)*
 
@@ -142,6 +150,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **Main Capital Gains And Losses Report**: The primary report containing selected inputs, summaries, reference sections, asset details, and other non-annex report content.
 - **PDF Report Output**: The A4 paged report file that contains the main report and Annex 1 in one file.
 - **Markdown Report Output**: The Markdown main report file generated for the selected report inputs.
+- **Reported Asset**: An asset identity selected by the existing report inclusion or reference-section rules for the selected year. This includes assets in Asset Detail, assets represented in the gains-and-losses summary before zero-net presentation filtering, and assets that appear only in the Reference Section. It excludes synced assets that are not selected by those rules for the generated report.
 - **Audit Annex**: Annex 1 of the report, titled `Annex 1 - Audit`, containing per-asset audit evidence followed by Currency Conversion Audit.
 - **Per-Asset Audit Section**: A section of Annex 1 that groups all activity evidence for one asset from the beginning of available history through the end of the selected report year.
 - **Audit Activity Entry**: One historical activity record in the annex, including activity details, held quantity after the activity, cost-basis effects, full liquidation events, and gains or losses.
@@ -157,9 +166,9 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **SC-003**: For Markdown output, every successful generation produces exactly one main report file and exactly one Annex 1 file; for PDF output, every successful generation produces exactly one PDF file containing both the main report and Annex 1.
 - **SC-004**: In test reports containing assets without report-year activity, 100% of those assets render as `Historical Position` and omit `Opening Position`, `In-Year Activity`, and `Closing Position` from the main Asset Detail.
 - **SC-005**: In test reports containing zero and non-zero Net Gain Or Loss summary rows, 100% of zero rows are omitted and 100% of non-zero rows remain visible.
-- **SC-006**: In generated reports, 100% of visible conversion status values in the main report and quote direction values in Annex 1 use user-friendly labels with no snake_case or internal code-style values.
+- **SC-006**: In generated reports, 100% of visible conversion status values in the main report and quote direction values in Annex 1 use the allowed labels `Same currency`, `Converted`, `Source currency per base currency`, or `Base currency per source currency` with no snake_case or internal code-style values.
 - **SC-007**: In generated reports, 100% of zero-priced SELL activities shown in In-Year Activity use `BLOCKCHAIN OP` as the Type value.
-- **SC-008**: Annex 1 allows a reviewer to trace 100% of each reported asset's activities on or before the report year end to post-activity held quantity, cost-basis effect, full liquidation status, and gain or loss effect, while excluding activities after the report year end.
+- **SC-008**: Annex 1 allows a reviewer to trace 100% of each reported asset's activities on or before the report year end, including reference-only reported assets, to post-activity held quantity, cost-basis effect, full liquidation status, and gain or loss effect, while excluding activities after the report year end.
 - **SC-009**: PDF output generation and Annex 1 rendering support the existing 10,000 cached-activity report scale and do not introduce a lower activity-count limit than Markdown output.
 - **SC-010**: In generated PDF reports, 100% of required report text is emitted as selectable text rather than rasterized page images.
 

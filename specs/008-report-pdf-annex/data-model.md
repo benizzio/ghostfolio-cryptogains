@@ -99,7 +99,7 @@ Validation rules:
 - Existing report validation rules remain applicable.
 - Main report must not include detailed Currency Conversion Audit rows after this feature.
 - Renderer must omit zero net-gain summary rows and render an empty state if all rows are omitted.
-- Renderer must use user-friendly labels for conversion status.
+- Renderer must use only `Same currency` for `same_currency` and `Converted` for `converted` conversion statuses.
 - Renderer must show zero-priced `SELL` activity rows as `BLOCKCHAIN OP` in the Type column.
 - Renderer must render `Historical Position` instead of opening/activity/closing subsections for assets without report-year activity.
 
@@ -136,6 +136,12 @@ State transitions:
 ## PerAssetAuditSection
 
 Purpose: A grouped Annex 1 section that traces one reported asset's activity history through the selected year end.
+
+Reported asset scope:
+
+- A reported asset is an asset identity selected by the existing report inclusion or reference-section rules for the selected year.
+- Reported assets include assets in Asset Detail, assets represented in the gains-and-losses summary before zero-net presentation filtering, and assets that appear only in the Reference Section.
+- Assets present in synced activity history but excluded by the existing report inclusion and reference-section rules are not reported assets.
 
 Fields:
 
@@ -231,8 +237,8 @@ Fields:
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `conversion_status_labels` | map | Maps `same_currency` and `converted` to user-friendly labels |
-| `quote_direction_labels` | map | Maps quote direction enums to user-friendly labels |
+| `conversion_status_labels` | map | Maps `same_currency` to `Same currency` and `converted` to `Converted` |
+| `quote_direction_labels` | map | Maps `source_per_base` to `Source currency per base currency` and `base_per_source` to `Base currency per source currency` |
 | `activity_type_labels` | map | Maps zero-priced SELL display override to `BLOCKCHAIN OP` |
 
 Relationships:
@@ -243,6 +249,7 @@ Relationships:
 Validation rules:
 
 - Renderers must not expose unmapped enum constants or snake_case values.
+- Renderers must use the exact allowed labels defined by this model for conversion statuses and quote directions.
 - Missing mapping returns a render error and no final output success.
 
 ## ReportDocument
@@ -271,6 +278,7 @@ Validation rules:
 - Document type and role must be compatible.
 - Markdown documents must contain non-empty text.
 - PDF documents must contain non-empty PDF bytes and use `.pdf` output.
+- PDF documents must not depend on platform-specific font paths, user-installed fonts, browser rendering, or operating-system print-to-PDF support.
 - Generated timestamp, year, and method are required for naming.
 
 ## ReportOutputBundle

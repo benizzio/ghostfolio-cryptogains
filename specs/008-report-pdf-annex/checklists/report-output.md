@@ -20,8 +20,8 @@
 ## Requirement Clarity
 
 - [x] CHK009 Is `as close as practical` defined with objective allowed differences between PDF and Markdown output? [Clarity, Spec §FR-004, Spec §SC-002]
-- [ ] CHK010 Are `when needed` PDF page break and page title criteria defined clearly enough to avoid subjective layout decisions? [Ambiguity, Spec §FR-005]
-- [ ] CHK011 Are `user-friendly label` expectations defined with allowed labels for conversion status and quote direction? [Clarity, Spec §FR-013, Spec §FR-015, Data Model §RenderLabelMap]
+- [x] CHK010 Are `when needed` PDF page break and page title criteria defined clearly enough to avoid subjective layout decisions? [Ambiguity, Spec §FR-005]
+- [x] CHK011 Are `user-friendly label` expectations defined with allowed labels for conversion status and quote direction? [Clarity, Spec §FR-013, Spec §FR-015, Data Model §RenderLabelMap]
 - [x] CHK012 Is the Markdown Annex 1 filename date-segment insertion rule unambiguous when collision suffixes are added? [Clarity, Spec §FR-021, Contract `report-output.md` §Markdown Output Files]
 - [x] CHK013 Are `activity details` in per-asset audit entries decomposed into mandatory fields rather than broad wording only? [Clarity, Spec §FR-019, Data Model §AuditActivityEntry]
 - [x] CHK014 Is `text-based searchable PDF` clarified with PDF text selection and search criteria rather than reader-specific assumptions? [Clarity, Spec §FR-024, Spec §SC-010]
@@ -53,7 +53,7 @@
 
 - [x] CHK029 Is filename collision behavior specified for both Markdown main and Annex 1 files as a matched pair? [Edge Case, Contract `report-output.md` §Markdown Output Files]
 - [x] CHK030 Is behavior defined when Annex 1 has no per-asset audit entries or no reported assets? [Gap, Spec §FR-016 through Spec §FR-019, Contract `report-rendering.md` §Annex 1 Structure]
-- [ ] CHK031 Are requirements explicit for whether assets appearing only in reference sections belong in Annex 1 per-asset audit evidence? [Ambiguity, Spec §FR-018, Spec §Key Entities]
+- [x] CHK031 Are requirements explicit for whether assets appearing only in reference sections belong in Annex 1 per-asset audit evidence? [Ambiguity, Spec §FR-018, Spec §Key Entities]
 - [x] CHK032 Are requirements defined for long PDF tables across page boundaries, including repeated or preserved column context? [Edge Case, Contract `report-rendering.md` §PDF Rendering Contract]
 
 ## Non-Functional Requirements
@@ -66,11 +66,11 @@
 ## Dependencies & Assumptions
 
 - [x] CHK037 Are assumptions about existing base-currency conversion rules referenced as dependencies rather than restated inconsistently? [Dependency, Spec §Assumptions, Plan §Summary]
-- [ ] CHK038 Are platform assumptions for Linux, macOS, Windows, and embedded fonts reflected in requirements rather than only implementation planning? [Assumption, Plan §Target Platform, Research §Embedded Font Strategy]
+- [x] CHK038 Are platform assumptions for Linux, macOS, Windows, and embedded fonts reflected in requirements rather than only implementation planning? [Assumption, Plan §Target Platform, Research §Embedded Font Strategy]
 
 ## Ambiguities & Conflicts
 
-- [ ] CHK039 Is `reported asset` defined consistently for assets appearing in summary, detail, reference, and annex sections? [Ambiguity, Spec §FR-018, Spec §Key Entities]
+- [x] CHK039 Is `reported asset` defined consistently for assets appearing in summary, detail, reference, and annex sections? [Ambiguity, Spec §FR-018, Spec §Key Entities]
 - [x] CHK040 Are requirements explicit about how PDF and Markdown table wrapping may differ while preserving the `same table content` requirement? [Ambiguity, Spec §FR-004, Spec §SC-002]
 
 ## Notes

@@ -93,3 +93,4 @@ Rules:
 
 - PDF rendering runs locally in the application process.
 - No report data, financial data, tokens, generated Markdown, generated PDF, or annex content may be sent to a remote PDF service, cloud renderer, telemetry service, or remote storage as part of this feature.
+- PDF generation must not depend on remote fonts, platform-specific font paths, user-installed fonts, browser rendering, or operating-system print-to-PDF support.
