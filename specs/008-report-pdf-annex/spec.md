@@ -25,6 +25,10 @@
 - Q: Do assets that appear only in the Reference Section belong in Annex 1 per-asset audit evidence? → A: Yes. A reported asset is any asset identity selected by the existing report inclusion or reference-section rules for the selected year, including reference-only assets and assets whose zero net summary rows are hidden.
 - Q: What platform and font boundary must PDF output satisfy? → A: PDF generation must work on supported Linux, macOS, and Windows installations without requiring user-installed fonts, platform-specific font paths, a browser, or operating-system print-to-PDF support.
 
+### Session 2026-07-04
+
+- Q: Are generated report files application-managed persistence requiring token-derived encryption at rest? → A: No. Generated report files are explicit user-requested exports outside the application-managed persistence boundary. The application writes them locally only when the user requests generation, does not manage them as a cache or durable application state, does not re-ingest them automatically, and must still use safe filenames, owner-local file handling, failure cleanup, and secret redaction.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Choose Report Output Format (Priority: P1)
@@ -97,7 +101,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **FR-001**: The system MUST allow the user to choose PDF or Markdown as the report output format before report generation begins.
 - **FR-002**: The system MUST keep Markdown output available as a report output option.
 - **FR-003**: The system MUST generate PDF reports on A4-sized pages.
-- **FR-004**: The system MUST keep the PDF and Markdown main report layouts as close as practical while preserving the same output data, explanatory text blocks, table content, and section intent.
+- **FR-004**: The system MUST keep PDF and Markdown main report shared content aligned by preserving the same required output data, explanatory text blocks, table content, and section meanings, with differences limited to PDF pagination, PDF page titles, and Markdown annex file separation.
 - **FR-005**: The system MUST start Annex 1 on a new PDF page, MUST allow additional PDF page breaks only before a top-level section, per-asset annex section, table row, or content block that would not fit in the remaining printable page area, and MUST repeat visible section or table context on continuation pages.
 - **FR-006**: The system MUST render information classifier labels in the initial report details block in bold.
 - **FR-007**: The system MUST omit Gains-And-Losses Summary rows whose Net Gain Or Loss is zero.
@@ -112,7 +116,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **FR-016**: The system MUST add Annex 1 with the title `Annex 1 - Audit` to every successful capital gains and losses report output.
 - **FR-017**: Annex 1 MUST contain the detailed per-asset audit report as its first section.
 - **FR-018**: The detailed per-asset audit report MUST list all activity for each reported asset from the beginning of available history through the end of the selected report year, including report-year activity, including assets that appear only in the Reference Section, including assets whose zero net summary rows are hidden from the visible summary, and excluding activity after the report year end.
-- **FR-019**: Each per-asset audit activity row MUST disclose activity details, held quantity after the activity, cost-basis effects after the activity, any full liquidation event, and gains or losses from that activity.
+- **FR-019**: Each per-asset audit activity row MUST disclose activity date or timestamp, non-secret source activity reference, activity type, quantity, applicable unit price, gross value, fee, original activity currency, calculation currency, held quantity after the activity, open cost basis after the activity, any allocated basis, net liquidation proceeds, full liquidation event status, gains or losses from that activity, conversion status when applicable, and sanitized note text when present.
 - **FR-020**: Annex 1 MUST contain Currency Conversion Audit as its second section, and the main report MUST NOT include detailed Currency Conversion Audit rows.
 - **FR-021**: When Markdown output is selected, the system MUST write Annex 1 as a separate Markdown file whose name preserves the main report filename pattern and inserts `-annex-1-` immediately before the date segment.
 - **FR-022**: When PDF output is selected, the system MUST include Annex 1 in the same PDF file after a page break.
@@ -133,14 +137,14 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 
 ### Security, Persistence, And Integration Evidence
 
-- **Persistence Impact**: This feature creates user-requested report output files only. It does not add synced-data persistence, protected snapshot persistence, remote persistence, or background storage of generated reports.
+- **Persistence Impact**: This feature creates user-requested report export files only. These exports are outside the application-managed persistence boundary because the application does not store them as cache/state, manage their lifecycle after generation, or re-ingest them automatically. It does not add synced-data persistence, protected snapshot persistence, remote persistence, telemetry, or background storage of generated reports.
 - **Token Handling Impact**: Ghostfolio tokens and security tokens remain runtime-only secrets and must not appear in generated reports, annexes, errors, diagnostics, examples, or fixtures.
 - **External Integration Impact**: This feature does not require a new external data provider or external document-generation service. PDF generation must run locally; any optional local dependency choice for producing PDF files must be justified during planning before implementation.
 - **Security Review Scope**: The feature must be reviewed for secret disclosure in cleartext reports, local report-file handling, path or filename safety, output-generation failure handling, dependency risk if any PDF dependency is proposed, and injection risk in rendered report content.
 
 ### Quality Gate Evidence *(mandatory)*
 
-- **Changed Source Inputs**: Source changes are expected for report output selection, report rendering, audit annex generation, and related tests. No dependency-file changes are assumed by this specification.
+- **Changed Source Inputs**: Source changes are expected for report output selection, report rendering, audit annex generation, related tests, and dependency pinning in `go.mod` and `go.sum` for local PDF/font support.
 - **Quality Gate Command**: `make quality QUALITY_BASE_REF=<base-ref>` must pass locally or through the `Quality` GitHub Actions check.
 - **No-Source-Change Behavior**: Not expected to apply because source inputs are expected to change; if planning later removes all source changes, the quality gate must still pass with explicit skip messages.
 
