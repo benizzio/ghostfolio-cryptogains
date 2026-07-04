@@ -287,14 +287,14 @@ func TestReportScreenViewsCoverSelectionBusyAndResultBranches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
-	outputFile, err := reportmodel.NewReportOutputFile("/tmp/Documents", "ghostfolio-capital-gains-2024-fifo.md", "/tmp/report.md", time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC), true, "")
+	outputFile, err := reportmodel.NewReportOutputFile("/tmp/Documents", "ghostfolio-capital-gains-2024-fifo.md", "/tmp/Documents/ghostfolio-capital-gains-2024-fifo.md", time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC), true, "")
 	if err != nil {
 		t.Fatalf("new report output file: %v", err)
 	}
 
 	var result = ReportResultScreenView(ReportResultScreenParams{
 		Theme:         component.DefaultTheme(),
-		Width:         80,
+		Width:         120,
 		Height:        24,
 		MethodLabel:   "FIFO",
 		MenuItems:     []component.MenuItem{{Label: "Back To Sync and Reports", Enabled: true}, {Label: "Generate Another Report", Enabled: true}},
@@ -307,7 +307,7 @@ func TestReportScreenViewsCoverSelectionBusyAndResultBranches(t *testing.T) {
 			OutputFile: outputFile,
 		},
 	})
-	if !strings.Contains(result, "Saved Markdown Path: /tmp/report.md") || !strings.Contains(result, "Back To Sync and Reports") || !strings.Contains(result, "Generate Another Report") {
+	if !strings.Contains(result, "Saved Markdown Path: /tmp/Documents/ghostfolio-capital-gains-2024-fifo.md") || !strings.Contains(result, "Back To Sync and Reports") || !strings.Contains(result, "Generate Another Report") {
 		t.Fatalf("expected report result content, got %q", result)
 	}
 }
@@ -417,7 +417,7 @@ func TestReportScreenHelperBranches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
-	var outputFile, outputErr = reportmodel.NewReportOutputFile("/tmp/Documents", "ghostfolio-capital-gains-2024-fifo.md", "/tmp/report.md", time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC), true, "open boom")
+	var outputFile, outputErr = reportmodel.NewReportOutputFile("/tmp/Documents", "ghostfolio-capital-gains-2024-fifo.md", "/tmp/Documents/ghostfolio-capital-gains-2024-fifo.md", time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC), true, "open boom")
 	if outputErr != nil {
 		t.Fatalf("new report output file: %v", outputErr)
 	}

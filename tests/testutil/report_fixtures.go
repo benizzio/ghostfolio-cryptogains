@@ -34,6 +34,84 @@ type ReportPerformanceFixture struct {
 	CalendarYearSpan       int
 }
 
+// ReportOutputFormatFixture stores one deterministic supported report output
+// format from the report model plus contract-facing file expectations.
+// Authored by: OpenCode
+type ReportOutputFormatFixture struct {
+	Format      reportmodel.ReportOutputFormat
+	Code        string
+	Label       string
+	FileCount   int
+	Extensions  []string
+	Description string
+}
+
+// ReportRequestFixture stores one deterministic validated report request for a
+// selected output format.
+// Authored by: OpenCode
+type ReportRequestFixture struct {
+	Request            reportmodel.ReportRequest
+	Year               int
+	CostBasisMethod    reportmodel.CostBasisMethod
+	ReportBaseCurrency reportmodel.ReportBaseCurrency
+	OutputFormat       reportmodel.ReportOutputFormat
+	RequestedAt        time.Time
+}
+
+// ReportAnnexFixture stores deterministic Annex 1 expected content with the
+// validated model shell required by calculated reports.
+// Authored by: OpenCode
+type ReportAnnexFixture struct {
+	Annex                          reportmodel.AuditAnnex
+	Title                          string
+	SectionOrder                   []reportmodel.AuditAnnexSection
+	PerAssetSections               []ExpectedPerAssetAuditSection
+	CurrencyConversionEntries      []reportmodel.ConversionAuditEntry
+	CurrencyConversionEmptyMessage string
+}
+
+// ExpectedPerAssetAuditSection stores one deterministic expected Annex 1 asset
+// section.
+// Authored by: OpenCode
+type ExpectedPerAssetAuditSection struct {
+	AssetIdentityKey string
+	DisplayLabel     string
+	Entries          []ExpectedAuditActivityEntry
+}
+
+// ExpectedAuditActivityEntry stores one deterministic expected Annex 1 activity
+// row or subsection.
+// Authored by: OpenCode
+type ExpectedAuditActivityEntry struct {
+	SourceID               string
+	OccurredAt             time.Time
+	ActivityType           syncmodel.ActivityType
+	Quantity               string
+	UnitPrice              string
+	GrossValue             string
+	FeeAmount              string
+	ActivityCurrency       string
+	CalculationCurrency    string
+	QuantityAfterActivity  string
+	BasisAfterActivity     string
+	FullLiquidationEvent   bool
+	AllocatedBasis         string
+	NetLiquidationProceeds string
+	GainOrLoss             string
+	ConversionStatus       reportmodel.ConversionStatus
+	Note                   string
+}
+
+// ReportConversionFixture stores deterministic report conversion audit evidence
+// for renderer, annex, and output contract tests.
+// Authored by: OpenCode
+type ReportConversionFixture struct {
+	RateSource         reportmodel.ExchangeRateEvidence
+	ConversionEntry    reportmodel.ConversionAuditEntry
+	ConvertedAmount    reportmodel.ConvertedActivityAmount
+	SameCurrencyAmount reportmodel.ConvertedActivityAmount
+}
+
 // ExpectedReportLedger stores one deterministic expected yearly report outcome
 // for one cost-basis method.
 // Authored by: OpenCode
@@ -448,6 +526,193 @@ func DeterministicLargeReportPerformanceFixture() ReportPerformanceFixture {
 		ReportYear:       reportYear,
 		ActivityCount:    len(activities),
 		CalendarYearSpan: calendarYearSpan,
+	}
+}
+
+// DeterministicReportOutputFormatFixtures returns the user-selectable output
+// formats from the report-output contract using the validated report model
+// constants.
+//
+// Authored by: OpenCode
+func DeterministicReportOutputFormatFixtures() []ReportOutputFormatFixture {
+	return []ReportOutputFormatFixture{
+		{
+			Format:      reportmodel.ReportOutputFormatMarkdown,
+			Code:        string(reportmodel.ReportOutputFormatMarkdown),
+			Label:       reportmodel.ReportOutputFormatMarkdown.Label(),
+			FileCount:   2,
+			Extensions:  []string{".md", ".md"},
+			Description: "Main Markdown report plus separate Annex 1 Markdown file",
+		},
+		{
+			Format:      reportmodel.ReportOutputFormatPDF,
+			Code:        string(reportmodel.ReportOutputFormatPDF),
+			Label:       reportmodel.ReportOutputFormatPDF.Label(),
+			FileCount:   1,
+			Extensions:  []string{".pdf"},
+			Description: "One PDF containing the main report and Annex 1",
+		},
+	}
+}
+
+// DeterministicReportRequestFixture returns one validated report request for the
+// provided output format and the shared primary report scenario.
+//
+// Authored by: OpenCode
+func DeterministicReportRequestFixture(outputFormat reportmodel.ReportOutputFormat) ReportRequestFixture {
+	var year = 2024
+	var method = reportmodel.CostBasisMethodFIFO
+	var reportBaseCurrency = reportmodel.ReportBaseCurrencyUSD
+	var requestedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
+	var request, err = reportmodel.NewReportRequest(year, method, reportBaseCurrency, outputFormat, requestedAt)
+	if err != nil {
+		panic(err)
+	}
+
+	return ReportRequestFixture{
+		Request:            request,
+		Year:               year,
+		CostBasisMethod:    method,
+		ReportBaseCurrency: reportBaseCurrency,
+		OutputFormat:       outputFormat,
+		RequestedAt:        requestedAt,
+	}
+}
+
+// DeterministicReportAnnexFixture returns expected Annex 1 audit data tied to
+// DeterministicReportLedgerFixture's primary report year.
+//
+// Authored by: OpenCode
+func DeterministicReportAnnexFixture() ReportAnnexFixture {
+	var conversion = DeterministicReportConversionFixture()
+	var annex = reportmodel.DefaultAuditAnnex()
+
+	return ReportAnnexFixture{
+		Annex:        annex,
+		Title:        annex.Title,
+		SectionOrder: append([]reportmodel.AuditAnnexSection(nil), annex.SectionOrder...),
+		PerAssetSections: []ExpectedPerAssetAuditSection{
+			{
+				AssetIdentityKey: "asset-btc-001",
+				DisplayLabel:     "BTC",
+				Entries: []ExpectedAuditActivityEntry{
+					{
+						SourceID:              "btc-buy-2023-boundary-001",
+						OccurredAt:            time.Date(2024, time.January, 1, 1, 30, 0, 0, time.UTC),
+						ActivityType:          syncmodel.ActivityTypeBuy,
+						Quantity:              "2",
+						GrossValue:            "44000",
+						FeeAmount:             "20",
+						ActivityCurrency:      "USD",
+						CalculationCurrency:   "USD",
+						QuantityAfterActivity: "2",
+						BasisAfterActivity:    "44019.8",
+						ConversionStatus:      reportmodel.ConversionStatusConverted,
+						Note:                  "Converted asset-profile EUR evidence retained separately from selected USD calculation fields.",
+					},
+					{
+						SourceID:               "btc-sell-2024-zero-fee-001",
+						OccurredAt:             time.Date(2023, time.December, 31, 23, 15, 0, 0, time.UTC),
+						ActivityType:           syncmodel.ActivityTypeSell,
+						Quantity:               "1",
+						GrossValue:             "25000",
+						FeeAmount:              "0",
+						ActivityCurrency:       "USD",
+						CalculationCurrency:    "USD",
+						QuantityAfterActivity:  "1",
+						BasisAfterActivity:     "22009.9",
+						AllocatedBasis:         "22009.9",
+						NetLiquidationProceeds: "25000",
+						GainOrLoss:             "2990.1",
+						ConversionStatus:       reportmodel.ConversionStatusSameCurrency,
+					},
+				},
+			},
+			{
+				AssetIdentityKey: "asset-xrp-001",
+				DisplayLabel:     "XRP",
+				Entries: []ExpectedAuditActivityEntry{
+					{
+						SourceID:              "xrp-reduction-2024-001",
+						OccurredAt:            time.Date(2024, time.April, 1, 12, 0, 0, 0, time.UTC),
+						ActivityType:          syncmodel.ActivityTypeSell,
+						Quantity:              "200",
+						UnitPrice:             "0",
+						GrossValue:            "0",
+						FeeAmount:             "0",
+						ActivityCurrency:      "USD",
+						CalculationCurrency:   "USD",
+						QuantityAfterActivity: "800",
+						BasisAfterActivity:    "400.8",
+						ConversionStatus:      reportmodel.ConversionStatusSameCurrency,
+						Note:                  "Bridge migration holding reduction",
+					},
+				},
+			},
+		},
+		CurrencyConversionEntries:      []reportmodel.ConversionAuditEntry{conversion.ConversionEntry},
+		CurrencyConversionEmptyMessage: "No converted activity amounts were used for this report.",
+	}
+}
+
+// DeterministicReportConversionFixture returns valid same-currency and
+// converted amount evidence for tests that need report conversion audit data.
+//
+// Authored by: OpenCode
+func DeterministicReportConversionFixture() ReportConversionFixture {
+	var activityDate = time.Date(2024, time.February, 5, 14, 30, 0, 0, time.UTC)
+	var rateDate = time.Date(2024, time.February, 5, 0, 0, 0, 0, time.UTC)
+	var rateValue = decimalValue("1.08")
+	var evidence = reportmodel.ExchangeRateEvidence{
+		SourceCurrency:   "EUR",
+		BaseCurrency:     reportmodel.ReportBaseCurrencyUSD,
+		ActivityDate:     activityDate,
+		RateDate:         rateDate,
+		Authority:        reportmodel.RateAuthorityFederalReserve,
+		ProviderID:       reportmodel.RateProviderIDFederalReserveH10,
+		RateKind:         "daily noon buying rate",
+		QuoteDirection:   reportmodel.QuoteDirectionBasePerSource,
+		RateValue:        rateValue,
+		DatasetReference: "Federal Reserve H.10 2024-02-05",
+	}
+	var convertedAmount = reportmodel.ConvertedActivityAmount{
+		SourceID:             "eur-sell-2024-converted-001",
+		AmountKind:           reportmodel.ConvertedAmountKindGrossValue,
+		OriginalCurrency:     "EUR",
+		OriginalAmount:       decimalValue("100"),
+		ReportBaseCurrency:   reportmodel.ReportBaseCurrencyUSD,
+		ConvertedAmount:      decimalValue("108"),
+		ExchangeRateEvidence: &evidence,
+		ConversionStatus:     reportmodel.ConversionStatusConverted,
+	}
+	var sameCurrencyAmount = reportmodel.ConvertedActivityAmount{
+		SourceID:           "usd-sell-2024-same-currency-001",
+		AmountKind:         reportmodel.ConvertedAmountKindGrossValue,
+		OriginalCurrency:   "USD",
+		OriginalAmount:     decimalValue("250"),
+		ReportBaseCurrency: reportmodel.ReportBaseCurrencyUSD,
+		ConvertedAmount:    decimalValue("250"),
+		ConversionStatus:   reportmodel.ConversionStatusSameCurrency,
+	}
+	var conversionEntry = reportmodel.ConversionAuditEntry{
+		SourceID:           convertedAmount.SourceID,
+		AssetLabel:         "EUR Asset",
+		ActivityDate:       activityDate,
+		SourceCurrency:     "EUR",
+		ReportBaseCurrency: reportmodel.ReportBaseCurrencyUSD,
+		RateDate:           rateDate,
+		RateAuthority:      reportmodel.RateAuthorityFederalReserve,
+		RateKind:           "daily noon buying rate",
+		RateValue:          rateValue,
+		QuoteDirection:     reportmodel.QuoteDirectionBasePerSource,
+		Amounts:            []reportmodel.ConvertedActivityAmount{convertedAmount},
+	}
+
+	return ReportConversionFixture{
+		RateSource:         evidence,
+		ConversionEntry:    conversionEntry,
+		ConvertedAmount:    convertedAmount,
+		SameCurrencyAmount: sameCurrencyAmount,
 	}
 }
 

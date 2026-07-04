@@ -890,12 +890,14 @@ func TestUpdateReportCoversSelectionBusyAndResultBranches(t *testing.T) {
 	var reportService = &testReportService{outcome: runtime.ReportOutcome{
 		Success: true,
 		Message: "Saved the report to \"/tmp/report.md\" and requested automatic opening.",
+		OutputBundle: reportmodel.ReportOutputBundle{
+			OpenRequested: true,
+		},
 		OutputFile: reportmodel.ReportOutputFile{
 			DocumentsDirectory: "/tmp",
 			Filename:           "report.md",
 			Path:               "/tmp/report.md",
 			SavedAt:            time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC),
-			OpenRequested:      true,
 		},
 	}}
 	var model = newTestModel(t, &config)

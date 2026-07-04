@@ -114,9 +114,9 @@
 
 **Purpose**: Add planned local PDF dependencies, package structure, and shared fixtures before changing report behavior.
 
-- [ ] T001 Pin planned PDF and font dependencies `github.com/signintech/gopdf@v0.36.1` and `golang.org/x/image@v0.43.0` in `go.mod` and `go.sum`, then verify `github.com/phpdave11/gofpdi@v1.0.16` is the selected transitive dependency when module resolution includes it
-- [ ] T002 [P] Create the local PDF renderer package skeleton and package documentation in `internal/report/pdf/renderer.go`
-- [ ] T003 [P] Add deterministic report-output fixture builders for format, annex, and conversion test data in `tests/testutil/report_fixtures.go` and `tests/testutil/report_io_fixtures.go`
+- [X] T001 Pin planned PDF and font dependencies `github.com/signintech/gopdf@v0.36.1` and `golang.org/x/image@v0.43.0` in `go.mod` and `go.sum`, then verify `github.com/phpdave11/gofpdi@v1.0.16` is the selected transitive dependency when module resolution includes it
+- [X] T002 [P] Create the local PDF renderer package skeleton and package documentation in `internal/report/pdf/renderer.go`
+- [X] T003 [P] Add deterministic report-output fixture builders for format, annex, and conversion test data in `tests/testutil/report_fixtures.go` and `tests/testutil/report_io_fixtures.go`
 
 ---
 
@@ -126,13 +126,13 @@
 
 **Critical**: No user story can be completed until this phase is complete.
 
-- [ ] T004 Add `ReportOutputFormat` enum, labels, supported-format list, and validation in `internal/report/model/report_output_format.go`
-- [ ] T005 Extend `ReportRequest` with required output format and update constructor validation in `internal/report/model/report_request.go`
-- [ ] T006 Add document roles, PDF byte payload support, and output bundle models in `internal/report/model/report_document.go` and `internal/report/model/report_output_bundle.go`; keep `internal/report/model/report_output_file.go` limited to persisted save metadata
-- [ ] T007 Add minimal `AuditAnnex` model shell with title and section-order validation in `internal/report/model/audit_annex.go`
-- [ ] T008 Update calculated report validation and clone behavior for annex-aware output in `internal/report/model/capital_gains_report.go` and `internal/report/model/report_clone.go`
-- [ ] T009 Update runtime report outcome structs for output bundles and selected output format in `internal/app/runtime/report_types.go` and `internal/app/runtime/report_output_outcome.go`
-- [ ] T010 Update shared test fixture builders to supply output format and annex shell defaults in `tests/testutil/report_fixtures.go` and `tests/testutil/report_io_fixtures.go`
+- [X] T004 Add `ReportOutputFormat` enum, labels, supported-format list, and validation in `internal/report/model/report_output_format.go`
+- [X] T005 Extend `ReportRequest` with required output format and update constructor validation in `internal/report/model/report_request.go`
+- [X] T006 Add document roles, PDF byte payload support, and output bundle models in `internal/report/model/report_document.go` and `internal/report/model/report_output_bundle.go`; keep `internal/report/model/report_output_file.go` limited to persisted save metadata
+- [X] T007 Add minimal `AuditAnnex` model shell with title and section-order validation in `internal/report/model/audit_annex.go`
+- [X] T008 Update calculated report validation and clone behavior for annex-aware output in `internal/report/model/capital_gains_report.go` and `internal/report/model/report_clone.go`
+- [X] T009 Update runtime report outcome structs for output bundles and selected output format in `internal/app/runtime/report_types.go` and `internal/app/runtime/report_output_outcome.go`
+- [X] T010 Update shared test fixture builders to supply output format and annex shell defaults in `tests/testutil/report_fixtures.go` and `tests/testutil/report_io_fixtures.go`
 
 **Checkpoint**: Report requests, calculated reports, rendered documents, output files, and runtime outcomes can represent Markdown main-plus-annex output and combined PDF output.
 

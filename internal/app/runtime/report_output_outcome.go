@@ -5,6 +5,7 @@ package runtime
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	reportoutput "github.com/benizzio/ghostfolio-cryptogains/internal/report/output"
@@ -22,9 +23,9 @@ func requestAutomaticOpen(
 		outputFile.DocumentsDirectory,
 		outputFile.Filename,
 		outputFile.Path,
+		outputFile.Role,
+		outputFile.MediaType,
 		outputFile.SavedAt,
-		true,
-		"",
 	)
 	if updateErr != nil {
 		return reportmodel.ReportOutputFile{}, pointerToReportOutcome(
@@ -41,13 +42,15 @@ func requestAutomaticOpen(
 		)
 	}
 	if open == nil {
-		return updatedOutputFile, pointerToReportOutcome(
-			reportFailureOutcome(
-				request,
-				ReportFailureAutomaticOpenFailedAfterSave,
-				reportOpenFailureMessage(outputFile.Path, "automatic opening is unavailable in this runtime"),
-			),
+		var outcome = reportFailureOutcome(
+			request,
+			ReportFailureAutomaticOpenFailedAfterSave,
+			reportOpenFailureMessage(outputFile.Path, "automatic opening is unavailable in this runtime"),
 		)
+		outcome.OutputFormat = request.OutputFormat
+		outcome.OutputFile = updatedOutputFile
+		outcome.OutputBundle = reportOutputBundleForOpen(request.OutputFormat, []reportmodel.ReportOutputFile{updatedOutputFile}, true, "automatic opening is unavailable in this runtime")
+		return updatedOutputFile, pointerToReportOutcome(outcome)
 	}
 
 	var err = open(outputFile.Path)
@@ -55,24 +58,58 @@ func requestAutomaticOpen(
 		return updatedOutputFile, nil
 	}
 
-	updatedOutputFile, _ = reportmodel.NewReportOutputFile(
-		outputFile.DocumentsDirectory,
-		outputFile.Filename,
-		outputFile.Path,
-		outputFile.SavedAt,
-		true,
-		strings.TrimSpace(err.Error()),
-	)
-
 	return updatedOutputFile, pointerToReportOutcome(
 		ReportOutcome{
 			Success:       true,
 			Message:       reportOpenFailureMessage(outputFile.Path, strings.TrimSpace(err.Error())),
 			FailureReason: ReportFailureAutomaticOpenFailedAfterSave,
 			Request:       request,
+			OutputFormat:  request.OutputFormat,
+			OutputBundle:  reportOutputBundleForOpen(request.OutputFormat, []reportmodel.ReportOutputFile{updatedOutputFile}, true, strings.TrimSpace(err.Error())),
 			OutputFile:    updatedOutputFile,
 		},
 	)
+}
+
+// reportOutputBundleForOpen builds bundle-level open metadata when the saved
+// files already satisfy the selected output format. Invalid partial bundles are
+// left empty so legacy single-file paths keep their existing behavior until the
+// bundle writer is wired in.
+// Authored by: OpenCode
+func reportOutputBundleForOpen(
+	outputFormat reportmodel.ReportOutputFormat,
+	files []reportmodel.ReportOutputFile,
+	openRequested bool,
+	openError string,
+) reportmodel.ReportOutputBundle {
+	var savedAt = reportOutputBundleSavedAt(files)
+	if savedAt.IsZero() {
+		return reportmodel.ReportOutputBundle{}
+	}
+
+	var bundle, err = reportmodel.NewReportOutputBundle(
+		outputFormat,
+		files,
+		savedAt,
+		openRequested,
+		openError,
+	)
+	if err != nil {
+		return reportmodel.ReportOutputBundle{}
+	}
+
+	return bundle
+}
+
+// reportOutputBundleSavedAt returns the shared saved-at timestamp for one output
+// bundle candidate.
+// Authored by: OpenCode
+func reportOutputBundleSavedAt(files []reportmodel.ReportOutputFile) time.Time {
+	if len(files) == 0 {
+		return time.Time{}
+	}
+
+	return files[0].SavedAt
 }
 
 // reportWriteFailureReason classifies one save failure into the supported

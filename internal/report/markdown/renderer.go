@@ -62,6 +62,7 @@ func Render(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, 
 
 	return reportmodel.NewReportDocument(
 		reportmodel.ReportDocumentTypeMarkdown,
+		reportmodel.ReportDocumentRoleMain,
 		builder.String(),
 		report.Year,
 		report.CostBasisMethod,

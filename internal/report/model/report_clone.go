@@ -81,3 +81,11 @@ func cloneOptionalDecimal(value *apd.Decimal) *apd.Decimal {
 	var cloned = *value
 	return &cloned
 }
+
+// cloneAuditAnnex returns a defensive copy of the minimal audit annex shell.
+// Authored by: OpenCode
+func cloneAuditAnnex(annex AuditAnnex) AuditAnnex {
+	var cloned = annex
+	cloned.SectionOrder = append([]AuditAnnexSection(nil), annex.SectionOrder...)
+	return cloned
+}

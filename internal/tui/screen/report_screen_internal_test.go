@@ -85,7 +85,7 @@ func TestReportResultScreenViewRendersSelectedBaseCurrency(t *testing.T) {
 	var outputFile, outputErr = reportmodel.NewReportOutputFile(
 		"/tmp/Documents",
 		"ghostfolio-capital-gains-2024-fifo.md",
-		"/tmp/report.md",
+		"/tmp/Documents/ghostfolio-capital-gains-2024-fifo.md",
 		time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC),
 		true,
 		"",

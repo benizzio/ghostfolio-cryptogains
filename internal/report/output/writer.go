@@ -113,7 +113,14 @@ func WriteReportDocument(document reportmodel.ReportDocument) (reportmodel.Repor
 
 	cleanupPath = false
 
-	return reportmodel.NewReportOutputFile(documentsDir, filename, path, savedAt, false, "")
+	return reportmodel.NewReportOutputFile(
+		documentsDir,
+		filename,
+		path,
+		reportmodel.ReportDocumentRoleMain,
+		reportmodel.ReportMediaTypeMarkdown,
+		savedAt,
+	)
 }
 
 // reserveReportFile reserves a unique final report path using exclusive file

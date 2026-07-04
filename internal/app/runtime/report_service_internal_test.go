@@ -145,7 +145,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 			},
 			write: func(document reportmodel.ReportDocument) (reportmodel.ReportOutputFile, error) {
 				savedPath = filepath.Join(fixture.DocumentsDir, "ghostfolio-capital-gains-2024-fifo-2026-05-20_15-04-05.md")
-				return reportmodel.NewReportOutputFile(fixture.DocumentsDir, filepath.Base(savedPath), savedPath, document.GeneratedAt, false, "")
+				return reportmodel.NewReportOutputFile(fixture.DocumentsDir, filepath.Base(savedPath), savedPath, reportmodel.ReportDocumentRoleMain, reportmodel.ReportMediaTypeMarkdown, document.GeneratedAt)
 			},
 			open: opener.Open,
 		}
@@ -154,7 +154,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		if !outcome.Success || outcome.FailureReason != ReportFailureNone {
 			t.Fatalf("expected successful outcome, got %#v", outcome)
 		}
-		if !outcome.OutputFile.OpenRequested || outcome.OutputFile.Path != savedPath {
+		if outcome.OutputFile.Path != savedPath {
 			t.Fatalf("expected saved output with open request, got %#v", outcome.OutputFile)
 		}
 		if opener.CallCount() != 1 || len(opener.Paths()) != 1 || opener.Paths()[0] != savedPath {
@@ -179,7 +179,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 				return reportDocumentFixture(t, report, "# Report\n"), nil
 			},
 			write: func(document reportmodel.ReportDocument) (reportmodel.ReportOutputFile, error) {
-				return reportmodel.NewReportOutputFile(fixture.DocumentsDir, filepath.Base(savedPath), savedPath, document.GeneratedAt, false, "")
+				return reportmodel.NewReportOutputFile(fixture.DocumentsDir, filepath.Base(savedPath), savedPath, reportmodel.ReportDocumentRoleMain, reportmodel.ReportMediaTypeMarkdown, document.GeneratedAt)
 			},
 			open: opener.Open,
 		}
@@ -191,7 +191,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		if outcome.FailureReason != ReportFailureAutomaticOpenFailedAfterSave {
 			t.Fatalf("expected automatic-open warning, got %#v", outcome)
 		}
-		if !outcome.OutputFile.OpenRequested || outcome.OutputFile.OpenError == "" {
+		if !strings.Contains(outcome.Message, "open boom") {
 			t.Fatalf("expected preserved saved file with open error, got %#v", outcome.OutputFile)
 		}
 		if opener.CallCount() != 1 {
@@ -212,7 +212,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 				return reportDocumentFixture(t, report, "# Report\n"), nil
 			},
 			write: func(document reportmodel.ReportDocument) (reportmodel.ReportOutputFile, error) {
-				return reportmodel.NewReportOutputFile(fixture.DocumentsDir, filepath.Base(savedPath), savedPath, document.GeneratedAt, false, "")
+				return reportmodel.NewReportOutputFile(fixture.DocumentsDir, filepath.Base(savedPath), savedPath, reportmodel.ReportDocumentRoleMain, reportmodel.ReportMediaTypeMarkdown, document.GeneratedAt)
 			},
 			open: nil,
 		}
@@ -243,6 +243,8 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 				return reportmodel.ReportOutputFile{
 					DocumentsDirectory: "/tmp/docs",
 					Path:               "/tmp/docs/report.md",
+					Role:               reportmodel.ReportDocumentRoleMain,
+					MediaType:          reportmodel.ReportMediaTypeMarkdown,
 					SavedAt:            document.GeneratedAt,
 				}, nil
 			},
@@ -566,6 +568,7 @@ func reportRequestFixture(t *testing.T, year int, method reportmodel.CostBasisMe
 		year,
 		method,
 		reportmodel.ReportBaseCurrencyUSD,
+		reportmodel.ReportOutputFormatMarkdown,
 		time.Date(2026, time.May, 20, 15, 4, 5, 0, time.UTC),
 	)
 	if err != nil {
@@ -638,7 +641,7 @@ func capitalGainsReportFixture(t *testing.T, request reportmodel.ReportRequest) 
 func reportDocumentFixture(t *testing.T, report reportmodel.CapitalGainsReport, content string) reportmodel.ReportDocument {
 	t.Helper()
 
-	var document, err = reportmodel.NewReportDocument(reportmodel.ReportDocumentTypeMarkdown, content, report.Year, report.CostBasisMethod, report.GeneratedAt)
+	var document, err = reportmodel.NewReportDocument(reportmodel.ReportDocumentTypeMarkdown, reportmodel.ReportDocumentRoleMain, content, report.Year, report.CostBasisMethod, report.GeneratedAt)
 	if err != nil {
 		t.Fatalf("new report document: %v", err)
 	}

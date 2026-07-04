@@ -16,6 +16,33 @@ type ReportDocumentType string
 const (
 	// ReportDocumentTypeMarkdown identifies the Markdown report document format.
 	ReportDocumentTypeMarkdown ReportDocumentType = "markdown"
+
+	// ReportDocumentTypePDF identifies the PDF report document format.
+	ReportDocumentTypePDF ReportDocumentType = "pdf"
+)
+
+// ReportDocumentRole identifies one rendered or persisted document's role in a
+// report output bundle.
+// Authored by: OpenCode
+type ReportDocumentRole string
+
+const (
+	// ReportDocumentRoleMain identifies the main capital gains report document.
+	ReportDocumentRoleMain ReportDocumentRole = "main"
+
+	// ReportDocumentRoleAnnex identifies the separate Annex 1 document.
+	ReportDocumentRoleAnnex ReportDocumentRole = "annex"
+
+	// ReportDocumentRoleCombined identifies a combined main-plus-annex document.
+	ReportDocumentRoleCombined ReportDocumentRole = "combined"
+)
+
+const (
+	// ReportMediaTypeMarkdown identifies Markdown report output bytes.
+	ReportMediaTypeMarkdown = "text/markdown"
+
+	// ReportMediaTypePDF identifies PDF report output bytes.
+	ReportMediaTypePDF = "application/pdf"
 )
 
 // ReferenceSectionStatus identifies whether one reference entry also appears in
@@ -47,6 +74,7 @@ type CapitalGainsReport struct {
 	DetailSections            []AssetDetailSection
 	ConversionAuditEntries    []ConversionAuditEntry
 	RateSources               []ExchangeRateEvidence
+	AuditAnnex                AuditAnnex
 }
 
 // AssetSummaryEntry stores one row in the summary section of the report.

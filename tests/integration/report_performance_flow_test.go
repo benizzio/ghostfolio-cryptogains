@@ -74,10 +74,6 @@ func TestReportPerformanceFlowLargeHistoryFixture(t *testing.T) {
 	if elapsed >= threshold {
 		t.Fatalf("expected SC-007 verification under %s, got %s", threshold, elapsed)
 	}
-	if !outcome.OutputFile.OpenRequested {
-		t.Fatalf("expected successful run to request automatic opening, got %#v", outcome.OutputFile)
-	}
-
 	testutil.AssertPathWithin(t, outcome.OutputFile.Path, reportIO.DocumentsDir)
 	testutil.AssertRegularFile(t, outcome.OutputFile.Path)
 

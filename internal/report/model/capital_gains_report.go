@@ -84,6 +84,7 @@ func NewCapitalGainsReportWithConversionArtifacts(
 		DetailSections:            cloneAssetDetailSections(detailSections),
 		ConversionAuditEntries:    cloneConversionAuditEntries(conversionAuditEntries),
 		RateSources:               cloneExchangeRateEvidence(rateSources),
+		AuditAnnex:                DefaultAuditAnnex(),
 	}
 
 	if err := report.Validate(); err != nil {
@@ -129,6 +130,13 @@ func (report CapitalGainsReport) Validate() error {
 	}
 	if err := report.validateConversionArtifacts(); err != nil {
 		return err
+	}
+	var annex = report.AuditAnnex
+	if annex.Title == "" && len(annex.SectionOrder) == 0 {
+		annex = DefaultAuditAnnex()
+	}
+	if err := annex.Validate(); err != nil {
+		return fmt.Errorf("capital gains report audit annex: %w", err)
 	}
 
 	return nil
