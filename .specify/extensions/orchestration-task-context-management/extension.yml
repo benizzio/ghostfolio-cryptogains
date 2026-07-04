@@ -1,0 +1,45 @@
+schema_version: "1.0"
+
+extension:
+  id: "orchestration-task-context-management"
+  name: "Orchestration Task Context Management"
+  version: "0.0.0"
+  description: "Adds subagent work-unit orchestration to generated Spec Kit task files"
+  author: "Igor Benicio de Mesquita"
+  repository: "https://github.com/benizzio/spec-kit-orchestration-task-context-management"
+  homepage: "https://github.com/benizzio/spec-kit-orchestration-task-context-management"
+  license: "MIT"
+
+requires:
+  speckit_version: ">=0.7.2"
+  commands:
+    - "speckit.tasks"
+    - "speckit.implement"
+
+provides:
+  commands:
+    - name: "speckit.orchestration-task-context-management.prepare"
+      file: "commands/speckit.orchestration-task-context-management.prepare.md"
+      description: "Insert or refresh subagent work-unit orchestration in tasks.md"
+    - name: "speckit.orchestration-task-context-management.validate"
+      file: "commands/speckit.orchestration-task-context-management.validate.md"
+      description: "Validate that tasks.md has a current work-unit orchestration ledger"
+
+hooks:
+  after_tasks:
+    command: "speckit.orchestration-task-context-management.prepare"
+    priority: 5
+    optional: true
+    prompt: "Add subagent work-unit orchestration to the generated tasks.md?"
+    description: "Insert or refresh the work-unit ledger after task generation"
+  before_implement:
+    command: "speckit.orchestration-task-context-management.validate"
+    priority: 5
+    optional: false
+    description: "Validate the work-unit ledger before implementation starts"
+
+tags:
+  - "agent"
+  - "orchestration"
+  - "tasks"
+  - "context"

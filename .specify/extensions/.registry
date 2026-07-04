@@ -171,6 +171,33 @@
       },
       "registered_skills": [],
       "installed_at": "2026-06-30T19:26:47.350008+00:00"
+    },
+    "orchestration-task-context-management": {
+      "version": "0.0.0",
+      "source": "local",
+      "manifest_hash": "sha256:f79829841eabb36ee3784524669621879bda623f65e3f5f9ca188d08a8bffb46",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "agy": [
+          "speckit.orchestration-task-context-management.prepare",
+          "speckit.orchestration-task-context-management.validate"
+        ],
+        "codex": [
+          "speckit.orchestration-task-context-management.prepare",
+          "speckit.orchestration-task-context-management.validate"
+        ],
+        "opencode": [
+          "speckit.orchestration-task-context-management.prepare",
+          "speckit.orchestration-task-context-management.validate"
+        ],
+        "zed": [
+          "speckit.orchestration-task-context-management.prepare",
+          "speckit.orchestration-task-context-management.validate"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-07-04T14:43:19.875387+00:00"
     }
   }
 }

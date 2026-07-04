@@ -4,6 +4,7 @@ installed:
 - coding-standards-drift-control
 - data-model-diagram
 - git
+- orchestration-task-context-management
 - test-coverage-drift-control
 - tinyspec
 settings:
@@ -64,6 +65,14 @@ hooks:
     optional: true
     prompt: Commit outstanding changes before implementation?
     description: Auto-commit before implementation
+    condition: null
+  - extension: orchestration-task-context-management
+    command: speckit.orchestration-task-context-management.validate
+    enabled: true
+    optional: false
+    priority: 5
+    prompt: Execute speckit.orchestration-task-context-management.validate?
+    description: Validate the work-unit ledger before implementation starts
     condition: null
   before_checklist:
   - extension: git
@@ -151,6 +160,14 @@ hooks:
     optional: true
     prompt: Commit task changes?
     description: Auto-commit after task generation
+    condition: null
+  - extension: orchestration-task-context-management
+    command: speckit.orchestration-task-context-management.prepare
+    enabled: true
+    optional: true
+    priority: 5
+    prompt: Add subagent work-unit orchestration to the generated tasks.md?
+    description: Insert or refresh the work-unit ledger after task generation
     condition: null
   after_implement:
   - extension: git

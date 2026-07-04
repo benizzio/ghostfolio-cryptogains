@@ -1,0 +1,13 @@
+# Local/editor files
+.DS_Store
+.idea/
+.vscode/
+
+# Python/runtime caches that may be created while testing Spec Kit installs
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Local extension packaging output
+dist/
+*.zip
