@@ -135,6 +135,8 @@ PDF output must satisfy these additional rules:
 
 - Page size is A4.
 - Required report text is emitted as selectable text, not as page images.
+- PDF output renders report-domain content through PDF-specific layout and must not use Markdown-rendered content as the PDF body.
+- Markdown structural syntax, including heading markers, table pipes or separators, and bold markers, must not appear as visible PDF report presentation.
 - Annex 1 starts on a new page.
 - Additional page breaks are allowed only before a top-level section, per-asset annex section, table row, or content block that would not fit in the remaining printable page area.
 - A continuation page must repeat visible section context or table header context before continued content.

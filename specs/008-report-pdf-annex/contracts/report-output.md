@@ -61,6 +61,8 @@ Rules:
 - The PDF must contain the main report first.
 - Annex 1 must appear after a page break in the same PDF file.
 - The PDF must be text-based and must not rasterize required report text into page images.
+- The PDF must be formatted from report-domain data through the PDF renderer, not by embedding Markdown-rendered source text as the report body.
+- A PDF that exposes Markdown structural syntax such as heading markers, table pipes or separators, or bold markers as visible report presentation is not a valid successful PDF output.
 - A PDF success outcome is valid only when the file is written, synced, closed, and recorded.
 
 ## Result Screen Path Reporting
