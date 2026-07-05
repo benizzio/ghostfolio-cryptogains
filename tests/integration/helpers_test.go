@@ -339,9 +339,27 @@ func startReportGenerationFromSelection(t *testing.T, model *flow.Model) (*flow.
 	return model, nil
 }
 
-// mustMarkdownFiles returns all generated Markdown files in one directory.
+// mustMarkdownFiles returns generated main Markdown report files in one
+// directory.
 // Authored by: OpenCode
 func mustMarkdownFiles(t *testing.T, dir string) []string {
+	t.Helper()
+
+	var files = mustAllMarkdownFiles(t, dir)
+	var mainFiles []string
+	for _, file := range files {
+		if strings.Contains(filepath.Base(file), "-annex-1-") {
+			continue
+		}
+		mainFiles = append(mainFiles, file)
+	}
+
+	return mainFiles
+}
+
+// mustAllMarkdownFiles returns every generated Markdown file in one directory.
+// Authored by: OpenCode
+func mustAllMarkdownFiles(t *testing.T, dir string) []string {
 	t.Helper()
 
 	var entries, err = os.ReadDir(dir)

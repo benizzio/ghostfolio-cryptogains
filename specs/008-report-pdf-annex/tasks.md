@@ -146,22 +146,22 @@
 
 ### Tests for User Story 1
 
-- [ ] T011 [P] [US1] Add report output-format workflow contract tests for selection, SC-001 selection-to-start timing evidence, busy state, and result copy in `tests/contract/report_generation_workflow_contract_test.go`
-- [ ] T012 [P] [US1] Add report output file contract tests for Markdown/PDF file counts, filename patterns, and suffix rules in `tests/contract/report_output_contract_test.go`
-- [ ] T013 [P] [US1] Add runtime integration test for generating the same fixture as Markdown and PDF in `tests/integration/report_generation_flow_test.go`
-- [ ] T014 [P] [US1] Add output bundle cleanup integration test for render and write failures in `tests/integration/report_failure_flow_test.go`
-- [ ] T015 [P] [US1] Add PDF renderer unit tests for A4 configuration, embedded font loading, and text emission seams in `internal/report/pdf/renderer_internal_test.go`
-- [ ] T016 [P] [US1] Add output bundle writer unit tests for Markdown pair reservation and PDF filename suffixes in `internal/report/output/writer_internal_test.go`
+- [X] T011 [P] [US1] Add report output-format workflow contract tests for selection, SC-001 selection-to-start timing evidence, busy state, and result copy in `tests/contract/report_generation_workflow_contract_test.go`
+- [X] T012 [P] [US1] Add report output file contract tests for Markdown/PDF file counts, filename patterns, and suffix rules in `tests/contract/report_output_contract_test.go`
+- [X] T013 [P] [US1] Add runtime integration test for generating the same fixture as Markdown and PDF in `tests/integration/report_generation_flow_test.go`
+- [X] T014 [P] [US1] Add output bundle cleanup integration test for render and write failures in `tests/integration/report_failure_flow_test.go`
+- [X] T015 [P] [US1] Add PDF renderer unit tests for A4 configuration, embedded font loading, and text emission seams in `internal/report/pdf/renderer_internal_test.go`
+- [X] T016 [P] [US1] Add output bundle writer unit tests for Markdown pair reservation and PDF filename suffixes in `internal/report/output/writer_internal_test.go`
 
 ### Implementation for User Story 1
 
-- [ ] T017 [US1] Implement output-format list state, focus movement, selection, and report request construction in `internal/tui/flow/state.go` and `internal/tui/flow/report_flow.go`
-- [ ] T018 [US1] Render output-format choices, selected-format explanations, busy state, and result copy in `internal/tui/flow/view.go`, `internal/tui/flow/help_text.go`, and `internal/tui/screen/report_screen.go`
-- [ ] T019 [US1] Implement bundle-aware Markdown rendering entry point returning main and Annex 1 documents in `internal/report/markdown/renderer.go` and `internal/report/markdown/renderer_annex.go`
-- [ ] T020 [US1] Implement initial local A4 PDF renderer for the main report plus Annex 1 shell in `internal/report/pdf/renderer.go`
-- [ ] T021 [US1] Implement output bundle reservation, write, sync, close, suffixing, and cleanup for two-file Markdown and one-file PDF output in `internal/report/output/writer.go`
-- [ ] T022 [US1] Select renderer by output format, write output bundles, request automatic open, and shape all saved paths in `internal/app/runtime/report_service.go` and `internal/app/runtime/report_output_outcome.go`
-- [ ] T023 [US1] Update report result path labels to show Markdown main path plus Annex 1 path or the single PDF path in `internal/tui/screen/report_screen.go`
+- [X] T017 [US1] Implement output-format list state, focus movement, selection, and report request construction in `internal/tui/flow/state.go` and `internal/tui/flow/report_flow.go`
+- [X] T018 [US1] Render output-format choices, selected-format explanations, busy state, and result copy in `internal/tui/flow/view.go`, `internal/tui/flow/help_text.go`, and `internal/tui/screen/report_screen.go`
+- [X] T019 [US1] Implement bundle-aware Markdown rendering entry point returning main and Annex 1 documents in `internal/report/markdown/renderer.go` and `internal/report/markdown/renderer_annex.go`
+- [X] T020 [US1] Implement initial local A4 PDF renderer for the main report plus Annex 1 shell in `internal/report/pdf/renderer.go`
+- [X] T021 [US1] Implement output bundle reservation, write, sync, close, suffixing, and cleanup for two-file Markdown and one-file PDF output in `internal/report/output/writer.go`
+- [X] T022 [US1] Select renderer by output format, write output bundles, request automatic open, and shape all saved paths in `internal/app/runtime/report_service.go` and `internal/app/runtime/report_output_outcome.go`
+- [X] T023 [US1] Update report result path labels to show Markdown main path plus Annex 1 path or the single PDF path in `internal/tui/screen/report_screen.go`
 
 **Checkpoint**: User Story 1 is fully functional and can be validated independently as the MVP.
 

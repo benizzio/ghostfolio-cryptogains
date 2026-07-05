@@ -936,8 +936,13 @@ func TestUpdateReportCoversSelectionBusyAndResultBranches(t *testing.T) {
 	model = updated.(*Model)
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*Model)
+	if cmd != nil || model.report.FocusArea != reportSelectionFocusOutputFormat {
+		t.Fatalf("expected base-currency activation to advance to output format, got cmd=%v report=%#v", cmd, model.report)
+	}
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = updated.(*Model)
 	if cmd != nil || model.report.FocusArea != reportSelectionFocusAction {
-		t.Fatalf("expected base-currency activation to advance to actions, got cmd=%v report=%#v", cmd, model.report)
+		t.Fatalf("expected output-format activation to advance to actions, got cmd=%v report=%#v", cmd, model.report)
 	}
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*Model)
@@ -993,8 +998,8 @@ func TestUpdateReportCoversSelectionBusyAndResultBranches(t *testing.T) {
 	}
 }
 
-// TestReportSelectionFocusIncludesBaseCurrencyPane verifies keyboard focus
-// moves through year, method, base currency, and action panes before wrapping.
+// TestReportSelectionFocusIncludesBaseCurrencyPane verifies keyboard focus moves
+// through year, method, base currency, output format, and action panes before wrapping.
 // Authored by: OpenCode
 func TestReportSelectionFocusIncludesBaseCurrencyPane(t *testing.T) {
 	t.Parallel()
@@ -1015,7 +1020,11 @@ func TestReportSelectionFocusIncludesBaseCurrencyPane(t *testing.T) {
 	}
 	model.advanceReportSelectionFocus()
 	if model.report.FocusArea != 3 {
-		t.Fatalf("expected third focus move to reach action pane after base-currency pane, got %d", model.report.FocusArea)
+		t.Fatalf("expected third focus move to reach output-format pane after base-currency pane, got %d", model.report.FocusArea)
+	}
+	model.advanceReportSelectionFocus()
+	if model.report.FocusArea != 4 {
+		t.Fatalf("expected fourth focus move to reach action pane after output-format pane, got %d", model.report.FocusArea)
 	}
 	model.advanceReportSelectionFocus()
 	if model.report.FocusArea != 0 {
@@ -1108,8 +1117,8 @@ func TestReportSelectionActivationFallsBackFromInvalidBaseCurrencyIndex(t *testi
 		t.Fatalf("expected base-currency fallback activation to stay synchronous")
 	}
 	model = assertUpdatedModel(t, updated)
-	if model.report.BaseCurrencyIndex != 0 || model.report.SelectedBaseCurrency != reportmodel.ReportBaseCurrencyUSD || model.report.FocusArea != reportSelectionFocusAction {
-		t.Fatalf("expected invalid base-currency index to fall back to USD and actions, got %#v", model.report)
+	if model.report.BaseCurrencyIndex != 0 || model.report.SelectedBaseCurrency != reportmodel.ReportBaseCurrencyUSD || model.report.FocusArea != reportSelectionFocusOutputFormat {
+		t.Fatalf("expected invalid base-currency index to fall back to USD and output format, got %#v", model.report)
 	}
 }
 

@@ -16,6 +16,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
@@ -465,6 +466,65 @@ func TestReportGenerationWriteFailureRemovesPartialFileAndShowsFailure(t *testin
 	}
 }
 
+// TestReportGenerationPDFRenderFailureLeavesNoPartialBundleFiles verifies that a
+// render failure stops before final output and leaves no Markdown or PDF bundle
+// files from the attempt.
+// Authored by: OpenCode
+func TestReportGenerationPDFRenderFailureLeavesNoPartialBundleFiles(t *testing.T) {
+	t.Setenv("GHOSTFOLIO_CRYPTOGAINS_PDF_RENDER_FAILURE", "forced PDF render failure")
+
+	var reportIO = testutil.NewReportIOFixture(t)
+	var openLogPath = installOpenCommandRecorder(t, 0)
+	var fixture = testutil.DeterministicReportLedgerFixture()
+	var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
+	var token = "token-123"
+
+	seedProtectedSnapshot(t, harness, token, fixture.ProtectedActivityCache)
+	var contextResult = harness.App.SyncService.UnlockSelectedServerSnapshot(context.Background(), harness.Config, token)
+	if !contextResult.ProtectedData.HasReadableSnapshot {
+		t.Fatalf("expected readable snapshot after unlock, got %#v", contextResult)
+	}
+
+	var request = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatPDF)
+	var outcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: request})
+	if outcome.Success {
+		t.Fatalf("expected PDF render failure before save, got %#v", outcome)
+	}
+	if outcome.FailureReason != runtime.ReportFailureUnsupportedReportCalculation {
+		t.Fatalf("expected PDF render failure category %q, got %#v", runtime.ReportFailureUnsupportedReportCalculation, outcome)
+	}
+	if !strings.Contains(outcome.Message, "No report file was saved") {
+		t.Fatalf("expected PDF render failure message to state that no file was saved, got %q", outcome.Message)
+	}
+	assertNoReportBundleFiles(t, reportIO.DocumentsDir)
+	if openerRequests := readOpenCommandRequests(t, openLogPath); len(openerRequests) != 0 {
+		t.Fatalf("expected no opener request after PDF render failure, got %#v", openerRequests)
+	}
+	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
+}
+
+// TestReportGenerationBundleWriteFailureLeavesNoPartialBundleFiles verifies that
+// a write failure after output reservation removes every bundle file created by
+// the failed attempt.
+// Authored by: OpenCode
+func TestReportGenerationBundleWriteFailureLeavesNoPartialBundleFiles(t *testing.T) {
+	if os.Getenv("GHOSTFOLIO_CRYPTOGAINS_HELPER_BUNDLE_WRITE_FAILURE") == "1" {
+		runReportGenerationBundleWriteFailureScenario(t)
+		return
+	}
+
+	var command = exec.Command(os.Args[0], "-test.run=TestReportGenerationBundleWriteFailureLeavesNoPartialBundleFiles$")
+	command.Env = append(
+		os.Environ(),
+		"GHOSTFOLIO_CRYPTOGAINS_HELPER_BUNDLE_WRITE_FAILURE=1",
+		"GHOSTFOLIO_CRYPTOGAINS_OUTPUT_FAIL_WRITE_AFTER_CREATE=forced bundle write failure",
+	)
+	var output, err = command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("run bundle write-failure helper process: %v\n%s", err, string(output))
+	}
+}
+
 // runReportGenerationWriteFailureScenario executes the runtime-backed write
 // failure assertions in a helper subprocess so report-output test seams stay
 // isolated from other parallel integration tests.
@@ -524,6 +584,43 @@ func runReportGenerationWriteFailureScenario(t *testing.T) {
 	if model.ActiveScreen() != "sync_reports_menu" {
 		t.Fatalf("expected write-failure dismissal to return to sync and reports menu, got %s", model.ActiveScreen())
 	}
+}
+
+// runReportGenerationBundleWriteFailureScenario executes bundle-level write
+// failure cleanup assertions in a helper subprocess so output test seams stay
+// isolated from other integration tests.
+// Authored by: OpenCode
+func runReportGenerationBundleWriteFailureScenario(t *testing.T) {
+	t.Helper()
+
+	var reportIO = testutil.NewReportIOFixture(t)
+	var openLogPath = installOpenCommandRecorder(t, 0)
+	var fixture = testutil.DeterministicReportLedgerFixture()
+	var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
+	var token = "token-123"
+
+	seedProtectedSnapshot(t, harness, token, fixture.ProtectedActivityCache)
+	var contextResult = harness.App.SyncService.UnlockSelectedServerSnapshot(context.Background(), harness.Config, token)
+	if !contextResult.ProtectedData.HasReadableSnapshot {
+		t.Fatalf("expected readable snapshot after unlock, got %#v", contextResult)
+	}
+
+	var request = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown)
+	var outcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: request})
+	if outcome.Success {
+		t.Fatalf("expected bundle write failure, got %#v", outcome)
+	}
+	if outcome.FailureReason != runtime.ReportFailureReportFileWriteFailed {
+		t.Fatalf("expected bundle write failure category %q, got %#v", runtime.ReportFailureReportFileWriteFailed, outcome)
+	}
+	if !strings.Contains(outcome.Message, "forced bundle write failure") {
+		t.Fatalf("expected bundle write failure detail, got %q", outcome.Message)
+	}
+	assertNoReportBundleFiles(t, reportIO.DocumentsDir)
+	if openerRequests := readOpenCommandRequests(t, openLogPath); len(openerRequests) != 0 {
+		t.Fatalf("expected no opener request when bundle save failed, got %#v", openerRequests)
+	}
+	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
 }
 
 // runReportGenerationWriteFailureDiagnosticScenario exercises the report-result
@@ -822,6 +919,27 @@ func reportFlowDecimalPointer(t *testing.T, raw string) *apd.Decimal {
 
 	var value = mustReportFlowDecimal(t, raw)
 	return &value
+}
+
+// assertNoReportBundleFiles verifies that a failed generation attempt left no
+// cleartext report bundle artifacts in the Documents directory.
+// Authored by: OpenCode
+func assertNoReportBundleFiles(t *testing.T, documentsDir string) {
+	t.Helper()
+
+	if markdownFiles := mustAllMarkdownFiles(t, documentsDir); len(markdownFiles) != 0 {
+		t.Fatalf("expected no Markdown bundle files after failed generation, got %#v", markdownFiles)
+	}
+	if pdfFiles := mustPDFFiles(t, documentsDir); len(pdfFiles) != 0 {
+		t.Fatalf("expected no PDF bundle files after failed generation, got %#v", pdfFiles)
+	}
+	var documentsEntries, err = os.ReadDir(documentsDir)
+	if err != nil {
+		t.Fatalf("read Documents directory: %v", err)
+	}
+	if len(documentsEntries) != 0 {
+		t.Fatalf("expected failed generation cleanup to leave Documents empty, got %#v", documentsEntries)
+	}
 }
 
 // assertReportFailureDiagnosticArtifact verifies one report-failure diagnostic

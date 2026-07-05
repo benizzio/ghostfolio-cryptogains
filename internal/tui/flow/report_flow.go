@@ -23,6 +23,7 @@ const (
 	reportSelectionFocusYear = iota
 	reportSelectionFocusMethod
 	reportSelectionFocusBaseCurrency
+	reportSelectionFocusOutputFormat
 	reportSelectionFocusAction
 	reportSelectionFocusCount
 )
@@ -68,15 +69,16 @@ func (m *Model) handleReportSelectionKey(message tea.KeyPressMsg) (tea.Model, te
 	var yearCount = len(m.syncReports.ProtectedData.AvailableReportYears)
 	var methodCount = len(m.reportMethodItems())
 	var baseCurrencyCount = len(m.reportBaseCurrencyItems())
+	var outputFormatCount = len(m.reportOutputFormatItems())
 	var actionCount = len(m.reportSelectionActions())
 
 	switch {
 	case key.Matches(message, focusBinding()):
 		m.advanceReportSelectionFocus()
 	case key.Matches(message, upBinding()):
-		m.moveReportSelection(-1, yearCount, methodCount, baseCurrencyCount, actionCount)
+		m.moveReportSelection(-1, yearCount, methodCount, baseCurrencyCount, outputFormatCount, actionCount)
 	case key.Matches(message, downBinding()):
-		m.moveReportSelection(1, yearCount, methodCount, baseCurrencyCount, actionCount)
+		m.moveReportSelection(1, yearCount, methodCount, baseCurrencyCount, outputFormatCount, actionCount)
 	case key.Matches(message, enterBinding()):
 		return m.activateReportSelection()
 	}
@@ -99,7 +101,7 @@ func (m *Model) advanceReportSelectionFocus() {
 
 // moveReportSelection advances the currently focused report-selection index by one step.
 // Authored by: OpenCode
-func (m *Model) moveReportSelection(step int, yearCount int, methodCount int, baseCurrencyCount int, actionCount int) {
+func (m *Model) moveReportSelection(step int, yearCount int, methodCount int, baseCurrencyCount int, outputFormatCount int, actionCount int) {
 	switch m.report.FocusArea {
 	case reportSelectionFocusYear:
 		m.report.YearIndex = boundedMenuIndex(m.report.YearIndex, step, yearCount)
@@ -108,6 +110,9 @@ func (m *Model) moveReportSelection(step int, yearCount int, methodCount int, ba
 	case reportSelectionFocusBaseCurrency:
 		m.report.BaseCurrencyIndex = boundedMenuIndex(m.report.BaseCurrencyIndex, step, baseCurrencyCount)
 		m.selectReportBaseCurrencyAtCurrentIndex()
+	case reportSelectionFocusOutputFormat:
+		m.report.OutputFormatIndex = boundedMenuIndex(m.report.OutputFormatIndex, step, outputFormatCount)
+		m.selectReportOutputFormatAtCurrentIndex()
 	case reportSelectionFocusAction:
 		m.report.ActionIndex = boundedMenuIndex(m.report.ActionIndex, step, actionCount)
 	}
@@ -120,6 +125,15 @@ func (m *Model) activateReportSelection() (tea.Model, tea.Cmd) {
 		if !m.selectReportBaseCurrencyAtCurrentIndex() {
 			m.report.BaseCurrencyIndex = 0
 			m.selectReportBaseCurrencyAtCurrentIndex()
+		}
+		m.report.FocusArea = reportSelectionFocusOutputFormat
+		return m, nil
+	}
+
+	if m.report.FocusArea == reportSelectionFocusOutputFormat {
+		if !m.selectReportOutputFormatAtCurrentIndex() {
+			m.report.OutputFormatIndex = 0
+			m.selectReportOutputFormatAtCurrentIndex()
 		}
 		m.report.FocusArea = reportSelectionFocusAction
 		return m, nil
@@ -144,6 +158,30 @@ func (m *Model) activateReportSelection() (tea.Model, tea.Cmd) {
 	default:
 		return m, nil
 	}
+}
+
+// selectReportOutputFormatAtCurrentIndex applies the highlighted output format
+// as the selected value for the pending report request.
+// Authored by: OpenCode
+func (m *Model) selectReportOutputFormatAtCurrentIndex() bool {
+	var outputFormat = reportOutputFormatForIndex(m.report.OutputFormatIndex)
+	if outputFormat == "" {
+		return false
+	}
+
+	m.report.SelectedOutputFormat = outputFormat
+	return true
+}
+
+// reportOutputFormatForIndex returns the supported report output format at one
+// stable UI index.
+// Authored by: OpenCode
+func reportOutputFormatForIndex(index int) reportmodel.ReportOutputFormat {
+	var formats = reportmodel.SupportedReportOutputFormats()
+	if index < 0 || index >= len(formats) {
+		return ""
+	}
+	return formats[index]
 }
 
 // syncSelectedReportYear applies the current year selection to the transient report state.
@@ -182,7 +220,7 @@ func reportBaseCurrencyForIndex(index int) reportmodel.ReportBaseCurrency {
 // generation request.
 // Authored by: OpenCode
 func (m *Model) startReportGeneration() (tea.Model, tea.Cmd) {
-	if m.report.SelectedBaseCurrency == "" {
+	if m.report.SelectedBaseCurrency == "" || m.report.SelectedOutputFormat == "" {
 		return m, nil
 	}
 
@@ -191,10 +229,11 @@ func (m *Model) startReportGeneration() (tea.Model, tea.Cmd) {
 		Year:               m.report.SelectedYear,
 		CostBasisMethod:    reportMethodForIndex(m.report.MethodIndex),
 		ReportBaseCurrency: m.report.SelectedBaseCurrency,
+		OutputFormat:       m.report.SelectedOutputFormat,
 		RequestedAt:        requestedAt,
 	}
 
-	var validatedRequest, err = reportmodel.NewReportRequest(m.report.SelectedYear, reportMethodForIndex(m.report.MethodIndex), m.report.SelectedBaseCurrency, requestedAt)
+	var validatedRequest, err = reportmodel.NewReportRequest(m.report.SelectedYear, reportMethodForIndex(m.report.MethodIndex), m.report.SelectedBaseCurrency, m.report.SelectedOutputFormat, requestedAt)
 	if err != nil {
 		m.enterReportResult(runtime.ReportOutcome{
 			Success:       false,

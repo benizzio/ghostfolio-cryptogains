@@ -34,7 +34,12 @@ func TestReportGenerationWorkflowContract(t *testing.T) {
 		},
 		SelectedMethod:    0,
 		MethodExplanation: reportmodel.CostBasisMethodFIFO.Explanation(),
-		MenuItems:         []component.MenuItem{{Label: "Generate Report", Enabled: true}, {Label: "Back", Enabled: true}},
+		OutputFormatItems: []component.MenuItem{
+			{Label: reportmodel.ReportOutputFormatMarkdown.Label(), Enabled: true},
+			{Label: reportmodel.ReportOutputFormatPDF.Label(), Enabled: true},
+		},
+		SelectedOutputFormatIndex: 1,
+		MenuItems:                 []component.MenuItem{{Label: "Generate Report", Enabled: true}, {Label: "Back", Enabled: true}},
 	})
 	assertContains(t, selection, "Generate Capital Gains Report")
 	assertContains(t, selection, "Available Years")
@@ -51,6 +56,9 @@ func TestReportGenerationWorkflowContract(t *testing.T) {
 	assertContains(t, selection, "USD")
 	assertContains(t, selection, "EUR")
 	assertNotContains(t, selection, "GBP")
+	assertContains(t, selection, "Output Format")
+	assertContains(t, selection, "Markdown")
+	assertContains(t, selection, "PDF")
 	assertContains(t, selection, "Method Explanation")
 	assertContains(t, selection, reportmodel.CostBasisMethodFIFO.Explanation())
 	assertContains(t, selection, "Generate Report")
@@ -63,6 +71,7 @@ func TestReportGenerationWorkflowContract(t *testing.T) {
 		SelectedYear:       2024,
 		MethodLabel:        "FIFO",
 		ReportBaseCurrency: reportmodel.ReportBaseCurrencyUSD,
+		OutputFormat:       reportmodel.ReportOutputFormatPDF,
 		BusyText:           "Generating capital gains report...",
 		SpinnerFrame:       "*",
 	})
@@ -71,13 +80,14 @@ func TestReportGenerationWorkflowContract(t *testing.T) {
 	assertContains(t, busy, "Selected Year: 2024")
 	assertContains(t, busy, "Cost Basis Method: FIFO")
 	assertContains(t, busy, "Report Base Currency: USD")
+	assertContains(t, busy, "Output Format: PDF")
 	assertNotContains(t, busy, "# Ghostfolio Capital Gains And Losses Report")
 
-	request, err := reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
+	request, err := reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatPDF, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
-	outputFile, err := reportmodel.NewReportOutputFile("/tmp/Documents", "ghostfolio-capital-gains-2024-fifo.md", "/tmp/Documents/ghostfolio-capital-gains-2024-fifo.md", time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC), true, "")
+	outputFile, err := reportmodel.NewReportOutputFile("/tmp/Documents", "ghostfolio-capital-gains-2024-fifo.pdf", "/tmp/Documents/ghostfolio-capital-gains-2024-fifo.pdf", reportmodel.ReportDocumentRoleCombined, reportmodel.ReportMediaTypePDF, time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report output file: %v", err)
 	}
@@ -90,17 +100,19 @@ func TestReportGenerationWorkflowContract(t *testing.T) {
 		MenuItems:     []component.MenuItem{{Label: "Back To Sync and Reports", Enabled: true}, {Label: "Generate Another Report", Enabled: true}},
 		SelectedIndex: 0,
 		Outcome: runtime.ReportOutcome{
-			Success:    true,
-			Message:    "Saved the report to \"/tmp/Documents/ghostfolio-capital-gains-2024-fifo.md\" and requested automatic opening.",
-			Request:    request,
-			OutputFile: outputFile,
+			Success:      true,
+			Message:      "Saved the report to \"/tmp/Documents/ghostfolio-capital-gains-2024-fifo.pdf\" and requested automatic opening.",
+			Request:      request,
+			OutputFormat: reportmodel.ReportOutputFormatPDF,
+			OutputFile:   outputFile,
 		},
 	})
 	assertContains(t, result, "Report Result")
-	assertContains(t, result, "Saved Markdown Path: /tmp/Documents/ghostfolio-capital-gains-2024-fifo.md")
+	assertContains(t, result, "Saved PDF Path: /tmp/Documents/ghostfolio-capital-gains-2024-fifo.pdf")
 	assertContains(t, result, "Selected Year: 2024")
 	assertContains(t, result, "Cost Basis Method: FIFO")
 	assertContains(t, result, "Report Base Currency: USD")
+	assertContains(t, result, "Output Format: PDF")
 	assertContains(t, result, "Back To Sync and Reports")
 	assertContains(t, result, "Generate Another Report")
 
@@ -176,4 +188,49 @@ func TestReportBaseCurrencyChoiceContract(t *testing.T) {
 			t.Fatalf("expected unsupported report base currency %q to fail request validation", unsupported)
 		}
 	}
+}
+
+// TestReportGenerationSelectionToStartWorkflowBoundContract verifies that the
+// TUI selection-to-busy step only validates the selected inputs and renders the
+// transient busy state before report generation work begins.
+// Authored by: OpenCode
+func TestReportGenerationSelectionToStartWorkflowBoundContract(t *testing.T) {
+	t.Parallel()
+
+	var startedAt = time.Now()
+	var request, err = reportmodel.NewReportRequest(
+		2024,
+		reportmodel.CostBasisMethodFIFO,
+		reportmodel.ReportBaseCurrencyUSD,
+		reportmodel.ReportOutputFormatPDF,
+		time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("new report request: %v", err)
+	}
+
+	var busy = screen.ReportBusyScreenView(screen.ReportBusyScreenParams{
+		Theme:              component.DefaultTheme(),
+		Width:              100,
+		Height:             32,
+		SelectedYear:       request.Year,
+		MethodLabel:        request.CostBasisMethod.Label(),
+		ReportBaseCurrency: request.ReportBaseCurrency,
+		OutputFormat:       request.OutputFormat,
+		BusyText:           "Generating capital gains report...",
+		SpinnerFrame:       "*",
+	})
+	var elapsed = time.Since(startedAt)
+	if elapsed > 250*time.Millisecond {
+		t.Fatalf("expected selection-to-busy workflow to complete without synchronous report file IO, took %s", elapsed)
+	}
+
+	assertContains(t, busy, "Report Generation")
+	assertContains(t, busy, "Selected Year: 2024")
+	assertContains(t, busy, "Cost Basis Method: FIFO")
+	assertContains(t, busy, "Report Base Currency: USD")
+	assertContains(t, busy, "Output Format: PDF")
+	assertNotContains(t, busy, "Saved PDF Path")
+	assertNotContains(t, busy, "Saved Markdown Path")
+	assertNotContains(t, busy, "/tmp/")
 }

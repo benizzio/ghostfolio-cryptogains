@@ -115,6 +115,72 @@ func TestReportGenerationSuccessWritesMarkdownAndReturnsToUnlockedContext(t *tes
 	}
 }
 
+// TestReportGenerationWritesSelectedMarkdownAndPDFBundles verifies that the
+// same deterministic runtime fixture can be generated as the selected Markdown
+// main-plus-annex bundle and as one combined PDF file.
+// Authored by: OpenCode
+func TestReportGenerationWritesSelectedMarkdownAndPDFBundles(t *testing.T) {
+	var cases = []struct {
+		name                  string
+		outputFormat          reportmodel.ReportOutputFormat
+		expectedMarkdownFiles int
+		expectedPDFFiles      int
+	}{
+		{
+			name:                  "markdown main plus annex",
+			outputFormat:          reportmodel.ReportOutputFormatMarkdown,
+			expectedMarkdownFiles: 2,
+		},
+		{
+			name:             "combined pdf",
+			outputFormat:     reportmodel.ReportOutputFormatPDF,
+			expectedPDFFiles: 1,
+		},
+	}
+
+	for _, testCase := range cases {
+		var testCase = testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			var reportIO = testutil.NewReportIOFixture(t)
+			var openLogPath = installOpenCommandRecorder(t, 0)
+			var fixture = testutil.DeterministicReportLedgerFixture()
+			var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
+			var token = "token-123"
+
+			seedProtectedSnapshot(t, harness, token, fixture.ProtectedActivityCache)
+			var contextResult = harness.App.SyncService.UnlockSelectedServerSnapshot(context.Background(), harness.Config, token)
+			if !contextResult.ProtectedData.HasReadableSnapshot {
+				t.Fatalf("expected readable snapshot after unlock, got %#v", contextResult)
+			}
+
+			var request = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportBaseCurrencyUSD, testCase.outputFormat)
+			var outcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: request})
+			if !outcome.Success {
+				t.Fatalf("expected %s report generation success, got %#v", testCase.outputFormat, outcome)
+			}
+
+			var markdownFiles = mustAllMarkdownFiles(t, reportIO.DocumentsDir)
+			if len(markdownFiles) != testCase.expectedMarkdownFiles {
+				t.Fatalf("expected %d Markdown files for %s output, got %#v", testCase.expectedMarkdownFiles, testCase.outputFormat, markdownFiles)
+			}
+			var pdfFiles = mustPDFFiles(t, reportIO.DocumentsDir)
+			if len(pdfFiles) != testCase.expectedPDFFiles {
+				t.Fatalf("expected %d PDF files for %s output, got %#v", testCase.expectedPDFFiles, testCase.outputFormat, pdfFiles)
+			}
+
+			var openerRequests = readOpenCommandRequests(t, openLogPath)
+			if len(openerRequests) == 0 {
+				t.Fatalf("expected at least one opener request after successful %s output", testCase.outputFormat)
+			}
+			for _, path := range append(markdownFiles, pdfFiles...) {
+				testutil.AssertPathWithin(t, path, reportIO.DocumentsDir)
+				testutil.AssertRegularFile(t, path)
+			}
+			assertNoCleartextReportInAppStorage(t, harness.BaseDir)
+		})
+	}
+}
+
 // TestReportGenerationOpenWarningPreservesSavedReportAndAllowsAnotherRun
 // verifies that an opener failure stays non-fatal and keeps the workflow in the
 // unlocked report context.
@@ -761,6 +827,47 @@ func mustIntegrationReportRequest(t *testing.T, year int, reportBaseCurrency rep
 	}
 
 	return request
+}
+
+// mustIntegrationReportRequestForFormat creates one validated report request for
+// integration tests that exercise a specific output format.
+// Authored by: OpenCode
+func mustIntegrationReportRequestForFormat(t *testing.T, year int, reportBaseCurrency reportmodel.ReportBaseCurrency, outputFormat reportmodel.ReportOutputFormat) reportmodel.ReportRequest {
+	t.Helper()
+
+	var request, err = reportmodel.NewReportRequest(
+		year,
+		reportmodel.CostBasisMethodFIFO,
+		reportBaseCurrency,
+		outputFormat,
+		time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("new integration report request for %s: %v", outputFormat, err)
+	}
+
+	return request
+}
+
+// mustPDFFiles returns all generated PDF files in one directory.
+// Authored by: OpenCode
+func mustPDFFiles(t *testing.T, dir string) []string {
+	t.Helper()
+
+	var entries, err = os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read dir %q: %v", dir, err)
+	}
+
+	var files []string
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".pdf") {
+			continue
+		}
+		files = append(files, filepath.Join(dir, entry.Name()))
+	}
+
+	return files
 }
 
 // capturingReportService records runtime report-generation requests received

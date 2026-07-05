@@ -70,6 +70,24 @@ func Render(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, 
 	)
 }
 
+// RenderDocuments converts one calculated report into the selected Markdown
+// output documents: the main report and a separate Annex 1 document.
+// Authored by: OpenCode
+func RenderDocuments(report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+	var mainDocument, err = Render(report)
+	if err != nil {
+		return nil, err
+	}
+
+	var annexDocument reportmodel.ReportDocument
+	annexDocument, err = RenderAnnex(report)
+	if err != nil {
+		return nil, err
+	}
+
+	return []reportmodel.ReportDocument{mainDocument, annexDocument}, nil
+}
+
 // writeHeader renders the required document heading and metadata block.
 // Authored by: OpenCode
 func writeHeader(builder *strings.Builder, report reportmodel.CapitalGainsReport, calculationCurrency string) {

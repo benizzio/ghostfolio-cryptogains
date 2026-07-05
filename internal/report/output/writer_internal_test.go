@@ -366,6 +366,137 @@ func TestWriteReportDocumentAdditionalBranches(t *testing.T) {
 	})
 }
 
+// TestWriteReportDocumentsReservesMarkdownPair verifies that Markdown bundle
+// output reserves the main report and Annex 1 files as one successful pair.
+// Authored by: OpenCode
+func TestWriteReportDocumentsReservesMarkdownPair(t *testing.T) {
+	var fixtureDir = t.TempDir()
+	var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+	defer restoreOutputSeams()
+
+	var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
+	var documents = []reportmodel.ReportDocument{
+		validMarkdownReportDocument(reportmodel.ReportDocumentRoleMain, "# Main Report\n", generatedAt),
+		validMarkdownReportDocument(reportmodel.ReportDocumentRoleAnnex, "# Annex 1 - Audit\n", generatedAt),
+	}
+
+	var bundle, err = WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, documents)
+	if err != nil {
+		t.Fatalf("write markdown report document bundle: %v", err)
+	}
+	assertOutputBundle(t, bundle, reportmodel.ReportOutputFormatMarkdown, generatedAt, 2)
+
+	var expectedMain = "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56.md"
+	var expectedAnnex = "ghostfolio-capital-gains-2024-fifo-annex-1-2026-05-21_12-34-56.md"
+	assertOutputFile(t, bundle.Files[0], reportmodel.ReportDocumentRoleMain, reportmodel.ReportMediaTypeMarkdown, expectedMain, "# Main Report\n")
+	assertOutputFile(t, bundle.Files[1], reportmodel.ReportDocumentRoleAnnex, reportmodel.ReportMediaTypeMarkdown, expectedAnnex, "# Annex 1 - Audit\n")
+}
+
+// TestWriteReportDocumentsUsesMatchedMarkdownSuffixes verifies that a Markdown
+// bundle collision advances both filenames to the same numeric suffix.
+// Authored by: OpenCode
+func TestWriteReportDocumentsUsesMatchedMarkdownSuffixes(t *testing.T) {
+	var fixtureDir = t.TempDir()
+	var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+	defer restoreOutputSeams()
+
+	var documentsDir = filepath.Join(fixtureDir, "Documents")
+	var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
+	var occupiedMain = filepath.Join(documentsDir, "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56.md")
+	var occupiedAnnex = filepath.Join(documentsDir, "ghostfolio-capital-gains-2024-fifo-annex-1-2026-05-21_12-34-56-2.md")
+	if err := os.WriteFile(occupiedMain, []byte("existing main"), 0o600); err != nil {
+		t.Fatalf("seed existing main report: %v", err)
+	}
+	if err := os.WriteFile(occupiedAnnex, []byte("existing annex"), 0o600); err != nil {
+		t.Fatalf("seed existing annex report: %v", err)
+	}
+
+	var documents = []reportmodel.ReportDocument{
+		validMarkdownReportDocument(reportmodel.ReportDocumentRoleMain, "# Main Report\n", generatedAt),
+		validMarkdownReportDocument(reportmodel.ReportDocumentRoleAnnex, "# Annex 1 - Audit\n", generatedAt),
+	}
+
+	var bundle, err = WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, documents)
+	if err != nil {
+		t.Fatalf("write markdown report document bundle after collisions: %v", err)
+	}
+
+	var expectedMain = "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56-3.md"
+	var expectedAnnex = "ghostfolio-capital-gains-2024-fifo-annex-1-2026-05-21_12-34-56-3.md"
+	assertOutputFile(t, bundle.Files[0], reportmodel.ReportDocumentRoleMain, reportmodel.ReportMediaTypeMarkdown, expectedMain, "# Main Report\n")
+	assertOutputFile(t, bundle.Files[1], reportmodel.ReportDocumentRoleAnnex, reportmodel.ReportMediaTypeMarkdown, expectedAnnex, "# Annex 1 - Audit\n")
+}
+
+// TestWriteReportDocumentsUsesPDFFilenameSuffixes verifies that PDF bundle
+// output uses the report filename stem with a PDF extension and numeric suffixes.
+// Authored by: OpenCode
+func TestWriteReportDocumentsUsesPDFFilenameSuffixes(t *testing.T) {
+	var fixtureDir = t.TempDir()
+	var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+	defer restoreOutputSeams()
+
+	var documentsDir = filepath.Join(fixtureDir, "Documents")
+	var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
+	var occupiedPDF = filepath.Join(documentsDir, "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56.pdf")
+	if err := os.WriteFile(occupiedPDF, []byte("existing pdf"), 0o600); err != nil {
+		t.Fatalf("seed existing PDF report: %v", err)
+	}
+
+	var documents = []reportmodel.ReportDocument{
+		validPDFReportDocument([]byte("%PDF-1.7\nreport\n"), generatedAt),
+	}
+
+	var bundle, err = WriteReportDocuments(reportmodel.ReportOutputFormatPDF, documents)
+	if err != nil {
+		t.Fatalf("write PDF report document bundle after collision: %v", err)
+	}
+	assertOutputBundle(t, bundle, reportmodel.ReportOutputFormatPDF, generatedAt, 1)
+
+	var expectedPDF = "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56-2.pdf"
+	assertOutputFile(t, bundle.Files[0], reportmodel.ReportDocumentRoleCombined, reportmodel.ReportMediaTypePDF, expectedPDF, "%PDF-1.7\nreport\n")
+}
+
+// TestWriteReportDocumentsCleansUpBundleOnWriteFailure verifies that a failed
+// multi-file bundle write removes every file created by the attempt.
+// Authored by: OpenCode
+func TestWriteReportDocumentsCleansUpBundleOnWriteFailure(t *testing.T) {
+	var fixtureDir = t.TempDir()
+	var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+	defer restoreOutputSeams()
+
+	var openedPaths []string
+	var openCount int
+	openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+		var file, err = os.OpenFile(path, flag, perm)
+		if err != nil {
+			return nil, err
+		}
+		openedPaths = append(openedPaths, path)
+		openCount++
+		if openCount == 2 {
+			return failingWriteFile{File: file, writeErr: errors.New("annex write boom")}, nil
+		}
+		return file, nil
+	}
+
+	var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
+	var documents = []reportmodel.ReportDocument{
+		validMarkdownReportDocument(reportmodel.ReportDocumentRoleMain, "# Main Report\n", generatedAt),
+		validMarkdownReportDocument(reportmodel.ReportDocumentRoleAnnex, "# Annex 1 - Audit\n", generatedAt),
+	}
+
+	_, err := WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, documents)
+	if err == nil || !strings.Contains(err.Error(), "write report file") {
+		t.Fatalf("expected bundle write failure, got %v", err)
+	}
+	if len(openedPaths) != 2 {
+		t.Fatalf("expected both Markdown paths to be reserved before cleanup, got %d", len(openedPaths))
+	}
+	for _, path := range openedPaths {
+		assertPathRemoved(t, path)
+	}
+}
+
 // failingWriteFile injects a deterministic write error after the file has been
 // reserved on disk.
 // Authored by: OpenCode
@@ -414,6 +545,34 @@ func validReportDocument(generatedAt time.Time) reportmodel.ReportDocument {
 	return reportmodel.ReportDocument{
 		DocumentType:    reportmodel.ReportDocumentTypeMarkdown,
 		Content:         "# Report\n",
+		Year:            2024,
+		CostBasisMethod: reportmodel.CostBasisMethodFIFO,
+		GeneratedAt:     generatedAt,
+	}
+}
+
+// validMarkdownReportDocument returns one role-specific Markdown report
+// document for bundle writer tests.
+// Authored by: OpenCode
+func validMarkdownReportDocument(role reportmodel.ReportDocumentRole, content string, generatedAt time.Time) reportmodel.ReportDocument {
+	return reportmodel.ReportDocument{
+		DocumentType:    reportmodel.ReportDocumentTypeMarkdown,
+		Role:            role,
+		Content:         content,
+		Year:            2024,
+		CostBasisMethod: reportmodel.CostBasisMethodFIFO,
+		GeneratedAt:     generatedAt,
+	}
+}
+
+// validPDFReportDocument returns one combined PDF report document for bundle
+// writer tests.
+// Authored by: OpenCode
+func validPDFReportDocument(content []byte, generatedAt time.Time) reportmodel.ReportDocument {
+	return reportmodel.ReportDocument{
+		DocumentType:    reportmodel.ReportDocumentTypePDF,
+		Role:            reportmodel.ReportDocumentRoleCombined,
+		PDFContent:      append([]byte(nil), content...),
 		Year:            2024,
 		CostBasisMethod: reportmodel.CostBasisMethodFIFO,
 		GeneratedAt:     generatedAt,
@@ -475,5 +634,47 @@ func assertPathRemoved(t *testing.T, path string) {
 	}
 	if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
 		t.Fatalf("expected partial file cleanup for %q, stat error: %v", path, statErr)
+	}
+}
+
+// assertOutputBundle verifies shared output bundle metadata.
+// Authored by: OpenCode
+func assertOutputBundle(t *testing.T, bundle reportmodel.ReportOutputBundle, format reportmodel.ReportOutputFormat, savedAt time.Time, fileCount int) {
+	t.Helper()
+
+	if bundle.OutputFormat != format {
+		t.Fatalf("expected output format %q, got %#v", format, bundle)
+	}
+	if !bundle.SavedAt.Equal(savedAt) {
+		t.Fatalf("expected saved-at %s, got %#v", savedAt, bundle)
+	}
+	if len(bundle.Files) != fileCount {
+		t.Fatalf("expected %d output files, got %#v", fileCount, bundle.Files)
+	}
+}
+
+// assertOutputFile verifies one saved output file and its persisted content.
+// Authored by: OpenCode
+func assertOutputFile(t *testing.T, outputFile reportmodel.ReportOutputFile, role reportmodel.ReportDocumentRole, mediaType string, filename string, content string) {
+	t.Helper()
+
+	if outputFile.Filename != filename {
+		t.Fatalf("expected filename %q, got %#v", filename, outputFile)
+	}
+	if outputFile.Role != role {
+		t.Fatalf("expected output role %q, got %#v", role, outputFile)
+	}
+	if outputFile.MediaType != mediaType {
+		t.Fatalf("expected media type %q, got %#v", mediaType, outputFile)
+	}
+	if filepath.Base(outputFile.Path) != filename {
+		t.Fatalf("expected path to end with %q, got %#v", filename, outputFile)
+	}
+	var body, err = os.ReadFile(outputFile.Path)
+	if err != nil {
+		t.Fatalf("read output file %q: %v", outputFile.Path, err)
+	}
+	if string(body) != content {
+		t.Fatalf("expected output content %q, got %q", content, string(body))
 	}
 }
