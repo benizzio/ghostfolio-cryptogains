@@ -33,6 +33,8 @@
 
 **Bugfix**: 2026-07-05 — [BUG-001] Clarified Markdown initial report detail label formatting.
 
+**Bugfix**: 2026-07-05 — [BUG-002] Clarified that PDF output must be formatted through the PDF renderer and must not render Markdown source syntax as the PDF body.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Choose Report Output Format (Priority: P1)
@@ -48,6 +50,7 @@ As a user generating a capital gains and losses report, I want to choose whether
 1. **Given** the user has completed report setup and selected valid report inputs, **When** the user selects PDF before generation, **Then** the report is generated as an A4 PDF file.
 2. **Given** the user has completed report setup and selected valid report inputs, **When** the user selects Markdown before generation, **Then** the report is generated in the existing Markdown format.
 3. **Given** the same report inputs are used for PDF and Markdown, **When** both reports are reviewed, **Then** shared report sections contain the same output data, explanatory text, and table content, with only format-specific page breaks, page titles, and annex placement differing.
+4. **Given** PDF output is selected, **When** the generated report is reviewed, **Then** headings, tables, emphasis, and Annex 1 content are presented as formatted PDF text and do not expose Markdown source syntax as report content.
 
 ---
 
@@ -131,6 +134,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **FR-027**: Generated reports and report-generation failure messages MUST NOT include Ghostfolio tokens, security tokens, bearer tokens, reusable authentication material, or other secrets.
 - **FR-028**: PDF generation and report rendering MUST run locally and MUST NOT send report data, financial data, tokens, or generated report files to any remote storage, telemetry destination, or external document-generation service as part of this feature.
 - **FR-029**: PDF generation MUST work on supported Linux, macOS, and Windows installations without requiring platform-specific font paths, user-installed fonts, a browser, or operating-system print-to-PDF support; required report text MUST use application-supplied local font data.
+- **FR-030**: When PDF output is selected, the system MUST render report-domain content through PDF-specific layout and MUST NOT use Markdown-rendered content or Markdown structural syntax, including heading markers, table pipes or separators, or bold markers, as the PDF body.
 
 ### Financial Calculation Evidence *(include when feature affects financial calculations)*
 
@@ -179,6 +183,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **SC-008**: Annex 1 allows a reviewer to trace 100% of each reported asset's activities on or before the report year end, including reference-only reported assets, to post-activity held quantity, cost-basis effect, full liquidation status, and gain or loss effect, while excluding activities after the report year end.
 - **SC-009**: PDF output generation and Annex 1 rendering support the existing 10,000 cached-activity report scale and do not introduce a lower activity-count limit than Markdown output.
 - **SC-010**: In generated PDF reports, 100% of required report text is emitted as selectable text rather than rasterized page images.
+- **SC-011**: In generated PDF reports, 0 Markdown structural syntax markers are visible as report presentation for headings, tables, emphasis, or Annex 1 sections.
 
 ## Assumptions
 

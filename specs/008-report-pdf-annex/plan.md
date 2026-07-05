@@ -12,6 +12,8 @@ Add an output-format choice to capital gains report generation so users can gene
 
 **Bugfix**: 2026-07-05 — [BUG-001] Updated from bugfix patch. Markdown initial detail verification must assert exact bold classifier label syntax.
 
+**Bugfix**: 2026-07-05 — [BUG-002] Updated from bugfix patch. PDF rendering must format report-domain data through PDF-specific layout and must not pass Markdown source text into the PDF body.
+
 ## Technical Context
 
 **Language/Version**: Go 1.26.3
@@ -100,7 +102,7 @@ Report generation remains a staged pipeline:
 3. Report calculation emits the existing main report data plus Annex 1 audit evidence for every activity on or before the selected year end.
 4. Runtime selects the renderer from output format.
 5. Markdown rendering returns a main report document and a separate Annex 1 document.
-6. PDF rendering returns one A4 text PDF document with a page break before Annex 1.
+6. PDF rendering returns one A4 text PDF document with a page break before Annex 1, produced from report-domain data through PDF-specific layout rather than Markdown-rendered body text.
 7. Output writing reserves and writes the complete bundle, cleaning up every file created by the attempt if any write, sync, close, render, or validation step fails before success.
 8. Runtime result screens report every generated file path for successful generation.
 
@@ -136,6 +138,7 @@ Security posture:
 - The selected design uses the dependency only to generate local text PDF output from already calculated in-memory report data.
 - The renderer must not import user-provided PDFs, fetch remote resources, execute external binaries, or accept remote templates.
 - Final implementation must pin module versions in `go.mod`/`go.sum`, verify the intended `github.com/phpdave11/gofpdi v1.0.16` transitive module when module resolution selects it, and pass the repository changed-source quality gate, including `govulncheck` as run by `make quality`.
+- BUG-002 follow-up must verify the selected `gopdf` usage can produce formatted headings, table-like layout, wrapping, and A4 pagination without Markdown passthrough; if it cannot, evaluate another local-only option that preserves the no-browser, no-remote-service, no-OS-print-to-PDF, no-platform-font-path, and no-telemetry constraints.
 
 Alternatives rejected:
 
@@ -157,6 +160,7 @@ Alternatives rejected:
 ## Testing Strategy
 
 - Contract tests verify report output format choices, TUI selection copy, output filename patterns, generated file path reporting, main report rendering changes, Annex 1 rendering order, and PDF A4/text-output contract.
+- PDF renderer tests must fail if generated PDF presentation text contains Markdown structural syntax such as heading markers, table pipes or separators, or bold markers instead of PDF-formatted report text.
 - Markdown renderer and contract tests must assert exact initial detail list-item labels `- **Year:**`, `- **Cost Basis Method:**`, `- **Generated At:**`, and `- **Report Calculation Currency:**` before report values.
 - Contract tests verify that the user can select an output format and start generation from the report generation step without waiting on rendering or file IO in the Bubble Tea event loop; this is the automated workflow evidence for SC-001's 30-second bound.
 - Integration tests generate Markdown and PDF from the same deterministic protected cache and assert shared report data matches between formats except for pagination, page titles, and Markdown annex splitting.
