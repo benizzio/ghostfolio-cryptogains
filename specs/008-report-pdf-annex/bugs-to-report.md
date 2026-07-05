@@ -24,3 +24,14 @@ The document seems to have the correct data and structure, but it is basically a
 When printing to PDF, we need to format the data in a way it is human legible when generated. Re-assess research and verify if the current option of PDF generation library can format the text correctly in a way that fits the A4 pages. 
 If viable and interpreted by the library, use HTML to properly format. If not, verify other possibilities.
 Pure report data and report formatting code must be isolated in their respective extension layers and most not interfere in each other (e.g. markdown formatted text should never enter the PDF layer)
+
+## [ ] 3 - PDF: Document is still illegible for humans after BUG-002
+
+The PDF document has correctly removed the Markdown syntax from the text, but it is still illegible. The entire data is dumped in a simple line structuring with no formatting.
+It should be formatted to look legible with the titles, segments and tables following the exact expectations of the properly rendered Markdown without using the Markdown language.
+
+Actual preview of the production PDF file generated:
+![pdf-preview.png](pdf-preview.png)
+
+Expected PDF formatting (line and table sizes should fit the page, pages can be added horizontally is tables are too large)
+![pdf-expected.png](pdf-expected.png)
