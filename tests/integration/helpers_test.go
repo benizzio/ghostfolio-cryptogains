@@ -389,6 +389,7 @@ func assertNoCleartextReportInAppStorage(t *testing.T, baseDir string) {
 			t.Fatalf("expected no Markdown file in app-managed storage, found %q", path)
 		}
 
+		//nolint:gosec // Test scans paths returned by the fixture artifact walker.
 		var rawBytes, err = os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("read persisted artifact %q: %v", path, err)
@@ -415,7 +416,7 @@ func installOpenCommandRecorder(t *testing.T, exitCode int) string {
 
 	var fixtureDir = t.TempDir()
 	var binDir = filepath.Join(fixtureDir, "bin")
-	if err := os.MkdirAll(binDir, 0o755); err != nil {
+	if err := os.MkdirAll(binDir, 0o750); err != nil {
 		t.Fatalf("mkdir opener bin dir: %v", err)
 	}
 
@@ -424,6 +425,7 @@ func installOpenCommandRecorder(t *testing.T, exitCode int) string {
 	var script = "#!/bin/sh\n" +
 		"printf '%s\\n' \"$1\" >> \"" + logPath + "\"\n" +
 		"exit " + strconv.Itoa(exitCode) + "\n"
+	//nolint:gosec // The opener stub must be executable so PATH lookup can run it.
 	if err := os.WriteFile(scriptPath, []byte(script), 0o700); err != nil {
 		t.Fatalf("write opener stub: %v", err)
 	}
@@ -438,6 +440,7 @@ func installOpenCommandRecorder(t *testing.T, exitCode int) string {
 func readOpenCommandRequests(t *testing.T, logPath string) []string {
 	t.Helper()
 
+	//nolint:gosec // Test reads the opener log path returned by installOpenCommandRecorder.
 	var raw, err = os.ReadFile(logPath)
 	if err != nil {
 		if os.IsNotExist(err) {

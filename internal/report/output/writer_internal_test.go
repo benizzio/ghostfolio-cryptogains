@@ -20,7 +20,7 @@ import (
 func TestWriteReportDocumentRemovesPartialFileOnWriteFailure(t *testing.T) {
 	var fixtureDir = t.TempDir()
 	var documentsDir = filepath.Join(fixtureDir, "Documents")
-	if err := os.MkdirAll(documentsDir, 0o755); err != nil {
+	if err := os.MkdirAll(documentsDir, 0o750); err != nil {
 		t.Fatalf("mkdir documents: %v", err)
 	}
 
@@ -51,6 +51,7 @@ func TestWriteReportDocumentRemovesPartialFileOnWriteFailure(t *testing.T) {
 
 	var reservedPath string
 	openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+		//nolint:gosec // Test seam intentionally opens the writer-provided path.
 		file, err := os.OpenFile(path, flag, perm)
 		if err != nil {
 			return nil, err
@@ -96,7 +97,7 @@ func TestOpenPathKeepsSavedFileWhenOpenFails(t *testing.T) {
 	})
 
 	currentGOOS = func() string { return "linux" }
-	runOpenCommand = func(command OpenCommand) error {
+	runOpenCommand = func(OpenCommand) error {
 		return errors.New("forced open failure")
 	}
 
@@ -145,6 +146,7 @@ func TestWriteReportDocumentFailureBranches(t *testing.T) {
 		userHomeDirectory = func() (string, error) { return fixtureDir, nil }
 		statPath = os.Stat
 		openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+			//nolint:gosec // Test seam intentionally opens the writer-provided path.
 			return os.OpenFile(path, flag, perm)
 		}
 		removePath = os.Remove
@@ -213,6 +215,7 @@ func TestWriteReportDocumentFailureBranches(t *testing.T) {
 
 		var reservedPath string
 		openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+			//nolint:gosec // Test seam intentionally opens the writer-provided path.
 			var file, err = os.OpenFile(path, flag, perm)
 			if err != nil {
 				return nil, err
@@ -235,6 +238,7 @@ func TestWriteReportDocumentFailureBranches(t *testing.T) {
 
 		var reservedPath string
 		openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+			//nolint:gosec // Test seam intentionally opens the writer-provided path.
 			var file, err = os.OpenFile(path, flag, perm)
 			if err != nil {
 				return nil, err
@@ -456,6 +460,33 @@ func TestWriteReportDocumentsUsesPDFFilenameSuffixes(t *testing.T) {
 	assertOutputFile(t, bundle.Files[0], reportmodel.ReportDocumentRoleCombined, reportmodel.ReportMediaTypePDF, expectedPDF, "%PDF-1.7\nreport\n")
 }
 
+// TestWriteReportDocumentsUsesGeneratedAtFallback verifies bundle writes apply
+// the same generated-at fallback behavior as single-document writes.
+// Authored by: OpenCode
+func TestWriteReportDocumentsUsesGeneratedAtFallback(t *testing.T) {
+	var fixtureDir = t.TempDir()
+	var fallbackTime = time.Date(2026, time.May, 22, 12, 34, 56, 0, time.UTC)
+	var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+	defer restoreOutputSeams()
+	currentTime = func() time.Time { return fallbackTime }
+
+	var documents = []reportmodel.ReportDocument{
+		validMarkdownReportDocument(reportmodel.ReportDocumentRoleMain, "# Main Report\n", time.Time{}),
+		validMarkdownReportDocument(reportmodel.ReportDocumentRoleAnnex, "# Annex 1 - Audit\n", time.Time{}),
+	}
+
+	var bundle, err = WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, documents)
+	if err != nil {
+		t.Fatalf("write markdown bundle with generated-at fallback: %v", err)
+	}
+	assertOutputBundle(t, bundle, reportmodel.ReportOutputFormatMarkdown, fallbackTime, 2)
+	for _, outputFile := range bundle.Files {
+		if !strings.Contains(outputFile.Filename, fallbackTime.Format("2006-01-02_15-04-05")) {
+			t.Fatalf("expected fallback timestamp in filename, got %#v", outputFile)
+		}
+	}
+}
+
 // TestWriteReportDocumentsCleansUpBundleOnWriteFailure verifies that a failed
 // multi-file bundle write removes every file created by the attempt.
 // Authored by: OpenCode
@@ -467,6 +498,7 @@ func TestWriteReportDocumentsCleansUpBundleOnWriteFailure(t *testing.T) {
 	var openedPaths []string
 	var openCount int
 	openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+		//nolint:gosec // Test seam intentionally opens the writer-provided path.
 		var file, err = os.OpenFile(path, flag, perm)
 		if err != nil {
 			return nil, err
@@ -494,6 +526,246 @@ func TestWriteReportDocumentsCleansUpBundleOnWriteFailure(t *testing.T) {
 	}
 	for _, path := range openedPaths {
 		assertPathRemoved(t, path)
+	}
+}
+
+// TestWriteReportDocumentsCleansUpBundleOnFinalizationFailure verifies defensive
+// output-model finalization failures still clean reserved files.
+// Authored by: OpenCode
+func TestWriteReportDocumentsCleansUpBundleOnFinalizationFailure(t *testing.T) {
+	t.Run("output file finalization", func(t *testing.T) {
+		var fixtureDir = t.TempDir()
+		var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+		defer restoreOutputSeams()
+
+		var previousConstructor = newReportOutputFileForWrite
+		defer func() { newReportOutputFileForWrite = previousConstructor }()
+		newReportOutputFileForWrite = func(string, string, string, ...any) (reportmodel.ReportOutputFile, error) {
+			return reportmodel.ReportOutputFile{}, errors.New("output file finalization boom")
+		}
+
+		var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
+		var documents = []reportmodel.ReportDocument{
+			validMarkdownReportDocument(reportmodel.ReportDocumentRoleMain, "# Main Report\n", generatedAt),
+			validMarkdownReportDocument(reportmodel.ReportDocumentRoleAnnex, "# Annex 1 - Audit\n", generatedAt),
+		}
+
+		_, err := WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, documents)
+		if err == nil || !strings.Contains(err.Error(), "output file finalization boom") {
+			t.Fatalf("expected output file finalization failure, got %v", err)
+		}
+	})
+
+	t.Run("output bundle finalization", func(t *testing.T) {
+		var fixtureDir = t.TempDir()
+		var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+		defer restoreOutputSeams()
+
+		var previousConstructor = newReportOutputBundleForWrite
+		defer func() { newReportOutputBundleForWrite = previousConstructor }()
+		newReportOutputBundleForWrite = func(reportmodel.ReportOutputFormat, []reportmodel.ReportOutputFile, time.Time, bool, string) (reportmodel.ReportOutputBundle, error) {
+			return reportmodel.ReportOutputBundle{}, errors.New("output bundle finalization boom")
+		}
+
+		var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
+		var documents = []reportmodel.ReportDocument{
+			validMarkdownReportDocument(reportmodel.ReportDocumentRoleMain, "# Main Report\n", generatedAt),
+			validMarkdownReportDocument(reportmodel.ReportDocumentRoleAnnex, "# Annex 1 - Audit\n", generatedAt),
+		}
+
+		_, err := WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, documents)
+		if err == nil || !strings.Contains(err.Error(), "output bundle finalization boom") {
+			t.Fatalf("expected output bundle finalization failure, got %v", err)
+		}
+	})
+}
+
+// TestWriteReportDocumentsValidationBranches verifies bundle-shape and metadata
+// failures before filesystem writes are attempted.
+// Authored by: OpenCode
+func TestWriteReportDocumentsValidationBranches(t *testing.T) {
+	var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
+	var mainDocument = validMarkdownReportDocument(reportmodel.ReportDocumentRoleMain, "# Main Report\n", generatedAt)
+	var annexDocument = validMarkdownReportDocument(reportmodel.ReportDocumentRoleAnnex, "# Annex 1 - Audit\n", generatedAt)
+	var pdfDocument = validPDFReportDocument([]byte("%PDF-1.7\n"), generatedAt)
+
+	if err := validateBundleDocuments(reportmodel.ReportOutputFormatMarkdown, []reportmodel.ReportDocument{mainDocument}); err == nil || !strings.Contains(err.Error(), "exactly two") {
+		t.Fatalf("expected Markdown document count failure, got %v", err)
+	}
+	if err := validateBundleDocuments(reportmodel.ReportOutputFormatMarkdown, []reportmodel.ReportDocument{annexDocument, mainDocument}); err == nil || !strings.Contains(err.Error(), "document 0") {
+		t.Fatalf("expected Markdown main role failure, got %v", err)
+	}
+	if err := validateBundleDocuments(reportmodel.ReportOutputFormatMarkdown, []reportmodel.ReportDocument{mainDocument, mainDocument}); err == nil || !strings.Contains(err.Error(), "document 1") {
+		t.Fatalf("expected Markdown annex role failure, got %v", err)
+	}
+	if err := validateBundleDocuments(reportmodel.ReportOutputFormatPDF, []reportmodel.ReportDocument{pdfDocument, pdfDocument}); err == nil || !strings.Contains(err.Error(), "exactly one") {
+		t.Fatalf("expected PDF document count failure, got %v", err)
+	}
+	if err := validateBundleDocuments(reportmodel.ReportOutputFormatPDF, []reportmodel.ReportDocument{mainDocument}); err == nil || !strings.Contains(err.Error(), "combined PDF") {
+		t.Fatalf("expected PDF document type failure, got %v", err)
+	}
+	if err := validateBundleDocuments(reportmodel.ReportOutputFormat("custom"), []reportmodel.ReportDocument{mainDocument}); err != nil {
+		t.Fatalf("expected custom output format to fall back to metadata validation, got %v", err)
+	}
+	if err := validateBundleDocumentMetadata(nil); err == nil || !strings.Contains(err.Error(), "at least one document") {
+		t.Fatalf("expected empty metadata failure, got %v", err)
+	}
+	var _, writeErr = writeReservedReportOutputFiles(t.TempDir(), generatedAt, []reservedReportFile{{}}, nil)
+	if writeErr == nil || !strings.Contains(writeErr.Error(), "reserved report file count") {
+		t.Fatalf("expected reservation/document count mismatch failure, got %v", writeErr)
+	}
+
+	var wrongYear = annexDocument
+	wrongYear.Year = 2025
+	if err := validateBundleDocuments(reportmodel.ReportOutputFormatMarkdown, []reportmodel.ReportDocument{mainDocument, wrongYear}); err == nil || !strings.Contains(err.Error(), "year does not match") {
+		t.Fatalf("expected metadata year failure, got %v", err)
+	}
+	var wrongMethod = annexDocument
+	wrongMethod.CostBasisMethod = reportmodel.CostBasisMethodLIFO
+	if err := validateBundleDocuments(reportmodel.ReportOutputFormatMarkdown, []reportmodel.ReportDocument{mainDocument, wrongMethod}); err == nil || !strings.Contains(err.Error(), "cost basis method") {
+		t.Fatalf("expected metadata method failure, got %v", err)
+	}
+	var wrongGeneratedAt = annexDocument
+	wrongGeneratedAt.GeneratedAt = generatedAt.Add(time.Second)
+	if err := validateBundleDocuments(reportmodel.ReportOutputFormatMarkdown, []reportmodel.ReportDocument{mainDocument, wrongGeneratedAt}); err == nil || !strings.Contains(err.Error(), "generated-at") {
+		t.Fatalf("expected metadata generated-at failure, got %v", err)
+	}
+}
+
+// TestValidateDocumentsDirectoryRejectsFile verifies non-directory Documents
+// path handling before reservation.
+// Authored by: OpenCode
+func TestValidateDocumentsDirectoryRejectsFile(t *testing.T) {
+	var filePath = filepath.Join(t.TempDir(), "Documents")
+	if err := os.WriteFile(filePath, []byte("not a directory"), 0o600); err != nil {
+		t.Fatalf("seed file path: %v", err)
+	}
+
+	var err = validateDocumentsDirectory(filePath)
+	if err == nil || !strings.Contains(err.Error(), "not a directory") {
+		t.Fatalf("expected non-directory validation failure, got %v", err)
+	}
+}
+
+// TestWriteReportDocumentsAdditionalFailureBranches verifies bundle writer
+// failures that occur before and during reservation and commit.
+// Authored by: OpenCode
+func TestWriteReportDocumentsAdditionalFailureBranches(t *testing.T) {
+	var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
+	var mainDocument = validMarkdownReportDocument(reportmodel.ReportDocumentRoleMain, "# Main Report\n", generatedAt)
+	var annexDocument = validMarkdownReportDocument(reportmodel.ReportDocumentRoleAnnex, "# Annex 1\n", generatedAt)
+
+	t.Run("rejects invalid output format before resolving documents", func(t *testing.T) {
+		if _, err := WriteReportDocuments(reportmodel.ReportOutputFormat("html"), []reportmodel.ReportDocument{mainDocument, annexDocument}); err == nil || !strings.Contains(err.Error(), "unsupported report output format") {
+			t.Fatalf("expected output format validation failure, got %v", err)
+		}
+	})
+
+	t.Run("rejects invalid document before resolving documents", func(t *testing.T) {
+		var invalidDocument = mainDocument
+		invalidDocument.Content = "   "
+		if _, err := WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, []reportmodel.ReportDocument{invalidDocument, annexDocument}); err == nil || !strings.Contains(err.Error(), "report document 0") {
+			t.Fatalf("expected document validation failure, got %v", err)
+		}
+	})
+
+	t.Run("propagates documents directory resolution failure", func(t *testing.T) {
+		var previousCurrentGOOS = currentGOOS
+		defer func() {
+			currentGOOS = previousCurrentGOOS
+		}()
+		currentGOOS = func() string { return "plan9" }
+
+		if _, err := WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, []reportmodel.ReportDocument{mainDocument, annexDocument}); err == nil || !strings.Contains(err.Error(), "unsupported") {
+			t.Fatalf("expected documents directory resolution failure, got %v", err)
+		}
+	})
+
+	t.Run("wraps reservation failure", func(t *testing.T) {
+		var fixtureDir = t.TempDir()
+		var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+		defer restoreOutputSeams()
+
+		openWritableFile = func(string, int, os.FileMode) (writeSyncCloser, error) {
+			return nil, errors.New("reserve boom")
+		}
+
+		if _, err := WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, []reportmodel.ReportDocument{mainDocument, annexDocument}); err == nil || !strings.Contains(err.Error(), "reserve report file") {
+			t.Fatalf("expected reservation failure, got %v", err)
+		}
+	})
+}
+
+// TestWriteReportDocumentsCleansUpOnSyncAndCloseFailures verifies bundle cleanup
+// after write succeeds but file finalization fails.
+// Authored by: OpenCode
+func TestWriteReportDocumentsCleansUpOnSyncAndCloseFailures(t *testing.T) {
+	var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
+	var documents = []reportmodel.ReportDocument{
+		validMarkdownReportDocument(reportmodel.ReportDocumentRoleMain, "# Main Report\n", generatedAt),
+		validMarkdownReportDocument(reportmodel.ReportDocumentRoleAnnex, "# Annex 1\n", generatedAt),
+	}
+
+	for _, testCase := range []struct {
+		name    string
+		wrap    func(*os.File) writeSyncCloser
+		message string
+	}{
+		{
+			name: "sync failure",
+			wrap: func(file *os.File) writeSyncCloser {
+				return failingSyncFile{File: file, syncErr: errors.New("sync boom")}
+			},
+			message: "sync report file",
+		},
+		{
+			name: "close failure",
+			wrap: func(file *os.File) writeSyncCloser {
+				return failingCloseFile{File: file, closeErr: errors.New("close boom")}
+			},
+			message: "close report file",
+		},
+	} {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			var fixtureDir = t.TempDir()
+			var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+			defer restoreOutputSeams()
+
+			var openedPaths []string
+			openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+				//nolint:gosec // Test seam intentionally opens the writer-provided path.
+				var file, err = os.OpenFile(path, flag, perm)
+				if err != nil {
+					return nil, err
+				}
+				openedPaths = append(openedPaths, path)
+				return testCase.wrap(file), nil
+			}
+
+			_, err := WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, documents)
+			if err == nil || !strings.Contains(err.Error(), testCase.message) {
+				t.Fatalf("expected %s failure, got %v", testCase.message, err)
+			}
+			for _, path := range openedPaths {
+				assertPathRemoved(t, path)
+			}
+		})
+	}
+}
+
+// TestBundleFilenameFallbacks verifies small filename helper fallbacks not hit
+// by end-to-end bundle writes.
+// Authored by: OpenCode
+func TestBundleFilenameFallbacks(t *testing.T) {
+	if filenames := bundleFilenames(reportmodel.ReportOutputFormat("html"), "base", 1); filenames != nil {
+		t.Fatalf("expected unsupported format to return nil filenames, got %#v", filenames)
+	}
+	if got := buildAnnexReportFilenameBase("short"); got != "short-annex-1" {
+		t.Fatalf("expected short base fallback, got %q", got)
+	}
+	if got := buildAnnexReportFilenameBase("prefix_2026-05-21_12-34-56"); got != "prefix_2026-05-21_12-34-56-annex-1" {
+		t.Fatalf("expected malformed timestamp separator fallback, got %q", got)
 	}
 }
 
@@ -594,7 +866,7 @@ func installWriterTestSeams(t *testing.T, homeDir string) func() {
 	originalCurrentTime := currentTime
 
 	var documentsDir = filepath.Join(homeDir, "Documents")
-	if err := os.MkdirAll(documentsDir, 0o755); err != nil && !errors.Is(err, os.ErrExist) {
+	if err := os.MkdirAll(documentsDir, 0o750); err != nil && !errors.Is(err, os.ErrExist) {
 		t.Fatalf("mkdir documents: %v", err)
 	}
 
@@ -608,6 +880,7 @@ func installWriterTestSeams(t *testing.T, homeDir string) func() {
 	userHomeDirectory = func() (string, error) { return homeDir, nil }
 	statPath = os.Stat
 	openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+		//nolint:gosec // Test seam intentionally opens the writer-provided path.
 		return os.OpenFile(path, flag, perm)
 	}
 	removePath = os.Remove

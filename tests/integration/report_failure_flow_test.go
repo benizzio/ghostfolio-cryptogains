@@ -58,6 +58,7 @@ func TestReportGenerationEmptyMainSectionWritesEmptyMarkdownReport(t *testing.T)
 	var reportPath = files[0]
 	testutil.AssertRegularFile(t, reportPath)
 
+	//nolint:gosec // Test reads the report path returned by the controlled output fixture.
 	var reportBytes, err = os.ReadFile(reportPath)
 	if err != nil {
 		t.Fatalf("read saved report %q: %v", reportPath, err)
@@ -65,7 +66,7 @@ func TestReportGenerationEmptyMainSectionWritesEmptyMarkdownReport(t *testing.T)
 	var reportText = string(reportBytes)
 	for _, expected := range []string{
 		"- Report Calculation Currency: USD",
-		"No assets qualified for the main report sections in the selected year.",
+		"No assets had a non-zero net gain or loss in the selected year.",
 		"| Overall Yearly Net Total | 0 | USD |",
 		"## Reference Section",
 		"reference only",
@@ -95,7 +96,8 @@ func TestReportGenerationWriteFailureGeneratesWrappedDiagnosticCauseChain(t *tes
 		return
 	}
 
-	var command = exec.Command(os.Args[0], "-test.run=TestReportGenerationWriteFailureGeneratesWrappedDiagnosticCauseChain$")
+	//nolint:gosec // This test intentionally re-executes the current test binary as a helper process.
+	var command = exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestReportGenerationWriteFailureGeneratesWrappedDiagnosticCauseChain$")
 	command.Env = append(
 		os.Environ(),
 		"GHOSTFOLIO_CRYPTOGAINS_HELPER_WRITE_FAILURE=2",
@@ -454,7 +456,8 @@ func TestReportGenerationWriteFailureRemovesPartialFileAndShowsFailure(t *testin
 		return
 	}
 
-	var command = exec.Command(os.Args[0], "-test.run=TestReportGenerationWriteFailureRemovesPartialFileAndShowsFailure$")
+	//nolint:gosec // This test intentionally re-executes the current test binary as a helper process.
+	var command = exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestReportGenerationWriteFailureRemovesPartialFileAndShowsFailure$")
 	command.Env = append(
 		os.Environ(),
 		"GHOSTFOLIO_CRYPTOGAINS_HELPER_WRITE_FAILURE=1",
@@ -513,7 +516,8 @@ func TestReportGenerationBundleWriteFailureLeavesNoPartialBundleFiles(t *testing
 		return
 	}
 
-	var command = exec.Command(os.Args[0], "-test.run=TestReportGenerationBundleWriteFailureLeavesNoPartialBundleFiles$")
+	//nolint:gosec // This test intentionally re-executes the current test binary as a helper process.
+	var command = exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestReportGenerationBundleWriteFailureLeavesNoPartialBundleFiles$")
 	command.Env = append(
 		os.Environ(),
 		"GHOSTFOLIO_CRYPTOGAINS_HELPER_BUNDLE_WRITE_FAILURE=1",
@@ -657,7 +661,7 @@ func runReportGenerationWriteFailureDiagnosticScenario(t *testing.T) {
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = assertFlowModel(t, updated)
 	updated, _ = model.Update(testutil.RunCmd(cmd))
-	model = assertFlowModel(t, updated)
+	_ = assertFlowModel(t, updated)
 
 	var diagnosticFiles = mustDiagnosticFiles(t, harness.BaseDir)
 	if len(diagnosticFiles) != 1 {
@@ -952,6 +956,7 @@ func assertReportFailureDiagnosticArtifact(t *testing.T, path string, expectFina
 	if filepath.Ext(path) != ".json" {
 		t.Fatalf("expected diagnostic artifact path, got %q", path)
 	}
+	//nolint:gosec // Test reads a diagnostics path discovered from the controlled fixture directory.
 	var raw, err = os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read report diagnostics artifact: %v", err)

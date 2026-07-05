@@ -16,7 +16,21 @@ import (
 	reportpdf "github.com/benizzio/ghostfolio-cryptogains/internal/report/pdf"
 	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
+	"golang.org/x/image/font/gofont/gobold"
+	"golang.org/x/image/font/gofont/goregular"
 )
+
+// reportPDFRenderOptions supplies application-owned embedded font bytes for the
+// local PDF renderer.
+// Authored by: OpenCode
+var reportPDFRenderOptions = func() reportpdf.RenderOptions {
+	return reportpdf.RenderOptions{Fonts: reportpdf.FontData{Regular: goregular.TTF, Bold: gobold.TTF}}
+}
+
+// newPDFReportDocumentForRuntime keeps the defensive runtime finalization branch
+// testable after renderer validation has guaranteed normal PDF document inputs.
+// Authored by: OpenCode
+var newPDFReportDocumentForRuntime = reportmodel.NewPDFReportDocument
 
 // reportCalculator defines the calculation seam used by the runtime report
 // service.
@@ -268,7 +282,7 @@ func renderReportOutputBundle(outputFormat reportmodel.ReportOutputFormat, repor
 		if detail := strings.TrimSpace(os.Getenv("GHOSTFOLIO_CRYPTOGAINS_PDF_RENDER_FAILURE")); detail != "" {
 			return nil, fmt.Errorf("forced PDF render failure: %s", detail)
 		}
-		var renderer, err = reportpdf.NewRenderer(reportpdf.RenderOptions{Fonts: reportpdf.FontData{Regular: []byte("application regular font"), Bold: []byte("application bold font")}})
+		var renderer, err = reportpdf.NewRenderer(reportPDFRenderOptions())
 		if err != nil {
 			return nil, err
 		}
@@ -278,7 +292,7 @@ func renderReportOutputBundle(outputFormat reportmodel.ReportOutputFormat, repor
 			return nil, err
 		}
 		var document reportmodel.ReportDocument
-		document, err = reportmodel.NewPDFReportDocument(reportmodel.ReportDocumentRoleCombined, payload, report.Year, report.CostBasisMethod, report.GeneratedAt)
+		document, err = newPDFReportDocumentForRuntime(reportmodel.ReportDocumentRoleCombined, payload, report.Year, report.CostBasisMethod, report.GeneratedAt)
 		if err != nil {
 			return nil, err
 		}

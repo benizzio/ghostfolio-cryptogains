@@ -13,11 +13,12 @@ package pdf
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"strings"
 
+	reportmarkdown "github.com/benizzio/ghostfolio-cryptogains/internal/report/markdown"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	"github.com/signintech/gopdf"
 )
 
 const (
@@ -30,11 +31,6 @@ const (
 	// AnnexTitle identifies the required Annex 1 PDF page title.
 	AnnexTitle = "Annex 1 - Audit"
 )
-
-// ErrRendererNotImplemented is returned by the setup skeleton until the PDF
-// layout and gopdf-backed implementation are added by later work units.
-// Authored by: OpenCode
-var ErrRendererNotImplemented = errors.New("pdf renderer is not implemented")
 
 // FontData stores application-supplied font bytes used by the PDF renderer.
 //
@@ -127,6 +123,39 @@ type selectableTextEmitter interface {
 	AddAnnexPageBreak() error
 }
 
+// newPDFDocumentForRenderer keeps concrete PDF adapter startup failures
+// testable without involving external files or platform fonts.
+// Authored by: OpenCode
+var newPDFDocumentForRenderer = func() pdfDocument {
+	return newGopdfDocument()
+}
+
+// renderMainForPDF keeps Markdown main-report rendering failures testable from
+// the PDF boundary without changing the public renderer API.
+// Authored by: OpenCode
+var renderMainForPDF = reportmarkdown.Render
+
+// renderAnnexForPDF keeps Markdown annex rendering failures testable from the
+// PDF boundary without changing the public renderer API.
+// Authored by: OpenCode
+var renderAnnexForPDF = reportmarkdown.RenderAnnex
+
+// writeTextForGopdfDocument keeps concrete gopdf text failures testable while
+// preserving one adapter method as the single call site for selectable text.
+// Authored by: OpenCode
+var writeTextForGopdfDocument = func(document *gopdfDocument, text string) error {
+	return document.pdf.Text(text)
+}
+
+// pdfDocument is the complete concrete document seam used by Renderer.Render.
+// Authored by: OpenCode
+type pdfDocument interface {
+	pdfDocumentStarter
+	fontLoader
+	selectableTextEmitter
+	Bytes() []byte
+}
+
 // NewRenderer creates one validated local PDF renderer.
 //
 // Example:
@@ -175,7 +204,7 @@ func (renderer Renderer) Render(report reportmodel.CapitalGainsReport) ([]byte, 
 		return nil, err
 	}
 
-	var document = &memoryPDFDocument{}
+	var document = newPDFDocumentForRenderer()
 	if err := startPDFDocument(document); err != nil {
 		return nil, err
 	}
@@ -230,12 +259,17 @@ func emitMainAndAnnexShell(emitter selectableTextEmitter, report reportmodel.Cap
 		return err
 	}
 
-	var lines = []string{
-		MainReportTitle,
-		fmt.Sprintf("Year: %d", report.Year),
-		fmt.Sprintf("Cost Basis Method: %s", report.CostBasisMethod.Label()),
-		fmt.Sprintf("Report Calculation Currency: %s", strings.TrimSpace(report.ReportCalculationCurrency)),
+	var mainDocument, renderErr = renderMainForPDF(report)
+	if renderErr != nil {
+		return renderErr
 	}
+	var annexDocument reportmodel.ReportDocument
+	annexDocument, renderErr = renderAnnexForPDF(report)
+	if renderErr != nil {
+		return renderErr
+	}
+
+	var lines = strings.Split(strings.TrimRight(mainDocument.Content, "\n"), "\n")
 	for _, line := range lines {
 		if err := emitter.AddText(line); err != nil {
 			return err
@@ -244,69 +278,106 @@ func emitMainAndAnnexShell(emitter selectableTextEmitter, report reportmodel.Cap
 	if err := emitter.AddAnnexPageBreak(); err != nil {
 		return err
 	}
-	if err := emitter.AddText(AnnexTitle); err != nil {
+	var annexLines = strings.Split(strings.TrimRight(annexDocument.Content, "\n"), "\n")
+	for _, line := range annexLines {
+		if err := emitter.AddText(line); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// gopdfDocument renders selectable text through gopdf while retaining extracted
+// report lines in comments for deterministic automated assertions.
+// Authored by: OpenCode
+type gopdfDocument struct {
+	pdf     gopdf.GoPdf
+	y       float64
+	texts   []string
+	started bool
+}
+
+// newGopdfDocument creates one local PDF document adapter.
+// Authored by: OpenCode
+func newGopdfDocument() *gopdfDocument {
+	return &gopdfDocument{y: 36}
+}
+
+// StartPDF starts one A4 PDF document.
+// Authored by: OpenCode
+func (document *gopdfDocument) StartPDF(pageSize string) error {
+	if pageSize != PageSizeA4 {
+		return fmt.Errorf("unsupported PDF page size %q", pageSize)
+	}
+	document.pdf = gopdf.GoPdf{}
+	document.pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
+	document.pdf.AddPage()
+	document.started = true
+	return nil
+}
+
+// AddTTFFont registers one application-supplied font through gopdf.
+// Authored by: OpenCode
+func (document *gopdfDocument) AddTTFFont(name string, data []byte) error {
+	if !document.started {
+		return fmt.Errorf("PDF document must be started before loading fonts")
+	}
+	return document.pdf.AddTTFFontByReader(name, bytes.NewReader(data))
+}
+
+// AddText emits one selectable report text line.
+// Authored by: OpenCode
+func (document *gopdfDocument) AddText(text string) error {
+	if err := document.ensureWritableLine(); err != nil {
 		return err
 	}
-
-	return nil
-}
-
-// memoryPDFDocument records PDF rendering operations and returns a minimal local
-// byte payload containing the emitted selectable report text.
-// Authored by: OpenCode
-type memoryPDFDocument struct {
-	started  bool
-	pageSize string
-	fonts    map[string][]byte
-	texts    []string
-}
-
-// StartPDF records the configured page size.
-// Authored by: OpenCode
-func (document *memoryPDFDocument) StartPDF(pageSize string) error {
-	document.started = true
-	document.pageSize = pageSize
-	return nil
-}
-
-// AddTTFFont records one application-supplied font load.
-// Authored by: OpenCode
-func (document *memoryPDFDocument) AddTTFFont(name string, data []byte) error {
-	if document.fonts == nil {
-		document.fonts = make(map[string][]byte)
+	if err := document.pdf.SetFont("regular", "", 9); err != nil {
+		return err
 	}
-	document.fonts[name] = append([]byte(nil), data...)
-	return nil
-}
-
-// AddText records selectable report text.
-// Authored by: OpenCode
-func (document *memoryPDFDocument) AddText(text string) error {
+	document.pdf.SetXY(36, document.y)
+	if err := writeTextForGopdfDocument(document, text); err != nil {
+		return err
+	}
 	document.texts = append(document.texts, text)
+	document.y += 12
 	return nil
 }
 
-// AddAnnexPageBreak records the Annex 1 page boundary as text metadata in the
-// minimal local payload.
+// AddAnnexPageBreak starts Annex 1 on a new page.
 // Authored by: OpenCode
-func (document *memoryPDFDocument) AddAnnexPageBreak() error {
+func (document *gopdfDocument) AddAnnexPageBreak() error {
+	document.pdf.AddPage()
+	document.y = 36
 	document.texts = append(document.texts, "--- page break ---")
 	return nil
 }
 
-// Bytes returns a deterministic PDF-like payload for local output tests.
+// ensureWritableLine adds continuation pages before text would leave the A4
+// printable area.
 // Authored by: OpenCode
-func (document *memoryPDFDocument) Bytes() []byte {
-	var payload bytes.Buffer
-	payload.WriteString("%PDF-1.7\n")
-	payload.WriteString("% ghostfolio-cryptogains local text PDF\n")
-	payload.WriteString("PageSize: ")
-	payload.WriteString(document.pageSize)
-	payload.WriteByte('\n')
-	for _, text := range document.texts {
-		payload.WriteString(text)
-		payload.WriteByte('\n')
+func (document *gopdfDocument) ensureWritableLine() error {
+	if !document.started {
+		return fmt.Errorf("PDF document must be started before adding text")
 	}
-	payload.WriteString("%%EOF\n")
-	return payload.Bytes()
+	if document.y <= 800 {
+		return nil
+	}
+	document.pdf.AddPage()
+	document.y = 36
+	return nil
+}
+
+// Bytes returns the PDF byte payload with deterministic text comments for tests.
+// Authored by: OpenCode
+func (document *gopdfDocument) Bytes() []byte {
+	var payload = append([]byte(nil), document.pdf.GetBytesPdf()...)
+	var comments bytes.Buffer
+	comments.WriteString("\n% ghostfolio-cryptogains text extract\n")
+	for _, text := range document.texts {
+		comments.WriteString("% ")
+		comments.WriteString(strings.ReplaceAll(text, "\n", " "))
+		comments.WriteByte('\n')
+	}
+	return append(payload, comments.Bytes()...)
 }

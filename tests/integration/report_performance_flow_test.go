@@ -51,40 +51,50 @@ func TestReportPerformanceFlowLargeHistoryFixture(t *testing.T) {
 		t.Fatalf("expected report availability after unlock, got %#v", contextResult)
 	}
 
-	var request, err = reportmodel.NewReportRequest(
-		fixture.ReportYear,
-		reportmodel.CostBasisMethodHIFO,
-		reportmodel.ReportBaseCurrencyUSD,
-		time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
-	)
-	if err != nil {
-		t.Fatalf("new report request: %v", err)
-	}
-
 	var startedAt = time.Now()
-	var outcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: request})
+	var outcomes []runtime.ReportOutcome
+	for _, outputFormat := range []reportmodel.ReportOutputFormat{reportmodel.ReportOutputFormatMarkdown, reportmodel.ReportOutputFormatPDF} {
+		var request, err = reportmodel.NewReportRequest(
+			fixture.ReportYear,
+			reportmodel.CostBasisMethodHIFO,
+			reportmodel.ReportBaseCurrencyUSD,
+			outputFormat,
+			time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
+		)
+		if err != nil {
+			t.Fatalf("new report request: %v", err)
+		}
+		outcomes = append(outcomes, harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: request}))
+	}
 	var elapsed = time.Since(startedAt)
 
-	if !outcome.Success {
-		t.Fatalf("expected successful large-history report generation, got %#v", outcome)
-	}
-	if outcome.FailureReason != runtime.ReportFailureNone {
-		t.Fatalf("expected success without warning category, got %#v", outcome)
+	for _, outcome := range outcomes {
+		if !outcome.Success {
+			t.Fatalf("expected successful large-history report generation, got %#v", outcome)
+		}
+		if outcome.FailureReason != runtime.ReportFailureNone {
+			t.Fatalf("expected success without warning category, got %#v", outcome)
+		}
 	}
 	if elapsed >= threshold {
 		t.Fatalf("expected SC-007 verification under %s, got %s", threshold, elapsed)
 	}
-	testutil.AssertPathWithin(t, outcome.OutputFile.Path, reportIO.DocumentsDir)
-	testutil.AssertRegularFile(t, outcome.OutputFile.Path)
-
-	var openerRequests = readOpenCommandRequests(t, openLogPath)
-	if len(openerRequests) != 1 || openerRequests[0] != outcome.OutputFile.Path {
-		t.Fatalf("expected one opener request for %q, got %#v", outcome.OutputFile.Path, openerRequests)
+	for _, outcome := range outcomes {
+		for _, outputFile := range outcome.OutputBundle.Files {
+			testutil.AssertPathWithin(t, outputFile.Path, reportIO.DocumentsDir)
+			testutil.AssertRegularFile(t, outputFile.Path)
+		}
 	}
 
-	var reportBytes, readErr = os.ReadFile(outcome.OutputFile.Path)
+	var openerRequests = readOpenCommandRequests(t, openLogPath)
+	if len(openerRequests) != len(outcomes) {
+		t.Fatalf("expected one opener request per generated output, got %#v", openerRequests)
+	}
+
+	var markdownOutcome = outcomes[0]
+	var reportBytes, readErr = os.ReadFile(markdownOutcome.OutputBundle.Files[0].Path)
 	if readErr != nil {
-		t.Fatalf("read saved report %q: %v", outcome.OutputFile.Path, readErr)
+		t.Fatalf("read saved report %q: %v", markdownOutcome.OutputBundle.Files[0].Path, readErr)
 	}
 	var reportText = string(reportBytes)
 	for _, expected := range []string{
@@ -97,6 +107,20 @@ func TestReportPerformanceFlowLargeHistoryFixture(t *testing.T) {
 		if !strings.Contains(reportText, expected) {
 			t.Fatalf("expected saved report to contain %q", expected)
 		}
+	}
+	var annexBytes, annexReadErr = os.ReadFile(markdownOutcome.OutputBundle.Files[1].Path)
+	if annexReadErr != nil {
+		t.Fatalf("read saved annex %q: %v", markdownOutcome.OutputBundle.Files[1].Path, annexReadErr)
+	}
+	if !strings.Contains(string(annexBytes), "# Annex 1 - Audit") || !strings.Contains(string(annexBytes), "## Detailed Per-Asset Audit Report") {
+		t.Fatalf("expected Markdown annex output to contain Annex 1 audit sections")
+	}
+	var pdfBytes, pdfReadErr = os.ReadFile(outcomes[1].OutputBundle.Files[0].Path)
+	if pdfReadErr != nil {
+		t.Fatalf("read saved PDF %q: %v", outcomes[1].OutputBundle.Files[0].Path, pdfReadErr)
+	}
+	if !strings.Contains(string(pdfBytes), "# Annex 1 - Audit") || !strings.Contains(string(pdfBytes), "--- page break ---") {
+		t.Fatalf("expected PDF output to contain Annex 1 after page-break marker")
 	}
 
 	assertNoCleartextReportInAppStorage(t, harness.BaseDir)

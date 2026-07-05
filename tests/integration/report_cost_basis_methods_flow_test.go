@@ -14,7 +14,6 @@ import (
 
 	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
-	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 	"github.com/cockroachdb/apd/v3"
 )
@@ -83,6 +82,7 @@ func TestReportGenerationMatchesControlledLedgersAcrossCostBasisMethods(t *testi
 				t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
 			}
 
+			//nolint:gosec // Test reads the report path returned by the controlled output fixture.
 			var rawReport, err = os.ReadFile(reportPath)
 			if err != nil {
 				t.Fatalf("read saved report %q: %v", reportPath, err)
@@ -160,6 +160,7 @@ func TestReportGenerationSupportsRoundedRepeatingDecimalHistoryAcrossMethods(t *
 				t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
 			}
 
+			//nolint:gosec // Test reads the report path returned by the controlled output fixture.
 			var rawReport, err = os.ReadFile(reportPath)
 			if err != nil {
 				t.Fatalf("read saved report %q: %v", reportPath, err)
@@ -229,6 +230,9 @@ func assertExpectedReportLedger(t *testing.T, reportText string, expected testut
 	t.Helper()
 
 	for _, entry := range expected.SummaryByAsset {
+		if entry.NetGainOrLoss == "0" {
+			continue
+		}
 		var row = "| " + entry.DisplayLabel + " | " + entry.NetGainOrLoss + " | " + expected.ReportCalculationCurrency + " |"
 		if !strings.Contains(reportText, row) {
 			t.Fatalf("expected summary row %q in report %q", row, reportText)
@@ -257,7 +261,7 @@ func assertExpectedReportLedger(t *testing.T, reportText string, expected testut
 		for _, liquidation := range detail.LiquidationSummaries {
 			var row = "| " + liquidation.SourceID + " |"
 			if !strings.Contains(reportText, row) {
-				row = "| " + liquidation.SourceID + " |"
+				t.Fatalf("expected liquidation row %q in report %q", row, reportText)
 			}
 			for _, part := range []string{
 				liquidation.SourceID,
@@ -321,21 +325,6 @@ func compactWhitespace(value string) string {
 	var compact = strings.Join(strings.Fields(value), " ")
 	compact = strings.ReplaceAll(compact, "- ", "-")
 	return compact
-}
-
-// assertIntegrationDecimalString verifies one exact decimal using canonical
-// formatting.
-// Authored by: OpenCode
-func assertIntegrationDecimalString(t *testing.T, value apd.Decimal, want string, label string) {
-	t.Helper()
-
-	var canonical, err = decimalsupport.CanonicalString(value)
-	if err != nil {
-		t.Fatalf("canonicalize %s: %v", label, err)
-	}
-	if canonical != want {
-		t.Fatalf("unexpected %s: got %q want %q", label, canonical, want)
-	}
 }
 
 // mustIntegrationTime returns one stable timestamp for report requests.

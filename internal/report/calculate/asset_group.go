@@ -27,6 +27,8 @@ type assetCalculationResult struct {
 	SummaryEntry   reportmodel.AssetSummaryEntry
 	ReferenceEntry *reportmodel.ReferenceLiquidationEntry
 	DetailSection  reportmodel.AssetDetailSection
+	AuditSection   reportmodel.PerAssetAuditSection
+	IncludeInAudit bool
 	YearlyNet      apd.Decimal
 }
 
@@ -97,7 +99,7 @@ func selectAssetInputGroupsThroughYear(records []syncmodel.ActivityRecord, selec
 // calculateAssetGroup replays one grouped asset history through the selected
 // year cutoff and derives its summary, reference, and detail contributions.
 // Authored by: OpenCode
-func calculateAssetGroup(method reportmodel.CostBasisMethod, selectedYear int, cache syncmodel.ProtectedActivityCache, group assetInputGroup) (assetCalculationResult, error) {
+func calculateAssetGroup(method reportmodel.CostBasisMethod, selectedYear int, _ syncmodel.ProtectedActivityCache, group assetInputGroup) (assetCalculationResult, error) {
 	var basisState, err = newAssetBasisStateFunc(method)
 	if err != nil {
 		return assetCalculationResult{}, newGroupCalculationError(reportmodel.CalculationErrorKindUnsupportedCostBasisMethod, group, err.Error(), err)

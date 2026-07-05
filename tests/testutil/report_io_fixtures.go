@@ -428,6 +428,7 @@ func (fixture ReportIOFixture) WriteDeterministicReportOutputCollisions(t *testi
 func AssertFileContent(t *testing.T, path string, expected string) {
 	t.Helper()
 
+	//nolint:gosec // Test assertion reads the caller-provided report fixture path.
 	var content, err = os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read file %q: %v", path, err)
@@ -442,7 +443,7 @@ func AssertFileContent(t *testing.T, path string, expected string) {
 func mustMkdirAll(t *testing.T, path string) {
 	t.Helper()
 
-	var err = os.MkdirAll(path, 0o755)
+	var err = os.MkdirAll(path, 0o750)
 	if err != nil {
 		t.Fatalf("mkdir %q: %v", path, err)
 	}

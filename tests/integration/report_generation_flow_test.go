@@ -77,7 +77,7 @@ func TestReportGenerationSuccessWritesMarkdownAndReturnsToUnlockedContext(t *tes
 		t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
 	}
 
-	var rawReport, err = os.ReadFile(reportPath)
+	var rawReport, err = os.ReadFile(reportPath) // #nosec G304 -- test reads the report path returned by the controlled output fixture.
 	if err != nil {
 		t.Fatalf("read saved report %q: %v", reportPath, err)
 	}
@@ -125,16 +125,43 @@ func TestReportGenerationWritesSelectedMarkdownAndPDFBundles(t *testing.T) {
 		outputFormat          reportmodel.ReportOutputFormat
 		expectedMarkdownFiles int
 		expectedPDFFiles      int
+		wantFileText          []string
+		forbiddenFileText     []string
 	}{
 		{
 			name:                  "markdown main plus annex",
 			outputFormat:          reportmodel.ReportOutputFormatMarkdown,
 			expectedMarkdownFiles: 2,
+			wantFileText: []string{
+				"| Asset | Historical Full Liquidation Count | Main Section Status |",
+				"- **Report Base Currency:** USD",
+				"- **Quantity:**",
+				"Same currency",
+			},
+			forbiddenFileText: []string{
+				"## Currency Conversion Audit",
+				"Full Liquidation Count Through Year End",
+				"same_currency",
+				"converted |",
+			},
 		},
 		{
 			name:             "combined pdf",
 			outputFormat:     reportmodel.ReportOutputFormatPDF,
 			expectedPDFFiles: 1,
+			wantFileText: []string{
+				"| Asset | Historical Full Liquidation Count | Main Section Status |",
+				"- **Report Base Currency:** USD",
+				"- **Quantity:**",
+				"Same currency",
+				"# Annex 1 - Audit",
+				"## Currency Conversion Audit",
+			},
+			forbiddenFileText: []string{
+				"Full Liquidation Count Through Year End",
+				"same_currency",
+				"converted |",
+			},
 		},
 	}
 
@@ -175,6 +202,23 @@ func TestReportGenerationWritesSelectedMarkdownAndPDFBundles(t *testing.T) {
 			for _, path := range append(markdownFiles, pdfFiles...) {
 				testutil.AssertPathWithin(t, path, reportIO.DocumentsDir)
 				testutil.AssertRegularFile(t, path)
+			}
+			var mainPath = selectedMainReportPath(t, markdownFiles, pdfFiles, testCase.outputFormat)
+			//nolint:gosec // Test reads the report path returned by the controlled output fixture.
+			var rawMainReport, readErr = os.ReadFile(mainPath)
+			if readErr != nil {
+				t.Fatalf("read generated %s report %q: %v", testCase.outputFormat, mainPath, readErr)
+			}
+			var mainText = string(rawMainReport)
+			for _, expected := range testCase.wantFileText {
+				if !strings.Contains(mainText, expected) {
+					t.Fatalf("expected generated %s report to contain %q, got %q", testCase.outputFormat, expected, mainText)
+				}
+			}
+			for _, forbidden := range testCase.forbiddenFileText {
+				if strings.Contains(mainText, forbidden) {
+					t.Fatalf("expected generated %s report to omit %q, got %q", testCase.outputFormat, forbidden, mainText)
+				}
 			}
 			assertNoCleartextReportInAppStorage(t, harness.BaseDir)
 		})
@@ -283,7 +327,7 @@ func TestReportGenerationSkipsCurrencylessOrderTier(t *testing.T) {
 		t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
 	}
 
-	var rawReport, err = os.ReadFile(reportPath)
+	var rawReport, err = os.ReadFile(reportPath) // #nosec G304 -- test reads the report path returned by the controlled output fixture.
 	if err != nil {
 		t.Fatalf("read saved report %q: %v", reportPath, err)
 	}
@@ -330,6 +374,7 @@ func TestReportGenerationRoundsSameTierUnitPriceDerivation(t *testing.T) {
 		t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
 	}
 
+	//nolint:gosec // Test reads the report path returned by the controlled output fixture.
 	var rawReport, err = os.ReadFile(reportPath)
 	if err != nil {
 		t.Fatalf("read saved report %q: %v", reportPath, err)
@@ -403,7 +448,7 @@ func TestReportGenerationAfterSyncAllowsRepeatingGrossValueOnlyUnitPriceDerivati
 		t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
 	}
 
-	var rawReport, err = os.ReadFile(reportPath)
+	var rawReport, err = os.ReadFile(reportPath) // #nosec G304 -- test reads the report path returned by the controlled output fixture.
 	if err != nil {
 		t.Fatalf("read saved report %q: %v", reportPath, err)
 	}
@@ -505,6 +550,7 @@ func TestSameCurrencyReportPreservesPriorMonetaryResults(t *testing.T) {
 				t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
 			}
 
+			//nolint:gosec // Test reads the report path returned by the controlled output fixture.
 			var rawReport, readErr = os.ReadFile(reportPath)
 			if readErr != nil {
 				t.Fatalf("read saved report %q: %v", reportPath, readErr)
@@ -570,6 +616,7 @@ func TestReportGenerationConvertsDeterministicMixedCurrencyFixture(t *testing.T)
 
 	var combinedReportText strings.Builder
 	for _, reportPath := range files {
+		//nolint:gosec // Test reads report paths returned by the controlled output fixture.
 		var rawReport, err = os.ReadFile(reportPath)
 		if err != nil {
 			t.Fatalf("read saved report %q: %v", reportPath, err)
@@ -583,16 +630,18 @@ func TestReportGenerationConvertsDeterministicMixedCurrencyFixture(t *testing.T)
 		"- Report Calculation Currency: USD",
 		"ECB Data Portal `EXR`",
 		"Federal Reserve Board H.10/Data Download Program",
-		"source_per_base",
-		"base_per_source",
 		"mixed-usd-buy-2024-000",
 		"mixed-eur-buy-2025-001",
 		"mixed-gbp-buy-2025-005",
 		"2024-01-06",
-		"2024-01-05",
 	} {
 		if !strings.Contains(reportText, expected) {
 			t.Fatalf("expected mixed-currency reports to contain %q, got %q", expected, reportText)
+		}
+	}
+	for _, forbidden := range []string{"## Currency Conversion Audit", "source_per_base", "base_per_source"} {
+		if strings.Contains(reportText, forbidden) {
+			t.Fatalf("expected mixed-currency main reports to omit %q, got %q", forbidden, reportText)
 		}
 	}
 	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
@@ -656,7 +705,7 @@ func roundedUnitPriceProtectedActivityCache(t *testing.T) syncmodel.ProtectedAct
 	t.Helper()
 
 	return syncmodel.ProtectedActivityCache{
-		SyncedAt:             mustReportFixtureTime(t, "2026-05-20T15:04:05Z"),
+		SyncedAt:             mustReportFixtureTime(t),
 		RetrievedCount:       2,
 		ActivityCount:        2,
 		AvailableReportYears: []int{2024},
@@ -740,7 +789,7 @@ func mixedCurrencyConversionProtectedActivityCache(t *testing.T, activityCount i
 	}
 
 	return syncmodel.ProtectedActivityCache{
-		SyncedAt:             mustReportFixtureTime(t, "2026-05-20T15:04:05Z"),
+		SyncedAt:             mustReportFixtureTime(t),
 		RetrievedCount:       len(activities),
 		ActivityCount:        len(activities),
 		AvailableReportYears: []int{2024, 2025},
@@ -784,7 +833,7 @@ func offsetSensitiveCurrencyProtectedActivityCache(t *testing.T) syncmodel.Prote
 	}
 
 	return syncmodel.ProtectedActivityCache{
-		SyncedAt:             mustReportFixtureTime(t, "2026-05-20T15:04:05Z"),
+		SyncedAt:             mustReportFixtureTime(t),
 		RetrievedCount:       len(activities),
 		ActivityCount:        len(activities),
 		AvailableReportYears: []int{2024},
@@ -847,6 +896,29 @@ func mustIntegrationReportRequestForFormat(t *testing.T, year int, reportBaseCur
 	}
 
 	return request
+}
+
+// selectedMainReportPath returns the main output path for the selected report
+// format in integration assertions.
+// Authored by: OpenCode
+func selectedMainReportPath(t *testing.T, markdownFiles []string, pdfFiles []string, outputFormat reportmodel.ReportOutputFormat) string {
+	t.Helper()
+
+	switch outputFormat {
+	case reportmodel.ReportOutputFormatMarkdown:
+		if len(markdownFiles) == 0 {
+			t.Fatalf("expected at least one Markdown main report")
+		}
+		return markdownFiles[0]
+	case reportmodel.ReportOutputFormatPDF:
+		if len(pdfFiles) == 0 {
+			t.Fatalf("expected at least one PDF report")
+		}
+		return pdfFiles[0]
+	default:
+		t.Fatalf("unsupported report output format %q", outputFormat)
+		return ""
+	}
 }
 
 // mustPDFFiles returns all generated PDF files in one directory.
@@ -1059,8 +1131,10 @@ func mustReportGenerationSyncConfig(t *testing.T, origin string) configmodel.App
 // mustReportFixtureTime parses one RFC3339 fixture timestamp for integration
 // caches.
 // Authored by: OpenCode
-func mustReportFixtureTime(t *testing.T, raw string) time.Time {
+func mustReportFixtureTime(t *testing.T) time.Time {
 	t.Helper()
+
+	const raw = "2026-05-20T15:04:05Z"
 
 	var parsed, err = time.Parse(time.RFC3339, raw)
 	if err != nil {

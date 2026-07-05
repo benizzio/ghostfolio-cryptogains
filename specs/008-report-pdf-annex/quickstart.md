@@ -4,7 +4,7 @@ This document defines validation flows for the PDF output and Annex 1 feature. A
 
 ## Prerequisites
 
-- Go 1.26.3 installed.
+- Go 1.26.4 installed.
 - Development tools installed as required by the repository quality gates.
 - A synced or fixture protected activity cache with reportable years, at least one asset with no report-year activity, at least one zero net-gain summary row, at least one zero-priced SELL activity, and at least one converted priced activity.
 - No live PDF service, browser service, or external document-generation service is required.

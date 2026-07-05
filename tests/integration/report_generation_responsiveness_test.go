@@ -110,7 +110,7 @@ func responsivenessCurrencyProtectedActivityCache(t *testing.T, activityCount in
 	}
 
 	return syncmodel.ProtectedActivityCache{
-		SyncedAt:             mustReportFixtureTime(t, "2026-05-20T15:04:05Z"),
+		SyncedAt:             mustReportFixtureTime(t),
 		RetrievedCount:       len(activities),
 		ActivityCount:        len(activities),
 		AvailableReportYears: []int{2025},

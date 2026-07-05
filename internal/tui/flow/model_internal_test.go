@@ -1122,6 +1122,53 @@ func TestReportSelectionActivationFallsBackFromInvalidBaseCurrencyIndex(t *testi
 	}
 }
 
+// TestReportOutputFormatSelectionBranches verifies output-format navigation,
+// stale-index fallback, and invalid helper indexes.
+// Authored by: OpenCode
+func TestReportOutputFormatSelectionBranches(t *testing.T) {
+	t.Parallel()
+
+	var config = mustSetupConfig(t)
+	var model = newTestModel(t, &config)
+	model.active = reportSelectionScreenKey
+	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
+	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
+
+	model.report.FocusArea = reportSelectionFocusOutputFormat
+	model.moveReportSelection(1, 1, len(model.reportMethodItems()), len(model.reportBaseCurrencyItems()), len(model.reportOutputFormatItems()), len(model.reportSelectionActions()))
+	if model.report.OutputFormatIndex != 1 || model.report.SelectedOutputFormat != reportmodel.ReportOutputFormatPDF {
+		t.Fatalf("expected output-format movement to select PDF, got %#v", model.report)
+	}
+
+	model.report.OutputFormatIndex = 99
+	model.report.SelectedOutputFormat = ""
+	var updated, cmd = model.activateReportSelection()
+	if cmd != nil {
+		t.Fatalf("expected stale output-format activation to stay synchronous")
+	}
+	model = assertUpdatedModel(t, updated)
+	if model.report.OutputFormatIndex != 0 || model.report.SelectedOutputFormat != reportmodel.ReportOutputFormatMarkdown || model.report.FocusArea != reportSelectionFocusAction {
+		t.Fatalf("expected invalid output-format index to fall back to Markdown and actions, got %#v", model.report)
+	}
+
+	if got := model.selectReportOutputFormatAtCurrentIndex(); !got {
+		t.Fatalf("expected current output-format selection to be valid")
+	}
+	model.report.OutputFormatIndex = -1
+	if got := model.selectReportOutputFormatAtCurrentIndex(); got {
+		t.Fatalf("expected negative output-format selection to fail")
+	}
+	if got := reportOutputFormatForIndex(99); got != "" {
+		t.Fatalf("expected invalid output-format helper index to return empty, got %q", got)
+	}
+
+	model.report.SelectedOutputFormat = ""
+	updated, cmd = model.startReportGeneration()
+	if cmd != nil || assertUpdatedModel(t, updated).active != reportSelectionScreenKey {
+		t.Fatalf("expected direct start with empty output format to remain on selection")
+	}
+}
+
 func TestUpdateReportCoversIgnoredAndFallbackBranches(t *testing.T) {
 	t.Parallel()
 

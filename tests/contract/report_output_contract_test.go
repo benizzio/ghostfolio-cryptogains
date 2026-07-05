@@ -248,12 +248,15 @@ func assertReportOutputBundleShape(t *testing.T, bundle reportmodel.ReportOutput
 	if len(bundle.Files) != len(roles) || len(bundle.Files) != len(mediaTypes) {
 		t.Fatalf("unexpected output file count: got %d want %d", len(bundle.Files), len(roles))
 	}
-	for index, file := range bundle.Files {
-		if file.Role != roles[index] {
-			t.Fatalf("unexpected file role at index %d: got %q want %q", index, file.Role, roles[index])
+	for index := range roles {
+		var file = bundle.Files[index]
+		var role = roles[index]
+		var mediaType = mediaTypes[index]
+		if file.Role != role {
+			t.Fatalf("unexpected file role at index %d: got %q want %q", index, file.Role, role)
 		}
-		if file.MediaType != mediaTypes[index] {
-			t.Fatalf("unexpected media type at index %d: got %q want %q", index, file.MediaType, mediaTypes[index])
+		if file.MediaType != mediaType {
+			t.Fatalf("unexpected media type at index %d: got %q want %q", index, file.MediaType, mediaType)
 		}
 	}
 }

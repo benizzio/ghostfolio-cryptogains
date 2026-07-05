@@ -89,9 +89,6 @@ func requestAutomaticOpenBundle(
 			),
 		)
 	}
-	if len(outputBundle.Files) == 0 {
-		return reportmodel.ReportOutputBundle{}, pointerToReportOutcome(reportFailureOutcome(request, ReportFailureReportFileWriteFailed, "Could not finalize the saved report result because no output file was recorded."))
-	}
 
 	var primaryPath = outputBundle.Files[0].Path
 	if open == nil {
@@ -131,7 +128,7 @@ func requestAutomaticOpenBundle(
 func reportOutputBundleForOpen(
 	outputFormat reportmodel.ReportOutputFormat,
 	files []reportmodel.ReportOutputFile,
-	openRequested bool,
+	_ bool,
 	openError string,
 ) reportmodel.ReportOutputBundle {
 	var savedAt = reportOutputBundleSavedAt(files)
@@ -143,7 +140,7 @@ func reportOutputBundleForOpen(
 		outputFormat,
 		files,
 		savedAt,
-		openRequested,
+		true,
 		openError,
 	)
 	if err != nil {

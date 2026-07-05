@@ -3,7 +3,10 @@
 // Authored by: OpenCode
 package model
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 const auditAnnexTitle = "Annex 1 - Audit"
 
@@ -22,12 +25,67 @@ const (
 	AuditAnnexSectionCurrencyConversionAudit AuditAnnexSection = "currency_conversion_audit"
 )
 
-// AuditAnnex stores the minimal Annex 1 shell attached to every calculated
-// report. Later audit-evidence tasks extend this model with section content.
+// PerAssetAuditSection stores one asset subsection in Annex 1's Detailed
+// Per-Asset Audit Report.
+// Authored by: OpenCode
+type PerAssetAuditSection struct {
+	AssetIdentityKey string
+	DisplayLabel     string
+	Entries          []AuditActivityEntry
+}
+
+// NewPerAssetAuditSection creates one validated Annex 1 per-asset audit
+// section.
+//
+// Example:
+//
+//	section, err := model.NewPerAssetAuditSection("asset-btc", "BTC", entries)
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = section.DisplayLabel
+//
+// Authored by: OpenCode
+func NewPerAssetAuditSection(assetIdentityKey string, displayLabel string, entries []AuditActivityEntry) (PerAssetAuditSection, error) {
+	var section = PerAssetAuditSection{
+		AssetIdentityKey: strings.TrimSpace(assetIdentityKey),
+		DisplayLabel:     strings.TrimSpace(displayLabel),
+		Entries:          cloneAuditActivityEntries(entries),
+	}
+	if err := section.Validate(); err != nil {
+		return PerAssetAuditSection{}, err
+	}
+
+	return section, nil
+}
+
+// Validate verifies one Annex 1 per-asset audit section.
+// Authored by: OpenCode
+func (section PerAssetAuditSection) Validate() error {
+	if strings.TrimSpace(section.AssetIdentityKey) == "" {
+		return fmt.Errorf("per-asset audit section asset identity key is required")
+	}
+	if strings.TrimSpace(section.DisplayLabel) == "" {
+		return fmt.Errorf("per-asset audit section display label is required")
+	}
+
+	for index, entry := range section.Entries {
+		if err := entry.Validate(); err != nil {
+			return fmt.Errorf("per-asset audit section entry %d: %w", index, err)
+		}
+	}
+
+	return nil
+}
+
+// AuditAnnex stores the Annex 1 shell and audit evidence attached to every
+// calculated report.
 // Authored by: OpenCode
 type AuditAnnex struct {
-	Title        string
-	SectionOrder []AuditAnnexSection
+	Title                  string
+	SectionOrder           []AuditAnnexSection
+	PerAssetAuditSections  []PerAssetAuditSection
+	ConversionAuditEntries []ConversionAuditEntry
 }
 
 // NewAuditAnnex creates one validated Annex 1 shell.
@@ -96,6 +154,53 @@ func (annex AuditAnnex) Validate() error {
 			return fmt.Errorf("audit annex section order %d must be %q", index, section)
 		}
 	}
+	for index, section := range annex.PerAssetAuditSections {
+		if err := section.Validate(); err != nil {
+			return fmt.Errorf("audit annex per-asset section %d: %w", index, err)
+		}
+	}
+	for index, entry := range annex.ConversionAuditEntries {
+		if err := entry.Validate(); err != nil {
+			return fmt.Errorf("audit annex conversion audit entry %d: %w", index, err)
+		}
+	}
 
 	return nil
+}
+
+// NewDetailedAuditAnnex creates one validated Annex 1 model with detailed audit
+// evidence.
+//
+// Example:
+//
+//	annex, err := model.NewDetailedAuditAnnex(sections, conversions)
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = annex.PerAssetAuditSections
+//
+// Authored by: OpenCode
+func NewDetailedAuditAnnex(sections []PerAssetAuditSection, conversions []ConversionAuditEntry) (AuditAnnex, error) {
+	var annex = DefaultAuditAnnex()
+	annex.PerAssetAuditSections = clonePerAssetAuditSections(sections)
+	annex.ConversionAuditEntries = cloneConversionAuditEntries(conversions)
+	if err := annex.Validate(); err != nil {
+		return AuditAnnex{}, err
+	}
+
+	return annex, nil
+}
+
+// clonePerAssetAuditSections returns a defensive copy of per-asset audit
+// sections.
+// Authored by: OpenCode
+func clonePerAssetAuditSections(sections []PerAssetAuditSection) []PerAssetAuditSection {
+	var cloned = make([]PerAssetAuditSection, 0, len(sections))
+	for _, section := range sections {
+		var sectionCopy = section
+		sectionCopy.Entries = cloneAuditActivityEntries(section.Entries)
+		cloned = append(cloned, sectionCopy)
+	}
+
+	return cloned
 }

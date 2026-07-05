@@ -97,6 +97,25 @@ func NewCapitalGainsReportWithConversionArtifacts(
 // Validate verifies one fully calculated report and its nested sections.
 // Authored by: OpenCode
 func (report CapitalGainsReport) Validate() error {
+	if err := report.validateMetadata(); err != nil {
+		return err
+	}
+	if err := report.validateSections(); err != nil {
+		return err
+	}
+	if err := report.validateConversionArtifacts(); err != nil {
+		return err
+	}
+	if err := report.validateAuditAnnex(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateMetadata verifies report-level scalar fields.
+// Authored by: OpenCode
+func (report CapitalGainsReport) validateMetadata() error {
 	if report.Year <= 0 {
 		return fmt.Errorf("capital gains report year must be greater than zero")
 	}
@@ -113,6 +132,12 @@ func (report CapitalGainsReport) Validate() error {
 		return err
 	}
 
+	return nil
+}
+
+// validateSections verifies nested summary, reference, and detail sections.
+// Authored by: OpenCode
+func (report CapitalGainsReport) validateSections() error {
 	for index, entry := range report.SummaryEntries {
 		if err := entry.Validate(); err != nil {
 			return fmt.Errorf("capital gains report summary entry %d: %w", index, err)
@@ -128,12 +153,20 @@ func (report CapitalGainsReport) Validate() error {
 			return fmt.Errorf("capital gains report detail section %d: %w", index, err)
 		}
 	}
-	if err := report.validateConversionArtifacts(); err != nil {
-		return err
-	}
+
+	return nil
+}
+
+// validateAuditAnnex verifies the detailed audit annex, filling legacy default
+// values for reports without explicit annex content.
+// Authored by: OpenCode
+func (report CapitalGainsReport) validateAuditAnnex() error {
 	var annex = report.AuditAnnex
 	if annex.Title == "" && len(annex.SectionOrder) == 0 {
 		annex = DefaultAuditAnnex()
+	}
+	if len(annex.ConversionAuditEntries) == 0 && len(report.ConversionAuditEntries) > 0 {
+		annex.ConversionAuditEntries = cloneConversionAuditEntries(report.ConversionAuditEntries)
 	}
 	if err := annex.Validate(); err != nil {
 		return fmt.Errorf("capital gains report audit annex: %w", err)

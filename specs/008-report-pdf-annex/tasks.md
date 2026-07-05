@@ -175,19 +175,19 @@
 
 ### Tests for User Story 2
 
-- [ ] T024 [P] [US2] Add main report presentation contract tests for bold labels, zero row omission, header rename, and no main conversion audit in `tests/contract/markdown_report_contract_test.go`
-- [ ] T025 [P] [US2] Add Markdown renderer unit tests for summary empty state, historical position, conversion status labels, and `BLOCKCHAIN OP` in `internal/report/markdown/renderer_internal_test.go`
-- [ ] T026 [P] [US2] Add PDF main report presentation unit tests mirroring shared Markdown content rules in `internal/report/pdf/renderer_internal_test.go`
-- [ ] T027 [P] [US2] Add report output integration assertions for clearer main report content in both formats in `tests/integration/report_generation_flow_test.go`
+- [X] T024 [P] [US2] Add main report presentation contract tests for bold labels, zero row omission, header rename, and no main conversion audit in `tests/contract/markdown_report_contract_test.go`
+- [X] T025 [P] [US2] Add Markdown renderer unit tests for summary empty state, historical position, conversion status labels, and `BLOCKCHAIN OP` in `internal/report/markdown/renderer_internal_test.go`
+- [X] T026 [P] [US2] Add PDF main report presentation unit tests mirroring shared Markdown content rules in `internal/report/pdf/renderer_internal_test.go`
+- [X] T027 [P] [US2] Add report output integration assertions for clearer main report content in both formats in `tests/integration/report_generation_flow_test.go`
 
 ### Implementation for User Story 2
 
-- [ ] T028 [US2] Add closed user-facing render label helpers for conversion status, quote direction, and zero-priced SELL display in `internal/report/model/render_labels.go`
-- [ ] T029 [US2] Bold initial detail labels and rate-source classifier labels in `internal/report/markdown/renderer.go` and `internal/report/markdown/renderer_conversion.go`
-- [ ] T030 [US2] Omit zero net-gain summary rows and render the all-zero empty state in `internal/report/markdown/renderer_summary.go`
-- [ ] T031 [US2] Rename the reference header and render `Historical Position` for assets without report-year activity in `internal/report/markdown/renderer_details.go`
-- [ ] T032 [US2] Remove detailed Currency Conversion Audit from the main Markdown report and use label helpers for visible conversion statuses in `internal/report/markdown/renderer_conversion.go` and `internal/report/markdown/renderer_details.go`
-- [ ] T033 [US2] Apply the same main-report presentation, zero-row filtering, historical-position, and label rules in the PDF renderer in `internal/report/pdf/renderer.go`
+- [X] T028 [US2] Add closed user-facing render label helpers for conversion status, quote direction, and zero-priced SELL display in `internal/report/model/render_labels.go`
+- [X] T029 [US2] Bold initial detail labels and rate-source classifier labels in `internal/report/markdown/renderer.go` and `internal/report/markdown/renderer_conversion.go`
+- [X] T030 [US2] Omit zero net-gain summary rows and render the all-zero empty state in `internal/report/markdown/renderer_summary.go`
+- [X] T031 [US2] Rename the reference header and render `Historical Position` for assets without report-year activity in `internal/report/markdown/renderer_details.go`
+- [X] T032 [US2] Remove detailed Currency Conversion Audit from the main Markdown report and use label helpers for visible conversion statuses in `internal/report/markdown/renderer_conversion.go` and `internal/report/markdown/renderer_details.go`
+- [X] T033 [US2] Apply the same main-report presentation, zero-row filtering, historical-position, and label rules in the PDF renderer in `internal/report/pdf/renderer.go`
 
 **Checkpoint**: User Story 2 can be validated independently without changing calculation outputs.
 
@@ -201,20 +201,20 @@
 
 ### Tests for User Story 3
 
-- [ ] T034 [P] [US3] Add Annex 1 rendering contract tests for title, section order, every required FR-019 per-asset visible audit field, quote labels, and empty states in `tests/contract/report_annex_contract_test.go`
-- [ ] T035 [P] [US3] Add calculation unit tests for annex scope including pre-year, report-year, post-year, zero-net, and reference-only assets in `internal/report/calculate/calculator_internal_test.go`
-- [ ] T036 [P] [US3] Add Markdown annex renderer unit tests for separate Annex 1 document content in `internal/report/markdown/renderer_internal_test.go`
-- [ ] T037 [P] [US3] Add PDF annex pagination, page-break, and repeated-context unit tests in `internal/report/pdf/renderer_internal_test.go`
-- [ ] T038 [P] [US3] Add 10,000 cached-activity Markdown/PDF annex scale integration test in `tests/integration/report_performance_flow_test.go`
+- [X] T034 [P] [US3] Add Annex 1 rendering contract tests for title, section order, every required FR-019 per-asset visible audit field, quote labels, and empty states in `tests/contract/report_annex_contract_test.go`
+- [X] T035 [P] [US3] Add calculation unit tests for annex scope including pre-year, report-year, post-year, zero-net, and reference-only assets in `internal/report/calculate/calculator_internal_test.go`
+- [X] T036 [P] [US3] Add Markdown annex renderer unit tests for separate Annex 1 document content in `internal/report/markdown/renderer_internal_test.go`
+- [X] T037 [P] [US3] Add PDF annex pagination, page-break, and repeated-context unit tests in `internal/report/pdf/renderer_internal_test.go`
+- [X] T038 [P] [US3] Add 10,000 cached-activity Markdown/PDF annex scale integration test in `tests/integration/report_performance_flow_test.go`
 
 ### Implementation for User Story 3
 
-- [ ] T039 [US3] Add detailed audit annex models for per-asset sections, audit activity entries with every required FR-019 field, and the conversion audit section in `internal/report/model/audit_annex.go` and `internal/report/model/audit_activity_entry.go`
-- [ ] T040 [US3] Capture per-activity post-replay audit evidence through the selected year end in `internal/report/calculate/asset_replay.go` and `internal/report/calculate/artifacts.go`
-- [ ] T041 [US3] Build reported-asset annex sections including reference-only assets and excluding post-year activity in `internal/report/calculate/calculator.go` and `internal/report/calculate/artifacts.go`
-- [ ] T042 [US3] Render Annex 1 Markdown title, per-asset audit report, and Currency Conversion Audit in `internal/report/markdown/renderer_annex.go`
-- [ ] T043 [US3] Append Annex 1 after a PDF page break with table and page continuation context in `internal/report/pdf/renderer.go`
-- [ ] T044 [US3] Ensure runtime and output failures from missing label mappings or annex validation save no partial files in `internal/app/runtime/report_service.go` and `internal/report/output/writer.go`
+- [X] T039 [US3] Add detailed audit annex models for per-asset sections, audit activity entries with every required FR-019 field, and the conversion audit section in `internal/report/model/audit_annex.go` and `internal/report/model/audit_activity_entry.go`
+- [X] T040 [US3] Capture per-activity post-replay audit evidence through the selected year end in `internal/report/calculate/asset_replay.go` and `internal/report/calculate/artifacts.go`
+- [X] T041 [US3] Build reported-asset annex sections including reference-only assets and excluding post-year activity in `internal/report/calculate/calculator.go` and `internal/report/calculate/artifacts.go`
+- [X] T042 [US3] Render Annex 1 Markdown title, per-asset audit report, and Currency Conversion Audit in `internal/report/markdown/renderer_annex.go`
+- [X] T043 [US3] Append Annex 1 after a PDF page break with table and page continuation context in `internal/report/pdf/renderer.go`
+- [X] T044 [US3] Ensure runtime and output failures from missing label mappings or annex validation save no partial files in `internal/app/runtime/report_service.go` and `internal/report/output/writer.go`
 
 **Checkpoint**: Annex 1 is complete for Markdown and PDF and all user stories are independently testable.
 
@@ -224,13 +224,13 @@
 
 **Purpose**: Final verification, security review, formatting, and documentation alignment across all stories.
 
-- [ ] T045 [P] Update validation notes if implementation details differ from the planned workflow in `specs/008-report-pdf-annex/quickstart.md`
-- [ ] T046 [P] Run `gofmt` on changed Go files under `internal/`, `tests/contract/`, `tests/integration/`, `tests/unit/`, and `tests/testutil/`
-- [ ] T047 Run `make test` using `Makefile` and fix failures in changed files under `internal/` and `tests/`
-- [ ] T048 Run `make coverage` using `Makefile` and inspect generated coverage artifacts under `dist/coverage/`
-- [ ] T049 Run `make quality QUALITY_BASE_REF=origin/main` using `Makefile` and fix changed-source findings in `*.go`, `go.mod`, and `go.sum`
-- [ ] T050 Review generated reports, result messages, diagnostics, and failure paths for token or secret leakage in `internal/report/`, `internal/app/runtime/`, and `internal/tui/`
-- [ ] T051 Run or cite supported-OS validation for Linux, macOS, and Windows PDF-enabled report generation using `.github/workflows/`, `Makefile`, and changed packages under `internal/report/pdf/`, `internal/report/markdown/`, `internal/report/output/`, `internal/app/runtime/`, and `internal/tui/`
+- [X] T045 [P] Update validation notes if implementation details differ from the planned workflow in `specs/008-report-pdf-annex/quickstart.md`
+- [X] T046 [P] Run `gofmt` on changed Go files under `internal/`, `tests/contract/`, `tests/integration/`, `tests/unit/`, and `tests/testutil/`
+- [X] T047 Run `make test` using `Makefile` and fix failures in changed files under `internal/` and `tests/`
+- [X] T048 Run `make coverage` using `Makefile` and inspect generated coverage artifacts under `dist/coverage/`
+- [X] T049 Run `make quality QUALITY_BASE_REF=origin/main` using `Makefile` and fix changed-source findings in `*.go`, `go.mod`, and `go.sum`
+- [X] T050 Review generated reports, result messages, diagnostics, and failure paths for token or secret leakage in `internal/report/`, `internal/app/runtime/`, and `internal/tui/`
+- [X] T051 Run or cite supported-OS validation for Linux, macOS, and Windows PDF-enabled report generation using `.github/workflows/`, `Makefile`, and changed packages under `internal/report/pdf/`, `internal/report/markdown/`, `internal/report/output/`, `internal/app/runtime/`, and `internal/tui/`
 
 ---
 

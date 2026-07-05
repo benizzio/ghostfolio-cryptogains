@@ -17,9 +17,9 @@ import (
 // Authored by: OpenCode
 func writeRateSourceSummary(builder *strings.Builder, report reportmodel.CapitalGainsReport) error {
 	builder.WriteString("## Rate Source Summary\n\n")
-	builder.WriteString(fmt.Sprintf("- Report Base Currency: %s\n", calculationCurrencyLabel(report.ReportCalculationCurrency)))
+	fmt.Fprintf(builder, "- **Report Base Currency:** %s\n", calculationCurrencyLabel(report.ReportCalculationCurrency))
 	if len(report.RateSources) == 0 {
-		builder.WriteString("- Exchange Rate Use: No activity required exchange-rate conversion.\n\n")
+		builder.WriteString("- **Exchange Rate Use:** No activity required exchange-rate conversion.\n\n")
 		return nil
 	}
 
@@ -30,10 +30,10 @@ func writeRateSourceSummary(builder *strings.Builder, report reportmodel.Capital
 			continue
 		}
 		rendered[key] = true
-		builder.WriteString(fmt.Sprintf("- Authority: %s\n", rateAuthorityLabel(source.Authority)))
-		builder.WriteString(fmt.Sprintf("- Provider: %s\n", rateProviderLabel(source.ProviderID)))
-		builder.WriteString(fmt.Sprintf("- Rate Kind: %s\n", sanitizeInlineText(source.RateKind)))
-		builder.WriteString(fmt.Sprintf("- Unavailable-Date Rule: %s\n", unavailableDateRule(source.ProviderID)))
+		fmt.Fprintf(builder, "- **Authority:** %s\n", rateAuthorityLabel(source.Authority))
+		fmt.Fprintf(builder, "- **Provider:** %s\n", rateProviderLabel(source.ProviderID))
+		fmt.Fprintf(builder, "- **Rate Kind:** %s\n", sanitizeInlineText(source.RateKind))
+		fmt.Fprintf(builder, "- **Unavailable-Date Rule:** %s\n", unavailableDateRule(source.ProviderID))
 	}
 
 	builder.WriteString("\n")
@@ -73,8 +73,13 @@ func writeConversionAuditRow(builder *strings.Builder, entryIndex int, entry rep
 	if err != nil {
 		return err
 	}
+	var quoteDirection string
+	quoteDirection, err = reportmodel.RenderQuoteDirectionLabel(entry.QuoteDirection)
+	if err != nil {
+		return fmt.Errorf("render conversion audit entry %d quote direction: %w", entryIndex, err)
+	}
 
-	builder.WriteString(fmt.Sprintf(
+	fmt.Fprintf(builder,
 		"| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
 		datesupport.FormatCalendarDate(entry.ActivityDate),
 		sanitizeInlineText(entry.SourceID),
@@ -83,9 +88,9 @@ func writeConversionAuditRow(builder *strings.Builder, entryIndex int, entry rep
 		sanitizeInlineText(entry.SourceCurrency),
 		sanitizeInlineText(entry.ReportBaseCurrency.Label()),
 		convertedAmounts,
-		sanitizeInlineText(string(entry.QuoteDirection)),
+		sanitizeInlineText(quoteDirection),
 		rateValue,
-	))
+	)
 	return nil
 }
 

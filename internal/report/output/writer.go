@@ -15,6 +15,14 @@ import (
 
 const reportFileMode = 0o600
 
+// Output model constructor seams keep defensive finalization failures testable
+// after earlier validation has guaranteed normal runtime inputs.
+// Authored by: OpenCode
+var (
+	newReportOutputFileForWrite   = reportmodel.NewReportOutputFile
+	newReportOutputBundleForWrite = reportmodel.NewReportOutputBundle
+)
+
 // writeSyncCloser defines the file contract used while reserving and writing a
 // final report file.
 // Authored by: OpenCode
@@ -146,19 +154,12 @@ func WriteReportOutputBundle(outputFormat reportmodel.ReportOutputFormat, docume
 // runtime while the output bundle API is rolled through the application.
 // Authored by: OpenCode
 func WriteReportDocuments(outputFormat reportmodel.ReportOutputFormat, documents []reportmodel.ReportDocument) (reportmodel.ReportOutputBundle, error) {
+	var savedAt = normalizeReportDocumentSavedAt(documents)
 	if err := outputFormat.Validate(); err != nil {
 		return reportmodel.ReportOutputBundle{}, err
 	}
 	if err := validateBundleDocuments(outputFormat, documents); err != nil {
 		return reportmodel.ReportOutputBundle{}, err
-	}
-
-	var savedAt = documents[0].GeneratedAt
-	if savedAt.IsZero() {
-		savedAt = currentTime()
-		for index := range documents {
-			documents[index].GeneratedAt = savedAt
-		}
 	}
 
 	var documentsDir, err = ResolveDocumentsDirectory()
@@ -183,35 +184,91 @@ func WriteReportDocuments(outputFormat reportmodel.ReportOutputFormat, documents
 		cleanupReservedReportFiles(reservations)
 	}()
 
-	var files = make([]reportmodel.ReportOutputFile, 0, len(reservations))
-	for index, reservation := range reservations {
-		if err = writeReservedReportFile(reservation, documents[index]); err != nil {
-			return reportmodel.ReportOutputBundle{}, err
-		}
-
-		var outputFile reportmodel.ReportOutputFile
-		outputFile, err = reportmodel.NewReportOutputFile(
-			documentsDir,
-			reservation.filename,
-			reservation.path,
-			documents[index].Role,
-			reportDocumentMediaType(documents[index]),
-			savedAt,
-		)
-		if err != nil {
-			return reportmodel.ReportOutputBundle{}, err
-		}
-		files = append(files, outputFile)
+	var files []reportmodel.ReportOutputFile
+	files, err = writeReservedReportOutputFiles(documentsDir, savedAt, reservations, documents)
+	if err != nil {
+		return reportmodel.ReportOutputBundle{}, err
 	}
 
 	var bundle reportmodel.ReportOutputBundle
-	bundle, err = reportmodel.NewReportOutputBundle(outputFormat, files, savedAt, false, "")
+	bundle, err = newReportOutputBundleForWrite(outputFormat, files, savedAt, false, "")
 	if err != nil {
 		return reportmodel.ReportOutputBundle{}, err
 	}
 
 	cleanupPaths = false
 	return bundle, nil
+}
+
+// normalizeReportDocumentSavedAt applies one generated timestamp across all
+// documents when the renderer did not provide one.
+// Authored by: OpenCode
+func normalizeReportDocumentSavedAt(documents []reportmodel.ReportDocument) time.Time {
+	var savedAt time.Time
+	if len(documents) > 0 {
+		savedAt = documents[0].GeneratedAt
+	}
+	if savedAt.IsZero() {
+		savedAt = currentTime()
+		for index := range documents {
+			documents[index].GeneratedAt = savedAt
+		}
+	}
+
+	return savedAt
+}
+
+// writeReservedReportOutputFiles writes reserved files and converts them into
+// validated output metadata.
+// Authored by: OpenCode
+func writeReservedReportOutputFiles(
+	documentsDir string,
+	savedAt time.Time,
+	reservations []reservedReportFile,
+	documents []reportmodel.ReportDocument,
+) ([]reportmodel.ReportOutputFile, error) {
+	if len(reservations) != len(documents) {
+		return nil, fmt.Errorf("reserved report file count does not match rendered document count")
+	}
+
+	var files = make([]reportmodel.ReportOutputFile, 0, len(reservations))
+	for len(reservations) > 0 {
+		var reservation = reservations[0]
+		var document = documents[0]
+		reservations = reservations[1:]
+		documents = documents[1:]
+
+		var outputFile, err = writeReservedReportOutputFile(documentsDir, savedAt, reservation, document)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, outputFile)
+	}
+
+	return files, nil
+}
+
+// writeReservedReportOutputFile writes one reserved file and returns its output
+// metadata.
+// Authored by: OpenCode
+func writeReservedReportOutputFile(
+	documentsDir string,
+	savedAt time.Time,
+	reservation reservedReportFile,
+	document reportmodel.ReportDocument,
+) (reportmodel.ReportOutputFile, error) {
+	if err := writeReservedReportFile(reservation, document); err != nil {
+		return reportmodel.ReportOutputFile{}, err
+	}
+
+	return newReportOutputFileForWrite(
+		documentsDir,
+		reservation.filename,
+		reservation.path,
+		document.Role,
+		reportDocumentMediaType(document),
+		savedAt,
+	)
 }
 
 // reservedReportFile stores one reserved output path and handle until it is
@@ -263,22 +320,38 @@ func validateBundleDocuments(outputFormat reportmodel.ReportOutputFormat, docume
 
 	switch outputFormat {
 	case reportmodel.ReportOutputFormatMarkdown:
-		if len(documents) != 2 {
-			return fmt.Errorf("markdown report output requires exactly two documents")
-		}
-		if documents[0].DocumentType != reportmodel.ReportDocumentTypeMarkdown || documents[0].Role != reportmodel.ReportDocumentRoleMain {
-			return fmt.Errorf("markdown report output document 0 must be the main Markdown document")
-		}
-		if documents[1].DocumentType != reportmodel.ReportDocumentTypeMarkdown || documents[1].Role != reportmodel.ReportDocumentRoleAnnex {
-			return fmt.Errorf("markdown report output document 1 must be the Annex 1 Markdown document")
-		}
+		return validateMarkdownBundleDocuments(documents)
 	case reportmodel.ReportOutputFormatPDF:
-		if len(documents) != 1 {
-			return fmt.Errorf("pdf report output requires exactly one document")
-		}
-		if documents[0].DocumentType != reportmodel.ReportDocumentTypePDF || documents[0].Role != reportmodel.ReportDocumentRoleCombined {
-			return fmt.Errorf("pdf report output document must be the combined PDF document")
-		}
+		return validatePDFBundleDocuments(documents)
+	}
+
+	return validateBundleDocumentMetadata(documents)
+}
+
+// validateMarkdownBundleDocuments verifies the two Markdown output documents.
+// Authored by: OpenCode
+func validateMarkdownBundleDocuments(documents []reportmodel.ReportDocument) error {
+	if len(documents) != 2 {
+		return fmt.Errorf("markdown report output requires exactly two documents")
+	}
+	if documents[0].DocumentType != reportmodel.ReportDocumentTypeMarkdown || documents[0].Role != reportmodel.ReportDocumentRoleMain {
+		return fmt.Errorf("markdown report output document 0 must be the main Markdown document")
+	}
+	if documents[1].DocumentType != reportmodel.ReportDocumentTypeMarkdown || documents[1].Role != reportmodel.ReportDocumentRoleAnnex {
+		return fmt.Errorf("markdown report output document 1 must be the Annex 1 Markdown document")
+	}
+
+	return validateBundleDocumentMetadata(documents)
+}
+
+// validatePDFBundleDocuments verifies the combined PDF output document.
+// Authored by: OpenCode
+func validatePDFBundleDocuments(documents []reportmodel.ReportDocument) error {
+	if len(documents) != 1 {
+		return fmt.Errorf("pdf report output requires exactly one document")
+	}
+	if documents[0].DocumentType != reportmodel.ReportDocumentTypePDF || documents[0].Role != reportmodel.ReportDocumentRoleCombined {
+		return fmt.Errorf("pdf report output document must be the combined PDF document")
 	}
 
 	return validateBundleDocumentMetadata(documents)

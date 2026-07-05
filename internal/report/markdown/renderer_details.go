@@ -27,7 +27,14 @@ func writeDetailSections(builder *strings.Builder, report reportmodel.CapitalGai
 // writeDetailSection renders one per-asset detail section.
 // Authored by: OpenCode
 func writeDetailSection(builder *strings.Builder, section reportmodel.AssetDetailSection, calculationCurrency string) error {
-	builder.WriteString(fmt.Sprintf("## Asset Detail: %s\n\n", renderDisplayLabel(section.DisplayLabel, section.AssetIdentityKey)))
+	fmt.Fprintf(builder, "## Asset Detail: %s\n\n", renderDisplayLabel(section.DisplayLabel, section.AssetIdentityKey))
+	if len(section.ActivityRows) == 0 {
+		if err := writePositionBlock(builder, "Historical Position", section.ClosingQuantity, section.ClosingCostBasis, section.CalculationCurrency, calculationCurrency); err != nil {
+			return fmt.Errorf("render historical position for %q: %w", section.AssetIdentityKey, err)
+		}
+
+		return nil
+	}
 	if err := writePositionBlock(builder, "Opening Position", section.OpeningQuantity, section.OpeningCostBasis, section.CalculationCurrency, calculationCurrency); err != nil {
 		return fmt.Errorf("render opening position for %q: %w", section.AssetIdentityKey, err)
 	}
@@ -57,10 +64,10 @@ func writePositionBlock(builder *strings.Builder, heading string, quantity apd.D
 		return fmt.Errorf("render cost basis: %w", err)
 	}
 
-	builder.WriteString(fmt.Sprintf("### %s\n\n", heading))
-	builder.WriteString(fmt.Sprintf("- Quantity: %s\n", quantityText))
-	builder.WriteString(fmt.Sprintf("- Cost Basis: %s\n", basisText))
-	builder.WriteString(fmt.Sprintf("- Calculation Currency: %s\n\n", calculationCurrencyLabelWithFallback(sectionCurrency, fallbackCurrency)))
+	fmt.Fprintf(builder, "### %s\n\n", heading)
+	fmt.Fprintf(builder, "- **Quantity:** %s\n", quantityText)
+	fmt.Fprintf(builder, "- **Cost Basis:** %s\n", basisText)
+	fmt.Fprintf(builder, "- **Calculation Currency:** %s\n\n", calculationCurrencyLabelWithFallback(sectionCurrency, fallbackCurrency))
 	return nil
 }
 
@@ -119,11 +126,21 @@ func writeActivityRow(builder *strings.Builder, row reportmodel.AssetActivityRow
 		return fmt.Errorf("render activity row %q quantity after row: %w", row.SourceID, err)
 	}
 
-	builder.WriteString(fmt.Sprintf(
+	var activityTypeLabel, labelErr = reportmodel.RenderActivityTypeLabel(row)
+	if labelErr != nil {
+		return fmt.Errorf("render activity row %q type label: %w", row.SourceID, labelErr)
+	}
+	var conversionStatusText string
+	conversionStatusText, labelErr = conversionStatusColumn(row)
+	if labelErr != nil {
+		return fmt.Errorf("render activity row %q conversion status label: %w", row.SourceID, labelErr)
+	}
+
+	fmt.Fprintf(builder,
 		"| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
 		row.OccurredAt.UTC().Format("2006-01-02 15:04:05"),
 		sanitizeInlineText(row.SourceID),
-		sanitizeInlineText(string(row.ActivityType)),
+		sanitizeInlineText(activityTypeLabel),
 		quantityText,
 		unitPriceText,
 		grossValueText,
@@ -132,9 +149,9 @@ func writeActivityRow(builder *strings.Builder, row reportmodel.AssetActivityRow
 		basisAfterRowText,
 		activityCurrencyColumn(row),
 		calculationCurrencyLabel(row.CalculationCurrency),
-		conversionStatusColumn(row),
+		conversionStatusText,
 		sanitizeInlineText(row.HoldingReductionExplanation),
-	))
+	)
 	return nil
 }
 
@@ -182,7 +199,7 @@ func writeLiquidationRow(builder *strings.Builder, liquidation reportmodel.Liqui
 		return fmt.Errorf("render liquidation %q gain or loss: %w", liquidation.SourceID, err)
 	}
 
-	builder.WriteString(fmt.Sprintf(
+	fmt.Fprintf(builder,
 		"| %s | %s | %s | %s | %s | %s | %s |\n",
 		liquidation.OccurredAt.UTC().Format("2006-01-02 15:04:05"),
 		sanitizeInlineText(liquidation.SourceID),
@@ -191,23 +208,29 @@ func writeLiquidationRow(builder *strings.Builder, liquidation reportmodel.Liqui
 		proceedsText,
 		gainOrLossText,
 		calculationCurrencyLabelWithFallback(liquidation.CalculationCurrency, fallbackCurrency),
-	))
+	)
 	return nil
 }
 
 // conversionStatusColumn classifies rendered priced activity rows without
 // exposing provider implementation details.
 // Authored by: OpenCode
-func conversionStatusColumn(row reportmodel.AssetActivityRow) string {
+func conversionStatusColumn(row reportmodel.AssetActivityRow) (string, error) {
 	if activityCurrencyColumn(row) == "" {
-		return ""
+		return "", nil
 	}
 	if strings.TrimSpace(string(row.ConversionStatus)) != "" {
-		return sanitizeInlineText(string(row.ConversionStatus))
+		var label, err = reportmodel.RenderConversionStatusLabel(row.ConversionStatus)
+		if err != nil {
+			return "", err
+		}
+		return sanitizeInlineText(label), nil
 	}
 	if strings.TrimSpace(row.ActivityCurrency) == strings.TrimSpace(row.CalculationCurrency) {
-		return sanitizeInlineText(string(reportmodel.ConversionStatusSameCurrency))
+		var label, _ = reportmodel.RenderConversionStatusLabel(reportmodel.ConversionStatusSameCurrency)
+		return sanitizeInlineText(label), nil
 	}
 
-	return sanitizeInlineText(string(reportmodel.ConversionStatusConverted))
+	var label, _ = reportmodel.RenderConversionStatusLabel(reportmodel.ConversionStatusConverted)
+	return sanitizeInlineText(label), nil
 }

@@ -866,10 +866,10 @@ func expectedBTCDetail() ExpectedAssetDetail {
 		CalculationCurrency:          "USD",
 		ExpectedFullLiquidationCount: 0,
 		ActivityRows: []ExpectedAssetActivityRow{
-			expectedPricedRow("btc-sell-2024-zero-fee-001", syncmodel.ActivityTypeSell, "1", "25000", "0", "USD", "22009.9", "1"),
+			expectedPricedRow("btc-sell-2024-zero-fee-001", syncmodel.ActivityTypeSell, "1", "25000", "0", "22009.9", "1"),
 		},
 		LiquidationSummaries: []ExpectedLiquidationSummary{
-			expectedLiquidation("btc-sell-2024-zero-fee-001", "1", "22009.9", "25000", "2990.1", "USD"),
+			expectedLiquidation("btc-sell-2024-zero-fee-001", "1", "22009.9", "25000", "2990.1"),
 		},
 	}
 }
@@ -887,7 +887,7 @@ func expectedXRPDetail() ExpectedAssetDetail {
 		CalculationCurrency:          "USD",
 		ExpectedFullLiquidationCount: 0,
 		ActivityRows: []ExpectedAssetActivityRow{
-			expectedPricedRow("xrp-buy-2024-001", syncmodel.ActivityTypeBuy, "1000", "500", "1", "USD", "501", "1000"),
+			expectedPricedRow("xrp-buy-2024-001", syncmodel.ActivityTypeBuy, "1000", "500", "1", "501", "1000"),
 			expectedHoldingReductionRow("xrp-reduction-2024-001", "200", "400.8", "800", "Bridge migration holding reduction"),
 		},
 	}
@@ -937,12 +937,12 @@ func expectedADADetail(closingBasis string, allocatedBasis string, gain string) 
 		CalculationCurrency:          "USD",
 		ExpectedFullLiquidationCount: 0,
 		ActivityRows: []ExpectedAssetActivityRow{
-			expectedPricedRow("ada-buy-2024-001", syncmodel.ActivityTypeBuy, "1000", "250", "2", "USD", "252", "1000"),
-			expectedPricedRow("ada-buy-2024-002", syncmodel.ActivityTypeBuy, "500", "140", "1", "USD", "393", "1500"),
-			expectedPricedRow("ada-sell-2024-001", syncmodel.ActivityTypeSell, "1000", "300", "3", "USD", closingBasis, "500"),
+			expectedPricedRow("ada-buy-2024-001", syncmodel.ActivityTypeBuy, "1000", "250", "2", "252", "1000"),
+			expectedPricedRow("ada-buy-2024-002", syncmodel.ActivityTypeBuy, "500", "140", "1", "393", "1500"),
+			expectedPricedRow("ada-sell-2024-001", syncmodel.ActivityTypeSell, "1000", "300", "3", closingBasis, "500"),
 		},
 		LiquidationSummaries: []ExpectedLiquidationSummary{
-			expectedLiquidation("ada-sell-2024-001", "1000", allocatedBasis, "297", gain, "USD"),
+			expectedLiquidation("ada-sell-2024-001", "1000", allocatedBasis, "297", gain),
 		},
 	}
 }
@@ -991,10 +991,10 @@ func expectedLTCDetail(closingBasis string, allocatedBasis string, gain string) 
 		CalculationCurrency:          "USD",
 		ExpectedFullLiquidationCount: 0,
 		ActivityRows: []ExpectedAssetActivityRow{
-			expectedPricedRow("ltc-sell-2024-001", syncmodel.ActivityTypeSell, "1", "250", "0", "USD", closingBasis, "1"),
+			expectedPricedRow("ltc-sell-2024-001", syncmodel.ActivityTypeSell, "1", "250", "0", closingBasis, "1"),
 		},
 		LiquidationSummaries: []ExpectedLiquidationSummary{
-			expectedLiquidation("ltc-sell-2024-001", "1", allocatedBasis, "250", gain, "USD"),
+			expectedLiquidation("ltc-sell-2024-001", "1", allocatedBasis, "250", gain),
 		},
 	}
 }
@@ -1043,10 +1043,10 @@ func expectedAVAXDetail(closingBasis string, allocatedBasis string, gain string,
 		CalculationCurrency:          "USD",
 		ExpectedFullLiquidationCount: fullLiquidationCount,
 		ActivityRows: []ExpectedAssetActivityRow{
-			expectedPricedRow("avax-sell-alpha-2024-001", syncmodel.ActivityTypeSell, "1", "250", "0", "USD", closingBasis, "1"),
+			expectedPricedRow("avax-sell-alpha-2024-001", syncmodel.ActivityTypeSell, "1", "250", "0", closingBasis, "1"),
 		},
 		LiquidationSummaries: []ExpectedLiquidationSummary{
-			expectedLiquidation("avax-sell-alpha-2024-001", "1", allocatedBasis, "250", gain, "USD"),
+			expectedLiquidation("avax-sell-alpha-2024-001", "1", allocatedBasis, "250", gain),
 		},
 	}
 }
@@ -1071,7 +1071,7 @@ func netGainFromDetail(detail ExpectedAssetDetail) string {
 
 // expectedPricedRow returns one expected priced activity row.
 // Authored by: OpenCode
-func expectedPricedRow(sourceID string, activityType syncmodel.ActivityType, quantity string, grossValue string, feeAmount string, activityCurrency string, basisAfterRow string, quantityAfterRow string) ExpectedAssetActivityRow {
+func expectedPricedRow(sourceID string, activityType syncmodel.ActivityType, quantity string, grossValue string, feeAmount string, basisAfterRow string, quantityAfterRow string) ExpectedAssetActivityRow {
 	return ExpectedAssetActivityRow{
 		SourceID:            sourceID,
 		ActivityType:        activityType,
@@ -1079,7 +1079,7 @@ func expectedPricedRow(sourceID string, activityType syncmodel.ActivityType, qua
 		UnitPrice:           "",
 		GrossValue:          grossValue,
 		FeeAmount:           feeAmount,
-		ActivityCurrency:    activityCurrency,
+		ActivityCurrency:    "USD",
 		BasisAfterRow:       basisAfterRow,
 		CalculationCurrency: "USD",
 		QuantityAfterRow:    quantityAfterRow,
@@ -1106,14 +1106,14 @@ func expectedHoldingReductionRow(sourceID string, quantity string, basisAfterRow
 
 // expectedLiquidation returns one expected priced-liquidation summary row.
 // Authored by: OpenCode
-func expectedLiquidation(sourceID string, disposedQuantity string, allocatedBasis string, netLiquidationProceeds string, gainOrLoss string, activityCurrency string) ExpectedLiquidationSummary {
+func expectedLiquidation(sourceID string, disposedQuantity string, allocatedBasis string, netLiquidationProceeds string, gainOrLoss string) ExpectedLiquidationSummary {
 	return ExpectedLiquidationSummary{
 		SourceID:               sourceID,
 		DisposedQuantity:       disposedQuantity,
 		AllocatedBasis:         allocatedBasis,
 		NetLiquidationProceeds: netLiquidationProceeds,
 		GainOrLoss:             gainOrLoss,
-		ActivityCurrency:       activityCurrency,
+		ActivityCurrency:       "USD",
 		CalculationCurrency:    "USD",
 	}
 }
