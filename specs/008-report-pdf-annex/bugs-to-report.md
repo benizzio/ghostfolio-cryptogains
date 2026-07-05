@@ -1,6 +1,6 @@
 # Bugs found to report using bugfix
 
-## [ ] 1 - Markdown: general "Ghostfolio Capital Gains And Losses Report" summary section information classifier labels are not bold
+## [x] 1 - Markdown: general "Ghostfolio Capital Gains And Losses Report" summary section information classifier labels are not bold
 
 Actual general summary section was
 ```markdown
@@ -23,3 +23,4 @@ Expected general summary section was
 The document seems to have the correct data and structure, but it is basically a Markdown syntax document inside a PDF, making it illegible to humans because the Markdown code is printed without any interpretation.
 When printing to PDF, we need to format the data in a way it is human legible when generated. Re-assess research and verify if the current option of PDF generation library can format the text correctly in a way that fits the A4 pages. 
 If viable and interpreted by the library, use HTML to properly format. If not, verify other possibilities.
+Pure report data and report formatting code must be isolated in their respective extension layers and most not interfere in each other (e.g. markdown formatted text should never enter the PDF layer)
