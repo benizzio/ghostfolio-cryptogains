@@ -10,6 +10,8 @@
 
 Add an output-format choice to capital gains report generation so users can generate either the existing Markdown output or a new local A4 text PDF. The existing report calculation rules remain authoritative. The implementation will extend the report model with an audit annex and generated-output bundle, move detailed Currency Conversion Audit rows into Annex 1, render Markdown as a main file plus a separate annex file, render PDF as one searchable text file containing the main report and Annex 1 after a page break, and update TUI/runtime/output flows to report every generated file or fail without presenting partial output.
 
+**Bugfix**: 2026-07-05 — [BUG-001] Updated from bugfix patch. Markdown initial detail verification must assert exact bold classifier label syntax.
+
 ## Technical Context
 
 **Language/Version**: Go 1.26.3
@@ -155,6 +157,7 @@ Alternatives rejected:
 ## Testing Strategy
 
 - Contract tests verify report output format choices, TUI selection copy, output filename patterns, generated file path reporting, main report rendering changes, Annex 1 rendering order, and PDF A4/text-output contract.
+- Markdown renderer and contract tests must assert exact initial detail list-item labels `- **Year:**`, `- **Cost Basis Method:**`, `- **Generated At:**`, and `- **Report Calculation Currency:**` before report values.
 - Contract tests verify that the user can select an output format and start generation from the report generation step without waiting on rendering or file IO in the Bubble Tea event loop; this is the automated workflow evidence for SC-001's 30-second bound.
 - Integration tests generate Markdown and PDF from the same deterministic protected cache and assert shared report data matches between formats except for pagination, page titles, and Markdown annex splitting.
 - Integration tests verify Markdown success creates exactly two files and PDF success creates exactly one file.

@@ -29,6 +29,10 @@
 
 - Q: Are generated report files application-managed persistence requiring token-derived encryption at rest? → A: No. Generated report files are explicit user-requested exports outside the application-managed persistence boundary. The application writes them locally only when the user requests generation, does not manage them as a cache or durable application state, does not re-ingest them automatically, and must still use safe filenames, owner-local file handling, failure cleanup, and secret redaction.
 
+### Session 2026-07-05
+
+**Bugfix**: 2026-07-05 — [BUG-001] Clarified Markdown initial report detail label formatting.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Choose Report Output Format (Priority: P1)
@@ -103,7 +107,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **FR-003**: The system MUST generate PDF reports on A4-sized pages.
 - **FR-004**: The system MUST keep PDF and Markdown main report shared content aligned by preserving the same required output data, explanatory text blocks, table content, and section meanings, with differences limited to PDF pagination, PDF page titles, and Markdown annex file separation.
 - **FR-005**: The system MUST start Annex 1 on a new PDF page, MUST allow additional PDF page breaks only before a top-level section, per-asset annex section, table row, or content block that would not fit in the remaining printable page area, and MUST repeat visible section or table context on continuation pages.
-- **FR-006**: The system MUST render information classifier labels in the initial report details block in bold.
+- **FR-006**: The system MUST render information classifier labels in the initial report details block in bold. For Markdown output, the initial details list items MUST use the exact classifier label shape `- **Year:**`, `- **Cost Basis Method:**`, `- **Generated At:**`, and `- **Report Calculation Currency:**` before their values.
 - **FR-007**: The system MUST omit Gains-And-Losses Summary rows whose Net Gain Or Loss is zero.
 - **FR-008**: The system MUST render a clear empty-state message when all Gains-And-Losses Summary rows are omitted because their Net Gain Or Loss is zero.
 - **FR-009**: The system MUST render information classifier labels in the Rate Source Summary in bold.
