@@ -84,9 +84,9 @@ func TestReportGenerationSuccessWritesMarkdownAndReturnsToUnlockedContext(t *tes
 	var reportText = string(rawReport)
 	for _, expected := range []string{
 		"# Ghostfolio Capital Gains And Losses Report",
-		"- Year: 2024",
-		"- Cost Basis Method: FIFO",
-		"- Report Calculation Currency: USD",
+		"- **Year:** 2024",
+		"- **Cost Basis Method:** FIFO",
+		"- **Report Calculation Currency:** USD",
 		"## Gains-And-Losses Summary",
 		"## Reference Section",
 		"| Overall Yearly Net Total |",
@@ -558,7 +558,7 @@ func TestSameCurrencyReportPreservesPriorMonetaryResults(t *testing.T) {
 			var reportText = string(rawReport)
 			var label = reportBaseCurrency.Label()
 			for _, expected := range []string{
-				"- Report Calculation Currency: " + label,
+				"- **Report Calculation Currency:** " + label,
 				"| unit-buy-2024-001 | BUY | 3 | 0.3333333333333333 | 1 | 0 | 3 | 1 | " + label + " | " + label + " |",
 				"| unit-sell-2024-001 | SELL | 1 | 1 | 1 | 0 | 2 | 0.6666666666666667 | " + label + " | " + label + " |",
 				"| unit-sell-2024-001 | 1 | 0.3333333333333333 | 1 | 0.6666666666666667 | " + label + " |",
@@ -626,8 +626,8 @@ func TestReportGenerationConvertsDeterministicMixedCurrencyFixture(t *testing.T)
 	}
 	var reportText = combinedReportText.String()
 	for _, expected := range []string{
-		"- Report Calculation Currency: EUR",
-		"- Report Calculation Currency: USD",
+		"- **Report Calculation Currency:** EUR",
+		"- **Report Calculation Currency:** USD",
 		"ECB Data Portal `EXR`",
 		"Federal Reserve Board H.10/Data Download Program",
 		"mixed-usd-buy-2024-000",

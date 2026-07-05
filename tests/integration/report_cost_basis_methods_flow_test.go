@@ -89,8 +89,8 @@ func TestReportGenerationMatchesControlledLedgersAcrossCostBasisMethods(t *testi
 			}
 			var reportText = string(rawReport)
 			for _, required := range []string{
-				"- Cost Basis Method: " + method.Label(),
-				"- Report Calculation Currency: " + expected.ReportCalculationCurrency,
+				"- **Cost Basis Method:** " + method.Label(),
+				"- **Report Calculation Currency:** " + expected.ReportCalculationCurrency,
 				"## Gains-And-Losses Summary",
 				"## Reference Section",
 			} {

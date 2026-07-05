@@ -177,7 +177,7 @@
 
 ### Tests for User Story 2
 
-- [ ] T024 [P] [US2] ⚠️ Reopened Add or tighten main report presentation contract tests for exact initial detail bold-label lines (`- **Year:**`, `- **Cost Basis Method:**`, `- **Generated At:**`, and `- **Report Calculation Currency:**`), zero row omission, header rename, and no main conversion audit in `tests/contract/markdown_report_contract_test.go` (reopened — BUG-001)
+- [X] T024 [P] [US2] ⚠️ Reopened Add or tighten main report presentation contract tests for exact initial detail bold-label lines (`- **Year:**`, `- **Cost Basis Method:**`, `- **Generated At:**`, and `- **Report Calculation Currency:**`), zero row omission, header rename, and no main conversion audit in `tests/contract/markdown_report_contract_test.go` (reopened — BUG-001)
 - [X] T025 [P] [US2] Add Markdown renderer unit tests for summary empty state, historical position, conversion status labels, and `BLOCKCHAIN OP` in `internal/report/markdown/renderer_internal_test.go`
 - [X] T026 [P] [US2] Add PDF main report presentation unit tests mirroring shared Markdown content rules in `internal/report/pdf/renderer_internal_test.go`
 - [X] T027 [P] [US2] Add report output integration assertions for clearer main report content in both formats in `tests/integration/report_generation_flow_test.go`
@@ -185,7 +185,7 @@
 ### Implementation for User Story 2
 
 - [X] T028 [US2] Add closed user-facing render label helpers for conversion status, quote direction, and zero-priced SELL display in `internal/report/model/render_labels.go`
-- [ ] T029 [US2] ⚠️ Reopened Bold the Markdown initial details block path with exact label-and-colon markup, plus rate-source classifier labels, in `internal/report/markdown/renderer.go` and `internal/report/markdown/renderer_conversion.go` (reopened — BUG-001)
+- [X] T029 [US2] ⚠️ Reopened Bold the Markdown initial details block path with exact label-and-colon markup, plus rate-source classifier labels, in `internal/report/markdown/renderer.go` and `internal/report/markdown/renderer_conversion.go` (reopened — BUG-001)
 - [X] T030 [US2] Omit zero net-gain summary rows and render the all-zero empty state in `internal/report/markdown/renderer_summary.go`
 - [X] T031 [US2] Rename the reference header and render `Historical Position` for assets without report-year activity in `internal/report/markdown/renderer_details.go`
 - [X] T032 [US2] Remove detailed Currency Conversion Audit from the main Markdown report and use label helpers for visible conversion statuses in `internal/report/markdown/renderer_conversion.go` and `internal/report/markdown/renderer_details.go`

@@ -99,8 +99,8 @@ func TestReportPerformanceFlowLargeHistoryFixture(t *testing.T) {
 	var reportText = string(reportBytes)
 	for _, expected := range []string{
 		"# Ghostfolio Capital Gains And Losses Report",
-		"- Year: 2025",
-		"- Cost Basis Method: HIFO",
+		"- **Year:** 2025",
+		"- **Cost Basis Method:** HIFO",
 		"## Gains-And-Losses Summary",
 		"## Reference Section",
 	} {

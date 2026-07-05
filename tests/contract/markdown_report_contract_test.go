@@ -39,10 +39,13 @@ func TestMarkdownReportDocumentContract(t *testing.T) {
 	}
 
 	assertContains(t, document.Content, "# Ghostfolio Capital Gains And Losses Report")
-	assertContains(t, document.Content, "- Year: 2024")
-	assertContains(t, document.Content, "- Cost Basis Method: FIFO")
-	assertContains(t, document.Content, "- Generated At:")
-	assertContains(t, document.Content, "- Report Calculation Currency: EUR")
+	assertContains(t, document.Content, "- **Year:** 2024")
+	assertContains(t, document.Content, "- **Cost Basis Method:** FIFO")
+	assertContains(t, document.Content, "- **Generated At:**")
+	assertContains(t, document.Content, "- **Report Calculation Currency:** EUR")
+	assertNotContains(t, document.Content, "- Year: 2024")
+	assertNotContains(t, document.Content, "- Cost Basis Method: FIFO")
+	assertNotContains(t, document.Content, "- Report Calculation Currency: EUR")
 	assertNotContains(t, document.Content, "- Report Calculation Currency: NOT APPLICABLE")
 	assertContains(t, document.Content, "## Gains-And-Losses Summary")
 	assertContains(t, document.Content, "## Reference Section")

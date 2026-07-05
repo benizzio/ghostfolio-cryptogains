@@ -65,7 +65,7 @@ func TestReportGenerationEmptyMainSectionWritesEmptyMarkdownReport(t *testing.T)
 	}
 	var reportText = string(reportBytes)
 	for _, expected := range []string{
-		"- Report Calculation Currency: USD",
+		"- **Report Calculation Currency:** USD",
 		"No assets had a non-zero net gain or loss in the selected year.",
 		"| Overall Yearly Net Total | 0 | USD |",
 		"## Reference Section",

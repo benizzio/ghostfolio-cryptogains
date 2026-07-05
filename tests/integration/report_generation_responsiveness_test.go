@@ -67,7 +67,7 @@ func TestReportGenerationResponsivenessLargeCrossCurrencyFixture(t *testing.T) {
 	}
 	var reportText = string(rawReport)
 	for _, expected := range []string{
-		"- Report Calculation Currency: USD",
+		"- **Report Calculation Currency:** USD",
 		"Federal Reserve Board H.10/Data Download Program",
 		"responsiveness-eur-buy-00000",
 		"responsiveness-gbp-buy-00001",

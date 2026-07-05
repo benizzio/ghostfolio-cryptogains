@@ -88,8 +88,8 @@ func RenderDocuments(report reportmodel.CapitalGainsReport) ([]reportmodel.Repor
 // Authored by: OpenCode
 func writeHeader(builder *strings.Builder, report reportmodel.CapitalGainsReport, calculationCurrency string) {
 	builder.WriteString("# Ghostfolio Capital Gains And Losses Report\n\n")
-	fmt.Fprintf(builder, "- Year: %d\n", report.Year)
-	fmt.Fprintf(builder, "- Cost Basis Method: %s\n", report.CostBasisMethod.Label())
-	fmt.Fprintf(builder, "- Generated At: %s\n", report.GeneratedAt.Local().Format("2006-01-02 15:04:05 MST"))
-	fmt.Fprintf(builder, "- Report Calculation Currency: %s\n\n", calculationCurrency)
+	fmt.Fprintf(builder, "- **Year:** %d\n", report.Year)
+	fmt.Fprintf(builder, "- **Cost Basis Method:** %s\n", report.CostBasisMethod.Label())
+	fmt.Fprintf(builder, "- **Generated At:** %s\n", report.GeneratedAt.Local().Format("2006-01-02 15:04:05 MST"))
+	fmt.Fprintf(builder, "- **Report Calculation Currency:** %s\n\n", calculationCurrency)
 }
