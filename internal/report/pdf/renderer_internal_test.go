@@ -98,12 +98,12 @@ func TestEmitMainAndAnnexShellUsesMainReportPresentationRules(t *testing.T) {
 
 	var text = strings.Join(recorder.texts, "\n")
 	for _, expected := range []string{
-		"| Asset | Historical Full Liquidation Count | Main Section Status |",
+		"Reference columns: Asset, Historical Full Liquidation Count, Main Section Status",
 		"No assets had a non-zero net gain or loss in the selected year.",
-		"### Historical Position",
-		"- **Quantity:** 4",
-		"| zero-sell | BLOCKCHAIN OP | 1 | 0 | 0 | 0 | 3 | 0 |  | USD |  | custody transfer |",
-		"| converted-sell | SELL | 1 | 10 | 10 | 0 | 0 | 0 | EUR | USD | Converted |  |",
+		"Historical Position",
+		"Quantity: 4",
+		"Activity row: 2024-01-01 10:00:00, zero-sell, BLOCKCHAIN OP, 1, 0, 0, 0, 3, 0, , USD, , custody transfer",
+		"Activity row: 2024-01-02 10:00:00, converted-sell, SELL, 1, 10, 10, 0, 0, 0, EUR, USD, Converted, ",
 	} {
 		assertTextEmitted(t, []string{text}, expected)
 	}
@@ -112,6 +112,7 @@ func TestEmitMainAndAnnexShellUsesMainReportPresentationRules(t *testing.T) {
 			t.Fatalf("expected PDF text to exclude %q, got %q", excluded, text)
 		}
 	}
+	assertNoMarkdownStructuralSyntax(t, recorder.texts)
 }
 
 // TestEmitMainAndAnnexShellIncludesDetailedAnnexAfterPageBreak verifies the PDF
@@ -130,11 +131,11 @@ func TestEmitMainAndAnnexShellIncludesDetailedAnnexAfterPageBreak(t *testing.T) 
 	}
 	var text = strings.Join(recorder.texts, "\n")
 	for _, expected := range []string{
-		"# Annex 1 - Audit",
-		"## Detailed Per-Asset Audit Report",
-		"### Asset: BTC",
-		"| Date/Time | Source ID | Activity Type | Quantity | Unit Price | Gross Value | Fee | Original Activity Currency | Calculation Currency | Quantity After Activity | Basis After Activity | Full Liquidation Event | Allocated Basis | Net Liquidation Proceeds | Gain/Loss | Conversion Status | Sanitized Note |",
-		"| pdf-annex-sell | SELL | 1 | 20 | 20 | 1 | EUR | USD | 0 | 0 | true | 10 | 19 | 9 | Converted | pdf annex note |",
+		"Annex 1 - Audit",
+		"Detailed Per-Asset Audit Report",
+		"Asset: BTC",
+		"Audit columns: Date/Time, Source ID, Activity Type, Quantity, Unit Price, Gross Value, Fee, Original Activity Currency, Calculation Currency, Quantity After Activity, Basis After Activity, Full Liquidation Event, Allocated Basis, Net Liquidation Proceeds, Gain/Loss, Conversion Status, Sanitized Note",
+		"Audit row: 2024-01-02 10:00:00, pdf-annex-sell, SELL, 1, 20, 20, 1, EUR, USD, 0, 0, true, 10, 19, 9, Converted, pdf annex note",
 		"Base currency per source currency",
 	} {
 		assertTextEmitted(t, []string{text}, expected)
@@ -144,6 +145,7 @@ func TestEmitMainAndAnnexShellIncludesDetailedAnnexAfterPageBreak(t *testing.T) 
 			t.Fatalf("expected PDF annex to exclude raw label %q, got %q", excluded, text)
 		}
 	}
+	assertNoMarkdownStructuralSyntax(t, recorder.texts)
 }
 
 // TestRendererRenderValidationAndSuccessBranches verifies the exported render
@@ -250,31 +252,509 @@ func TestRendererSeamErrorBranches(t *testing.T) {
 	}
 }
 
-// TestPDFMarkdownRenderSeamFailures verifies the PDF boundary returns failures
-// from the main and Annex Markdown renderers before writing selectable text.
+// TestPDFRenderedTextExcludesMarkdownStructuralSyntax verifies the PDF renderer
+// emits PDF presentation text rather than Markdown-rendered body content.
 // Authored by: OpenCode
-func TestPDFMarkdownRenderSeamFailures(t *testing.T) {
-	var previousMainRenderer = renderMainForPDF
-	var previousAnnexRenderer = renderAnnexForPDF
+func TestPDFRenderedTextExcludesMarkdownStructuralSyntax(t *testing.T) {
+	var recorder = &textEmissionRecorder{}
+	var err = emitMainAndAnnexShell(recorder, pdfAnnexReportFixture(t))
+	if err != nil {
+		t.Fatalf("emit PDF text: %v", err)
+	}
+
+	assertNoMarkdownStructuralSyntax(t, recorder.texts)
+}
+
+// TestPDFFormattingHelperFallbackBranches covers PDF-only label and conversion
+// fallback paths that are not naturally exercised by the report fixtures.
+// Authored by: OpenCode
+func TestPDFFormattingHelperFallbackBranches(t *testing.T) {
+	var fallbackLabel = renderDisplayLabel("", "asset-fallback")
+	if fallbackLabel != "asset-fallback" {
+		t.Fatalf("fallback display label = %q, want asset-fallback", fallbackLabel)
+	}
+	var unknownLabel = renderDisplayLabel("", "")
+	if unknownLabel != "Unknown Asset" {
+		t.Fatalf("unknown display label = %q, want Unknown Asset", unknownLabel)
+	}
+
+	var unitPrice = apd.New(1, 0)
+	var status, err = conversionStatusColumn(reportmodel.AssetActivityRow{
+		ActivityCurrency:    "USD",
+		CalculationCurrency: "USD",
+		UnitPrice:           unitPrice,
+	})
+	if err != nil {
+		t.Fatalf("same-currency conversion status: %v", err)
+	}
+	if status != "Same currency" {
+		t.Fatalf("same-currency conversion status = %q, want Same currency", status)
+	}
+	var convertedStatus string
+	convertedStatus, err = conversionStatusColumn(reportmodel.AssetActivityRow{
+		ActivityCurrency:    "EUR",
+		CalculationCurrency: "USD",
+		UnitPrice:           unitPrice,
+	})
+	if err != nil {
+		t.Fatalf("inferred converted status: %v", err)
+	}
+	if convertedStatus != "Converted" {
+		t.Fatalf("inferred converted status = %q, want Converted", convertedStatus)
+	}
+	var noMonetaryStatus string
+	noMonetaryStatus, err = conversionStatusColumn(reportmodel.AssetActivityRow{ActivityCurrency: "USD"})
+	if err != nil {
+		t.Fatalf("no-monetary conversion status: %v", err)
+	}
+	if noMonetaryStatus != "" {
+		t.Fatalf("no-monetary conversion status = %q, want empty", noMonetaryStatus)
+	}
+	if label := calculationCurrencyLabel(""); label != "NOT APPLICABLE" {
+		t.Fatalf("empty calculation currency label = %q, want NOT APPLICABLE", label)
+	}
+	if label := calculationCurrencyLabelWithFallback("", "USD"); label != "USD" {
+		t.Fatalf("fallback calculation currency label = %q, want USD", label)
+	}
+	if label := rateProviderLabel(reportmodel.RateProviderIDECBEXR); label != "ECB Data Portal EXR" {
+		t.Fatalf("ECB provider label = %q, want ECB Data Portal EXR", label)
+	}
+}
+
+// TestPDFFormattingHelperErrorBranches covers defensive renderer helper failures
+// so the PDF package keeps complete coverage while retaining explicit error paths.
+// Authored by: OpenCode
+func TestPDFFormattingHelperErrorBranches(t *testing.T) {
+	var invalidDecimal = nonFiniteDecimal()
+	var validReport = pdfPresentationReportFixture(t)
+
+	var summaryReport = validReport
+	summaryReport.SummaryEntries = []reportmodel.AssetSummaryEntry{{
+		AssetIdentityKey:          "asset-invalid-summary",
+		DisplayLabel:              "BAD",
+		NetGainOrLoss:             invalidDecimal,
+		ReportCalculationCurrency: "USD",
+	}}
+	assertErrorContains(t, func() error {
+		_, err := buildMainReportLines(summaryReport)
+		return err
+	}, "net gain or loss")
+
+	var totalReport = validReport
+	totalReport.SummaryEntries = nil
+	totalReport.YearlyNetTotal = invalidDecimal
+	assertErrorContains(t, func() error {
+		_, err := buildSummaryLines(totalReport, "USD")
+		return err
+	}, "yearly net total")
+
+	var duplicateRateReport = validReport
+	var conversion = pdfAnnexConversionEntry()
+	duplicateRateReport.RateSources = []reportmodel.ExchangeRateEvidence{*conversion.Amounts[0].ExchangeRateEvidence, *conversion.Amounts[0].ExchangeRateEvidence}
+	var duplicateRateLines = buildRateSourceLines(duplicateRateReport)
+	assertTextEmitted(t, duplicateRateLines, "Rate Source Summary")
+
+	assertErrorContains(t, func() error {
+		var err = emitMainAndAnnexShell(&textEmissionRecorder{}, summaryReport)
+		return err
+	}, "net gain or loss")
+
+	assertErrorContains(t, func() error {
+		_, err := buildPositionLines("Bad Position", invalidDecimal, *apd.New(1, 0), "USD", "USD")
+		return err
+	}, "quantity")
+	assertErrorContains(t, func() error {
+		_, err := buildPositionLines("Bad Position", *apd.New(1, 0), invalidDecimal, "USD", "USD")
+		return err
+	}, "cost basis")
+
+	var historicalReport = validReport
+	historicalReport.DetailSections = []reportmodel.AssetDetailSection{{AssetIdentityKey: "asset-historical", ClosingQuantity: invalidDecimal}}
+	assertErrorContains(t, func() error {
+		_, err := buildDetailLines(historicalReport, "USD")
+		return err
+	}, "historical position")
+
+	var openingReport = validReport
+	openingReport.DetailSections = []reportmodel.AssetDetailSection{{AssetIdentityKey: "asset-opening", ActivityRows: []reportmodel.AssetActivityRow{{SourceID: "row", ActivityType: reportmodel.ActivityTypeBuy}}, OpeningQuantity: invalidDecimal}}
+	assertErrorContains(t, func() error {
+		_, err := buildDetailLines(openingReport, "USD")
+		return err
+	}, "opening position")
+
+	var activityReport = validReport
+	activityReport.DetailSections = []reportmodel.AssetDetailSection{{AssetIdentityKey: "asset-activity", ActivityRows: []reportmodel.AssetActivityRow{{SourceID: "row", Quantity: invalidDecimal}}}}
+	assertErrorContains(t, func() error {
+		_, err := buildDetailLines(activityReport, "USD")
+		return err
+	}, "in-year activity")
+
+	var liquidationReport = validReport
+	liquidationReport.DetailSections = []reportmodel.AssetDetailSection{{
+		AssetIdentityKey: "asset-liquidation",
+		ActivityRows:     []reportmodel.AssetActivityRow{{SourceID: "row", ActivityType: reportmodel.ActivityTypeBuy, Quantity: *apd.New(1, 0)}},
+		LiquidationSummaries: []reportmodel.LiquidationCalculation{{
+			SourceID:         "liq",
+			DisposedQuantity: invalidDecimal,
+		}},
+	}}
+	assertErrorContains(t, func() error {
+		_, err := buildDetailLines(liquidationReport, "USD")
+		return err
+	}, "liquidation calculations")
+
+	var closingReport = validReport
+	closingReport.DetailSections = []reportmodel.AssetDetailSection{{AssetIdentityKey: "asset-closing", ActivityRows: []reportmodel.AssetActivityRow{{SourceID: "row", ActivityType: reportmodel.ActivityTypeBuy, Quantity: *apd.New(1, 0)}}, ClosingQuantity: invalidDecimal}}
+	assertErrorContains(t, func() error {
+		_, err := buildMainReportLines(closingReport)
+		return err
+	}, "closing position")
+	assertErrorContains(t, func() error {
+		_, err := buildDetailLines(closingReport, "USD")
+		return err
+	}, "closing position")
+
+	var annexReport = validReport
+	var invalidConversion = pdfAnnexConversionEntry()
+	invalidConversion.RateValue = invalidDecimal
+	annexReport.AuditAnnex = reportmodel.AuditAnnex{Title: AnnexTitle, SectionOrder: reportmodel.RequiredAuditAnnexSectionOrder(), ConversionAuditEntries: []reportmodel.ConversionAuditEntry{invalidConversion}}
+	assertErrorContains(t, func() error {
+		var err = emitMainAndAnnexShell(&textEmissionRecorder{}, annexReport)
+		return err
+	}, "rate value")
+
+	assertActivityLineErrorBranches(t, invalidDecimal)
+	assertLiquidationLineErrorBranches(t, invalidDecimal)
+	assertAnnexErrorBranches(t, invalidDecimal)
+}
+
+// TestPDFEmissionBuilderSeamErrorBranches covers wrapper error propagation from
+// the private PDF line-builder seams.
+// Authored by: OpenCode
+func TestPDFEmissionBuilderSeamErrorBranches(t *testing.T) {
+	var previousMainBuilder = buildMainReportLinesForPDF
+	var previousAnnexBuilder = buildAnnexLinesForPDF
 	defer func() {
-		renderMainForPDF = previousMainRenderer
-		renderAnnexForPDF = previousAnnexRenderer
+		buildMainReportLinesForPDF = previousMainBuilder
+		buildAnnexLinesForPDF = previousAnnexBuilder
 	}()
 
-	renderMainForPDF = func(reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
-		return reportmodel.ReportDocument{}, errors.New("main render failed")
+	buildMainReportLinesForPDF = func(reportmodel.CapitalGainsReport) ([]string, error) {
+		return nil, errors.New("main PDF layout failed")
 	}
-	if err := emitMainAndAnnexShell(&textEmissionRecorder{}, minimalPDFReportFixture(t)); err == nil || !strings.Contains(err.Error(), "main render failed") {
-		t.Fatalf("expected main render failure, got %v", err)
-	}
+	assertErrorContains(t, func() error {
+		return emitMainAndAnnexShell(&textEmissionRecorder{}, minimalPDFReportFixture(t))
+	}, "main PDF layout failed")
 
-	renderMainForPDF = previousMainRenderer
-	renderAnnexForPDF = func(reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
-		return reportmodel.ReportDocument{}, errors.New("annex render failed")
+	buildMainReportLinesForPDF = previousMainBuilder
+	buildAnnexLinesForPDF = func(reportmodel.AuditAnnex) ([]string, error) {
+		return nil, errors.New("annex PDF layout failed")
 	}
-	if err := emitMainAndAnnexShell(&textEmissionRecorder{}, minimalPDFReportFixture(t)); err == nil || !strings.Contains(err.Error(), "annex render failed") {
-		t.Fatalf("expected annex render failure, got %v", err)
+	assertErrorContains(t, func() error {
+		return emitMainAndAnnexShell(&textEmissionRecorder{}, minimalPDFReportFixture(t))
+	}, "annex PDF layout failed")
+}
+
+// assertActivityLineErrorBranches verifies activity-row PDF formatting failures.
+// Authored by: OpenCode
+func assertActivityLineErrorBranches(t *testing.T, invalidDecimal apd.Decimal) {
+	t.Helper()
+
+	var valid = reportmodel.AssetActivityRow{SourceID: "row", ActivityType: reportmodel.ActivityTypeSell, Quantity: *apd.New(1, 0), BasisAfterRow: *apd.New(0, 0), QuantityAfterRow: *apd.New(0, 0)}
+	var cases = []struct {
+		name string
+		row  reportmodel.AssetActivityRow
+		want string
+	}{
+		{name: "quantity", row: withActivityQuantity(valid, invalidDecimal), want: "quantity"},
+		{name: "unit price", row: withActivityUnitPrice(valid, invalidDecimal), want: "unit price"},
+		{name: "gross value", row: withActivityGrossValue(valid, invalidDecimal), want: "gross value"},
+		{name: "fee", row: withActivityFee(valid, invalidDecimal), want: "fee"},
+		{name: "basis after row", row: withActivityBasisAfterRow(valid, invalidDecimal), want: "basis after row"},
+		{name: "quantity after row", row: withActivityQuantityAfterRow(valid, invalidDecimal), want: "quantity after row"},
+		{name: "activity type label", row: withActivityType(valid, reportmodel.ActivityType("bad_type")), want: "type label"},
+		{name: "conversion status", row: withActivityConversionStatus(valid, reportmodel.ConversionStatus("bad_status")), want: "conversion status label"},
 	}
+	for _, testCase := range cases {
+		var testCase = testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			assertErrorContains(t, func() error {
+				_, err := buildActivityLine(testCase.row)
+				return err
+			}, testCase.want)
+		})
+	}
+	assertErrorContains(t, func() error {
+		_, err := buildActivityLines(reportmodel.AssetDetailSection{ActivityRows: []reportmodel.AssetActivityRow{{SourceID: "row", Quantity: invalidDecimal}}})
+		return err
+	}, "quantity")
+}
+
+// assertLiquidationLineErrorBranches verifies liquidation PDF formatting failures.
+// Authored by: OpenCode
+func assertLiquidationLineErrorBranches(t *testing.T, invalidDecimal apd.Decimal) {
+	t.Helper()
+
+	var valid = reportmodel.LiquidationCalculation{SourceID: "liq", DisposedQuantity: *apd.New(1, 0), AllocatedBasis: *apd.New(1, 0), NetLiquidationProceeds: *apd.New(1, 0), GainOrLoss: *apd.New(0, 0)}
+	var cases = []struct {
+		name        string
+		liquidation reportmodel.LiquidationCalculation
+		want        string
+	}{
+		{name: "disposed quantity", liquidation: withDisposedQuantity(valid, invalidDecimal), want: "disposed quantity"},
+		{name: "allocated basis", liquidation: withAllocatedBasis(valid, invalidDecimal), want: "allocated basis"},
+		{name: "net proceeds", liquidation: withNetLiquidationProceeds(valid, invalidDecimal), want: "net proceeds"},
+		{name: "gain or loss", liquidation: withGainOrLoss(valid, invalidDecimal), want: "gain or loss"},
+	}
+	for _, testCase := range cases {
+		var testCase = testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			assertErrorContains(t, func() error {
+				_, err := buildLiquidationLines(reportmodel.AssetDetailSection{LiquidationSummaries: []reportmodel.LiquidationCalculation{testCase.liquidation}}, "USD")
+				return err
+			}, testCase.want)
+		})
+	}
+}
+
+// assertAnnexErrorBranches verifies Annex 1 PDF formatting failures.
+// Authored by: OpenCode
+func assertAnnexErrorBranches(t *testing.T, invalidDecimal apd.Decimal) {
+	t.Helper()
+
+	var lines, err = buildAnnexLines(reportmodel.AuditAnnex{})
+	if err != nil {
+		t.Fatalf("default annex lines: %v", err)
+	}
+	assertTextEmitted(t, lines, AnnexTitle)
+
+	assertErrorContains(t, func() error {
+		_, err := buildAnnexLines(reportmodel.AuditAnnex{Title: AnnexTitle, SectionOrder: reportmodel.RequiredAuditAnnexSectionOrder(), PerAssetAuditSections: []reportmodel.PerAssetAuditSection{{AssetIdentityKey: "asset", Entries: []reportmodel.AuditActivityEntry{{SourceID: "entry", Quantity: invalidDecimal}}}}})
+		return err
+	}, "quantity")
+	assertErrorContains(t, func() error {
+		_, err := buildAnnexLines(reportmodel.AuditAnnex{Title: AnnexTitle, SectionOrder: reportmodel.RequiredAuditAnnexSectionOrder(), ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{SourceID: "conversion", RateValue: invalidDecimal}}})
+		return err
+	}, "rate value")
+
+	assertAnnexActivityLineErrorBranches(t, invalidDecimal)
+	assertAnnexConversionLineErrorBranches(t, invalidDecimal)
+}
+
+// assertAnnexActivityLineErrorBranches verifies detailed audit row PDF failures.
+// Authored by: OpenCode
+func assertAnnexActivityLineErrorBranches(t *testing.T, invalidDecimal apd.Decimal) {
+	t.Helper()
+
+	var valid = reportmodel.AuditActivityEntry{
+		SourceID:              "entry",
+		ActivityType:          reportmodel.ActivityTypeSell,
+		Quantity:              *apd.New(1, 0),
+		QuantityAfterActivity: *apd.New(0, 0),
+		BasisAfterActivity:    *apd.New(0, 0),
+	}
+	var cases = []struct {
+		name  string
+		entry reportmodel.AuditActivityEntry
+		want  string
+	}{
+		{name: "quantity", entry: withAnnexQuantity(valid, invalidDecimal), want: "quantity"},
+		{name: "unit price", entry: withAnnexUnitPrice(valid, invalidDecimal), want: "unit price"},
+		{name: "gross value", entry: withAnnexGrossValue(valid, invalidDecimal), want: "gross value"},
+		{name: "fee", entry: withAnnexFee(valid, invalidDecimal), want: "fee"},
+		{name: "quantity after", entry: withAnnexQuantityAfter(valid, invalidDecimal), want: "quantity after activity"},
+		{name: "basis after", entry: withAnnexBasisAfter(valid, invalidDecimal), want: "basis after activity"},
+		{name: "allocated basis", entry: withAnnexAllocatedBasis(valid, invalidDecimal), want: "allocated basis"},
+		{name: "proceeds", entry: withAnnexProceeds(valid, invalidDecimal), want: "net liquidation proceeds"},
+		{name: "gain", entry: withAnnexGain(valid, invalidDecimal), want: "gain or loss"},
+		{name: "type", entry: withAnnexActivityType(valid, reportmodel.ActivityType("bad_type")), want: "activity type label"},
+		{name: "conversion", entry: withAnnexConversionStatus(valid, reportmodel.ConversionStatus("bad_status")), want: "conversion status label"},
+	}
+	for _, testCase := range cases {
+		var testCase = testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			assertErrorContains(t, func() error {
+				_, err := buildAnnexActivityLine(testCase.entry)
+				return err
+			}, testCase.want)
+		})
+	}
+}
+
+// assertAnnexConversionLineErrorBranches verifies conversion audit PDF failures.
+// Authored by: OpenCode
+func assertAnnexConversionLineErrorBranches(t *testing.T, invalidDecimal apd.Decimal) {
+	t.Helper()
+
+	var valid = pdfAnnexConversionEntry()
+	assertErrorContains(t, func() error {
+		var entry = valid
+		entry.RateValue = invalidDecimal
+		_, err := buildAnnexConversionLines(reportmodel.AuditAnnex{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{entry}})
+		return err
+	}, "rate value")
+	assertErrorContains(t, func() error {
+		var entry = valid
+		entry.Amounts = append([]reportmodel.ConvertedActivityAmount(nil), valid.Amounts...)
+		entry.Amounts[0].OriginalAmount = invalidDecimal
+		_, err := buildAnnexConversionLines(reportmodel.AuditAnnex{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{entry}})
+		return err
+	}, "original amount")
+	assertErrorContains(t, func() error {
+		var entry = valid
+		entry.Amounts = append([]reportmodel.ConvertedActivityAmount(nil), valid.Amounts...)
+		entry.Amounts[0].ConvertedAmount = invalidDecimal
+		_, err := buildAnnexConversionLines(reportmodel.AuditAnnex{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{entry}})
+		return err
+	}, "converted amount")
+	assertErrorContains(t, func() error {
+		var entry = valid
+		entry.QuoteDirection = reportmodel.QuoteDirection("bad_direction")
+		_, err := buildAnnexConversionLines(reportmodel.AuditAnnex{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{entry}})
+		return err
+	}, "quote direction")
+
+	var zeroAmount = valid.Amounts[0]
+	zeroAmount.OriginalAmount = *apd.New(0, 0)
+	zeroAmount.ConvertedAmount = *apd.New(0, 0)
+	if rendered, err := renderGroupedConvertedAmounts(0, []reportmodel.ConvertedActivityAmount{zeroAmount}); err != nil || rendered != "" {
+		t.Fatalf("zero converted amounts = %q, %v; want empty nil", rendered, err)
+	}
+}
+
+// assertErrorContains verifies a direct helper returns a matching error.
+// Authored by: OpenCode
+func assertErrorContains(t *testing.T, call func() error, want string) {
+	t.Helper()
+
+	var err = call()
+	if err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("error = %v, want containing %q", err, want)
+	}
+}
+
+// nonFiniteDecimal returns a decimal that support/decimal rejects for rendering.
+// Authored by: OpenCode
+func nonFiniteDecimal() apd.Decimal {
+	return apd.Decimal{Form: apd.NaN}
+}
+
+func withActivityQuantity(row reportmodel.AssetActivityRow, value apd.Decimal) reportmodel.AssetActivityRow {
+	row.Quantity = value
+	return row
+}
+
+func withActivityUnitPrice(row reportmodel.AssetActivityRow, value apd.Decimal) reportmodel.AssetActivityRow {
+	row.UnitPrice = &value
+	return row
+}
+
+func withActivityGrossValue(row reportmodel.AssetActivityRow, value apd.Decimal) reportmodel.AssetActivityRow {
+	row.GrossValue = &value
+	return row
+}
+
+func withActivityFee(row reportmodel.AssetActivityRow, value apd.Decimal) reportmodel.AssetActivityRow {
+	row.FeeAmount = &value
+	return row
+}
+
+func withActivityBasisAfterRow(row reportmodel.AssetActivityRow, value apd.Decimal) reportmodel.AssetActivityRow {
+	row.BasisAfterRow = value
+	return row
+}
+
+func withActivityQuantityAfterRow(row reportmodel.AssetActivityRow, value apd.Decimal) reportmodel.AssetActivityRow {
+	row.QuantityAfterRow = value
+	return row
+}
+
+func withActivityType(row reportmodel.AssetActivityRow, value reportmodel.ActivityType) reportmodel.AssetActivityRow {
+	row.ActivityType = value
+	return row
+}
+
+func withActivityConversionStatus(row reportmodel.AssetActivityRow, value reportmodel.ConversionStatus) reportmodel.AssetActivityRow {
+	row.ActivityCurrency = "EUR"
+	row.CalculationCurrency = "USD"
+	row.UnitPrice = apd.New(1, 0)
+	row.ConversionStatus = value
+	return row
+}
+
+func withDisposedQuantity(liquidation reportmodel.LiquidationCalculation, value apd.Decimal) reportmodel.LiquidationCalculation {
+	liquidation.DisposedQuantity = value
+	return liquidation
+}
+
+func withAllocatedBasis(liquidation reportmodel.LiquidationCalculation, value apd.Decimal) reportmodel.LiquidationCalculation {
+	liquidation.AllocatedBasis = value
+	return liquidation
+}
+
+func withNetLiquidationProceeds(liquidation reportmodel.LiquidationCalculation, value apd.Decimal) reportmodel.LiquidationCalculation {
+	liquidation.NetLiquidationProceeds = value
+	return liquidation
+}
+
+func withGainOrLoss(liquidation reportmodel.LiquidationCalculation, value apd.Decimal) reportmodel.LiquidationCalculation {
+	liquidation.GainOrLoss = value
+	return liquidation
+}
+
+func withAnnexQuantity(entry reportmodel.AuditActivityEntry, value apd.Decimal) reportmodel.AuditActivityEntry {
+	entry.Quantity = value
+	return entry
+}
+
+func withAnnexUnitPrice(entry reportmodel.AuditActivityEntry, value apd.Decimal) reportmodel.AuditActivityEntry {
+	entry.UnitPrice = &value
+	return entry
+}
+
+func withAnnexGrossValue(entry reportmodel.AuditActivityEntry, value apd.Decimal) reportmodel.AuditActivityEntry {
+	entry.GrossValue = &value
+	return entry
+}
+
+func withAnnexFee(entry reportmodel.AuditActivityEntry, value apd.Decimal) reportmodel.AuditActivityEntry {
+	entry.FeeAmount = &value
+	return entry
+}
+
+func withAnnexQuantityAfter(entry reportmodel.AuditActivityEntry, value apd.Decimal) reportmodel.AuditActivityEntry {
+	entry.QuantityAfterActivity = value
+	return entry
+}
+
+func withAnnexBasisAfter(entry reportmodel.AuditActivityEntry, value apd.Decimal) reportmodel.AuditActivityEntry {
+	entry.BasisAfterActivity = value
+	return entry
+}
+
+func withAnnexAllocatedBasis(entry reportmodel.AuditActivityEntry, value apd.Decimal) reportmodel.AuditActivityEntry {
+	entry.AllocatedBasis = &value
+	return entry
+}
+
+func withAnnexProceeds(entry reportmodel.AuditActivityEntry, value apd.Decimal) reportmodel.AuditActivityEntry {
+	entry.NetLiquidationProceeds = &value
+	return entry
+}
+
+func withAnnexGain(entry reportmodel.AuditActivityEntry, value apd.Decimal) reportmodel.AuditActivityEntry {
+	entry.GainOrLoss = &value
+	return entry
+}
+
+func withAnnexActivityType(entry reportmodel.AuditActivityEntry, value reportmodel.ActivityType) reportmodel.AuditActivityEntry {
+	entry.ActivityType = value
+	return entry
+}
+
+func withAnnexConversionStatus(entry reportmodel.AuditActivityEntry, value reportmodel.ConversionStatus) reportmodel.AuditActivityEntry {
+	entry.ConversionStatus = value
+	return entry
 }
 
 // TestGopdfDocumentGuardBranches verifies concrete adapter guards that do not
@@ -506,6 +986,20 @@ func assertTextEmitted(t *testing.T, texts []string, want string) {
 	}
 
 	t.Fatalf("required text %q was not emitted in %q", want, texts)
+}
+
+// assertNoMarkdownStructuralSyntax verifies PDF presentation lines do not expose
+// Markdown heading markers, bold markers, table pipes, or table separators.
+// Authored by: OpenCode
+func assertNoMarkdownStructuralSyntax(t *testing.T, texts []string) {
+	t.Helper()
+
+	for _, text := range texts {
+		var trimmed = strings.TrimSpace(text)
+		if strings.HasPrefix(trimmed, "#") || strings.Contains(trimmed, "**") || strings.Contains(trimmed, "|") || strings.Contains(trimmed, "---") {
+			t.Fatalf("PDF text line contains Markdown structural syntax: %q", text)
+		}
+	}
 }
 
 // minimalPDFReportFixture creates a validated report containing only the fields

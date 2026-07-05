@@ -41,6 +41,8 @@ Rationale: The spec requires text-based searchable PDF output with selectable re
 
 Alternatives considered: Render Markdown to an image and place it in a PDF, but that would violate the selectable text requirement. Use an external `pdftotext`-style binary in tests, but that would add a platform dependency outside Go test control. Add a PDF text-extraction dependency immediately, but the first implementation can validate renderer behavior without another PDF dependency unless test evidence later proves insufficient.
 
+BUG-002 reassessment, 2026-07-05: `gopdf` remains suitable for the selected local-only renderer boundary. The implementation emits report-domain values through PDF-specific line formatting and `gopdf` text calls. It does not pass Markdown-rendered source text into the PDF body. Targeted regression tests cover formatted headings as plain PDF text, table-like column context as PDF presentation lines, wrapping/pagination through the renderer's A4 page seam, Annex 1 page break behavior, and rejection of visible Markdown heading markers, bold markers, table pipes, and table separators. No local-only alternative is needed for this boundary at this time.
+
 ## Embedded Font Strategy
 
 Decision: Load deterministic embedded Go font bytes through `gopdf.AddTTFFontByReader` rather than relying on local system font files.
