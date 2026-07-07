@@ -137,6 +137,8 @@ PDF output must satisfy these additional rules:
 - Required report text is emitted as selectable text, not as page images.
 - PDF output renders report-domain content through PDF-specific layout and must not use Markdown-rendered content as the PDF body.
 - Markdown structural syntax, including heading markers, table pipes or separators, and bold markers, must not appear as visible PDF report presentation.
+- PDF output must use `github.com/signintech/gopdf` layout primitives for A4 page creation, application-supplied font loading, heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context.
+- A PDF renderer that emits report-domain values only as a plain sequential line dump is not a valid successful PDF output, even when the emitted text is selectable and contains no Markdown structural syntax.
 - Annex 1 starts on a new page.
 - Additional page breaks are allowed only before a top-level section, per-asset annex section, table row, or content block that would not fit in the remaining printable page area.
 - A continuation page must repeat visible section context or table header context before continued content.

@@ -23,6 +23,7 @@ Expected result:
 - TUI contract tests show output-format selection and selected format on busy/result screens
 - Markdown renderer tests produce a main document and Annex 1 document
 - PDF renderer tests produce A4 text PDF bytes through the local renderer
+- PDF renderer tests require `gopdf` layout primitives for visible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context, and fail for plain sequential line dumps
 - rendering tests cover bold classifier labels, zero summary row omission, summary empty state, `Historical Full Liquidation Count`, `Historical Position`, exact conversion status labels `Same currency` and `Converted`, exact quote direction labels `Source currency per base currency` and `Base currency per source currency`, and `BLOCKCHAIN OP`
 - runtime tests verify Markdown creates exactly two files and PDF creates exactly one file
 - failure tests verify partial output cleanup
@@ -63,6 +64,8 @@ Contract and integration coverage should prove these scenarios:
 - Markdown Annex 1 filename inserts `-annex-1-` immediately before the date segment.
 - Successful result screens list all generated paths.
 - PDF generation works without user-installed fonts, platform-specific font paths, browser rendering, operating-system print-to-PDF support, or remote font resources.
+- PDF renderer tests prove the `gopdf` layout boundary is used for A4 pages, application-supplied fonts, headings, styled text, table rows, table columns, wrapping, and continuation context.
+- PDF output is rejected when it is only a plain sequential line dump, even if its text is selectable and contains no Markdown syntax.
 - Main report omits detailed Currency Conversion Audit rows.
 - Annex 1 title is `Annex 1 - Audit`.
 - Annex 1 renders per-asset audit evidence before Currency Conversion Audit.
@@ -120,6 +123,7 @@ Expected result:
 - PDF opens locally if automatic open succeeds
 - PDF generation does not require installing fonts or using OS-specific font paths
 - PDF text can be selected and searched in a PDF reader that supports text selection
+- PDF content is human-legible, with visible heading hierarchy, styled labels, table headers, row and column readability, wrapped content, and continuation context instead of a plain line dump
 - Annex 1 appears in the PDF after a page break
 
 1. Run a fixture or development setup that forces PDF render or output write failure.

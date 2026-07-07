@@ -63,6 +63,8 @@ Rules:
 - The PDF must be text-based and must not rasterize required report text into page images.
 - The PDF must be formatted from report-domain data through the PDF renderer, not by embedding Markdown-rendered source text as the report body.
 - A PDF that exposes Markdown structural syntax such as heading markers, table pipes or separators, or bold markers as visible report presentation is not a valid successful PDF output.
+- A PDF that presents report-domain data as a plain sequential line dump without visible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context is not a valid successful PDF output.
+- The PDF renderer must use `github.com/signintech/gopdf` layout primitives for A4 pages, application-supplied fonts, headings, styled text, table rows, table columns, wrapping, and continuation context.
 - A PDF success outcome is valid only when the file is written, synced, closed, and recorded.
 
 ## Result Screen Path Reporting
