@@ -119,7 +119,7 @@ func TestReportPerformanceFlowLargeHistoryFixture(t *testing.T) {
 	if pdfReadErr != nil {
 		t.Fatalf("read saved PDF %q: %v", outcomes[1].OutputBundle.Files[0].Path, pdfReadErr)
 	}
-	if !strings.Contains(string(pdfBytes), "# Annex 1 - Audit") || !strings.Contains(string(pdfBytes), "--- page break ---") {
+	if !strings.Contains(string(pdfBytes), "Annex 1 - Audit") || !strings.Contains(string(pdfBytes), "PAGE BREAK: Annex 1") {
 		t.Fatalf("expected PDF output to contain Annex 1 after page-break marker")
 	}
 

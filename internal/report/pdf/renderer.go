@@ -2,12 +2,12 @@
 // gains-and-losses reports.
 //
 // The renderer is intentionally scoped to in-process, local-only PDF generation
-// under internal/report/pdf. It is reserved for A4, text-based report output so
-// generated report text can remain searchable and selectable in PDF readers that
-// support text selection. The package accepts application-supplied font bytes and
-// must not read platform font paths, call browser services, use external PDF
-// binaries, contact remote rendering services, emit telemetry, or persist report
-// state.
+// under internal/report/pdf. It renders A4, text-based report output from report
+// domain models through gopdf layout primitives so generated report text remains
+// searchable and selectable in PDF readers that support text selection. The
+// package accepts application-supplied font bytes and must not read platform font
+// paths, call browser services, use external PDF binaries, contact remote
+// rendering services, emit telemetry, or persist report state.
 // Authored by: OpenCode
 package pdf
 
@@ -33,12 +33,16 @@ const (
 
 	// AnnexTitle identifies the required Annex 1 PDF page title.
 	AnnexTitle = "Annex 1 - Audit"
+
+	fontRegular = "regular"
+	fontBold    = "bold"
+
+	pageMargin  = 36.0
+	pageBottom  = 806.0
+	contentWide = 523.0
 )
 
 // FontData stores application-supplied font bytes used by the PDF renderer.
-//
-// The final renderer will load these bytes from deterministic in-application font
-// data instead of platform font paths or user-installed fonts.
 // Authored by: OpenCode
 type FontData struct {
 	Regular []byte
@@ -68,10 +72,6 @@ func (fonts FontData) Validate() error {
 }
 
 // RenderOptions stores local PDF renderer configuration.
-//
-// The package currently supports only A4 output and application-supplied fonts.
-// More layout controls should remain private until a report contract requires a
-// caller-visible option.
 // Authored by: OpenCode
 type RenderOptions struct {
 	Fonts FontData
@@ -96,10 +96,6 @@ func (options RenderOptions) Validate() error {
 }
 
 // Renderer renders one calculated report into a local A4 PDF byte payload.
-//
-// Renderer instances are configured with application-supplied font bytes. They
-// do not own file writing, output filename selection, post-save opening, or any
-// persisted report state.
 // Authored by: OpenCode
 type Renderer struct {
 	options RenderOptions
@@ -118,45 +114,70 @@ type fontLoader interface {
 	AddTTFFont(name string, data []byte) error
 }
 
-// selectableTextEmitter is the minimal seam used to verify selectable report
-// text and the Annex 1 page break.
+// pdfLayoutDocument is the complete structured document seam used by Render.
 // Authored by: OpenCode
-type selectableTextEmitter interface {
-	AddText(text string) error
+type pdfLayoutDocument interface {
+	pdfDocumentStarter
+	fontLoader
+	AddTitle(text string) error
+	AddSectionHeading(text string) error
+	AddSubsectionHeading(text string) error
+	AddKeyValue(label string, value string) error
+	AddParagraph(text string) error
+	AddTable(table pdfTable) error
 	AddAnnexPageBreak() error
+	Bytes() []byte
+}
+
+// pdfColumn describes one PDF table column.
+// Authored by: OpenCode
+type pdfColumn struct {
+	Header string
+	Width  float64
+	Align  string
+}
+
+// pdfTable describes one structured PDF table rendered through gopdf layout APIs.
+// Authored by: OpenCode
+type pdfTable struct {
+	Title             string
+	ContinuationTitle string
+	Columns           []pdfColumn
+	Rows              [][]string
+	StyledLastRow     bool
+	RowHeight         float64
 }
 
 // newPDFDocumentForRenderer keeps concrete PDF adapter startup failures
 // testable without involving external files or platform fonts.
 // Authored by: OpenCode
-var newPDFDocumentForRenderer = func() pdfDocument {
+var newPDFDocumentForRenderer = func() pdfLayoutDocument {
 	return newGopdfDocument()
 }
 
-// writeTextForGopdfDocument keeps concrete gopdf text failures testable while
-// preserving one adapter method as the single call site for selectable text.
+// writeTextForGopdfDocument keeps concrete gopdf text failures testable.
 // Authored by: OpenCode
 var writeTextForGopdfDocument = func(document *gopdfDocument, text string) error {
 	return document.pdf.Text(text)
 }
 
-// buildMainReportLinesForPDF keeps main-report PDF layout failures testable at
-// the render emission boundary.
+// writeCellForGopdfDocument keeps concrete gopdf cell failures testable.
 // Authored by: OpenCode
-var buildMainReportLinesForPDF = buildMainReportLines
+var writeCellForGopdfDocument = func(document *gopdfDocument, rectangle *gopdf.Rect, text string) error {
+	return document.pdf.Cell(rectangle, text)
+}
 
-// buildAnnexLinesForPDF keeps Annex 1 PDF layout failures testable at the render
-// emission boundary.
+// writeMultiCellForGopdfDocument keeps concrete gopdf wrapped-text failures
+// testable.
 // Authored by: OpenCode
-var buildAnnexLinesForPDF = buildAnnexLines
+var writeMultiCellForGopdfDocument = func(document *gopdfDocument, rectangle *gopdf.Rect, text string) error {
+	return document.pdf.MultiCell(rectangle, text)
+}
 
-// pdfDocument is the complete concrete document seam used by Renderer.Render.
+// drawTableForGopdfDocument keeps concrete gopdf table failures testable.
 // Authored by: OpenCode
-type pdfDocument interface {
-	pdfDocumentStarter
-	fontLoader
-	selectableTextEmitter
-	Bytes() []byte
+var drawTableForGopdfDocument = func(table gopdf.TableLayout) error {
+	return table.DrawTable()
 }
 
 // NewRenderer creates one validated local PDF renderer.
@@ -180,7 +201,7 @@ func NewRenderer(options RenderOptions) (Renderer, error) {
 	return Renderer{options: options}, nil
 }
 
-// Render validates the calculated report and returns the rendered PDF bytes.
+// Render validates the calculated report and returns rendered PDF bytes.
 //
 // Example:
 //
@@ -196,8 +217,6 @@ func NewRenderer(options RenderOptions) (Renderer, error) {
 //	}
 //	_ = payload
 //
-// The setup skeleton validates the existing report boundary and then returns
-// ErrRendererNotImplemented until the local A4 text renderer is implemented.
 // Authored by: OpenCode
 func (renderer Renderer) Render(report reportmodel.CapitalGainsReport) ([]byte, error) {
 	if err := renderer.options.Validate(); err != nil {
@@ -214,7 +233,13 @@ func (renderer Renderer) Render(report reportmodel.CapitalGainsReport) ([]byte, 
 	if err := loadApplicationFonts(document, renderer.options.Fonts); err != nil {
 		return nil, err
 	}
-	if err := emitMainAndAnnexShell(document, report); err != nil {
+	if err := renderMainReport(document, report); err != nil {
+		return nil, err
+	}
+	if err := document.AddAnnexPageBreak(); err != nil {
+		return nil, err
+	}
+	if err := renderAnnex(document, report.AuditAnnex); err != nil {
 		return nil, err
 	}
 
@@ -231,8 +256,7 @@ func startPDFDocument(document pdfDocumentStarter) error {
 	return document.StartPDF(PageSizeA4)
 }
 
-// loadApplicationFonts registers the application-supplied regular and bold font
-// bytes through the renderer seam.
+// loadApplicationFonts registers regular and bold application-supplied fonts.
 // Authored by: OpenCode
 func loadApplicationFonts(loader fontLoader, fonts FontData) error {
 	if loader == nil {
@@ -241,284 +265,299 @@ func loadApplicationFonts(loader fontLoader, fonts FontData) error {
 	if err := fonts.Validate(); err != nil {
 		return err
 	}
-	if err := loader.AddTTFFont("regular", fonts.Regular); err != nil {
+	if err := loader.AddTTFFont(fontRegular, fonts.Regular); err != nil {
 		return fmt.Errorf("load regular font: %w", err)
 	}
-	if err := loader.AddTTFFont("bold", fonts.Bold); err != nil {
+	if err := loader.AddTTFFont(fontBold, fonts.Bold); err != nil {
 		return fmt.Errorf("load bold font: %w", err)
 	}
 
 	return nil
 }
 
-// emitMainAndAnnexShell emits selectable PDF presentation text from report-domain
-// values without passing Markdown-rendered source into the PDF body.
+// renderMainReport renders the main report through structured PDF operations.
 // Authored by: OpenCode
-func emitMainAndAnnexShell(emitter selectableTextEmitter, report reportmodel.CapitalGainsReport) error {
-	if emitter == nil {
-		return fmt.Errorf("pdf text emitter is required")
+func renderMainReport(document pdfLayoutDocument, report reportmodel.CapitalGainsReport) error {
+	if document == nil {
+		return fmt.Errorf("pdf layout document is required")
 	}
 	if err := report.Validate(); err != nil {
 		return err
 	}
 
-	var lines, err = buildMainReportLinesForPDF(report)
-	if err != nil {
-		return err
-	}
-	for _, line := range lines {
-		if err := emitter.AddText(line); err != nil {
-			return err
-		}
-	}
-	if err := emitter.AddAnnexPageBreak(); err != nil {
-		return err
-	}
-	var annexLines []string
-	annexLines, err = buildAnnexLinesForPDF(report.AuditAnnex)
-	if err != nil {
-		return err
-	}
-	for _, line := range annexLines {
-		if err := emitter.AddText(line); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// buildMainReportLines formats the PDF main report directly from report-domain
-// fields using line-oriented PDF presentation text.
-// Authored by: OpenCode
-func buildMainReportLines(report reportmodel.CapitalGainsReport) ([]string, error) {
 	var calculationCurrency = calculationCurrencyLabel(report.ReportCalculationCurrency)
-	var lines = []string{
-		MainReportTitle,
-		fmt.Sprintf("Year: %d", report.Year),
-		fmt.Sprintf("Cost Basis Method: %s", report.CostBasisMethod.Label()),
-		fmt.Sprintf("Generated At: %s", report.GeneratedAt.Local().Format("2006-01-02 15:04:05 MST")),
-		fmt.Sprintf("Report Calculation Currency: %s", calculationCurrency),
-		"Gains-And-Losses Summary",
+	if err := document.AddTitle(MainReportTitle); err != nil {
+		return err
 	}
-
-	var summaryLines, err = buildSummaryLines(report, calculationCurrency)
-	if err != nil {
-		return nil, err
+	if err := document.AddKeyValue("Year", fmt.Sprintf("%d", report.Year)); err != nil {
+		return err
 	}
-	lines = append(lines, summaryLines...)
-
-	var rateLines = buildRateSourceLines(report)
-	lines = append(lines, rateLines...)
-	lines = append(lines, buildReferenceLines(report)...)
-
-	var detailLines []string
-	detailLines, err = buildDetailLines(report, calculationCurrency)
-	if err != nil {
-		return nil, err
+	if err := document.AddKeyValue("Cost Basis Method", report.CostBasisMethod.Label()); err != nil {
+		return err
 	}
-	lines = append(lines, detailLines...)
-
-	return lines, nil
+	if err := document.AddKeyValue("Generated At", report.GeneratedAt.Local().Format("2006-01-02 15:04:05 MST")); err != nil {
+		return err
+	}
+	if err := document.AddKeyValue("Report Calculation Currency", calculationCurrency); err != nil {
+		return err
+	}
+	if err := renderSummarySection(document, report, calculationCurrency); err != nil {
+		return err
+	}
+	if err := renderRateSourceSection(document, report); err != nil {
+		return err
+	}
+	if err := renderReferenceSection(document, report); err != nil {
+		return err
+	}
+	return renderDetailSections(document, report, calculationCurrency)
 }
 
-// buildSummaryLines formats the non-zero summary rows and yearly total for PDF.
+// renderSummarySection renders non-zero summary rows and the yearly total.
 // Authored by: OpenCode
-func buildSummaryLines(report reportmodel.CapitalGainsReport, calculationCurrency string) ([]string, error) {
-	var lines []string
-	var renderedEntries []reportmodel.AssetSummaryEntry
+func renderSummarySection(document pdfLayoutDocument, report reportmodel.CapitalGainsReport, calculationCurrency string) error {
+	if err := document.AddSectionHeading("Gains-And-Losses Summary"); err != nil {
+		return err
+	}
+	var rows [][]string
 	for _, entry := range report.SummaryEntries {
 		if entry.NetGainOrLoss.Sign() == 0 {
 			continue
 		}
-		renderedEntries = append(renderedEntries, entry)
-	}
-	if len(renderedEntries) == 0 {
-		lines = append(lines, "No assets had a non-zero net gain or loss in the selected year.")
-	}
-	lines = append(lines, "Summary columns: Asset, Net Gain Or Loss, Report Calculation Currency")
-	for _, entry := range renderedEntries {
 		var netGainOrLoss, err = decimalsupport.CanonicalString(entry.NetGainOrLoss)
 		if err != nil {
-			return nil, fmt.Errorf("render summary entry %q net gain or loss: %w", entry.AssetIdentityKey, err)
+			return fmt.Errorf("render summary entry %q net gain or loss: %w", entry.AssetIdentityKey, err)
 		}
-		lines = append(lines, fmt.Sprintf(
-			"Summary row: %s, %s, %s",
+		rows = append(rows, []string{
 			renderDisplayLabel(entry.DisplayLabel, entry.AssetIdentityKey),
 			netGainOrLoss,
 			calculationCurrencyLabelWithFallback(entry.ReportCalculationCurrency, calculationCurrency),
-		))
+		})
+	}
+	if len(rows) == 0 {
+		if err := document.AddParagraph("No assets had a non-zero net gain or loss in the selected year."); err != nil {
+			return err
+		}
+	} else if err := document.AddTable(pdfTable{
+		Title:             "Gains-And-Losses Summary Table",
+		ContinuationTitle: "Gains-And-Losses Summary Table (continued)",
+		Columns: []pdfColumn{
+			{Header: "Asset", Width: 220, Align: "left"},
+			{Header: "Net Gain Or Loss", Width: 150, Align: "right"},
+			{Header: "Report Calculation Currency", Width: 150, Align: "left"},
+		},
+		Rows: rows,
+	}); err != nil {
+		return err
 	}
 
 	var yearlyNetTotal, err = decimalsupport.CanonicalString(report.YearlyNetTotal)
 	if err != nil {
-		return nil, fmt.Errorf("render yearly net total: %w", err)
+		return fmt.Errorf("render yearly net total: %w", err)
 	}
-	lines = append(lines, fmt.Sprintf("Overall Yearly Net Total: %s %s", yearlyNetTotal, calculationCurrency))
-	return lines, nil
+	return document.AddKeyValue("Overall Yearly Net Total", yearlyNetTotal+" "+calculationCurrency)
 }
 
-// buildRateSourceLines formats provider-level rate source evidence for PDF.
+// renderRateSourceSection renders provider-level rate source evidence.
 // Authored by: OpenCode
-func buildRateSourceLines(report reportmodel.CapitalGainsReport) []string {
-	var lines = []string{"Rate Source Summary", fmt.Sprintf("Report Base Currency: %s", calculationCurrencyLabel(report.ReportCalculationCurrency))}
+func renderRateSourceSection(document pdfLayoutDocument, report reportmodel.CapitalGainsReport) error {
+	if err := document.AddSectionHeading("Rate Source Summary"); err != nil {
+		return err
+	}
+	if err := document.AddKeyValue("Report Base Currency", calculationCurrencyLabel(report.ReportCalculationCurrency)); err != nil {
+		return err
+	}
 	if len(report.RateSources) == 0 {
-		return append(lines, "Exchange Rate Use: No activity required exchange-rate conversion.")
+		return document.AddParagraph("Exchange Rate Use: No activity required exchange-rate conversion.")
 	}
 
 	var rendered = make(map[string]bool)
+	var rows [][]string
 	for _, source := range report.RateSources {
 		var key = strings.Join([]string{string(source.Authority), string(source.ProviderID), source.RateKind}, "|")
 		if rendered[key] {
 			continue
 		}
 		rendered[key] = true
-		lines = append(lines,
-			fmt.Sprintf("Authority: %s", sanitizeText(reportmodel.RateAuthorityDisplayLabel(source.Authority))),
-			fmt.Sprintf("Provider: %s", rateProviderLabel(source.ProviderID)),
-			fmt.Sprintf("Rate Kind: %s", sanitizeText(source.RateKind)),
-			fmt.Sprintf("Unavailable-Date Rule: %s", sanitizeText(reportmodel.RateProviderUnavailableDateRule(source.ProviderID))),
-		)
+		rows = append(rows, []string{
+			sanitizeText(reportmodel.RateAuthorityDisplayLabel(source.Authority)),
+			rateProviderLabel(source.ProviderID),
+			sanitizeText(source.RateKind),
+			sanitizeText(reportmodel.RateProviderUnavailableDateRule(source.ProviderID)),
+		})
 	}
-	return lines
+	return document.AddTable(pdfTable{
+		Title:             "Rate Source Summary Table",
+		ContinuationTitle: "Rate Source Summary Table (continued)",
+		Columns: []pdfColumn{
+			{Header: "Authority", Width: 115, Align: "left"},
+			{Header: "Provider", Width: 125, Align: "left"},
+			{Header: "Rate Kind", Width: 140, Align: "left"},
+			{Header: "Unavailable-Date Rule", Width: 140, Align: "left"},
+		},
+		Rows: rows,
+	})
 }
 
-// buildReferenceLines formats the historical full-liquidation reference rows.
+// renderReferenceSection renders the historical full-liquidation reference rows.
 // Authored by: OpenCode
-func buildReferenceLines(report reportmodel.CapitalGainsReport) []string {
-	var lines = []string{"Reference Section"}
+func renderReferenceSection(document pdfLayoutDocument, report reportmodel.CapitalGainsReport) error {
+	if err := document.AddSectionHeading("Reference Section"); err != nil {
+		return err
+	}
 	if len(report.ReferenceEntries) == 0 {
-		return append(lines, "No assets reached full liquidation by year end.")
+		return document.AddParagraph("No assets reached full liquidation by year end.")
 	}
-	lines = append(lines, "Reference columns: Asset, Historical Full Liquidation Count, Main Section Status")
+
+	var rows [][]string
 	for _, entry := range report.ReferenceEntries {
-		lines = append(lines, fmt.Sprintf(
-			"Reference row: %s, %d, %s",
+		rows = append(rows, []string{
 			renderDisplayLabel(entry.DisplayLabel, entry.AssetIdentityKey),
-			entry.FullLiquidationCountThroughYearEnd,
+			fmt.Sprintf("%d", entry.FullLiquidationCountThroughYearEnd),
 			sanitizeText(string(entry.MainSectionStatus)),
-		))
+		})
 	}
-	return lines
+	return document.AddTable(pdfTable{
+		Title:             "Reference Table",
+		ContinuationTitle: "Reference Table (continued)",
+		Columns: []pdfColumn{
+			{Header: "Asset", Width: 170, Align: "left"},
+			{Header: "Historical Full Liquidation Count", Width: 190, Align: "right"},
+			{Header: "Main Section Status", Width: 160, Align: "left"},
+		},
+		Rows: rows,
+	})
 }
 
-// buildDetailLines formats asset detail sections using PDF-specific text lines.
+// renderDetailSections renders asset detail sections from report-domain rows.
 // Authored by: OpenCode
-func buildDetailLines(report reportmodel.CapitalGainsReport, calculationCurrency string) ([]string, error) {
-	var lines []string
+func renderDetailSections(document pdfLayoutDocument, report reportmodel.CapitalGainsReport, calculationCurrency string) error {
 	for _, section := range report.DetailSections {
-		lines = append(lines, fmt.Sprintf("Asset Detail: %s", renderDisplayLabel(section.DisplayLabel, section.AssetIdentityKey)))
+		if err := document.AddSectionHeading("Asset Detail: " + renderDisplayLabel(section.DisplayLabel, section.AssetIdentityKey)); err != nil {
+			return err
+		}
 		if len(section.ActivityRows) == 0 {
-			var positionLines, err = buildPositionLines("Historical Position", section.ClosingQuantity, section.ClosingCostBasis, section.CalculationCurrency, calculationCurrency)
-			if err != nil {
-				return nil, fmt.Errorf("render historical position for %q: %w", section.AssetIdentityKey, err)
+			if err := renderPositionBlock(document, "Historical Position", section.ClosingQuantity, section.ClosingCostBasis, section.CalculationCurrency, calculationCurrency); err != nil {
+				return fmt.Errorf("render historical position for %q: %w", section.AssetIdentityKey, err)
 			}
-			lines = append(lines, positionLines...)
 			continue
 		}
-		var positionLines, err = buildPositionLines("Opening Position", section.OpeningQuantity, section.OpeningCostBasis, section.CalculationCurrency, calculationCurrency)
-		if err != nil {
-			return nil, fmt.Errorf("render opening position for %q: %w", section.AssetIdentityKey, err)
+		if err := renderPositionBlock(document, "Opening Position", section.OpeningQuantity, section.OpeningCostBasis, section.CalculationCurrency, calculationCurrency); err != nil {
+			return fmt.Errorf("render opening position for %q: %w", section.AssetIdentityKey, err)
 		}
-		lines = append(lines, positionLines...)
-		var activityLines []string
-		activityLines, err = buildActivityLines(section)
-		if err != nil {
-			return nil, fmt.Errorf("render in-year activity for %q: %w", section.AssetIdentityKey, err)
+		if err := renderActivityRows(document, section); err != nil {
+			return fmt.Errorf("render in-year activity for %q: %w", section.AssetIdentityKey, err)
 		}
-		lines = append(lines, activityLines...)
-		var liquidationLines []string
-		liquidationLines, err = buildLiquidationLines(section, calculationCurrency)
-		if err != nil {
-			return nil, fmt.Errorf("render liquidation calculations for %q: %w", section.AssetIdentityKey, err)
+		if err := renderLiquidationRows(document, section, calculationCurrency); err != nil {
+			return fmt.Errorf("render liquidation calculations for %q: %w", section.AssetIdentityKey, err)
 		}
-		lines = append(lines, liquidationLines...)
-		positionLines, err = buildPositionLines("Closing Position", section.ClosingQuantity, section.ClosingCostBasis, section.CalculationCurrency, calculationCurrency)
-		if err != nil {
-			return nil, fmt.Errorf("render closing position for %q: %w", section.AssetIdentityKey, err)
+		if err := renderPositionBlock(document, "Closing Position", section.ClosingQuantity, section.ClosingCostBasis, section.CalculationCurrency, calculationCurrency); err != nil {
+			return fmt.Errorf("render closing position for %q: %w", section.AssetIdentityKey, err)
 		}
-		lines = append(lines, positionLines...)
 	}
-	return lines, nil
+	return nil
 }
 
-// buildPositionLines formats one asset position block.
+// renderPositionBlock renders one asset position block with styled labels.
 // Authored by: OpenCode
-func buildPositionLines(heading string, quantity apd.Decimal, basis apd.Decimal, sectionCurrency string, fallbackCurrency string) ([]string, error) {
+func renderPositionBlock(document pdfLayoutDocument, heading string, quantity apd.Decimal, basis apd.Decimal, sectionCurrency string, fallbackCurrency string) error {
+	if err := document.AddSubsectionHeading(heading); err != nil {
+		return err
+	}
 	var quantityText, err = decimalsupport.CanonicalString(quantity)
 	if err != nil {
-		return nil, fmt.Errorf("render quantity: %w", err)
+		return fmt.Errorf("render quantity: %w", err)
 	}
 	var basisText string
 	basisText, err = decimalsupport.CanonicalString(basis)
 	if err != nil {
-		return nil, fmt.Errorf("render cost basis: %w", err)
+		return fmt.Errorf("render cost basis: %w", err)
 	}
-	return []string{
-		heading,
-		fmt.Sprintf("Quantity: %s", quantityText),
-		fmt.Sprintf("Cost Basis: %s", basisText),
-		fmt.Sprintf("Calculation Currency: %s", calculationCurrencyLabelWithFallback(sectionCurrency, fallbackCurrency)),
-	}, nil
+	if err := document.AddKeyValue("Quantity", quantityText); err != nil {
+		return err
+	}
+	if err := document.AddKeyValue("Cost Basis", basisText); err != nil {
+		return err
+	}
+	return document.AddKeyValue("Calculation Currency", calculationCurrencyLabelWithFallback(sectionCurrency, fallbackCurrency))
 }
 
-// buildActivityLines formats the in-year activity rows for one asset section.
+// renderActivityRows renders in-year asset activity as a table.
 // Authored by: OpenCode
-func buildActivityLines(section reportmodel.AssetDetailSection) ([]string, error) {
-	var lines = []string{"In-Year Activity", "Activity columns: Date, Source ID, Type, Quantity, Unit Price, Gross Value, Fee, Quantity After Row, Basis After Row, Original Activity Currency, Calculation Currency, Conversion Status, Note"}
+func renderActivityRows(document pdfLayoutDocument, section reportmodel.AssetDetailSection) error {
+	var rows [][]string
 	for _, row := range section.ActivityRows {
-		var rowText, err = buildActivityLine(row)
+		var rendered, err = renderActivityRow(row)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		lines = append(lines, rowText)
+		rows = append(rows, rendered)
 	}
-	return lines, nil
+	return document.AddTable(pdfTable{
+		Title:             "In-Year Activity",
+		ContinuationTitle: "In-Year Activity (continued)",
+		Columns: []pdfColumn{
+			{Header: "Date", Width: 52, Align: "left"},
+			{Header: "Source ID", Width: 45, Align: "left"},
+			{Header: "Type", Width: 42, Align: "left"},
+			{Header: "Quantity", Width: 40, Align: "right"},
+			{Header: "Unit Price", Width: 40, Align: "right"},
+			{Header: "Gross", Width: 38, Align: "right"},
+			{Header: "Fee", Width: 34, Align: "right"},
+			{Header: "Qty After", Width: 42, Align: "right"},
+			{Header: "Basis After", Width: 46, Align: "right"},
+			{Header: "Activity Currency", Width: 42, Align: "left"},
+			{Header: "Calc Currency", Width: 42, Align: "left"},
+			{Header: "Conversion", Width: 52, Align: "left"},
+			{Header: "Note", Width: 50, Align: "left"},
+		},
+		Rows:      rows,
+		RowHeight: 32,
+	})
 }
 
-// buildActivityLine formats one in-year activity row.
+// renderActivityRow formats one in-year activity row for a PDF table.
 // Authored by: OpenCode
-func buildActivityLine(row reportmodel.AssetActivityRow) (string, error) {
+func renderActivityRow(row reportmodel.AssetActivityRow) ([]string, error) {
 	var quantityText, err = decimalsupport.CanonicalString(row.Quantity)
 	if err != nil {
-		return "", fmt.Errorf("render activity row %q quantity: %w", row.SourceID, err)
+		return nil, fmt.Errorf("render activity row %q quantity: %w", row.SourceID, err)
 	}
 	var unitPriceText string
 	unitPriceText, err = decimalsupport.CanonicalStringPointer(row.UnitPrice)
 	if err != nil {
-		return "", fmt.Errorf("render activity row %q unit price: %w", row.SourceID, err)
+		return nil, fmt.Errorf("render activity row %q unit price: %w", row.SourceID, err)
 	}
 	var grossValueText string
 	grossValueText, err = decimalsupport.CanonicalStringPointer(row.GrossValue)
 	if err != nil {
-		return "", fmt.Errorf("render activity row %q gross value: %w", row.SourceID, err)
+		return nil, fmt.Errorf("render activity row %q gross value: %w", row.SourceID, err)
 	}
 	var feeText string
 	feeText, err = decimalsupport.CanonicalStringPointer(row.FeeAmount)
 	if err != nil {
-		return "", fmt.Errorf("render activity row %q fee: %w", row.SourceID, err)
+		return nil, fmt.Errorf("render activity row %q fee: %w", row.SourceID, err)
 	}
 	var basisAfterRowText string
 	basisAfterRowText, err = decimalsupport.CanonicalString(row.BasisAfterRow)
 	if err != nil {
-		return "", fmt.Errorf("render activity row %q basis after row: %w", row.SourceID, err)
+		return nil, fmt.Errorf("render activity row %q basis after row: %w", row.SourceID, err)
 	}
 	var quantityAfterRowText string
 	quantityAfterRowText, err = decimalsupport.CanonicalString(row.QuantityAfterRow)
 	if err != nil {
-		return "", fmt.Errorf("render activity row %q quantity after row: %w", row.SourceID, err)
+		return nil, fmt.Errorf("render activity row %q quantity after row: %w", row.SourceID, err)
 	}
 	var activityTypeLabel, labelErr = reportmodel.RenderActivityTypeLabel(row)
 	if labelErr != nil {
-		return "", fmt.Errorf("render activity row %q type label: %w", row.SourceID, labelErr)
+		return nil, fmt.Errorf("render activity row %q type label: %w", row.SourceID, labelErr)
 	}
 	var conversionStatusText string
 	conversionStatusText, labelErr = conversionStatusColumn(row)
 	if labelErr != nil {
-		return "", fmt.Errorf("render activity row %q conversion status label: %w", row.SourceID, labelErr)
+		return nil, fmt.Errorf("render activity row %q conversion status label: %w", row.SourceID, labelErr)
 	}
-	return fmt.Sprintf(
-		"Activity row: %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s",
+	return []string{
 		row.OccurredAt.UTC().Format("2006-01-02 15:04:05"),
 		sanitizeText(row.SourceID),
 		sanitizeText(activityTypeLabel),
@@ -532,141 +571,205 @@ func buildActivityLine(row reportmodel.AssetActivityRow) (string, error) {
 		calculationCurrencyLabel(row.CalculationCurrency),
 		conversionStatusText,
 		sanitizeText(row.HoldingReductionExplanation),
-	), nil
+	}, nil
 }
 
-// buildLiquidationLines formats priced liquidation rows when present.
+// renderLiquidationRows renders priced liquidation rows when present.
 // Authored by: OpenCode
-func buildLiquidationLines(section reportmodel.AssetDetailSection, fallbackCurrency string) ([]string, error) {
+func renderLiquidationRows(document pdfLayoutDocument, section reportmodel.AssetDetailSection, fallbackCurrency string) error {
 	if len(section.LiquidationSummaries) == 0 {
-		return nil, nil
+		return nil
 	}
-	var lines = []string{"Liquidation Calculations", "Liquidation columns: Date, Source ID, Disposed Quantity, Allocated Basis, Net Liquidation Proceeds, Gain Or Loss, Calculation Currency"}
+	var rows [][]string
 	for _, liquidation := range section.LiquidationSummaries {
-		var disposedQuantityText, err = decimalsupport.CanonicalString(liquidation.DisposedQuantity)
+		var row, err = renderLiquidationRow(liquidation, fallbackCurrency)
 		if err != nil {
-			return nil, fmt.Errorf("render liquidation %q disposed quantity: %w", liquidation.SourceID, err)
+			return err
 		}
-		var allocatedBasisText string
-		allocatedBasisText, err = decimalsupport.CanonicalString(liquidation.AllocatedBasis)
-		if err != nil {
-			return nil, fmt.Errorf("render liquidation %q allocated basis: %w", liquidation.SourceID, err)
-		}
-		var proceedsText string
-		proceedsText, err = decimalsupport.CanonicalString(liquidation.NetLiquidationProceeds)
-		if err != nil {
-			return nil, fmt.Errorf("render liquidation %q net proceeds: %w", liquidation.SourceID, err)
-		}
-		var gainOrLossText string
-		gainOrLossText, err = decimalsupport.CanonicalString(liquidation.GainOrLoss)
-		if err != nil {
-			return nil, fmt.Errorf("render liquidation %q gain or loss: %w", liquidation.SourceID, err)
-		}
-		lines = append(lines, fmt.Sprintf(
-			"Liquidation row: %s, %s, %s, %s, %s, %s, %s",
-			liquidation.OccurredAt.UTC().Format("2006-01-02 15:04:05"),
-			sanitizeText(liquidation.SourceID),
-			disposedQuantityText,
-			allocatedBasisText,
-			proceedsText,
-			gainOrLossText,
-			calculationCurrencyLabelWithFallback(liquidation.CalculationCurrency, fallbackCurrency),
-		))
+		rows = append(rows, row)
 	}
-	return lines, nil
+	return document.AddTable(pdfTable{
+		Title:             "Liquidation Calculations",
+		ContinuationTitle: "Liquidation Calculations (continued)",
+		Columns: []pdfColumn{
+			{Header: "Date", Width: 72, Align: "left"},
+			{Header: "Source ID", Width: 66, Align: "left"},
+			{Header: "Disposed Quantity", Width: 76, Align: "right"},
+			{Header: "Allocated Basis", Width: 74, Align: "right"},
+			{Header: "Net Proceeds", Width: 72, Align: "right"},
+			{Header: "Gain Or Loss", Width: 70, Align: "right"},
+			{Header: "Calculation Currency", Width: 88, Align: "left"},
+		},
+		Rows: rows,
+	})
 }
 
-// buildAnnexLines formats Annex 1 directly from the calculated audit annex.
+// renderLiquidationRow formats one liquidation calculation row.
 // Authored by: OpenCode
-func buildAnnexLines(annex reportmodel.AuditAnnex) ([]string, error) {
+func renderLiquidationRow(liquidation reportmodel.LiquidationCalculation, fallbackCurrency string) ([]string, error) {
+	var disposedQuantityText, err = decimalsupport.CanonicalString(liquidation.DisposedQuantity)
+	if err != nil {
+		return nil, fmt.Errorf("render liquidation %q disposed quantity: %w", liquidation.SourceID, err)
+	}
+	var allocatedBasisText string
+	allocatedBasisText, err = decimalsupport.CanonicalString(liquidation.AllocatedBasis)
+	if err != nil {
+		return nil, fmt.Errorf("render liquidation %q allocated basis: %w", liquidation.SourceID, err)
+	}
+	var proceedsText string
+	proceedsText, err = decimalsupport.CanonicalString(liquidation.NetLiquidationProceeds)
+	if err != nil {
+		return nil, fmt.Errorf("render liquidation %q net proceeds: %w", liquidation.SourceID, err)
+	}
+	var gainOrLossText string
+	gainOrLossText, err = decimalsupport.CanonicalString(liquidation.GainOrLoss)
+	if err != nil {
+		return nil, fmt.Errorf("render liquidation %q gain or loss: %w", liquidation.SourceID, err)
+	}
+	return []string{
+		liquidation.OccurredAt.UTC().Format("2006-01-02 15:04:05"),
+		sanitizeText(liquidation.SourceID),
+		disposedQuantityText,
+		allocatedBasisText,
+		proceedsText,
+		gainOrLossText,
+		calculationCurrencyLabelWithFallback(liquidation.CalculationCurrency, fallbackCurrency),
+	}, nil
+}
+
+// renderAnnex renders Annex 1 after the required PDF page break.
+// Authored by: OpenCode
+func renderAnnex(document pdfLayoutDocument, annex reportmodel.AuditAnnex) error {
+	if document == nil {
+		return fmt.Errorf("pdf layout document is required")
+	}
 	if annex.Title == "" && len(annex.SectionOrder) == 0 {
 		annex = reportmodel.DefaultAuditAnnex()
 	}
-	var lines = []string{annex.Title, "Detailed Per-Asset Audit Report"}
-	if len(annex.PerAssetAuditSections) == 0 {
-		lines = append(lines, "No per-asset audit activity is available for this report.")
-	} else {
-		for _, section := range annex.PerAssetAuditSections {
-			lines = append(lines, fmt.Sprintf("Asset: %s", renderDisplayLabel(section.DisplayLabel, section.AssetIdentityKey)))
-			lines = append(lines, "Audit columns: Date/Time, Source ID, Activity Type, Quantity, Unit Price, Gross Value, Fee, Original Activity Currency, Calculation Currency, Quantity After Activity, Basis After Activity, Full Liquidation Event, Allocated Basis, Net Liquidation Proceeds, Gain/Loss, Conversion Status, Sanitized Note")
-			for _, entry := range section.Entries {
-				var row, err = buildAnnexActivityLine(entry)
-				if err != nil {
-					return nil, fmt.Errorf("render annex audit entry %q: %w", entry.SourceID, err)
-				}
-				lines = append(lines, row)
-			}
-		}
+	if err := annex.Validate(); err != nil {
+		return err
 	}
-	var conversionLines, err = buildAnnexConversionLines(annex)
-	if err != nil {
-		return nil, err
+	if err := document.AddTitle(annex.Title); err != nil {
+		return err
 	}
-	lines = append(lines, conversionLines...)
-	return lines, nil
+	if err := renderAnnexPerAssetAudit(document, annex); err != nil {
+		return err
+	}
+	return renderAnnexConversionAudit(document, annex)
 }
 
-// buildAnnexActivityLine formats one detailed audit activity row for PDF.
+// renderAnnexPerAssetAudit renders the Detailed Per-Asset Audit Report section.
 // Authored by: OpenCode
-func buildAnnexActivityLine(entry reportmodel.AuditActivityEntry) (string, error) {
+func renderAnnexPerAssetAudit(document pdfLayoutDocument, annex reportmodel.AuditAnnex) error {
+	if err := document.AddSectionHeading("Detailed Per-Asset Audit Report"); err != nil {
+		return err
+	}
+	if len(annex.PerAssetAuditSections) == 0 {
+		return document.AddParagraph("No per-asset audit activity is available for this report.")
+	}
+	for _, section := range annex.PerAssetAuditSections {
+		if err := document.AddSubsectionHeading("Asset: " + renderDisplayLabel(section.DisplayLabel, section.AssetIdentityKey)); err != nil {
+			return err
+		}
+		var rows [][]string
+		for _, entry := range section.Entries {
+			var row, err = renderAnnexActivityRow(entry)
+			if err != nil {
+				return fmt.Errorf("render annex audit entry %q: %w", entry.SourceID, err)
+			}
+			rows = append(rows, row)
+		}
+		if err := document.AddTable(pdfTable{
+			Title:             "Per-Asset Audit Activity",
+			ContinuationTitle: "Per-Asset Audit Activity (continued)",
+			Columns: []pdfColumn{
+				{Header: "Date/Time", Width: 42, Align: "left"},
+				{Header: "Source ID", Width: 38, Align: "left"},
+				{Header: "Activity Type", Width: 38, Align: "left"},
+				{Header: "Quantity", Width: 34, Align: "right"},
+				{Header: "Unit Price", Width: 34, Align: "right"},
+				{Header: "Gross", Width: 32, Align: "right"},
+				{Header: "Fee", Width: 30, Align: "right"},
+				{Header: "Activity Currency", Width: 34, Align: "left"},
+				{Header: "Calc Currency", Width: 34, Align: "left"},
+				{Header: "Qty After", Width: 38, Align: "right"},
+				{Header: "Basis After", Width: 40, Align: "right"},
+				{Header: "Full Liquidation", Width: 34, Align: "left"},
+				{Header: "Allocated Basis", Width: 34, Align: "right"},
+				{Header: "Net Proceeds", Width: 34, Align: "right"},
+				{Header: "Gain/Loss", Width: 32, Align: "right"},
+				{Header: "Conversion", Width: 38, Align: "left"},
+				{Header: "Note", Width: 38, Align: "left"},
+			},
+			Rows:      rows,
+			RowHeight: 36,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// renderAnnexActivityRow formats one detailed audit activity row for a PDF table.
+// Authored by: OpenCode
+func renderAnnexActivityRow(entry reportmodel.AuditActivityEntry) ([]string, error) {
 	var quantity, err = decimalsupport.CanonicalString(entry.Quantity)
 	if err != nil {
-		return "", fmt.Errorf("quantity: %w", err)
+		return nil, fmt.Errorf("quantity: %w", err)
 	}
 	var unitPrice string
 	unitPrice, err = decimalsupport.CanonicalStringPointer(entry.UnitPrice)
 	if err != nil {
-		return "", fmt.Errorf("unit price: %w", err)
+		return nil, fmt.Errorf("unit price: %w", err)
 	}
 	var grossValue string
 	grossValue, err = decimalsupport.CanonicalStringPointer(entry.GrossValue)
 	if err != nil {
-		return "", fmt.Errorf("gross value: %w", err)
+		return nil, fmt.Errorf("gross value: %w", err)
 	}
 	var fee string
 	fee, err = decimalsupport.CanonicalStringPointer(entry.FeeAmount)
 	if err != nil {
-		return "", fmt.Errorf("fee: %w", err)
+		return nil, fmt.Errorf("fee: %w", err)
 	}
 	var quantityAfter string
 	quantityAfter, err = decimalsupport.CanonicalString(entry.QuantityAfterActivity)
 	if err != nil {
-		return "", fmt.Errorf("quantity after activity: %w", err)
+		return nil, fmt.Errorf("quantity after activity: %w", err)
 	}
 	var basisAfter string
 	basisAfter, err = decimalsupport.CanonicalString(entry.BasisAfterActivity)
 	if err != nil {
-		return "", fmt.Errorf("basis after activity: %w", err)
+		return nil, fmt.Errorf("basis after activity: %w", err)
 	}
 	var allocatedBasis string
 	allocatedBasis, err = decimalsupport.CanonicalStringPointer(entry.AllocatedBasis)
 	if err != nil {
-		return "", fmt.Errorf("allocated basis: %w", err)
+		return nil, fmt.Errorf("allocated basis: %w", err)
 	}
 	var proceeds string
 	proceeds, err = decimalsupport.CanonicalStringPointer(entry.NetLiquidationProceeds)
 	if err != nil {
-		return "", fmt.Errorf("net liquidation proceeds: %w", err)
+		return nil, fmt.Errorf("net liquidation proceeds: %w", err)
 	}
 	var gainOrLoss string
 	gainOrLoss, err = decimalsupport.CanonicalStringPointer(entry.GainOrLoss)
 	if err != nil {
-		return "", fmt.Errorf("gain or loss: %w", err)
+		return nil, fmt.Errorf("gain or loss: %w", err)
 	}
 	var activityTypeLabel string
 	activityTypeLabel, err = reportmodel.RenderAuditActivityTypeLabel(entry)
 	if err != nil {
-		return "", fmt.Errorf("activity type label: %w", err)
+		return nil, fmt.Errorf("activity type label: %w", err)
 	}
 	var conversionStatus string
 	if strings.TrimSpace(string(entry.ConversionStatus)) != "" {
 		conversionStatus, err = reportmodel.RenderConversionStatusLabel(entry.ConversionStatus)
 		if err != nil {
-			return "", fmt.Errorf("conversion status label: %w", err)
+			return nil, fmt.Errorf("conversion status label: %w", err)
 		}
 	}
-	return fmt.Sprintf(
-		"Audit row: %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %t, %s, %s, %s, %s, %s",
+	return []string{
 		entry.OccurredAt.UTC().Format("2006-01-02 15:04:05"),
 		sanitizeText(entry.SourceID),
 		sanitizeText(activityTypeLabel),
@@ -678,52 +781,80 @@ func buildAnnexActivityLine(entry reportmodel.AuditActivityEntry) (string, error
 		sanitizeText(entry.CalculationCurrency),
 		quantityAfter,
 		basisAfter,
-		entry.FullLiquidationEvent,
+		fmt.Sprintf("%t", entry.FullLiquidationEvent),
 		allocatedBasis,
 		proceeds,
 		gainOrLoss,
 		sanitizeText(conversionStatus),
 		sanitizeText(entry.Note),
-	), nil
+	}, nil
 }
 
-// buildAnnexConversionLines formats the Annex 1 currency conversion audit.
+// renderAnnexConversionAudit renders Annex 1 currency conversion evidence.
 // Authored by: OpenCode
-func buildAnnexConversionLines(annex reportmodel.AuditAnnex) ([]string, error) {
-	var lines = []string{"Currency Conversion Audit"}
+func renderAnnexConversionAudit(document pdfLayoutDocument, annex reportmodel.AuditAnnex) error {
+	if err := document.AddSectionHeading("Currency Conversion Audit"); err != nil {
+		return err
+	}
 	if len(annex.ConversionAuditEntries) == 0 {
-		return append(lines, "No converted activity was present for this report."), nil
+		return document.AddParagraph("No converted activity was present for this report.")
 	}
-	lines = append(lines, "Conversion columns: Date, Source ID, Asset, Rate Date, Source Currency, Report Base Currency, Converted Amounts, Quote Direction, Rate Value")
+
+	var rows [][]string
 	for index, entry := range annex.ConversionAuditEntries {
-		var rateValue, err = decimalsupport.CanonicalString(entry.RateValue)
+		var row, err = renderConversionAuditRow(index, entry)
 		if err != nil {
-			return nil, fmt.Errorf("render conversion audit entry %d rate value: %w", index, err)
+			return err
 		}
-		var convertedAmounts string
-		convertedAmounts, err = renderGroupedConvertedAmounts(index, entry.Amounts)
-		if err != nil {
-			return nil, err
-		}
-		var quoteDirection string
-		quoteDirection, err = reportmodel.RenderQuoteDirectionLabel(entry.QuoteDirection)
-		if err != nil {
-			return nil, fmt.Errorf("render conversion audit entry %d quote direction: %w", index, err)
-		}
-		lines = append(lines, fmt.Sprintf(
-			"Conversion row: %s, %s, %s, %s, %s, %s, %s, %s, %s",
-			datesupport.FormatCalendarDate(entry.ActivityDate),
-			sanitizeText(entry.SourceID),
-			sanitizeText(entry.AssetLabel),
-			datesupport.FormatCalendarDate(entry.RateDate),
-			sanitizeText(entry.SourceCurrency),
-			sanitizeText(entry.ReportBaseCurrency.Label()),
-			convertedAmounts,
-			sanitizeText(quoteDirection),
-			rateValue,
-		))
+		rows = append(rows, row)
 	}
-	return lines, nil
+	return document.AddTable(pdfTable{
+		Title:             "Currency Conversion Audit Table",
+		ContinuationTitle: "Currency Conversion Audit Table (continued)",
+		Columns: []pdfColumn{
+			{Header: "Date", Width: 50, Align: "left"},
+			{Header: "Source ID", Width: 55, Align: "left"},
+			{Header: "Asset", Width: 45, Align: "left"},
+			{Header: "Rate Date", Width: 50, Align: "left"},
+			{Header: "Source Currency", Width: 55, Align: "left"},
+			{Header: "Report Base Currency", Width: 62, Align: "left"},
+			{Header: "Converted Amounts", Width: 105, Align: "left"},
+			{Header: "Quote Direction", Width: 95, Align: "left"},
+			{Header: "Rate Value", Width: 50, Align: "right"},
+		},
+		Rows:      rows,
+		RowHeight: 36,
+	})
+}
+
+// renderConversionAuditRow formats one conversion audit row.
+// Authored by: OpenCode
+func renderConversionAuditRow(index int, entry reportmodel.ConversionAuditEntry) ([]string, error) {
+	var rateValue, err = decimalsupport.CanonicalString(entry.RateValue)
+	if err != nil {
+		return nil, fmt.Errorf("render conversion audit entry %d rate value: %w", index, err)
+	}
+	var convertedAmounts string
+	convertedAmounts, err = renderGroupedConvertedAmounts(index, entry.Amounts)
+	if err != nil {
+		return nil, err
+	}
+	var quoteDirection string
+	quoteDirection, err = reportmodel.RenderQuoteDirectionLabel(entry.QuoteDirection)
+	if err != nil {
+		return nil, fmt.Errorf("render conversion audit entry %d quote direction: %w", index, err)
+	}
+	return []string{
+		datesupport.FormatCalendarDate(entry.ActivityDate),
+		sanitizeText(entry.SourceID),
+		sanitizeText(entry.AssetLabel),
+		datesupport.FormatCalendarDate(entry.RateDate),
+		sanitizeText(entry.SourceCurrency),
+		sanitizeText(entry.ReportBaseCurrency.Label()),
+		convertedAmounts,
+		sanitizeText(quoteDirection),
+		rateValue,
+	}, nil
 }
 
 // renderGroupedConvertedAmounts formats non-zero converted amount evidence.
@@ -833,7 +964,7 @@ func sanitizeText(raw string) string {
 }
 
 // gopdfDocument renders selectable text through gopdf while retaining extracted
-// report lines in comments for deterministic automated assertions.
+// report text comments for deterministic automated assertions.
 // Authored by: OpenCode
 type gopdfDocument struct {
 	pdf     gopdf.GoPdf
@@ -845,7 +976,7 @@ type gopdfDocument struct {
 // newGopdfDocument creates one local PDF document adapter.
 // Authored by: OpenCode
 func newGopdfDocument() *gopdfDocument {
-	return &gopdfDocument{y: 36}
+	return &gopdfDocument{y: pageMargin}
 }
 
 // StartPDF starts one A4 PDF document.
@@ -870,21 +1001,105 @@ func (document *gopdfDocument) AddTTFFont(name string, data []byte) error {
 	return document.pdf.AddTTFFontByReader(name, bytes.NewReader(data))
 }
 
-// AddText emits one selectable report text line.
+// AddTitle emits a top-level PDF heading with bold font styling.
 // Authored by: OpenCode
-func (document *gopdfDocument) AddText(text string) error {
-	if err := document.ensureWritableLine(); err != nil {
+func (document *gopdfDocument) AddTitle(text string) error {
+	return document.addTextBlock(text, fontBold, 16, 24)
+}
+
+// AddSectionHeading emits a section heading with bold font styling.
+// Authored by: OpenCode
+func (document *gopdfDocument) AddSectionHeading(text string) error {
+	return document.addTextBlock(text, fontBold, 12, 18)
+}
+
+// AddSubsectionHeading emits a subsection heading with bold font styling.
+// Authored by: OpenCode
+func (document *gopdfDocument) AddSubsectionHeading(text string) error {
+	return document.addTextBlock(text, fontBold, 10, 16)
+}
+
+// AddKeyValue emits one styled label/value row using Cell and Text operations.
+// Authored by: OpenCode
+func (document *gopdfDocument) AddKeyValue(label string, value string) error {
+	if err := document.ensureSpace(16); err != nil {
 		return err
 	}
-	if err := document.pdf.SetFont("regular", "", 9); err != nil {
+	var labelText = sanitizeText(label) + ":"
+	var valueText = sanitizeText(value)
+	document.pdf.SetXY(pageMargin, document.y)
+	if err := document.pdf.SetFont(fontBold, "", 9); err != nil {
 		return err
 	}
-	document.pdf.SetXY(36, document.y)
-	if err := writeTextForGopdfDocument(document, text); err != nil {
+	if err := writeCellForGopdfDocument(document, &gopdf.Rect{W: 150, H: 12}, labelText); err != nil {
 		return err
 	}
-	document.texts = append(document.texts, text)
-	document.y += 12
+	if err := document.pdf.SetFont(fontRegular, "", 9); err != nil {
+		return err
+	}
+	document.pdf.SetXY(pageMargin+154, document.y)
+	if err := writeTextForGopdfDocument(document, valueText); err != nil {
+		return err
+	}
+	document.recordText(labelText + " " + valueText)
+	document.y += 14
+	return nil
+}
+
+// AddParagraph emits wrapped paragraph text through MultiCell.
+// Authored by: OpenCode
+func (document *gopdfDocument) AddParagraph(text string) error {
+	if err := document.ensureSpace(34); err != nil {
+		return err
+	}
+	var sanitized = sanitizeText(text)
+	if err := document.pdf.SetFont(fontRegular, "", 9); err != nil {
+		return err
+	}
+	document.pdf.SetXY(pageMargin, document.y)
+	if err := writeMultiCellForGopdfDocument(document, &gopdf.Rect{W: contentWide, H: 30}, sanitized); err != nil {
+		return err
+	}
+	document.recordText(sanitized)
+	document.y += 34
+	return nil
+}
+
+// AddTable emits one structured table through gopdf table layout primitives.
+// Authored by: OpenCode
+func (document *gopdfDocument) AddTable(table pdfTable) error {
+	if len(table.Columns) == 0 {
+		return fmt.Errorf("pdf table columns are required")
+	}
+	if len(table.Rows) == 0 {
+		return nil
+	}
+
+	var rowHeight = table.RowHeight
+	if rowHeight <= 0 {
+		rowHeight = 24
+	}
+	var remainingRows = table.Rows
+	var firstChunk = true
+	for len(remainingRows) > 0 {
+		var capacity = document.tableRowCapacity(rowHeight)
+		if capacity < 1 {
+			document.addContinuationPage(table.ContinuationTitle)
+			capacity = document.tableRowCapacity(rowHeight)
+		}
+		if capacity > len(remainingRows) {
+			capacity = len(remainingRows)
+		}
+		var chunk = remainingRows[:capacity]
+		if err := document.drawTableChunk(table, chunk, rowHeight, firstChunk && len(remainingRows) == len(chunk)); err != nil {
+			return err
+		}
+		remainingRows = remainingRows[capacity:]
+		firstChunk = false
+		if len(remainingRows) > 0 {
+			document.addContinuationPage(table.ContinuationTitle)
+		}
+	}
 	return nil
 }
 
@@ -892,24 +1107,116 @@ func (document *gopdfDocument) AddText(text string) error {
 // Authored by: OpenCode
 func (document *gopdfDocument) AddAnnexPageBreak() error {
 	document.pdf.AddPage()
-	document.y = 36
-	document.texts = append(document.texts, "--- page break ---")
+	document.y = pageMargin
+	document.recordText("PAGE BREAK: Annex 1")
 	return nil
 }
 
-// ensureWritableLine adds continuation pages before text would leave the A4
-// printable area.
+// addTextBlock emits a title or heading through gopdf Text.
 // Authored by: OpenCode
-func (document *gopdfDocument) ensureWritableLine() error {
-	if !document.started {
-		return fmt.Errorf("PDF document must be started before adding text")
+func (document *gopdfDocument) addTextBlock(text string, font string, size float64, verticalAdvance float64) error {
+	if err := document.ensureSpace(verticalAdvance); err != nil {
+		return err
 	}
-	if document.y <= 800 {
+	var sanitized = sanitizeText(text)
+	if err := document.pdf.SetFont(font, "", size); err != nil {
+		return err
+	}
+	document.pdf.SetXY(pageMargin, document.y)
+	if err := writeTextForGopdfDocument(document, sanitized); err != nil {
+		return err
+	}
+	document.recordText(sanitized)
+	document.y += verticalAdvance
+	return nil
+}
+
+// ensureSpace adds a continuation page before content would leave the A4 area.
+// Authored by: OpenCode
+func (document *gopdfDocument) ensureSpace(height float64) error {
+	if !document.started {
+		return fmt.Errorf("PDF document must be started before adding content")
+	}
+	if document.y+height <= pageBottom {
 		return nil
 	}
-	document.pdf.AddPage()
-	document.y = 36
+	document.addContinuationPage("Continued")
 	return nil
+}
+
+// tableRowCapacity returns the number of data rows that fit on the current page.
+// Authored by: OpenCode
+func (document *gopdfDocument) tableRowCapacity(rowHeight float64) int {
+	var available = pageBottom - document.y - rowHeight
+	if available <= 0 {
+		return 0
+	}
+	if available < rowHeight {
+		return 1
+	}
+	return int(available / rowHeight)
+}
+
+// drawTableChunk draws one page-local table chunk and records its text extract.
+// Authored by: OpenCode
+func (document *gopdfDocument) drawTableChunk(table pdfTable, rows [][]string, rowHeight float64, includeStyledLastRow bool) error {
+	if table.Title != "" {
+		if err := document.AddSubsectionHeading(table.Title); err != nil {
+			return err
+		}
+	}
+	var layout = document.pdf.NewTableLayout(pageMargin, document.y, rowHeight, len(rows))
+	for _, column := range table.Columns {
+		layout.AddColumn(sanitizeText(column.Header), column.Width, column.Align)
+	}
+	layout.SetTableStyle(tableStyle())
+	layout.SetHeaderStyle(headerStyle())
+	layout.SetCellStyle(cellStyle())
+	for rowIndex, row := range rows {
+		var sanitizedRow = sanitizeRow(row)
+		if includeStyledLastRow && table.StyledLastRow && rowIndex == len(rows)-1 {
+			layout.AddStyledRow(styledRowCells(sanitizedRow))
+		} else {
+			layout.AddRow(sanitizedRow)
+		}
+	}
+	if err := drawTableForGopdfDocument(layout); err != nil {
+		return err
+	}
+	document.recordTable(table.Columns, rows)
+	document.y += rowHeight*float64(len(rows)+1) + 12
+	return nil
+}
+
+// addContinuationPage starts a new page with repeated context.
+// Authored by: OpenCode
+func (document *gopdfDocument) addContinuationPage(context string) {
+	document.pdf.AddPage()
+	document.y = pageMargin
+	var label = sanitizeText(context)
+	if label == "" {
+		label = "Continued"
+	}
+	document.recordText("CONTINUED: " + label)
+}
+
+// recordTable records table headers and rows for deterministic test assertions.
+// Authored by: OpenCode
+func (document *gopdfDocument) recordTable(columns []pdfColumn, rows [][]string) {
+	var headers []string
+	for _, column := range columns {
+		headers = append(headers, sanitizeText(column.Header))
+	}
+	document.recordText(strings.Join(headers, "\t"))
+	for _, row := range rows {
+		document.recordText(strings.Join(sanitizeRow(row), "\t"))
+	}
+}
+
+// recordText appends one sanitized extract line.
+// Authored by: OpenCode
+func (document *gopdfDocument) recordText(text string) {
+	document.texts = append(document.texts, sanitizeText(text))
 }
 
 // Bytes returns the PDF byte payload with deterministic text comments for tests.
@@ -924,4 +1231,49 @@ func (document *gopdfDocument) Bytes() []byte {
 		comments.WriteByte('\n')
 	}
 	return append(payload, comments.Bytes()...)
+}
+
+// tableStyle returns the base table border style.
+// Authored by: OpenCode
+func tableStyle() gopdf.CellStyle {
+	return gopdf.CellStyle{BorderStyle: gopdf.BorderStyle{Top: true, Left: true, Right: true, Bottom: true, Width: 0.4, RGBColor: gopdf.RGBColor{R: 90, G: 90, B: 90}}}
+}
+
+// headerStyle returns the table header style.
+// Authored by: OpenCode
+func headerStyle() gopdf.CellStyle {
+	return gopdf.CellStyle{BorderStyle: gopdf.BorderStyle{Top: true, Left: true, Right: true, Bottom: true, Width: 0.4, RGBColor: gopdf.RGBColor{R: 70, G: 70, B: 70}}, FillColor: gopdf.RGBColor{R: 225, G: 230, B: 236}, TextColor: gopdf.RGBColor{R: 0, G: 0, B: 0}, Font: fontBold, FontSize: 7}
+}
+
+// cellStyle returns the default table cell style.
+// Authored by: OpenCode
+func cellStyle() gopdf.CellStyle {
+	return gopdf.CellStyle{BorderStyle: gopdf.BorderStyle{Top: true, Left: true, Right: true, Bottom: true, Width: 0.3, RGBColor: gopdf.RGBColor{R: 120, G: 120, B: 120}}, FillColor: gopdf.RGBColor{R: 255, G: 255, B: 255}, TextColor: gopdf.RGBColor{R: 0, G: 0, B: 0}, Font: fontRegular, FontSize: 6.5}
+}
+
+// highlightedCellStyle returns the emphasized row style.
+// Authored by: OpenCode
+func highlightedCellStyle() gopdf.CellStyle {
+	return gopdf.CellStyle{BorderStyle: gopdf.BorderStyle{Top: true, Left: true, Right: true, Bottom: true, Width: 0.4, RGBColor: gopdf.RGBColor{R: 80, G: 80, B: 80}}, FillColor: gopdf.RGBColor{R: 245, G: 247, B: 250}, TextColor: gopdf.RGBColor{R: 0, G: 0, B: 0}, Font: fontBold, FontSize: 6.5}
+}
+
+// styledRowCells converts strings into highlighted gopdf row cells.
+// Authored by: OpenCode
+func styledRowCells(row []string) []gopdf.RowCell {
+	var cells = make([]gopdf.RowCell, 0, len(row))
+	var style = highlightedCellStyle()
+	for _, cell := range row {
+		cells = append(cells, gopdf.NewRowCell(cell, style))
+	}
+	return cells
+}
+
+// sanitizeRow returns a sanitized copy of one table row.
+// Authored by: OpenCode
+func sanitizeRow(row []string) []string {
+	var sanitized = make([]string, 0, len(row))
+	for _, cell := range row {
+		sanitized = append(sanitized, sanitizeText(cell))
+	}
+	return sanitized
 }

@@ -150,7 +150,7 @@ func TestReportGenerationWritesSelectedMarkdownAndPDFBundles(t *testing.T) {
 			outputFormat:     reportmodel.ReportOutputFormatPDF,
 			expectedPDFFiles: 1,
 			wantFileText: []string{
-				"Reference columns: Asset, Historical Full Liquidation Count, Main Section Status",
+				"Asset Historical Full Liquidation Count Main Section Status",
 				"Report Base Currency: USD",
 				"Quantity:",
 				"Same currency",

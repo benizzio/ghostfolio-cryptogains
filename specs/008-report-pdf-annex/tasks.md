@@ -158,7 +158,7 @@
 - [X] T012 [P] [US1] Add report output file contract tests for Markdown/PDF file counts, filename patterns, and suffix rules in `tests/contract/report_output_contract_test.go`
 - [X] T013 [P] [US1] Add runtime integration test for generating the same fixture as Markdown and PDF in `tests/integration/report_generation_flow_test.go`
 - [X] T014 [P] [US1] Add output bundle cleanup integration test for render and write failures in `tests/integration/report_failure_flow_test.go`
-- [ ] T015 [P] [US1] ⚠️ Reopened Add or tighten PDF renderer unit tests for A4 configuration, embedded font loading through `gopdf.AddTTFFontByReader`, text emission seams, `gopdf` table/styled-layout seams, and no Markdown structural syntax in emitted PDF presentation text in `internal/report/pdf/renderer_internal_test.go` (reopened — BUG-002; reopened — BUG-003)
+- [X] T015 [P] [US1] ⚠️ Reopened Add or tighten PDF renderer unit tests for A4 configuration, embedded font loading through `gopdf.AddTTFFontByReader`, text emission seams, `gopdf` table/styled-layout seams, and no Markdown structural syntax in emitted PDF presentation text in `internal/report/pdf/renderer_internal_test.go` (reopened — BUG-002; reopened — BUG-003)
 - [X] T016 [P] [US1] Add output bundle writer unit tests for Markdown pair reservation and PDF filename suffixes in `internal/report/output/writer_internal_test.go`
 
 ### Implementation for User Story 1
@@ -166,7 +166,7 @@
 - [X] T017 [US1] Implement output-format list state, focus movement, selection, and report request construction in `internal/tui/flow/state.go` and `internal/tui/flow/report_flow.go`
 - [X] T018 [US1] Render output-format choices, selected-format explanations, busy state, and result copy in `internal/tui/flow/view.go`, `internal/tui/flow/help_text.go`, and `internal/tui/screen/report_screen.go`
 - [X] T019 [US1] Implement bundle-aware Markdown rendering entry point returning main and Annex 1 documents in `internal/report/markdown/renderer.go` and `internal/report/markdown/renderer_annex.go`
-- [ ] T020 [US1] ⚠️ Reopened Implement initial local A4 PDF renderer for the main report plus Annex 1 shell through `gopdf` page, font, text, styled-cell, and table-layout APIs instead of Markdown-rendered body text or plain line dumps in `internal/report/pdf/renderer.go` (reopened — BUG-002; reopened — BUG-003)
+- [X] T020 [US1] ⚠️ Reopened Implement initial local A4 PDF renderer for the main report plus Annex 1 shell through `gopdf` page, font, text, styled-cell, and table-layout APIs instead of Markdown-rendered body text or plain line dumps in `internal/report/pdf/renderer.go` (reopened — BUG-002; reopened — BUG-003)
 - [X] T021 [US1] Implement output bundle reservation, write, sync, close, suffixing, and cleanup for two-file Markdown and one-file PDF output in `internal/report/output/writer.go`
 - [X] T022 [US1] Select renderer by output format, write output bundles, request automatic open, and shape all saved paths in `internal/app/runtime/report_service.go` and `internal/app/runtime/report_output_outcome.go`
 - [X] T023 [US1] Update report result path labels to show Markdown main path plus Annex 1 path or the single PDF path in `internal/tui/screen/report_screen.go`
@@ -185,7 +185,7 @@
 
 - [X] T024 [P] [US2] ⚠️ Reopened Add or tighten main report presentation contract tests for exact initial detail bold-label lines (`- **Year:**`, `- **Cost Basis Method:**`, `- **Generated At:**`, and `- **Report Calculation Currency:**`), zero row omission, header rename, and no main conversion audit in `tests/contract/markdown_report_contract_test.go` (reopened — BUG-001)
 - [X] T025 [P] [US2] Add Markdown renderer unit tests for summary empty state, historical position, conversion status labels, and `BLOCKCHAIN OP` in `internal/report/markdown/renderer_internal_test.go`
-- [ ] T026 [P] [US2] ⚠️ Reopened Add PDF main report presentation unit tests mirroring shared Markdown content rules, requiring visible heading hierarchy, styled classifier labels, table headers, table rows, table columns, and wrapped content, and rejecting Markdown heading, table, and bold markers in rendered PDF text in `internal/report/pdf/renderer_internal_test.go` (reopened — BUG-002; reopened — BUG-003)
+- [X] T026 [P] [US2] ⚠️ Reopened Add PDF main report presentation unit tests mirroring shared Markdown content rules, requiring visible heading hierarchy, styled classifier labels, table headers, table rows, table columns, and wrapped content, and rejecting Markdown heading, table, and bold markers in rendered PDF text in `internal/report/pdf/renderer_internal_test.go` (reopened — BUG-002; reopened — BUG-003)
 - [X] T027 [P] [US2] Add report output integration assertions for clearer main report content in both formats in `tests/integration/report_generation_flow_test.go`
 
 ### Implementation for User Story 2
@@ -195,7 +195,7 @@
 - [X] T030 [US2] Omit zero net-gain summary rows and render the all-zero empty state in `internal/report/markdown/renderer_summary.go`
 - [X] T031 [US2] Rename the reference header and render `Historical Position` for assets without report-year activity in `internal/report/markdown/renderer_details.go`
 - [X] T032 [US2] Remove detailed Currency Conversion Audit from the main Markdown report and use label helpers for visible conversion statuses in `internal/report/markdown/renderer_conversion.go` and `internal/report/markdown/renderer_details.go`
-- [ ] T033 [US2] ⚠️ Reopened Apply the same main-report presentation, zero-row filtering, historical-position, label rules, styled classifier labels, and readable table layout in the PDF renderer through `gopdf` layout primitives without Markdown passthrough or line dumping in `internal/report/pdf/renderer.go` (reopened — BUG-002; reopened — BUG-003)
+- [X] T033 [US2] ⚠️ Reopened Apply the same main-report presentation, zero-row filtering, historical-position, label rules, styled classifier labels, and readable table layout in the PDF renderer through `gopdf` layout primitives without Markdown passthrough or line dumping in `internal/report/pdf/renderer.go` (reopened — BUG-002; reopened — BUG-003)
 
 **Checkpoint**: User Story 2 PDF presentation is reopened by BUG-002 and BUG-003 until T026, T033, T052, T053, T054, T056, T057, and T058 are completed, then can be validated independently without changing calculation outputs.
 
@@ -212,7 +212,7 @@
 - [X] T034 [P] [US3] Add Annex 1 rendering contract tests for title, section order, every required FR-019 per-asset visible audit field, quote labels, and empty states in `tests/contract/report_annex_contract_test.go`
 - [X] T035 [P] [US3] Add calculation unit tests for annex scope including pre-year, report-year, post-year, zero-net, and reference-only assets in `internal/report/calculate/calculator_internal_test.go`
 - [X] T036 [P] [US3] Add Markdown annex renderer unit tests for separate Annex 1 document content in `internal/report/markdown/renderer_internal_test.go`
-- [ ] T037 [P] [US3] ⚠️ Reopened Add PDF annex pagination, page-break, repeated-context, table header, row, column, wrapped-cell, and no Markdown structural syntax unit tests in `internal/report/pdf/renderer_internal_test.go` (reopened — BUG-002; reopened — BUG-003)
+- [X] T037 [P] [US3] ⚠️ Reopened Add PDF annex pagination, page-break, repeated-context, table header, row, column, wrapped-cell, and no Markdown structural syntax unit tests in `internal/report/pdf/renderer_internal_test.go` (reopened — BUG-002; reopened — BUG-003)
 - [X] T038 [P] [US3] Add 10,000 cached-activity Markdown/PDF annex scale integration test in `tests/integration/report_performance_flow_test.go`
 
 ### Implementation for User Story 3
@@ -221,7 +221,7 @@
 - [X] T040 [US3] Capture per-activity post-replay audit evidence through the selected year end in `internal/report/calculate/asset_replay.go` and `internal/report/calculate/artifacts.go`
 - [X] T041 [US3] Build reported-asset annex sections including reference-only assets and excluding post-year activity in `internal/report/calculate/calculator.go` and `internal/report/calculate/artifacts.go`
 - [X] T042 [US3] Render Annex 1 Markdown title, per-asset audit report, and Currency Conversion Audit in `internal/report/markdown/renderer_annex.go`
-- [ ] T043 [US3] ⚠️ Reopened Append Annex 1 after a PDF page break with `gopdf` table rows, table columns, wrapped cells, and page continuation context through PDF-specific layout, not Markdown-rendered body text or line dumping, in `internal/report/pdf/renderer.go` (reopened — BUG-002; reopened — BUG-003)
+- [X] T043 [US3] ⚠️ Reopened Append Annex 1 after a PDF page break with `gopdf` table rows, table columns, wrapped cells, and page continuation context through PDF-specific layout, not Markdown-rendered body text or line dumping, in `internal/report/pdf/renderer.go` (reopened — BUG-002; reopened — BUG-003)
 - [X] T044 [US3] Ensure runtime and output failures from missing label mappings or annex validation save no partial files in `internal/app/runtime/report_service.go` and `internal/report/output/writer.go`
 
 **Checkpoint**: Annex 1 PDF placement is reopened by BUG-002 and BUG-003 until T037, T043, T052, T053, T054, T056, T057, and T058 are completed, then Annex 1 is complete for Markdown and PDF and all user stories are independently testable.
@@ -239,13 +239,13 @@
 - [X] T049 Run `make quality QUALITY_BASE_REF=origin/main` using `Makefile` and fix changed-source findings in `*.go`, `go.mod`, and `go.sum`
 - [X] T050 Review generated reports, result messages, diagnostics, and failure paths for token or secret leakage in `internal/report/`, `internal/app/runtime/`, and `internal/tui/`
 - [X] T051 Run or cite supported-OS validation for Linux, macOS, and Windows PDF-enabled report generation using `.github/workflows/`, `Makefile`, and changed packages under `internal/report/pdf/`, `internal/report/markdown/`, `internal/report/output/`, `internal/app/runtime/`, and `internal/tui/`
-- [ ] T052 [P] [US1] ⚠️ Reopened Add fail-first PDF no-Markdown-source regression tests in `internal/report/pdf/renderer_internal_test.go` that fail when PDF presentation emits Markdown heading markers, bold markers, table pipes, Markdown table separators, or a plain sequential line dump as report text (reopened — BUG-003)
-- [ ] T053 [US1] ⚠️ Reopened Rework or prove `internal/report/pdf/renderer.go` consumes report-domain data and `gopdf` page, font, styled text, and table-layout APIs directly instead of Markdown-rendered output or line-oriented output for main report and Annex 1 PDF content (reopened — BUG-003)
-- [ ] T054 [P] [US1] ⚠️ Reopened Reassess the selected PDF dependency in `specs/008-report-pdf-annex/research.md` for the exact `gopdf` APIs used for formatted headings, styled labels, tables, rows, columns, wrapping, and A4 pagination without Markdown passthrough or line dumping; evaluate a local-only alternative only if `gopdf` cannot satisfy the boundary (reopened — BUG-003)
-- [ ] T055 ⚠️ Reopened Run BUG-002 and BUG-003 final validation after PDF renderer changes using `gofmt` on changed Go files, `go test ./internal/report/pdf`, `make test`, `make coverage`, and `make quality QUALITY_BASE_REF=origin/main`; cite supported-OS evidence or run build/test checks if the PDF dependency decision changes (reopened — BUG-003)
-- [ ] T056 [P] [US1] Add fail-first PDF layout regression tests in `internal/report/pdf/renderer_internal_test.go` that fail for simple line dumps and require visible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continued table context
-- [ ] T057 [US1] Replace line-oriented PDF output with `gopdf` layout primitives in `internal/report/pdf/renderer.go`, using `Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})`, `AddPage`, `AddTTFFontByReader`, `SetFont`, `Text`/`Cell`/`MultiCell`, `NewTableLayout`, `AddColumn`, `AddRow`/`AddStyledRow`, `CellStyle`, and `DrawTable` for headings, styled text, custom fonts, table rows, and columns
-- [ ] T058 [US1] Validate generated PDF layout against `specs/008-report-pdf-annex/pdf-expected.png` and `specs/008-report-pdf-annex/pdf-preview.png` by manual inspection or renderer seams, including table fit, row and column readability, wrapping, continuation pages, selectable text, and absence of Markdown syntax
+- [X] T052 [P] [US1] ⚠️ Reopened Add fail-first PDF no-Markdown-source regression tests in `internal/report/pdf/renderer_internal_test.go` that fail when PDF presentation emits Markdown heading markers, bold markers, table pipes, Markdown table separators, or a plain sequential line dump as report text (reopened — BUG-003)
+- [X] T053 [US1] ⚠️ Reopened Rework or prove `internal/report/pdf/renderer.go` consumes report-domain data and `gopdf` page, font, styled text, and table-layout APIs directly instead of Markdown-rendered output or line-oriented output for main report and Annex 1 PDF content (reopened — BUG-003)
+- [X] T054 [P] [US1] ⚠️ Reopened Reassess the selected PDF dependency in `specs/008-report-pdf-annex/research.md` for the exact `gopdf` APIs used for formatted headings, styled labels, tables, rows, columns, wrapping, and A4 pagination without Markdown passthrough or line dumping; evaluate a local-only alternative only if `gopdf` cannot satisfy the boundary (reopened — BUG-003)
+- [X] T055 ⚠️ Reopened Run BUG-002 and BUG-003 final validation after PDF renderer changes using `gofmt` on changed Go files, `go test ./internal/report/pdf`, `make test`, `make coverage`, and `make quality QUALITY_BASE_REF=origin/main`; cite supported-OS evidence or run build/test checks if the PDF dependency decision changes (reopened — BUG-003)
+- [X] T056 [P] [US1] Add fail-first PDF layout regression tests in `internal/report/pdf/renderer_internal_test.go` that fail for simple line dumps and require visible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continued table context
+- [X] T057 [US1] Replace line-oriented PDF output with `gopdf` layout primitives in `internal/report/pdf/renderer.go`, using `Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})`, `AddPage`, `AddTTFFontByReader`, `SetFont`, `Text`/`Cell`/`MultiCell`, `NewTableLayout`, `AddColumn`, `AddRow`/`AddStyledRow`, `CellStyle`, and `DrawTable` for headings, styled text, custom fonts, table rows, and columns
+- [X] T058 [US1] Validate generated PDF layout against `specs/008-report-pdf-annex/pdf-expected.png` and `specs/008-report-pdf-annex/pdf-preview.png` by manual inspection or renderer seams, including table fit, row and column readability, wrapping, continuation pages, selectable text, and absence of Markdown syntax
 
 ---
 
