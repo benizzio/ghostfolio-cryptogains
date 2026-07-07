@@ -35,6 +35,10 @@
 
 **Bugfix**: 2026-07-05 — [BUG-002] Clarified that PDF output must be formatted through the PDF renderer and must not render Markdown source syntax as the PDF body.
 
+### Session 2026-07-07
+
+**Bugfix**: 2026-07-07 — [BUG-003] Clarified that PDF output must use `github.com/signintech/gopdf` layout primitives for human-legible headings, styled labels, and tables instead of plain line dumping.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Choose Report Output Format (Priority: P1)
@@ -51,6 +55,7 @@ As a user generating a capital gains and losses report, I want to choose whether
 2. **Given** the user has completed report setup and selected valid report inputs, **When** the user selects Markdown before generation, **Then** the report is generated in the existing Markdown format.
 3. **Given** the same report inputs are used for PDF and Markdown, **When** both reports are reviewed, **Then** shared report sections contain the same output data, explanatory text, and table content, with only format-specific page breaks, page titles, and annex placement differing.
 4. **Given** PDF output is selected, **When** the generated report is reviewed, **Then** headings, tables, emphasis, and Annex 1 content are presented as formatted PDF text and do not expose Markdown source syntax as report content.
+5. **Given** PDF output is selected, **When** the generated report is reviewed, **Then** the visible report uses a human-legible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context rather than a sequential dump of report lines.
 
 ---
 
@@ -100,6 +105,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - If a report has no currency conversions, Annex 1 must still include the Currency Conversion Audit section with a clear statement that no converted activity was present.
 - If a label mapping is unavailable for conversion status or quote direction, the report must fail before final output rather than exposing internal code labels to the user.
 - If PDF generation cannot complete, no incomplete or misleading final PDF report should be presented as successfully generated.
+- If a PDF renderer can emit selectable text but only as sequential dumped lines without visible heading hierarchy, styled labels, tables, rows, columns, wrapping, and continuation context, the PDF output is not a valid successful report.
 
 ## Requirements *(mandatory)*
 
@@ -135,6 +141,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **FR-028**: PDF generation and report rendering MUST run locally and MUST NOT send report data, financial data, tokens, or generated report files to any remote storage, telemetry destination, or external document-generation service as part of this feature.
 - **FR-029**: PDF generation MUST work on supported Linux, macOS, and Windows installations without requiring platform-specific font paths, user-installed fonts, a browser, or operating-system print-to-PDF support; required report text MUST use application-supplied local font data.
 - **FR-030**: When PDF output is selected, the system MUST render report-domain content through PDF-specific layout and MUST NOT use Markdown-rendered content or Markdown structural syntax, including heading markers, table pipes or separators, or bold markers, as the PDF body.
+- **FR-031**: When PDF output is selected, the system MUST use `github.com/signintech/gopdf` layout primitives for A4 page creation, application-supplied font loading, headings, styled text, table headers, table rows, table columns, wrapped cell content, and continuation context; a plain line-dump renderer is not a valid PDF implementation.
 
 ### Financial Calculation Evidence *(include when feature affects financial calculations)*
 
@@ -184,6 +191,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **SC-009**: PDF output generation and Annex 1 rendering support the existing 10,000 cached-activity report scale and do not introduce a lower activity-count limit than Markdown output.
 - **SC-010**: In generated PDF reports, 100% of required report text is emitted as selectable text rather than rasterized page images.
 - **SC-011**: In generated PDF reports, 0 Markdown structural syntax markers are visible as report presentation for headings, tables, emphasis, or Annex 1 sections.
+- **SC-012**: PDF layout verification confirms required report samples render with visible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context rather than as sequential dumped lines.
 
 ## Assumptions
 

@@ -14,11 +14,15 @@ Add an output-format choice to capital gains report generation so users can gene
 
 **Bugfix**: 2026-07-05 — [BUG-002] Updated from bugfix patch. PDF rendering must format report-domain data through PDF-specific layout and must not pass Markdown source text into the PDF body.
 
+**Bugfix**: 2026-07-07 — [BUG-003] Updated from bugfix patch. PDF rendering must use concrete `gopdf` layout APIs for human-legible headings, styled labels, tables, rows, columns, wrapping, and continuation context rather than plain line dumping.
+
 ## Technical Context
 
 **Language/Version**: Go 1.26.3
 
 **Primary Dependencies**: Existing dependencies: `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `github.com/cockroachdb/apd/v3`, `golang.org/x/crypto/argon2`, `github.com/Fabianexe/gocoverageplus`, and Go standard library packages. Planned new PDF dependencies: `github.com/signintech/gopdf v0.36.1` for local PDF generation, `golang.org/x/image v0.43.0` for embedded Go font TTF data loaded through `gopdf.AddTTFFontByReader`, and `github.com/phpdave11/gofpdi v1.0.16` as a refreshed indirect dependency if Go module resolution permits it with `gopdf`.
+
+**PDF Renderer API Shape**: The `internal/report/pdf` renderer must construct a `gopdf.GoPdf`, initialize it with `Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})`, add pages with `AddPage`, register embedded regular and bold fonts with `AddTTFFontByReader`, select fonts with `SetFont`, position content with `SetXY`, `GetX`, and `GetY`, render headings and styled labels with `Text`, `Cell`, or `MultiCell`, and produce structured report tables with `NewTableLayout`, `AddColumn`, `AddRow` or `AddStyledRow`, `CellStyle`, `BorderStyle`, `RGBColor`, and `DrawTable`. Where explicit separators or section boxes are needed, use `Line`, `SetLineWidth`, `SetStrokeColor`, `RectFromUpperLeftWithStyle`, or table border styles. The rendered PDF bytes should be obtained through `WriteTo` or `GetBytesPdf` before output writing. A renderer that only iterates report-domain strings into sequential `Text` or `Cell` lines without table layout, styled cells, wrapped cell content, and continuation context does not satisfy this plan.
 
 **Storage**: User-requested cleartext report export files in the resolved local Documents directory. These exports are outside the application-managed persistence boundary: the application writes them only after an explicit generation request, does not manage them as cache or durable application state, and does not re-ingest them automatically. Markdown output writes one main `.md` file and one Annex 1 `.md` file. PDF output writes one `.pdf` file. No synced-data persistence, protected snapshot persistence, report history cache, rate cache, remote persistence, telemetry, or background report storage is added.
 
@@ -102,7 +106,7 @@ Report generation remains a staged pipeline:
 3. Report calculation emits the existing main report data plus Annex 1 audit evidence for every activity on or before the selected year end.
 4. Runtime selects the renderer from output format.
 5. Markdown rendering returns a main report document and a separate Annex 1 document.
-6. PDF rendering returns one A4 text PDF document with a page break before Annex 1, produced from report-domain data through PDF-specific layout rather than Markdown-rendered body text.
+6. PDF rendering returns one A4 text PDF document with a page break before Annex 1, produced from report-domain data through `gopdf` page, font, text, styled-cell, and table-layout APIs rather than Markdown-rendered body text or plain sequential line dumping.
 7. Output writing reserves and writes the complete bundle, cleaning up every file created by the attempt if any write, sync, close, render, or validation step fails before success.
 8. Runtime result screens report every generated file path for successful generation.
 
@@ -116,6 +120,7 @@ Recorded evidence:
 - GitHub repository `signintech/gopdf` is not archived, has about 2,908 stars, and had commits on 2026-05-18 and 2026-05-19.
 - Context7 documentation shows A4 page setup through `gopdf.Config{PageSize: *gopdf.PageSizeA4}`, text APIs such as `Text` and `Cell`, table layout APIs, `WritePdf`, and font registration through `AddTTFFontByReader`.
 - The library generates PDFs in-process and does not require a browser, external binary, remote service, or CGO boundary for the planned use.
+- Required implementation APIs for BUG-003 are `Start`, `AddPage`, `AddTTFFontByReader`, `SetFont`, `SetXY`, `Text`, `Cell` or `MultiCell`, `NewTableLayout`, `AddColumn`, `AddRow` or `AddStyledRow`, `CellStyle`, `BorderStyle`, `RGBColor`, `DrawTable`, and `WriteTo` or `GetBytesPdf`; drawing helpers such as `Line`, `SetLineWidth`, `SetStrokeColor`, and `RectFromUpperLeftWithStyle` may be used for section rules or boxes when table styles are insufficient.
 
 Planned direct font-data dependency: `golang.org/x/image v0.43.0`.
 
@@ -139,6 +144,7 @@ Security posture:
 - The renderer must not import user-provided PDFs, fetch remote resources, execute external binaries, or accept remote templates.
 - Final implementation must pin module versions in `go.mod`/`go.sum`, verify the intended `github.com/phpdave11/gofpdi v1.0.16` transitive module when module resolution selects it, and pass the repository changed-source quality gate, including `govulncheck` as run by `make quality`.
 - BUG-002 follow-up must verify the selected `gopdf` usage can produce formatted headings, table-like layout, wrapping, and A4 pagination without Markdown passthrough; if it cannot, evaluate another local-only option that preserves the no-browser, no-remote-service, no-OS-print-to-PDF, no-platform-font-path, and no-telemetry constraints.
+- BUG-003 follow-up must verify the implementation actually calls the selected `gopdf` layout APIs for headings, styled labels, tables, rows, columns, wrapped cells, and continuation context, and must reject an implementation that only emits sequential report lines.
 
 Alternatives rejected:
 
@@ -161,6 +167,7 @@ Alternatives rejected:
 
 - Contract tests verify report output format choices, TUI selection copy, output filename patterns, generated file path reporting, main report rendering changes, Annex 1 rendering order, and PDF A4/text-output contract.
 - PDF renderer tests must fail if generated PDF presentation text contains Markdown structural syntax such as heading markers, table pipes or separators, or bold markers instead of PDF-formatted report text.
+- PDF renderer tests must fail if the PDF path is only a selectable text line dump; tests must require visible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context through the `gopdf` layout boundary.
 - Markdown renderer and contract tests must assert exact initial detail list-item labels `- **Year:**`, `- **Cost Basis Method:**`, `- **Generated At:**`, and `- **Report Calculation Currency:**` before report values.
 - Contract tests verify that the user can select an output format and start generation from the report generation step without waiting on rendering or file IO in the Bubble Tea event loop; this is the automated workflow evidence for SC-001's 30-second bound.
 - Integration tests generate Markdown and PDF from the same deterministic protected cache and assert shared report data matches between formats except for pagination, page titles, and Markdown annex splitting.
