@@ -25,7 +25,7 @@ When printing to PDF, we need to format the data in a way it is human legible wh
 If viable and interpreted by the library, use HTML to properly format. If not, verify other possibilities.
 Pure report data and report formatting code must be isolated in their respective extension layers and most not interfere in each other (e.g. markdown formatted text should never enter the PDF layer)
 
-## [ ] 3 - PDF: Document is still illegible for humans after BUG-002
+## [x] 3 - PDF: Document is still illegible for humans after BUG-002
 
 The PDF document has correctly removed the Markdown syntax from the text, but it is still illegible. The entire data is dumped in a simple line structuring with no formatting.
 It should be formatted to look legible with the titles, segments and tables following the exact expectations of the properly rendered Markdown without using the Markdown language.
@@ -35,3 +35,7 @@ Actual preview of the production PDF file generated:
 
 Expected PDF formatting (line and table sizes should fit the page, pages can be added horizontally is tables are too large)
 ![pdf-expected.png](pdf-expected.png)
+
+### NON NEGOTIABLE Technical requirements:
+
+The implementation must use `github.com/signintech/gopdf` top render tables, headings, styled text, A4 pages, custom fonts, and table rows/columns, so the layout looks the closes possible to the Markdown whent it's properly interpreted or rendered.
