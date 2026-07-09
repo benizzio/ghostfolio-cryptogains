@@ -58,7 +58,7 @@ In the `Annex 1 - Audit`
 
 - When in the same page, the `Asset: <asset symbel>` subheading has a too small top margin, causing the characters to be too close to the table of the previous section
 
-## [ ] 5 - PDF layout problems:
+## [x] 5 - PDF layout problems:
 
 - After changing all pages to landscape, all tables are now too compacted and unnecessarily breaking lines in their cells text. We should properly use the entire horizontal page space so the tables fill the entire page and provide better visibility. The blank margins on the left and right of the page should be of the same size when the tables are expanded
 - The `Gains-And-Losses Summary`, `Rate Source Summary`, `Reference Section`, `Asset Detail: <asset symbol>` and `In-Year Activity` are not correctly not overlapping with the previous sections, but still have a too narrow top margin, so the legibility is still compromised. We need to improve it by increasing that marging, so the previous section has a bigger distance from those subheadings
