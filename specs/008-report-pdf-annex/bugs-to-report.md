@@ -39,3 +39,21 @@ Expected PDF formatting (line and table sizes should fit the page, pages can be 
 ### NON NEGOTIABLE Technical requirements:
 
 The implementation must use `github.com/signintech/gopdf` top render tables, headings, styled text, A4 pages, custom fonts, and table rows/columns, so the layout looks the closes possible to the Markdown whent it's properly interpreted or rendered.
+
+## [ ] 4 - PDF layout problems:
+
+The PDF formatting now contains multiple problems, as listed below:
+
+In the `Ghostfolio Capital Gains And Losses Report`:
+
+- Most of the tables are proving to be too extensive horizontally and are being pressed even with a smaller font inside them, and also not respecting the right padding and being cut on the right. We need to change all pages in landscape orientation
+- The `Gains-And-Losses Summary` subtitle and the line above it (`Report Calculation Currency: <currency code>`) have negative margin between them, causing the characters to pile over each other becoming illegible. Subheadings should contain a margin to separate them from the previous text section
+- The `Overall Yearly Net Total` should be the last line of the `Gains-And-Losses Summary Table`, but it's being printed outside
+- The `Rate Source Summary` section contains a `Rate Source Summary Table` grouping some information in columns. That shouldn't exist, that section should be formatted as bold label lines followed by non-bold values, exactly like the properly rendered Markdown report
+- The `Reference Section` does not need the added `Reference Table` subheading
+- All of the `Asset Detail: <asset symbol>` subheadings have too small or negative top margins and touch or invade the space of the previous sections
+- The `In-Year Activity` subheadings, when in the same page, have negative top margin and are invading the space of the previous section causing the characters to pile up
+
+In the `Annex 1 - Audit`
+
+- When in the same page, the `Asset: <asset symbel>` subheading has a too small top margin, causing the characters to be too close to the table of the previous section
