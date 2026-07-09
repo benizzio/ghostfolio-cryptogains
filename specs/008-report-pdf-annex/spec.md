@@ -43,6 +43,8 @@
 
 **Bugfix**: 2026-07-09 — [BUG-004] Clarified landscape A4 PDF layout, table fit, non-overlapping section spacing, and section-specific PDF presentation rules.
 
+**Bugfix**: 2026-07-09 — [BUG-005] Clarified full-width balanced PDF tables, readable section spacing, and bottom-margin-safe table continuation.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Choose Report Output Format (Priority: P1)
@@ -61,6 +63,7 @@ As a user generating a capital gains and losses report, I want to choose whether
 4. **Given** PDF output is selected, **When** the generated report is reviewed, **Then** headings, tables, emphasis, and Annex 1 content are presented as formatted PDF text and do not expose Markdown source syntax as report content.
 5. **Given** PDF output is selected, **When** the generated report is reviewed, **Then** the visible report uses a human-legible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context rather than a sequential dump of report lines.
 6. **Given** PDF output is selected, **When** the generated report is reviewed, **Then** every page uses landscape A4 layout and wide report tables remain inside the printable area with visible right padding, wrapped cell content, and no clipped columns.
+7. **Given** PDF output is selected, **When** a wide report table is rendered, **Then** it uses the available landscape printable width with equal left and right margins while retaining the required padding, wrapping, and no-clipping behavior.
 
 ---
 
@@ -85,6 +88,7 @@ As a user reviewing the main capital gains and losses report, I want labels and 
 9. **Given** PDF output is selected, **When** the Rate Source Summary is rendered, **Then** it uses bold classifier label lines followed by non-bold values and does not render as a `Rate Source Summary Table`.
 10. **Given** PDF output is selected, **When** the Reference Section is rendered, **Then** it does not introduce a generated `Reference Table` subheading.
 11. **Given** PDF output is selected, **When** adjacent main-report text sections, headings, or subheadings are rendered on the same page, **Then** the `Report Calculation Currency` line, `Gains-And-Losses Summary` subtitle, `Asset Detail` headings, and `In-Year Activity` subheadings have non-overlapping vertical spacing from preceding content.
+12. **Given** PDF output is selected, **When** the affected main-report section transitions are rendered on the same page, **Then** they have the renderer-defined readable positive vertical separation from preceding content.
 
 ---
 
@@ -105,6 +109,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 5. **Given** the PDF format is selected, **When** the report is generated, **Then** Annex 1 appears in the same PDF file after a page break.
 6. **Given** a Currency Conversion Audit row includes quote direction, **When** Annex 1 is rendered, **Then** quote direction is shown as a user-friendly label and does not expose code-style or snake_case values.
 7. **Given** PDF output is selected, **When** Annex 1 renders multiple per-asset audit sections on the same page, **Then** each `Asset: <asset symbol>` subheading has sufficient top margin and does not touch or overlap the previous section's table.
+8. **Given** a PDF table continues onto another page, **When** the next row or its borders would cross the bottom printable margin, **Then** the renderer advances before drawing that row and preserves complete row content, borders, and blank bottom margin.
 
 ### Edge Cases
 
@@ -117,6 +122,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - If PDF generation cannot complete, no incomplete or misleading final PDF report should be presented as successfully generated.
 - If a PDF renderer can emit selectable text but only as sequential dumped lines without visible heading hierarchy, styled labels, tables, rows, columns, wrapping, and continuation context, the PDF output is not a valid successful report.
 - If PDF tables, headings, or subheadings would otherwise exceed the printable area or collide with preceding content, the PDF renderer must wrap, reflow, add vertical space, or advance the page instead of clipping columns or overlapping text.
+- If a PDF table row or its borders would cross the bottom printable margin, the renderer must advance before drawing the row and preserve the required continuation context rather than clipping row content or margins.
 
 ## Requirements *(mandatory)*
 
@@ -159,6 +165,9 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **FR-035**: When PDF output is selected, the system MUST render `Overall Yearly Net Total` as the final row or footer inside the Gains-And-Losses Summary table.
 - **FR-036**: When PDF output is selected, the system MUST render the Rate Source Summary as bold classifier label lines followed by non-bold values and MUST NOT render it as a table titled `Rate Source Summary Table`.
 - **FR-037**: When PDF output is selected, the system MUST NOT introduce generated helper subheadings that are not part of the report presentation contract, including `Reference Table` under the Reference Section.
+- **FR-038**: Before drawing a PDF table row or its borders, the system MUST determine whether the complete row fits inside the remaining printable height while preserving the bottom margin; otherwise it MUST advance the row to a continuation page with visible table or section context and MUST NOT clip row text, cells, borders, or the bottom margin.
+- **FR-039**: When PDF output is selected, the system MUST size each table to use the available landscape printable width with equal left and right outer margins while retaining the padding, wrapping, and no-clipping requirements of FR-033.
+- **FR-040**: When PDF output is selected, the system MUST maintain a renderer-defined readable positive vertical separation at the affected transitions covered by FR-034.
 
 ### Financial Calculation Evidence *(include when feature affects financial calculations)*
 
@@ -210,6 +219,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **SC-011**: In generated PDF reports, 0 Markdown structural syntax markers are visible as report presentation for headings, tables, emphasis, or Annex 1 sections.
 - **SC-012**: PDF layout verification confirms required report samples render with visible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context rather than as sequential dumped lines.
 - **SC-013**: PDF layout verification confirms required report samples use landscape A4 pages, keep all table columns within the printable area without right-edge clipping, avoid overlapping adjacent text sections, place `Overall Yearly Net Total` inside the Gains-And-Losses Summary table, render Rate Source Summary as label/value lines, omit the extra `Reference Table` subheading, and preserve top margin before main-report and Annex 1 asset subheadings.
+- **SC-014**: PDF layout verification confirms required wide-table samples use the available landscape printable width with equal left and right margins, affected section transitions have the renderer-defined readable positive separation, and every continued table row and border remains wholly inside the printable area with a preserved bottom margin and visible continuation context.
 
 ## Assumptions
 
