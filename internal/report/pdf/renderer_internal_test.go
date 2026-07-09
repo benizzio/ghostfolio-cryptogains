@@ -47,11 +47,122 @@ func TestGopdfDocumentUsesLandscapeA4AndPrintableWidth(t *testing.T) {
 	if document.pageWidth != gopdf.PageSizeA4Landscape.W || document.pageHeight != gopdf.PageSizeA4Landscape.H {
 		t.Fatalf("page size = %.0fx%.0f, want landscape A4 %.0fx%.0f", document.pageWidth, document.pageHeight, gopdf.PageSizeA4Landscape.W, gopdf.PageSizeA4Landscape.H)
 	}
-	if contentWide+pageMargin > document.pageWidth-pageMargin {
-		t.Fatalf("content width %.0f leaves no right padding on page width %.0f", contentWide, document.pageWidth)
+	if contentWide != document.pageWidth-2*pageMargin {
+		t.Fatalf("content width %.0f, want printable width %.0f", contentWide, document.pageWidth-2*pageMargin)
 	}
 	if pageBottom > document.pageHeight-pageMargin {
 		t.Fatalf("page bottom %.0f exceeds landscape A4 printable height %.0f", pageBottom, document.pageHeight-pageMargin)
+	}
+}
+
+// TestBUG005TableWidthSpacingAndRowPreflight verifies that the concrete layout
+// adapter uses balanced printable-width tables, 12-point block separation, and
+// advances before a header-and-row chunk could cross the bottom margin.
+// Authored by: OpenCode
+func TestBUG005TableWidthSpacingAndRowPreflight(t *testing.T) {
+	var columns = printableWidthColumns([]pdfColumn{
+		{Header: "Wide", Width: 3, Align: "left"},
+		{Header: "Narrow", Width: 1, Align: "right"},
+	})
+	var width float64
+	for _, column := range columns {
+		width += column.Width
+	}
+	if width != contentWide {
+		t.Fatalf("scaled table width = %.2f, want full printable width %.2f", width, contentWide)
+	}
+	var equalColumns = printableWidthColumns([]pdfColumn{
+		{Header: "First", Align: "left"},
+		{Header: "Second", Align: "right"},
+	})
+	if equalColumns[0].Width != contentWide/2 || equalColumns[1].Width != contentWide/2 {
+		t.Fatalf("zero-width columns = %#v, want equal printable-width allocation", equalColumns)
+	}
+	if sectionSpacing < 12 || tableSpacing < 12 {
+		t.Fatalf("section/table spacing = %.0f/%.0f, want at least 12 points", sectionSpacing, tableSpacing)
+	}
+
+	var document = startedTestDocument(t)
+	if err := document.AddTitle("Title"); err != nil {
+		t.Fatalf("add title: %v", err)
+	}
+	var titleEnd = document.y
+	if err := document.AddSectionHeading("Section"); err != nil {
+		t.Fatalf("add section: %v", err)
+	}
+	if document.y-titleEnd-18 < sectionSpacing {
+		t.Fatalf("section top gap = %.0f, want at least %.0f", document.y-titleEnd-18, sectionSpacing)
+	}
+	var sectionEnd = document.y
+	if err := document.AddSubsectionHeading("Subsection"); err != nil {
+		t.Fatalf("add subsection: %v", err)
+	}
+	if document.y-sectionEnd-16 < sectionSpacing {
+		t.Fatalf("subsection top gap = %.0f, want at least %.0f", document.y-sectionEnd-16, sectionSpacing)
+	}
+
+	var preflightDocument = startedTestDocument(t)
+	preflightDocument.y = pageBottom - 47
+	if capacity := preflightDocument.tableRowCapacity(24); capacity != 0 {
+		t.Fatalf("row capacity = %d, want 0 when header and row would cross the bottom margin", capacity)
+	}
+	if err := preflightDocument.AddTable(pdfTable{
+		ContinuationTitle: "Audit table (continued)",
+		Columns:           []pdfColumn{{Header: "Entry", Width: 1, Align: "left"}},
+		Rows:              [][]string{{"must start on the next page"}},
+		RowHeight:         24,
+	}); err != nil {
+		t.Fatalf("add preflighted table: %v", err)
+	}
+	var text = string(preflightDocument.Bytes())
+	if !strings.Contains(text, "CONTINUED: Audit table (continued)") {
+		t.Fatalf("expected preflight continuation context, got %q", text)
+	}
+
+	var tallRowDocument = startedTestDocument(t)
+	if err := tallRowDocument.AddTable(pdfTable{
+		ContinuationTitle: "Tall row (continued)",
+		Columns:           []pdfColumn{{Header: "Entry", Width: 1, Align: "left"}},
+		Rows:              [][]string{{"one"}, {"two"}},
+		RowHeight:         230,
+	}); err != nil {
+		t.Fatalf("add tall preflighted table: %v", err)
+	}
+	if tallRowDocument.y > pageBottom {
+		t.Fatalf("tall table ended at %.0f, beyond bottom margin %.0f", tallRowDocument.y, pageBottom)
+	}
+
+	var unrenderableContinuation = startedTestDocument(t)
+	assertErrorContains(t, func() error {
+		return unrenderableContinuation.AddTable(pdfTable{
+			ContinuationTitle: "Too tall (continued)",
+			Columns:           []pdfColumn{{Header: "Entry", Width: 1, Align: "left"}},
+			Rows:              [][]string{{"one"}, {"two"}},
+			RowHeight:         249,
+		})
+	}, "does not fit within the printable page area")
+}
+
+// TestBUG005TableContinuationRepeatsContextAndHeader verifies each continued
+// page identifies the table and redraws its header before its next whole row.
+// Authored by: OpenCode
+func TestBUG005TableContinuationRepeatsContextAndHeader(t *testing.T) {
+	var document = startedTestDocument(t)
+	if err := document.AddTable(pdfTable{
+		ContinuationTitle: "Per-Asset Audit Activity (continued)",
+		Columns:           []pdfColumn{{Header: "Source ID", Width: 1, Align: "left"}},
+		Rows:              [][]string{{"first"}, {"second"}, {"third"}},
+		RowHeight:         200,
+	}); err != nil {
+		t.Fatalf("add continued table: %v", err)
+	}
+
+	var text = string(document.Bytes())
+	if strings.Count(text, "CONTINUED: Per-Asset Audit Activity (continued)") != 2 {
+		t.Fatalf("continuation context count = %d, want 2", strings.Count(text, "CONTINUED: Per-Asset Audit Activity (continued)"))
+	}
+	if strings.Count(text, "% Source ID") != 3 {
+		t.Fatalf("repeated header count = %d, want 3", strings.Count(text, "% Source ID"))
 	}
 }
 
@@ -598,7 +709,9 @@ func TestGopdfDocumentLayoutBranches(t *testing.T) {
 	if err := startedDocument.AddAnnexPageBreak(); err != nil {
 		t.Fatalf("page break: %v", err)
 	}
-	startedDocument.addContinuationPage("")
+	if err := startedDocument.addContinuationPage(""); err != nil {
+		t.Fatalf("continuation page: %v", err)
+	}
 	var payload = string(startedDocument.Bytes())
 	for _, expected := range []string{"% ghostfolio-cryptogains text extract", "% Title", "% Label: Value", "% A", "% CONTINUED: Continued"} {
 		if !strings.Contains(payload, expected) {
@@ -615,7 +728,7 @@ func TestGopdfDocumentLayoutBranches(t *testing.T) {
 		t.Fatalf("ensure continuation space: %v", err)
 	}
 	continuationDocument.y = pageBottom
-	if err := continuationDocument.AddTable(pdfTable{Columns: []pdfColumn{{Header: "A", Width: 120, Align: "left"}}, Rows: [][]string{{"one"}, {"two"}, {"three"}}, RowHeight: 390}); err != nil {
+	if err := continuationDocument.AddTable(pdfTable{Columns: []pdfColumn{{Header: "A", Width: 120, Align: "left"}}, Rows: [][]string{{"one"}, {"two"}, {"three"}}, RowHeight: 200}); err != nil {
 		t.Fatalf("continuation table: %v", err)
 	}
 }
@@ -636,7 +749,41 @@ func TestGopdfDocumentInjectedFailureBranches(t *testing.T) {
 
 	writeTextForGopdfDocument = func(*gopdfDocument, string) error { return errors.New("gopdf text failed") }
 	assertErrorContains(t, func() error { return startedTestDocument(t).AddTitle("line") }, "gopdf text failed")
+	var continuationDocument = startedTestDocument(t)
+	continuationDocument.y = pageBottom
+	assertErrorContains(t, func() error { return continuationDocument.AddSectionHeading("continued section") }, "gopdf text failed")
+	assertErrorContains(t, func() error {
+		return startedTestDocument(t).AddTable(pdfTable{
+			ContinuationTitle: "continued table",
+			Columns:           []pdfColumn{{Header: "Entry", Width: 100, Align: "left"}},
+			Rows:              [][]string{{"first"}, {"second"}},
+			RowHeight:         200,
+		})
+	}, "gopdf text failed")
 	writeTextForGopdfDocument = previousTextWriter
+
+	var regularOnlyDocument = newGopdfDocument()
+	if err := regularOnlyDocument.StartPDF(PageSizeA4); err != nil {
+		t.Fatalf("start regular-only document: %v", err)
+	}
+	if err := regularOnlyDocument.AddTTFFont(fontRegular, goregular.TTF); err != nil {
+		t.Fatalf("load regular font: %v", err)
+	}
+	assertErrorContains(t, func() error { return regularOnlyDocument.addContinuationPage("continued") }, "font")
+	regularOnlyDocument.y = pageBottom
+	assertErrorContains(t, func() error {
+		return regularOnlyDocument.AddTable(pdfTable{
+			Columns: []pdfColumn{{Header: "Entry", Width: 100, Align: "left"}},
+			Rows:    [][]string{{"entry"}},
+		})
+	}, "font")
+	assertErrorContains(t, func() error {
+		return startedTestDocument(t).AddTable(pdfTable{
+			Columns:   []pdfColumn{{Header: "Entry", Width: 100, Align: "left"}},
+			Rows:      [][]string{{"entry"}},
+			RowHeight: 260,
+		})
+	}, "does not fit within the printable page area")
 
 	writeCellForGopdfDocument = func(*gopdfDocument, *gopdf.Rect, string) error { return errors.New("gopdf cell failed") }
 	assertErrorContains(t, func() error { return startedTestDocument(t).AddKeyValue("label", "value") }, "gopdf cell failed")

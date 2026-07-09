@@ -84,13 +84,13 @@ func (document *gopdfDocument) AddTitle(text string) error {
 // AddSectionHeading emits a section heading with bold font styling.
 // Authored by: OpenCode
 func (document *gopdfDocument) AddSectionHeading(text string) error {
-	return document.addSpacedTextBlock(text, fontBold, 12, 18, 10)
+	return document.addSpacedTextBlock(text, fontBold, 12, 18, sectionSpacing)
 }
 
 // AddSubsectionHeading emits a subsection heading with bold font styling.
 // Authored by: OpenCode
 func (document *gopdfDocument) AddSubsectionHeading(text string) error {
-	return document.addSpacedTextBlock(text, fontBold, 10, 16, 8)
+	return document.addSpacedTextBlock(text, fontBold, 10, 16, sectionSpacing)
 }
 
 // AddKeyValue emits one styled label/value row using Cell and Text operations.
@@ -153,25 +153,29 @@ func (document *gopdfDocument) AddTable(table pdfTable) error {
 	if rowHeight <= 0 {
 		rowHeight = 24
 	}
+	var columns = printableWidthColumns(table.Columns)
 	var remainingRows = table.Rows
-	var firstChunk = true
+	if err := document.prepareTableStart(table.Title, table.ContinuationTitle, rowHeight); err != nil {
+		return err
+	}
 	for len(remainingRows) > 0 {
 		var capacity = document.tableRowCapacity(rowHeight)
 		if capacity < 1 {
-			document.addContinuationPage(table.ContinuationTitle)
-			capacity = document.tableRowCapacity(rowHeight)
+			return fmt.Errorf("table row height %.0f does not fit within the printable page area", rowHeight)
 		}
 		if capacity > len(remainingRows) {
 			capacity = len(remainingRows)
 		}
 		var chunk = remainingRows[:capacity]
-		if err := document.drawTableChunk(table, chunk, rowHeight, firstChunk && len(remainingRows) == len(chunk)); err != nil {
+		if err := document.drawTableChunk(table, columns, chunk, rowHeight, len(remainingRows) == len(chunk)); err != nil {
 			return err
 		}
 		remainingRows = remainingRows[capacity:]
-		firstChunk = false
 		if len(remainingRows) > 0 {
-			document.addContinuationPage(table.ContinuationTitle)
+			if err := document.addContinuationPage(table.ContinuationTitle); err != nil {
+				return err
+			}
+			document.y += tableSpacing
 		}
 	}
 	return nil
@@ -211,7 +215,9 @@ func (document *gopdfDocument) addTextBlock(text string, font string, size float
 func (document *gopdfDocument) addSpacedTextBlock(text string, font string, size float64, verticalAdvance float64, topSpacing float64) error {
 	if document.started && document.y > pageMargin {
 		if document.y+verticalAdvance+topSpacing > pageBottom {
-			document.addContinuationPage("Continued")
+			if err := document.addContinuationPage("Continued"); err != nil {
+				return err
+			}
 		} else {
 			document.y += topSpacing
 		}
@@ -228,33 +234,25 @@ func (document *gopdfDocument) ensureSpace(height float64) error {
 	if document.y+height <= pageBottom {
 		return nil
 	}
-	document.addContinuationPage("Continued")
-	return nil
+	return document.addContinuationPage("Continued")
 }
 
-// tableRowCapacity returns the number of data rows that fit on the current page.
+// tableRowCapacity returns the number of data rows whose header, cells, and
+// borders fit wholly within the current page's printable area.
 // Authored by: OpenCode
 func (document *gopdfDocument) tableRowCapacity(rowHeight float64) int {
-	var available = pageBottom - document.y - rowHeight
-	if available <= 0 {
+	var available = pageBottom - document.y - tableSpacing
+	if rowHeight <= 0 || available < rowHeight*2 {
 		return 0
 	}
-	if available < rowHeight {
-		return 1
-	}
-	return int(available / rowHeight)
+	return int(available/rowHeight) - 1
 }
 
 // drawTableChunk draws one page-local table chunk and records its text extract.
 // Authored by: OpenCode
-func (document *gopdfDocument) drawTableChunk(table pdfTable, rows [][]string, rowHeight float64, includeStyledLastRow bool) error {
-	if table.Title != "" {
-		if err := document.AddSubsectionHeading(table.Title); err != nil {
-			return err
-		}
-	}
+func (document *gopdfDocument) drawTableChunk(table pdfTable, columns []pdfColumn, rows [][]string, rowHeight float64, includeStyledLastRow bool) error {
 	var layout = document.pdf.NewTableLayout(pageMargin, document.y, rowHeight, len(rows))
-	for _, column := range table.Columns {
+	for _, column := range columns {
 		layout.AddColumn(sanitizeText(column.Header), column.Width, column.Align)
 	}
 	layout.SetTableStyle(tableStyle())
@@ -271,21 +269,84 @@ func (document *gopdfDocument) drawTableChunk(table pdfTable, rows [][]string, r
 	if err := drawTableForGopdfDocument(layout); err != nil {
 		return err
 	}
-	document.recordTable(table.Columns, rows)
+	document.recordTable(columns, rows)
 	document.y += rowHeight*float64(len(rows)+1) + 12
 	return nil
 }
 
 // addContinuationPage starts a new page with repeated context.
 // Authored by: OpenCode
-func (document *gopdfDocument) addContinuationPage(context string) {
+func (document *gopdfDocument) addContinuationPage(context string) error {
 	document.pdf.AddPage()
 	document.y = pageMargin
 	var label = sanitizeText(context)
 	if label == "" {
 		label = "Continued"
 	}
+	if err := document.pdf.SetFont(fontBold, "", 10); err != nil {
+		return err
+	}
+	document.pdf.SetXY(pageMargin, document.y)
+	if err := writeTextForGopdfDocument(document, "Continued: "+label); err != nil {
+		return err
+	}
+	document.y += 16
 	document.recordText("CONTINUED: " + label)
+	return nil
+}
+
+// prepareTableStart reserves enough space for a table title, header, and first
+// row before emitting any part of the table block.
+// Authored by: OpenCode
+func (document *gopdfDocument) prepareTableStart(title string, continuationTitle string, rowHeight float64) error {
+	var titleHeight float64
+	if title != "" {
+		titleHeight = sectionSpacing + 16
+	}
+	var required = titleHeight + tableSpacing*2 + rowHeight*2
+	if document.y+required > pageBottom {
+		if err := document.addContinuationPage(continuationTitle); err != nil {
+			return err
+		}
+	}
+	if document.y+required > pageBottom {
+		return fmt.Errorf("table row height %.0f does not fit within the printable page area", rowHeight)
+	}
+	if title != "" {
+		if err := document.AddSubsectionHeading(title); err != nil {
+			return err
+		}
+	}
+	document.y += tableSpacing
+	return nil
+}
+
+// printableWidthColumns scales source column proportions to the full printable
+// width, leaving the page margins as the equal outer table margins.
+// Authored by: OpenCode
+func printableWidthColumns(columns []pdfColumn) []pdfColumn {
+	var width float64
+	for _, column := range columns {
+		width += column.Width
+	}
+	var scaled = append([]pdfColumn(nil), columns...)
+	if width <= 0 {
+		var equalWidth = contentWide / float64(len(scaled))
+		for index := range scaled {
+			scaled[index].Width = equalWidth
+		}
+		return scaled
+	}
+	var used float64
+	for index := range scaled {
+		if index == len(scaled)-1 {
+			scaled[index].Width = contentWide - used
+			break
+		}
+		scaled[index].Width = scaled[index].Width * contentWide / width
+		used += scaled[index].Width
+	}
+	return scaled
 }
 
 // recordTable records table headers and rows for deterministic test assertions.
