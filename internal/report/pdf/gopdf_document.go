@@ -37,10 +37,12 @@ var drawTableForGopdfDocument = func(table gopdf.TableLayout) error {
 // report text comments for deterministic automated assertions.
 // Authored by: OpenCode
 type gopdfDocument struct {
-	pdf     gopdf.GoPdf
-	y       float64
-	texts   []string
-	started bool
+	pdf        gopdf.GoPdf
+	y          float64
+	pageWidth  float64
+	pageHeight float64
+	texts      []string
+	started    bool
 }
 
 // newGopdfDocument creates one local PDF document adapter.
@@ -56,8 +58,10 @@ func (document *gopdfDocument) StartPDF(pageSize string) error {
 		return fmt.Errorf("unsupported PDF page size %q", pageSize)
 	}
 	document.pdf = gopdf.GoPdf{}
-	document.pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})
+	document.pdf.Start(gopdf.Config{PageSize: *gopdf.PageSizeA4Landscape})
 	document.pdf.AddPage()
+	document.pageWidth = gopdf.PageSizeA4Landscape.W
+	document.pageHeight = gopdf.PageSizeA4Landscape.H
 	document.started = true
 	return nil
 }
@@ -80,13 +84,13 @@ func (document *gopdfDocument) AddTitle(text string) error {
 // AddSectionHeading emits a section heading with bold font styling.
 // Authored by: OpenCode
 func (document *gopdfDocument) AddSectionHeading(text string) error {
-	return document.addTextBlock(text, fontBold, 12, 18)
+	return document.addSpacedTextBlock(text, fontBold, 12, 18, 10)
 }
 
 // AddSubsectionHeading emits a subsection heading with bold font styling.
 // Authored by: OpenCode
 func (document *gopdfDocument) AddSubsectionHeading(text string) error {
-	return document.addTextBlock(text, fontBold, 10, 16)
+	return document.addSpacedTextBlock(text, fontBold, 10, 16, 8)
 }
 
 // AddKeyValue emits one styled label/value row using Cell and Text operations.
@@ -199,6 +203,20 @@ func (document *gopdfDocument) addTextBlock(text string, font string, size float
 	document.recordText(sanitized)
 	document.y += verticalAdvance
 	return nil
+}
+
+// addSpacedTextBlock emits a heading with positive top margin so adjacent PDF
+// sections cannot collide vertically.
+// Authored by: OpenCode
+func (document *gopdfDocument) addSpacedTextBlock(text string, font string, size float64, verticalAdvance float64, topSpacing float64) error {
+	if document.started && document.y > pageMargin {
+		if document.y+verticalAdvance+topSpacing > pageBottom {
+			document.addContinuationPage("Continued")
+		} else {
+			document.y += topSpacing
+		}
+	}
+	return document.addTextBlock(text, font, size, verticalAdvance)
 }
 
 // ensureSpace adds a continuation page before content would leave the A4 area.

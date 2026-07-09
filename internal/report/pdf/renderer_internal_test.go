@@ -34,6 +34,27 @@ func TestStartPDFDocumentUsesA4Configuration(t *testing.T) {
 	}
 }
 
+// TestGopdfDocumentUsesLandscapeA4AndPrintableWidth verifies the concrete
+// renderer uses landscape A4 dimensions and a printable area with right padding.
+// Authored by: OpenCode
+func TestGopdfDocumentUsesLandscapeA4AndPrintableWidth(t *testing.T) {
+	var document = newGopdfDocument()
+	var err = document.StartPDF(PageSizeA4)
+	if err != nil {
+		t.Fatalf("start PDF document: %v", err)
+	}
+
+	if document.pageWidth != gopdf.PageSizeA4Landscape.W || document.pageHeight != gopdf.PageSizeA4Landscape.H {
+		t.Fatalf("page size = %.0fx%.0f, want landscape A4 %.0fx%.0f", document.pageWidth, document.pageHeight, gopdf.PageSizeA4Landscape.W, gopdf.PageSizeA4Landscape.H)
+	}
+	if contentWide+pageMargin > document.pageWidth-pageMargin {
+		t.Fatalf("content width %.0f leaves no right padding on page width %.0f", contentWide, document.pageWidth)
+	}
+	if pageBottom > document.pageHeight-pageMargin {
+		t.Fatalf("page bottom %.0f exceeds landscape A4 printable height %.0f", pageBottom, document.pageHeight-pageMargin)
+	}
+}
+
 // TestLoadApplicationFontsValidatesAndLoadsRegularAndBoldFonts specifies the
 // application-supplied font seam.
 // Authored by: OpenCode
@@ -69,6 +90,8 @@ func TestRenderMainReportUsesStructuredLayoutPrimitives(t *testing.T) {
 	assertContains(t, recorder.sections, "Reference Section")
 	assertContains(t, recorder.subsections, "Historical Position")
 	assertKeyValue(t, recorder, "Report Calculation Currency", "USD")
+	assertNoSubsection(t, recorder, "Rate Source Summary Table")
+	assertNoSubsection(t, recorder, "Reference Table")
 	assertTableHeader(t, recorder, "Historical Full Liquidation Count")
 	assertTableCell(t, recorder, "BLOCKCHAIN OP")
 	assertTableCell(t, recorder, "Converted")
@@ -77,6 +100,28 @@ func TestRenderMainReportUsesStructuredLayoutPrimitives(t *testing.T) {
 		t.Fatalf("table count = %d, want structured summary/reference/activity tables", len(recorder.tables))
 	}
 	assertNoMarkdownStructuralSyntax(t, recorder.allText())
+}
+
+// TestBUG004PDFLayoutRegressionRules verifies the renderer seams for the
+// production layout defects patched by BUG-004.
+// Authored by: OpenCode
+func TestBUG004PDFLayoutRegressionRules(t *testing.T) {
+	var recorder = &layoutRecorder{}
+	var report = pdfNonZeroLiquidationReportFixture(t)
+	var conversion = pdfAnnexConversionEntry()
+	report.RateSources = []reportmodel.ExchangeRateEvidence{*conversion.Amounts[0].ExchangeRateEvidence}
+
+	var err = renderMainReport(recorder, report)
+	if err != nil {
+		t.Fatalf("render main report: %v", err)
+	}
+
+	assertNoSubsection(t, recorder, "Reference Table")
+	assertNoSubsection(t, recorder, "Rate Source Summary Table")
+	assertKeyValue(t, recorder, "Authority", reportmodel.RateAuthorityDisplayLabel(conversion.Amounts[0].ExchangeRateEvidence.Authority))
+	assertKeyValue(t, recorder, "Provider", rateProviderLabel(conversion.Amounts[0].ExchangeRateEvidence.ProviderID))
+	assertSummaryTotalInsideTable(t, recorder)
+	assertTablesWithinPrintableWidth(t, recorder)
 }
 
 // TestRenderAnnexUsesStructuredLayoutPrimitives verifies Annex 1 uses a page
@@ -451,6 +496,25 @@ func TestRemainingRendererErrorBranches(t *testing.T) {
 	assertErrorContains(t, func() error {
 		return renderRateSourceSection(&errorLayoutRecorder{failSection: "Rate Source Summary"}, zeroReport)
 	}, "section failed")
+	var rateReport = pdfNonZeroLiquidationReportFixture(t)
+	var conversion = pdfAnnexConversionEntry()
+	rateReport.RateSources = []reportmodel.ExchangeRateEvidence{*conversion.Amounts[0].ExchangeRateEvidence}
+	for _, testCase := range []struct {
+		name string
+		key  string
+	}{
+		{name: "authority", key: "Authority"},
+		{name: "provider", key: "Provider"},
+		{name: "rate kind", key: "Rate Kind"},
+		{name: "unavailable", key: "Unavailable-Date Rule"},
+	} {
+		var testCase = testCase
+		t.Run("rate source "+testCase.name, func(t *testing.T) {
+			assertErrorContains(t, func() error {
+				return renderRateSourceSection(&errorLayoutRecorder{failKey: testCase.key}, rateReport)
+			}, "key failed")
+		})
+	}
 	assertErrorContains(t, func() error {
 		return renderPositionBlock(&errorLayoutRecorder{failKey: "Cost Basis"}, "Position", *apd.New(1, 0), *apd.New(1, 0), "USD", "USD")
 	}, "key failed")
@@ -512,6 +576,9 @@ func TestGopdfDocumentLayoutBranches(t *testing.T) {
 	assertErrorContains(t, func() error { return boldOnlyDocument.AddKeyValue("Label", "Value") }, "font")
 
 	var startedDocument = startedTestDocument(t)
+	if err := startedDocument.AddSectionHeading("First Section Without Extra Top Spacing"); err != nil {
+		t.Fatalf("first section heading: %v", err)
+	}
 	assertErrorContains(t, func() error { return startedDocument.AddTable(pdfTable{}) }, "columns are required")
 	if err := startedDocument.AddTable(pdfTable{Columns: []pdfColumn{{Header: "A", Width: 20, Align: "left"}}}); err != nil {
 		t.Fatalf("empty table rows should be a no-op: %v", err)
@@ -780,7 +847,7 @@ func (recorder *errorLayoutRecorder) AddParagraph(text string) error {
 }
 
 func (recorder *errorLayoutRecorder) AddTable(table pdfTable) error {
-	if recorder.failTable == table.Title {
+	if recorder.failTable != "" && recorder.failTable == table.Title {
 		return errors.New("table failed")
 	}
 	return recorder.layoutRecorder.AddTable(table)
@@ -884,6 +951,49 @@ func assertTableCell(t *testing.T, recorder *layoutRecorder, want string) {
 		}
 	}
 	t.Fatalf("table cell %q was not found in %#v", want, recorder.tables)
+}
+
+func assertNoSubsection(t *testing.T, recorder *layoutRecorder, forbidden string) {
+	t.Helper()
+	for _, text := range recorder.subsections {
+		if strings.Contains(text, forbidden) {
+			t.Fatalf("forbidden subsection %q was found in %q", forbidden, recorder.subsections)
+		}
+	}
+}
+
+func assertSummaryTotalInsideTable(t *testing.T, recorder *layoutRecorder) {
+	t.Helper()
+	for _, table := range recorder.tables {
+		if table.Title != "Gains-And-Losses Summary Table" {
+			continue
+		}
+		if !table.StyledLastRow {
+			t.Fatalf("summary table must style the total row")
+		}
+		if len(table.Rows) == 0 {
+			t.Fatalf("summary table has no rows")
+		}
+		var lastRow = table.Rows[len(table.Rows)-1]
+		if len(lastRow) == 0 || lastRow[0] != "Overall Yearly Net Total" {
+			t.Fatalf("summary final row = %#v, want Overall Yearly Net Total", lastRow)
+		}
+		return
+	}
+	t.Fatalf("Gains-And-Losses Summary Table was not rendered")
+}
+
+func assertTablesWithinPrintableWidth(t *testing.T, recorder *layoutRecorder) {
+	t.Helper()
+	for _, table := range recorder.tables {
+		var width float64
+		for _, column := range table.Columns {
+			width += column.Width
+		}
+		if width > contentWide {
+			t.Fatalf("table %q width %.0f exceeds printable width %.0f", table.Title, width, contentWide)
+		}
+	}
 }
 
 func assertNoMarkdownStructuralSyntax(t *testing.T, texts []string) {

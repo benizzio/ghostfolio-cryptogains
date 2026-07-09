@@ -53,12 +53,17 @@ func renderSummarySection(document pdfLayoutDocument, report reportmodel.Capital
 	if err := document.AddSectionHeading("Gains-And-Losses Summary"); err != nil {
 		return err
 	}
+	var yearlyNetTotal, err = decimalsupport.CanonicalString(report.YearlyNetTotal)
+	if err != nil {
+		return fmt.Errorf("render yearly net total: %w", err)
+	}
 	var rows [][]string
 	for _, entry := range report.SummaryEntries {
 		if entry.NetGainOrLoss.Sign() == 0 {
 			continue
 		}
-		var netGainOrLoss, err = decimalsupport.CanonicalString(entry.NetGainOrLoss)
+		var netGainOrLoss string
+		netGainOrLoss, err = decimalsupport.CanonicalString(entry.NetGainOrLoss)
 		if err != nil {
 			return fmt.Errorf("render summary entry %q net gain or loss: %w", entry.AssetIdentityKey, err)
 		}
@@ -72,6 +77,7 @@ func renderSummarySection(document pdfLayoutDocument, report reportmodel.Capital
 		if err := document.AddParagraph("No assets had a non-zero net gain or loss in the selected year."); err != nil {
 			return err
 		}
+		return document.AddKeyValue("Overall Yearly Net Total", yearlyNetTotal+" "+calculationCurrency)
 	} else if err := document.AddTable(pdfTable{
 		Title:             "Gains-And-Losses Summary Table",
 		ContinuationTitle: "Gains-And-Losses Summary Table (continued)",
@@ -80,16 +86,12 @@ func renderSummarySection(document pdfLayoutDocument, report reportmodel.Capital
 			{Header: "Net Gain Or Loss", Width: 150, Align: "right"},
 			{Header: "Report Calculation Currency", Width: 150, Align: "left"},
 		},
-		Rows: rows,
+		Rows:          append(rows, []string{"Overall Yearly Net Total", yearlyNetTotal, calculationCurrency}),
+		StyledLastRow: true,
 	}); err != nil {
 		return err
 	}
-
-	var yearlyNetTotal, err = decimalsupport.CanonicalString(report.YearlyNetTotal)
-	if err != nil {
-		return fmt.Errorf("render yearly net total: %w", err)
-	}
-	return document.AddKeyValue("Overall Yearly Net Total", yearlyNetTotal+" "+calculationCurrency)
+	return nil
 }
 
 // renderRateSourceSection renders provider-level rate source evidence.
@@ -106,31 +108,26 @@ func renderRateSourceSection(document pdfLayoutDocument, report reportmodel.Capi
 	}
 
 	var rendered = make(map[string]bool)
-	var rows [][]string
 	for _, source := range report.RateSources {
 		var key = strings.Join([]string{string(source.Authority), string(source.ProviderID), source.RateKind}, "|")
 		if rendered[key] {
 			continue
 		}
 		rendered[key] = true
-		rows = append(rows, []string{
-			sanitizeText(reportmodel.RateAuthorityDisplayLabel(source.Authority)),
-			rateProviderLabel(source.ProviderID),
-			sanitizeText(source.RateKind),
-			sanitizeText(reportmodel.RateProviderUnavailableDateRule(source.ProviderID)),
-		})
+		if err := document.AddKeyValue("Authority", sanitizeText(reportmodel.RateAuthorityDisplayLabel(source.Authority))); err != nil {
+			return err
+		}
+		if err := document.AddKeyValue("Provider", rateProviderLabel(source.ProviderID)); err != nil {
+			return err
+		}
+		if err := document.AddKeyValue("Rate Kind", sanitizeText(source.RateKind)); err != nil {
+			return err
+		}
+		if err := document.AddKeyValue("Unavailable-Date Rule", sanitizeText(reportmodel.RateProviderUnavailableDateRule(source.ProviderID))); err != nil {
+			return err
+		}
 	}
-	return document.AddTable(pdfTable{
-		Title:             "Rate Source Summary Table",
-		ContinuationTitle: "Rate Source Summary Table (continued)",
-		Columns: []pdfColumn{
-			{Header: "Authority", Width: 115, Align: "left"},
-			{Header: "Provider", Width: 125, Align: "left"},
-			{Header: "Rate Kind", Width: 140, Align: "left"},
-			{Header: "Unavailable-Date Rule", Width: 140, Align: "left"},
-		},
-		Rows: rows,
-	})
+	return nil
 }
 
 // renderReferenceSection renders the historical full-liquidation reference rows.
@@ -152,8 +149,7 @@ func renderReferenceSection(document pdfLayoutDocument, report reportmodel.Capit
 		})
 	}
 	return document.AddTable(pdfTable{
-		Title:             "Reference Table",
-		ContinuationTitle: "Reference Table (continued)",
+		ContinuationTitle: "Reference Section (continued)",
 		Columns: []pdfColumn{
 			{Header: "Asset", Width: 170, Align: "left"},
 			{Header: "Historical Full Liquidation Count", Width: 190, Align: "right"},

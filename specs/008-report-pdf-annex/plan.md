@@ -20,7 +20,7 @@ Add an output-format choice to capital gains report generation so users can gene
 
 ## Technical Context
 
-**Language/Version**: Go 1.26.3
+**Language/Version**: Go 1.26.5
 
 **Primary Dependencies**: Existing dependencies: `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `github.com/cockroachdb/apd/v3`, `golang.org/x/crypto/argon2`, `github.com/Fabianexe/gocoverageplus`, and Go standard library packages. Planned new PDF dependencies: `github.com/signintech/gopdf v0.36.1` for local PDF generation, `golang.org/x/image v0.43.0` for embedded Go font TTF data loaded through `gopdf.AddTTFFontByReader`, and `github.com/phpdave11/gofpdi v1.0.16` as a refreshed indirect dependency if Go module resolution permits it with `gopdf`.
 

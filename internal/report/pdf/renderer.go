@@ -31,8 +31,8 @@ const (
 	fontBold    = "bold"
 
 	pageMargin  = 36.0
-	pageBottom  = 806.0
-	contentWide = 523.0
+	pageBottom  = 559.0
+	contentWide = 770.0
 )
 
 // FontData stores application-supplied font bytes used by the PDF renderer.
