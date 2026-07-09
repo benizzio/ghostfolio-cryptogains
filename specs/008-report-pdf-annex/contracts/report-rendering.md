@@ -4,6 +4,8 @@
 
 This contract defines user-visible report content for the main capital gains and losses report and Annex 1 after adding PDF output and audit annex support.
 
+**Bugfix**: 2026-07-09 — [BUG-005] Added balanced printable-width, 12-point separation, and bottom-margin row-preflight PDF layout rules.
+
 ## Shared Main Report Content
 
 The main report must include the existing report sections except where this contract changes presentation.
@@ -140,12 +142,15 @@ PDF output must satisfy these additional rules:
 - PDF output must use `github.com/signintech/gopdf` layout primitives for landscape A4 page creation, application-supplied font loading, heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context.
 - A PDF renderer that emits report-domain values only as a plain sequential line dump is not a valid successful PDF output, even when the emitted text is selectable and contains no Markdown structural syntax.
 - PDF tables must fit inside the landscape printable area with visible right padding, no right-edge clipping, and wrapped cell content for values that exceed their column width.
+- PDF tables must consume the available landscape printable width with equal left and right outer margins while retaining the required padding, wrapping, and no-clipping behavior.
 - Adjacent text blocks, section headings, subheadings, and tables must have non-overlapping vertical spacing, including the `Report Calculation Currency` line, `Gains-And-Losses Summary` subtitle, `Asset Detail` headings, `In-Year Activity` subheadings, and Annex 1 `Asset: <asset symbol>` subheadings.
+- The affected transitions must retain at least 12 points of vertical separation from preceding content.
 - `Overall Yearly Net Total` must render as the final row or footer inside the `Gains-And-Losses Summary` table.
 - `Rate Source Summary` must render as bold classifier label lines followed by non-bold values and must not render as a `Rate Source Summary Table`.
 - `Reference Section` must not introduce generated helper subheadings that are not part of the report presentation contract, including `Reference Table`.
 - Annex 1 starts on a new page.
 - Additional page breaks are allowed only before a top-level section, per-asset annex section, table row, or content block that would not fit in the remaining printable page area.
+- Before drawing a table row or its borders, the renderer must preflight the complete rendered row height against the remaining printable height. If the row would cross the bottom margin, it must advance before drawing any part of the row, cells, or borders.
 - A continuation page must repeat visible section context or table header context before continued content.
 - Long tables may continue across pages with repeated or clear table context.
 - The first main-report page title is `Ghostfolio Capital Gains And Losses Report`; the first Annex page title is `Annex 1 - Audit`; continuation page titles or repeated context must identify the current top-level section or table.

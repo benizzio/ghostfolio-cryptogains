@@ -88,7 +88,7 @@ As a user reviewing the main capital gains and losses report, I want labels and 
 9. **Given** PDF output is selected, **When** the Rate Source Summary is rendered, **Then** it uses bold classifier label lines followed by non-bold values and does not render as a `Rate Source Summary Table`.
 10. **Given** PDF output is selected, **When** the Reference Section is rendered, **Then** it does not introduce a generated `Reference Table` subheading.
 11. **Given** PDF output is selected, **When** adjacent main-report text sections, headings, or subheadings are rendered on the same page, **Then** the `Report Calculation Currency` line, `Gains-And-Losses Summary` subtitle, `Asset Detail` headings, and `In-Year Activity` subheadings have non-overlapping vertical spacing from preceding content.
-12. **Given** PDF output is selected, **When** the affected main-report section transitions are rendered on the same page, **Then** they have the renderer-defined readable positive vertical separation from preceding content.
+12. **Given** PDF output is selected, **When** the affected main-report section transitions are rendered on the same page, **Then** they have at least 12 points of vertical separation from preceding content.
 
 ---
 
@@ -167,7 +167,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **FR-037**: When PDF output is selected, the system MUST NOT introduce generated helper subheadings that are not part of the report presentation contract, including `Reference Table` under the Reference Section.
 - **FR-038**: Before drawing a PDF table row or its borders, the system MUST determine whether the complete row fits inside the remaining printable height while preserving the bottom margin; otherwise it MUST advance the row to a continuation page with visible table or section context and MUST NOT clip row text, cells, borders, or the bottom margin.
 - **FR-039**: When PDF output is selected, the system MUST size each table to use the available landscape printable width with equal left and right outer margins while retaining the padding, wrapping, and no-clipping requirements of FR-033.
-- **FR-040**: When PDF output is selected, the system MUST maintain a renderer-defined readable positive vertical separation at the affected transitions covered by FR-034.
+- **FR-040**: When PDF output is selected, the system MUST maintain at least 12 points of vertical separation at the affected transitions covered by FR-034.
 
 ### Financial Calculation Evidence *(include when feature affects financial calculations)*
 
@@ -219,7 +219,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **SC-011**: In generated PDF reports, 0 Markdown structural syntax markers are visible as report presentation for headings, tables, emphasis, or Annex 1 sections.
 - **SC-012**: PDF layout verification confirms required report samples render with visible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context rather than as sequential dumped lines.
 - **SC-013**: PDF layout verification confirms required report samples use landscape A4 pages, keep all table columns within the printable area without right-edge clipping, avoid overlapping adjacent text sections, place `Overall Yearly Net Total` inside the Gains-And-Losses Summary table, render Rate Source Summary as label/value lines, omit the extra `Reference Table` subheading, and preserve top margin before main-report and Annex 1 asset subheadings.
-- **SC-014**: PDF layout verification confirms required wide-table samples use the available landscape printable width with equal left and right margins, affected section transitions have the renderer-defined readable positive separation, and every continued table row and border remains wholly inside the printable area with a preserved bottom margin and visible continuation context.
+- **SC-014**: PDF layout verification confirms required wide-table samples use the available landscape printable width with equal left and right margins, affected section transitions have at least 12 points of vertical separation, and every continued table row and border remains wholly inside the printable area with a preserved bottom margin and visible continuation context.
 
 ## Assumptions
 
