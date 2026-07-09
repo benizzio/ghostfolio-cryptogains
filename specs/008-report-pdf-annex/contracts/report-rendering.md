@@ -133,12 +133,17 @@ Rules:
 
 PDF output must satisfy these additional rules:
 
-- Page size is A4.
+- Page size is landscape A4 on every page.
 - Required report text is emitted as selectable text, not as page images.
 - PDF output renders report-domain content through PDF-specific layout and must not use Markdown-rendered content as the PDF body.
 - Markdown structural syntax, including heading markers, table pipes or separators, and bold markers, must not appear as visible PDF report presentation.
-- PDF output must use `github.com/signintech/gopdf` layout primitives for A4 page creation, application-supplied font loading, heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context.
+- PDF output must use `github.com/signintech/gopdf` layout primitives for landscape A4 page creation, application-supplied font loading, heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context.
 - A PDF renderer that emits report-domain values only as a plain sequential line dump is not a valid successful PDF output, even when the emitted text is selectable and contains no Markdown structural syntax.
+- PDF tables must fit inside the landscape printable area with visible right padding, no right-edge clipping, and wrapped cell content for values that exceed their column width.
+- Adjacent text blocks, section headings, subheadings, and tables must have non-overlapping vertical spacing, including the `Report Calculation Currency` line, `Gains-And-Losses Summary` subtitle, `Asset Detail` headings, `In-Year Activity` subheadings, and Annex 1 `Asset: <asset symbol>` subheadings.
+- `Overall Yearly Net Total` must render as the final row or footer inside the `Gains-And-Losses Summary` table.
+- `Rate Source Summary` must render as bold classifier label lines followed by non-bold values and must not render as a `Rate Source Summary Table`.
+- `Reference Section` must not introduce generated helper subheadings that are not part of the report presentation contract, including `Reference Table`.
 - Annex 1 starts on a new page.
 - Additional page breaks are allowed only before a top-level section, per-asset annex section, table row, or content block that would not fit in the remaining printable page area.
 - A continuation page must repeat visible section context or table header context before continued content.

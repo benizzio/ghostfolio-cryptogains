@@ -68,7 +68,7 @@ Rules:
 
 - Calculation uses the currently unlocked protected cache and does not run a new sync.
 - Markdown output renders a main Markdown document plus an Annex 1 Markdown document.
-- PDF output renders one local A4 text PDF containing the main report and Annex 1.
+- PDF output renders one local landscape A4 text PDF containing the main report and Annex 1.
 - The UI must not show cleartext report content as a preview.
 - On calculation, render, or save failure before final save, the workflow reports an actionable non-secret error and removes any partial cleartext output created by the attempt.
 - On save success and automatic-open failure, the workflow treats the save as successful and reports the open warning.

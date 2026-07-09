@@ -22,8 +22,9 @@ Expected result:
 - report output-format request validation passes for Markdown and PDF and rejects unsupported formats
 - TUI contract tests show output-format selection and selected format on busy/result screens
 - Markdown renderer tests produce a main document and Annex 1 document
-- PDF renderer tests produce A4 text PDF bytes through the local renderer
+- PDF renderer tests produce landscape A4 text PDF bytes through the local renderer
 - PDF renderer tests require `gopdf` layout primitives for visible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context, and fail for plain sequential line dumps
+- PDF renderer tests require landscape A4 pages, printable-width table sizing with right padding, no clipped columns, non-overlapping vertical spacing, summary totals inside the summary table, Rate Source Summary label/value formatting, no generated `Reference Table` subheading, and adequate top margin before main-report and Annex 1 asset subheadings
 - rendering tests cover bold classifier labels, zero summary row omission, summary empty state, `Historical Full Liquidation Count`, `Historical Position`, exact conversion status labels `Same currency` and `Converted`, exact quote direction labels `Source currency per base currency` and `Base currency per source currency`, and `BLOCKCHAIN OP`
 - runtime tests verify Markdown creates exactly two files and PDF creates exactly one file
 - failure tests verify partial output cleanup
@@ -64,7 +65,13 @@ Contract and integration coverage should prove these scenarios:
 - Markdown Annex 1 filename inserts `-annex-1-` immediately before the date segment.
 - Successful result screens list all generated paths.
 - PDF generation works without user-installed fonts, platform-specific font paths, browser rendering, operating-system print-to-PDF support, or remote font resources.
-- PDF renderer tests prove the `gopdf` layout boundary is used for A4 pages, application-supplied fonts, headings, styled text, table rows, table columns, wrapping, and continuation context.
+- PDF renderer tests prove the `gopdf` layout boundary is used for landscape A4 pages, application-supplied fonts, headings, styled text, table rows, table columns, wrapping, and continuation context.
+- PDF renderer tests prove every PDF page uses landscape A4 orientation.
+- PDF renderer tests prove wide tables retain visible right padding, stay inside printable bounds, wrap long cell content, and do not clip columns at the page edge.
+- PDF renderer tests prove adjacent text blocks, section headings, subheadings, and tables do not overlap, including the `Report Calculation Currency` line, `Gains-And-Losses Summary` subtitle, `Asset Detail`, `In-Year Activity`, and Annex 1 asset subheadings.
+- PDF renderer tests prove `Overall Yearly Net Total` is the final row or footer inside the `Gains-And-Losses Summary` table.
+- PDF renderer tests prove Rate Source Summary renders as bold classifier label lines followed by non-bold values and not as a `Rate Source Summary Table`.
+- PDF renderer tests prove the Reference Section does not add a generated `Reference Table` subheading.
 - PDF output is rejected when it is only a plain sequential line dump, even if its text is selectable and contains no Markdown syntax.
 - Main report omits detailed Currency Conversion Audit rows.
 - Annex 1 title is `Annex 1 - Audit`.
@@ -124,6 +131,12 @@ Expected result:
 - PDF generation does not require installing fonts or using OS-specific font paths
 - PDF text can be selected and searched in a PDF reader that supports text selection
 - PDF content is human-legible, with visible heading hierarchy, styled labels, table headers, row and column readability, wrapped content, and continuation context instead of a plain line dump
+- every PDF page uses landscape A4 orientation
+- wide tables stay inside the printable area with visible right padding, no right-edge clipping, readable columns, and wrapped long cell content
+- the `Report Calculation Currency` line, `Gains-And-Losses Summary` subtitle, `Asset Detail` headings, `In-Year Activity` subheadings, and Annex 1 asset subheadings do not overlap adjacent content
+- `Overall Yearly Net Total` appears inside the `Gains-And-Losses Summary` table as its final row or footer
+- Rate Source Summary renders as bold classifier label lines followed by non-bold values and does not render as a `Rate Source Summary Table`
+- Reference Section does not include a generated `Reference Table` subheading
 - Annex 1 appears in the PDF after a page break
 
 1. Run a fixture or development setup that forces PDF render or output write failure.
