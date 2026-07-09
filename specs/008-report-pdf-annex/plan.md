@@ -8,7 +8,7 @@
 
 ## Summary
 
-Add an output-format choice to capital gains report generation so users can generate either the existing Markdown output or a new local A4 text PDF. The existing report calculation rules remain authoritative. The implementation will extend the report model with an audit annex and generated-output bundle, move detailed Currency Conversion Audit rows into Annex 1, render Markdown as a main file plus a separate annex file, render PDF as one searchable text file containing the main report and Annex 1 after a page break, and update TUI/runtime/output flows to report every generated file or fail without presenting partial output.
+Add an output-format choice to capital gains report generation so users can generate either the existing Markdown output or a new local landscape A4 text PDF. The existing report calculation rules remain authoritative. The implementation will extend the report model with an audit annex and generated-output bundle, move detailed Currency Conversion Audit rows into Annex 1, render Markdown as a main file plus a separate annex file, render PDF as one searchable text file containing the main report and Annex 1 after a page break, and update TUI/runtime/output flows to report every generated file or fail without presenting partial output.
 
 **Bugfix**: 2026-07-05 — [BUG-001] Updated from bugfix patch. Markdown initial detail verification must assert exact bold classifier label syntax.
 
@@ -16,13 +16,15 @@ Add an output-format choice to capital gains report generation so users can gene
 
 **Bugfix**: 2026-07-07 — [BUG-003] Updated from bugfix patch. PDF rendering must use concrete `gopdf` layout APIs for human-legible headings, styled labels, tables, rows, columns, wrapping, and continuation context rather than plain line dumping.
 
+**Bugfix**: 2026-07-09 — [BUG-004] Updated from bugfix patch. PDF rendering must use landscape A4 pages, keep tables inside printable bounds, preserve non-overlapping vertical spacing, and match section-specific Markdown presentation meanings where required.
+
 ## Technical Context
 
 **Language/Version**: Go 1.26.3
 
 **Primary Dependencies**: Existing dependencies: `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, `github.com/cockroachdb/apd/v3`, `golang.org/x/crypto/argon2`, `github.com/Fabianexe/gocoverageplus`, and Go standard library packages. Planned new PDF dependencies: `github.com/signintech/gopdf v0.36.1` for local PDF generation, `golang.org/x/image v0.43.0` for embedded Go font TTF data loaded through `gopdf.AddTTFFontByReader`, and `github.com/phpdave11/gofpdi v1.0.16` as a refreshed indirect dependency if Go module resolution permits it with `gopdf`.
 
-**PDF Renderer API Shape**: The `internal/report/pdf` renderer must construct a `gopdf.GoPdf`, initialize it with `Start(gopdf.Config{PageSize: *gopdf.PageSizeA4})`, add pages with `AddPage`, register embedded regular and bold fonts with `AddTTFFontByReader`, select fonts with `SetFont`, position content with `SetXY`, `GetX`, and `GetY`, render headings and styled labels with `Text`, `Cell`, or `MultiCell`, and produce structured report tables with `NewTableLayout`, `AddColumn`, `AddRow` or `AddStyledRow`, `CellStyle`, `BorderStyle`, `RGBColor`, and `DrawTable`. Where explicit separators or section boxes are needed, use `Line`, `SetLineWidth`, `SetStrokeColor`, `RectFromUpperLeftWithStyle`, or table border styles. The rendered PDF bytes should be obtained through `WriteTo` or `GetBytesPdf` before output writing. A renderer that only iterates report-domain strings into sequential `Text` or `Cell` lines without table layout, styled cells, wrapped cell content, and continuation context does not satisfy this plan.
+**PDF Renderer API Shape**: The `internal/report/pdf` renderer must construct a `gopdf.GoPdf`, initialize it with landscape A4 page dimensions through `Start(gopdf.Config{PageSize: ...})` using a library-provided landscape A4 page size or an A4 rectangle with width and height swapped, add pages with `AddPage`, register embedded regular and bold fonts with `AddTTFFontByReader`, select fonts with `SetFont`, position content with `SetXY`, `GetX`, and `GetY`, render headings and styled labels with `Text`, `Cell`, or `MultiCell`, and produce structured report tables with `NewTableLayout`, `AddColumn`, `AddRow` or `AddStyledRow`, `CellStyle`, `BorderStyle`, `RGBColor`, and `DrawTable`. Where explicit separators or section boxes are needed, use `Line`, `SetLineWidth`, `SetStrokeColor`, `RectFromUpperLeftWithStyle`, or table border styles. Table widths must be derived from the landscape printable area so columns retain right padding and never clip at the page edge. Vertical flow must add positive spacing before section titles, subheadings, and tables, or advance to a new page when the next block would collide with preceding content. The rendered PDF bytes should be obtained through `WriteTo` or `GetBytesPdf` before output writing. A renderer that only iterates report-domain strings into sequential `Text` or `Cell` lines without table layout, styled cells, wrapped cell content, and continuation context does not satisfy this plan.
 
 **Storage**: User-requested cleartext report export files in the resolved local Documents directory. These exports are outside the application-managed persistence boundary: the application writes them only after an explicit generation request, does not manage them as cache or durable application state, and does not re-ingest them automatically. Markdown output writes one main `.md` file and one Annex 1 `.md` file. PDF output writes one `.pdf` file. No synced-data persistence, protected snapshot persistence, report history cache, rate cache, remote persistence, telemetry, or background report storage is added.
 
@@ -36,7 +38,7 @@ Add an output-format choice to capital gains report generation so users can gene
 
 **Performance Goals**: Preserve the existing report-generation scale target of 10,000 cached activities. Keep report generation asynchronous from the Bubble Tea event loop. Avoid a lower activity-count limit for PDF or Annex 1 generation than Markdown output. Avoid rasterizing report pages into images.
 
-**Constraints**: No floating-point financial logic. Exact decimals and explicit currency identity remain unchanged from the current report calculation pipeline. PDF generation must be local-only, A4-sized, text-based, searchable, and selectable by PDF readers that support text selection. Generated outputs and failures must not expose Ghostfolio tokens, bearer tokens, reusable authentication material, protected payload bytes, or unrelated secrets. Failed render or write attempts must not be reported as successful and must remove partial output files created by the attempt.
+**Constraints**: No floating-point financial logic. Exact decimals and explicit currency identity remain unchanged from the current report calculation pipeline. PDF generation must be local-only, landscape A4-sized, text-based, searchable, and selectable by PDF readers that support text selection. Generated outputs and failures must not expose Ghostfolio tokens, bearer tokens, reusable authentication material, protected payload bytes, or unrelated secrets. Failed render or write attempts must not be reported as successful and must remove partial output files created by the attempt.
 
 **Scale/Scope**: One report output format selection (`Markdown` or `PDF`), one audit annex model, one Markdown main-plus-annex renderer flow, one PDF renderer flow, output bundle writing for one or two files, report-result display of all generated files, and no new external document-generation service.
 
@@ -82,7 +84,7 @@ internal/
 │   ├── model/                # Output format, report bundle, audit annex, audit activity, label contracts
 │   ├── calculate/            # Preserve existing calculation, emit through-year audit activity evidence
 │   ├── markdown/             # Render main Markdown and separate Annex 1 Markdown document
-│   ├── pdf/                  # Render local A4 searchable text PDF from calculated report and annex
+│   ├── pdf/                  # Render local landscape A4 searchable text PDF from calculated report and annex
 │   └── output/               # Reserve/write/cleanup one-file PDF or two-file Markdown output bundles
 └── tui/
     ├── flow/                 # Output-format selection state and report request construction
@@ -106,7 +108,7 @@ Report generation remains a staged pipeline:
 3. Report calculation emits the existing main report data plus Annex 1 audit evidence for every activity on or before the selected year end.
 4. Runtime selects the renderer from output format.
 5. Markdown rendering returns a main report document and a separate Annex 1 document.
-6. PDF rendering returns one A4 text PDF document with a page break before Annex 1, produced from report-domain data through `gopdf` page, font, text, styled-cell, and table-layout APIs rather than Markdown-rendered body text or plain sequential line dumping.
+6. PDF rendering returns one landscape A4 text PDF document with a page break before Annex 1, produced from report-domain data through `gopdf` page, font, text, styled-cell, and table-layout APIs rather than Markdown-rendered body text or plain sequential line dumping.
 7. Output writing reserves and writes the complete bundle, cleaning up every file created by the attempt if any write, sync, close, render, or validation step fails before success.
 8. Runtime result screens report every generated file path for successful generation.
 
@@ -145,6 +147,7 @@ Security posture:
 - Final implementation must pin module versions in `go.mod`/`go.sum`, verify the intended `github.com/phpdave11/gofpdi v1.0.16` transitive module when module resolution selects it, and pass the repository changed-source quality gate, including `govulncheck` as run by `make quality`.
 - BUG-002 follow-up must verify the selected `gopdf` usage can produce formatted headings, table-like layout, wrapping, and A4 pagination without Markdown passthrough; if it cannot, evaluate another local-only option that preserves the no-browser, no-remote-service, no-OS-print-to-PDF, no-platform-font-path, and no-telemetry constraints.
 - BUG-003 follow-up must verify the implementation actually calls the selected `gopdf` layout APIs for headings, styled labels, tables, rows, columns, wrapped cells, and continuation context, and must reject an implementation that only emits sequential report lines.
+- BUG-004 follow-up must verify `gopdf` is configured for landscape A4 pages and that renderer layout policy prevents clipped tables, overlapping adjacent text blocks, misplaced summary totals, and generated helper subheadings that are not part of the report contract.
 
 Alternatives rejected:
 
@@ -165,9 +168,10 @@ Alternatives rejected:
 
 ## Testing Strategy
 
-- Contract tests verify report output format choices, TUI selection copy, output filename patterns, generated file path reporting, main report rendering changes, Annex 1 rendering order, and PDF A4/text-output contract.
+- Contract tests verify report output format choices, TUI selection copy, output filename patterns, generated file path reporting, main report rendering changes, Annex 1 rendering order, and PDF landscape A4/text-output contract.
 - PDF renderer tests must fail if generated PDF presentation text contains Markdown structural syntax such as heading markers, table pipes or separators, or bold markers instead of PDF-formatted report text.
 - PDF renderer tests must fail if the PDF path is only a selectable text line dump; tests must require visible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context through the `gopdf` layout boundary.
+- PDF renderer tests must fail if pages are not landscape A4, if table columns exceed the printable width or clip at the right edge, if adjacent section text overlaps, if `Overall Yearly Net Total` is outside the Gains-And-Losses Summary table, if Rate Source Summary renders as a table instead of bold label/value lines, if `Reference Table` is generated, or if main-report and Annex 1 asset subheadings have insufficient top margin.
 - Markdown renderer and contract tests must assert exact initial detail list-item labels `- **Year:**`, `- **Cost Basis Method:**`, `- **Generated At:**`, and `- **Report Calculation Currency:**` before report values.
 - Contract tests verify that the user can select an output format and start generation from the report generation step without waiting on rendering or file IO in the Bubble Tea event loop; this is the automated workflow evidence for SC-001's 30-second bound.
 - Integration tests generate Markdown and PDF from the same deterministic protected cache and assert shared report data matches between formats except for pagination, page titles, and Markdown annex splitting.
@@ -179,6 +183,8 @@ Alternatives rejected:
 - Existing empirical financial tests remain unchanged and continue to verify calculation behavior.
 
 ## Complexity Tracking
+
+BUG-004 adds concrete layout edge-case validation for wide tables, section transitions, and section-specific PDF presentation. It does not add a constitution violation.
 
 No constitution violations are planned.
 

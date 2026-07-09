@@ -39,6 +39,10 @@
 
 **Bugfix**: 2026-07-07 — [BUG-003] Clarified that PDF output must use `github.com/signintech/gopdf` layout primitives for human-legible headings, styled labels, and tables instead of plain line dumping.
 
+### Session 2026-07-09
+
+**Bugfix**: 2026-07-09 — [BUG-004] Clarified landscape A4 PDF layout, table fit, non-overlapping section spacing, and section-specific PDF presentation rules.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Choose Report Output Format (Priority: P1)
@@ -56,6 +60,7 @@ As a user generating a capital gains and losses report, I want to choose whether
 3. **Given** the same report inputs are used for PDF and Markdown, **When** both reports are reviewed, **Then** shared report sections contain the same output data, explanatory text, and table content, with only format-specific page breaks, page titles, and annex placement differing.
 4. **Given** PDF output is selected, **When** the generated report is reviewed, **Then** headings, tables, emphasis, and Annex 1 content are presented as formatted PDF text and do not expose Markdown source syntax as report content.
 5. **Given** PDF output is selected, **When** the generated report is reviewed, **Then** the visible report uses a human-legible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context rather than a sequential dump of report lines.
+6. **Given** PDF output is selected, **When** the generated report is reviewed, **Then** every page uses landscape A4 layout and wide report tables remain inside the printable area with visible right padding, wrapped cell content, and no clipped columns.
 
 ---
 
@@ -76,6 +81,10 @@ As a user reviewing the main capital gains and losses report, I want labels and 
 5. **Given** an asset has no activity registered during the report year, **When** the Asset Detail section is rendered, **Then** the report shows the closing-position information under the title `Historical Position` and omits the separate `Opening Position`, `In-Year Activity`, and `Closing Position` subsections for that asset.
 6. **Given** an In-Year Activity row includes a conversion status, **When** the row is rendered, **Then** the status is shown as a user-friendly label and does not expose code-style or snake_case values.
 7. **Given** an In-Year Activity row represents a zero-priced SELL activity, **When** the row is rendered, **Then** the Type value is `BLOCKCHAIN OP` instead of `SELL`.
+8. **Given** PDF output is selected, **When** the Gains-And-Losses Summary is rendered, **Then** `Overall Yearly Net Total` is the final row or footer inside the Gains-And-Losses Summary table.
+9. **Given** PDF output is selected, **When** the Rate Source Summary is rendered, **Then** it uses bold classifier label lines followed by non-bold values and does not render as a `Rate Source Summary Table`.
+10. **Given** PDF output is selected, **When** the Reference Section is rendered, **Then** it does not introduce a generated `Reference Table` subheading.
+11. **Given** PDF output is selected, **When** adjacent main-report text sections, headings, or subheadings are rendered on the same page, **Then** the `Report Calculation Currency` line, `Gains-And-Losses Summary` subtitle, `Asset Detail` headings, and `In-Year Activity` subheadings have non-overlapping vertical spacing from preceding content.
 
 ---
 
@@ -95,6 +104,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 4. **Given** the Markdown format is selected, **When** the report is generated, **Then** Annex 1 is written as a separate Markdown file whose name preserves the main report filename pattern and inserts `-annex-1-` immediately before the date segment.
 5. **Given** the PDF format is selected, **When** the report is generated, **Then** Annex 1 appears in the same PDF file after a page break.
 6. **Given** a Currency Conversion Audit row includes quote direction, **When** Annex 1 is rendered, **Then** quote direction is shown as a user-friendly label and does not expose code-style or snake_case values.
+7. **Given** PDF output is selected, **When** Annex 1 renders multiple per-asset audit sections on the same page, **Then** each `Asset: <asset symbol>` subheading has sufficient top margin and does not touch or overlap the previous section's table.
 
 ### Edge Cases
 
@@ -106,6 +116,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - If a label mapping is unavailable for conversion status or quote direction, the report must fail before final output rather than exposing internal code labels to the user.
 - If PDF generation cannot complete, no incomplete or misleading final PDF report should be presented as successfully generated.
 - If a PDF renderer can emit selectable text but only as sequential dumped lines without visible heading hierarchy, styled labels, tables, rows, columns, wrapping, and continuation context, the PDF output is not a valid successful report.
+- If PDF tables, headings, or subheadings would otherwise exceed the printable area or collide with preceding content, the PDF renderer must wrap, reflow, add vertical space, or advance the page instead of clipping columns or overlapping text.
 
 ## Requirements *(mandatory)*
 
@@ -142,6 +153,12 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **FR-029**: PDF generation MUST work on supported Linux, macOS, and Windows installations without requiring platform-specific font paths, user-installed fonts, a browser, or operating-system print-to-PDF support; required report text MUST use application-supplied local font data.
 - **FR-030**: When PDF output is selected, the system MUST render report-domain content through PDF-specific layout and MUST NOT use Markdown-rendered content or Markdown structural syntax, including heading markers, table pipes or separators, or bold markers, as the PDF body.
 - **FR-031**: When PDF output is selected, the system MUST use `github.com/signintech/gopdf` layout primitives for A4 page creation, application-supplied font loading, headings, styled text, table headers, table rows, table columns, wrapped cell content, and continuation context; a plain line-dump renderer is not a valid PDF implementation.
+- **FR-032**: When PDF output is selected, the system MUST generate every page using landscape A4 orientation.
+- **FR-033**: When PDF output is selected, the system MUST keep table columns inside the printable page area with visible right padding, no right-edge clipping, and wrapped cell content where values exceed the column width.
+- **FR-034**: When PDF output is selected, the system MUST maintain non-overlapping vertical spacing between adjacent text blocks, headings, subheadings, and tables, including the `Report Calculation Currency` line, `Gains-And-Losses Summary` subtitle, `Asset Detail` headings, `In-Year Activity` subheadings, and Annex 1 per-asset subheadings.
+- **FR-035**: When PDF output is selected, the system MUST render `Overall Yearly Net Total` as the final row or footer inside the Gains-And-Losses Summary table.
+- **FR-036**: When PDF output is selected, the system MUST render the Rate Source Summary as bold classifier label lines followed by non-bold values and MUST NOT render it as a table titled `Rate Source Summary Table`.
+- **FR-037**: When PDF output is selected, the system MUST NOT introduce generated helper subheadings that are not part of the report presentation contract, including `Reference Table` under the Reference Section.
 
 ### Financial Calculation Evidence *(include when feature affects financial calculations)*
 
@@ -167,7 +184,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 
 - **Report Output Format Selection**: The user's selected output format for a report generation run, either PDF or Markdown.
 - **Main Capital Gains And Losses Report**: The primary report containing selected inputs, summaries, reference sections, asset details, and other non-annex report content.
-- **PDF Report Output**: The A4 paged report file that contains the main report and Annex 1 in one file.
+- **PDF Report Output**: The landscape A4 paged report file that contains the main report and Annex 1 in one file.
 - **Markdown Report Output**: The Markdown main report file generated for the selected report inputs.
 - **Reported Asset**: An asset identity selected by the existing report inclusion or reference-section rules for the selected year. This includes assets in Asset Detail, assets represented in the gains-and-losses summary before zero-net presentation filtering, and assets that appear only in the Reference Section. It excludes synced assets that are not selected by those rules for the generated report.
 - **Audit Annex**: Annex 1 of the report, titled `Annex 1 - Audit`, containing per-asset audit evidence followed by Currency Conversion Audit.
@@ -192,6 +209,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **SC-010**: In generated PDF reports, 100% of required report text is emitted as selectable text rather than rasterized page images.
 - **SC-011**: In generated PDF reports, 0 Markdown structural syntax markers are visible as report presentation for headings, tables, emphasis, or Annex 1 sections.
 - **SC-012**: PDF layout verification confirms required report samples render with visible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context rather than as sequential dumped lines.
+- **SC-013**: PDF layout verification confirms required report samples use landscape A4 pages, keep all table columns within the printable area without right-edge clipping, avoid overlapping adjacent text sections, place `Overall Yearly Net Total` inside the Gains-And-Losses Summary table, render Rate Source Summary as label/value lines, omit the extra `Reference Table` subheading, and preserve top margin before main-report and Annex 1 asset subheadings.
 
 ## Assumptions
 
