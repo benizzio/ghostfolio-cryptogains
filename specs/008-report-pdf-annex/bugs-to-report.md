@@ -40,7 +40,7 @@ Expected PDF formatting (line and table sizes should fit the page, pages can be 
 
 The implementation must use `github.com/signintech/gopdf` top render tables, headings, styled text, A4 pages, custom fonts, and table rows/columns, so the layout looks the closes possible to the Markdown whent it's properly interpreted or rendered.
 
-## [ ] 4 - PDF layout problems:
+## [x] 4 - PDF layout problems:
 
 The PDF formatting now contains multiple problems, as listed below:
 
