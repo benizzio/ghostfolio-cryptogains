@@ -57,3 +57,9 @@ In the `Ghostfolio Capital Gains And Losses Report`:
 In the `Annex 1 - Audit`
 
 - When in the same page, the `Asset: <asset symbel>` subheading has a too small top margin, causing the characters to be too close to the table of the previous section
+
+## [ ] 5 - PDF layout problems:
+
+- After changing all pages to landscape, all tables are now too compacted and unnecessarily breaking lines in their cells text. We should properly use the entire horizontal page space so the tables fill the entire page and provide better visibility. The blank margins on the left and right of the page should be of the same size when the tables are expanded
+- The `Gains-And-Losses Summary`, `Rate Source Summary`, `Reference Section`, `Asset Detail: <asset symbol>` and `In-Year Activity` are not correctly not overlapping with the previous sections, but still have a too narrow top margin, so the legibility is still compromised. We need to improve it by increasing that marging, so the previous section has a bigger distance from those subheadings
+- In the `Annex 1 - Audit` > `Detailed Per-Asset Audit Report` > `Per-Asset Audit Activity`, some tables that are split in the first line for a page brake have negative bottom margin, so the page break overlaps it and cuts the table line information and show no bottom margin blank space. Even when there is a table being split in the page, all page's bottom margins should be consistent and there should be no information being cut. Example: ![table-page-break-problem.png](table-page-break-problem.png)
