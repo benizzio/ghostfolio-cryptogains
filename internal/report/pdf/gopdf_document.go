@@ -148,21 +148,17 @@ func (document *gopdfDocument) AddTable(table pdfTable) error {
 	if len(table.Rows) == 0 {
 		return nil
 	}
-
 	var rowHeight = table.RowHeight
 	if rowHeight <= 0 {
 		rowHeight = 24
 	}
 	var columns = printableWidthColumns(table.Columns)
 	var remainingRows = table.Rows
-	if err := document.prepareTableStart(table.Title, table.ContinuationTitle, rowHeight); err != nil {
+	if err := document.prepareTableStart(table.Title, rowHeight); err != nil {
 		return err
 	}
 	for len(remainingRows) > 0 {
 		var capacity = document.tableRowCapacity(rowHeight)
-		if capacity < 1 {
-			return fmt.Errorf("table row height %.0f does not fit within the printable page area", rowHeight)
-		}
 		if capacity > len(remainingRows) {
 			capacity = len(remainingRows)
 		}
@@ -172,7 +168,7 @@ func (document *gopdfDocument) AddTable(table pdfTable) error {
 		}
 		remainingRows = remainingRows[capacity:]
 		if len(remainingRows) > 0 {
-			if err := document.addContinuationPage(table.ContinuationTitle); err != nil {
+			if err := document.addTableContinuationPage(table.ContinuationTitle); err != nil {
 				return err
 			}
 			document.y += tableSpacing
@@ -215,9 +211,7 @@ func (document *gopdfDocument) addTextBlock(text string, font string, size float
 func (document *gopdfDocument) addSpacedTextBlock(text string, font string, size float64, verticalAdvance float64, topSpacing float64) error {
 	if document.started && document.y > pageMargin {
 		if document.y+verticalAdvance+topSpacing > pageBottom {
-			if err := document.addContinuationPage("Continued"); err != nil {
-				return err
-			}
+			document.addPage()
 		} else {
 			document.y += topSpacing
 		}
@@ -234,7 +228,8 @@ func (document *gopdfDocument) ensureSpace(height float64) error {
 	if document.y+height <= pageBottom {
 		return nil
 	}
-	return document.addContinuationPage("Continued")
+	document.addPage()
+	return nil
 }
 
 // tableRowCapacity returns the number of data rows whose header, cells, and
@@ -274,40 +269,42 @@ func (document *gopdfDocument) drawTableChunk(table pdfTable, columns []pdfColum
 	return nil
 }
 
-// addContinuationPage starts a new page with repeated context.
+// addPage starts a new page without table continuation context.
 // Authored by: OpenCode
-func (document *gopdfDocument) addContinuationPage(context string) error {
+func (document *gopdfDocument) addPage() {
 	document.pdf.AddPage()
 	document.y = pageMargin
+}
+
+// addTableContinuationPage starts a new page with context for a table that
+// actually continued from the preceding page.
+// Authored by: OpenCode
+func (document *gopdfDocument) addTableContinuationPage(context string) error {
+	document.addPage()
 	var label = sanitizeText(context)
-	if label == "" {
-		label = "Continued"
-	}
 	if err := document.pdf.SetFont(fontBold, "", 10); err != nil {
 		return err
 	}
 	document.pdf.SetXY(pageMargin, document.y)
-	if err := writeTextForGopdfDocument(document, "Continued: "+label); err != nil {
+	if err := writeTextForGopdfDocument(document, label); err != nil {
 		return err
 	}
 	document.y += 16
-	document.recordText("CONTINUED: " + label)
+	document.recordText(label)
 	return nil
 }
 
 // prepareTableStart reserves enough space for a table title, header, and first
 // row before emitting any part of the table block.
 // Authored by: OpenCode
-func (document *gopdfDocument) prepareTableStart(title string, continuationTitle string, rowHeight float64) error {
+func (document *gopdfDocument) prepareTableStart(title string, rowHeight float64) error {
 	var titleHeight float64
 	if title != "" {
 		titleHeight = sectionSpacing + 16
 	}
 	var required = titleHeight + tableSpacing*2 + rowHeight*2
 	if document.y+required > pageBottom {
-		if err := document.addContinuationPage(continuationTitle); err != nil {
-			return err
-		}
+		document.addPage()
 	}
 	if document.y+required > pageBottom {
 		return fmt.Errorf("table row height %.0f does not fit within the printable page area", rowHeight)

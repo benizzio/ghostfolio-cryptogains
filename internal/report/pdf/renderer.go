@@ -34,8 +34,8 @@ const (
 	pageBottom  = 559.0
 	contentWide = 770.0
 
-	sectionSpacing = 12.0
-	tableSpacing   = 12.0
+	sectionSpacing = 24.0
+	tableSpacing   = 24.0
 )
 
 // FontData stores application-supplied font bytes used by the PDF renderer.

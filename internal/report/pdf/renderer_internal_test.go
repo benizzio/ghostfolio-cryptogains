@@ -56,7 +56,7 @@ func TestGopdfDocumentUsesLandscapeA4AndPrintableWidth(t *testing.T) {
 }
 
 // TestBUG005TableWidthSpacingAndRowPreflight verifies that the concrete layout
-// adapter uses balanced printable-width tables, 12-point block separation, and
+// adapter uses balanced printable-width tables, 24-point block separation, and
 // advances before a header-and-row chunk could cross the bottom margin.
 // Authored by: OpenCode
 func TestBUG005TableWidthSpacingAndRowPreflight(t *testing.T) {
@@ -78,8 +78,8 @@ func TestBUG005TableWidthSpacingAndRowPreflight(t *testing.T) {
 	if equalColumns[0].Width != contentWide/2 || equalColumns[1].Width != contentWide/2 {
 		t.Fatalf("zero-width columns = %#v, want equal printable-width allocation", equalColumns)
 	}
-	if sectionSpacing < 12 || tableSpacing < 12 {
-		t.Fatalf("section/table spacing = %.0f/%.0f, want at least 12 points", sectionSpacing, tableSpacing)
+	if sectionSpacing < 24 || tableSpacing < 24 {
+		t.Fatalf("section/table spacing = %.0f/%.0f, want at least 24 points", sectionSpacing, tableSpacing)
 	}
 
 	var document = startedTestDocument(t)
@@ -115,8 +115,8 @@ func TestBUG005TableWidthSpacingAndRowPreflight(t *testing.T) {
 		t.Fatalf("add preflighted table: %v", err)
 	}
 	var text = string(preflightDocument.Bytes())
-	if !strings.Contains(text, "CONTINUED: Audit table (continued)") {
-		t.Fatalf("expected preflight continuation context, got %q", text)
+	if strings.Contains(text, "Audit table (continued)") || strings.Contains(text, "CONTINUED:") {
+		t.Fatalf("table moved before its first row emitted continuation context: %q", text)
 	}
 
 	var tallRowDocument = startedTestDocument(t)
@@ -124,7 +124,7 @@ func TestBUG005TableWidthSpacingAndRowPreflight(t *testing.T) {
 		ContinuationTitle: "Tall row (continued)",
 		Columns:           []pdfColumn{{Header: "Entry", Width: 1, Align: "left"}},
 		Rows:              [][]string{{"one"}, {"two"}},
-		RowHeight:         230,
+		RowHeight:         220,
 	}); err != nil {
 		t.Fatalf("add tall preflighted table: %v", err)
 	}
@@ -158,8 +158,11 @@ func TestBUG005TableContinuationRepeatsContextAndHeader(t *testing.T) {
 	}
 
 	var text = string(document.Bytes())
-	if strings.Count(text, "CONTINUED: Per-Asset Audit Activity (continued)") != 2 {
-		t.Fatalf("continuation context count = %d, want 2", strings.Count(text, "CONTINUED: Per-Asset Audit Activity (continued)"))
+	if strings.Count(text, "Per-Asset Audit Activity (continued)") != 2 {
+		t.Fatalf("continuation context count = %d, want 2", strings.Count(text, "Per-Asset Audit Activity (continued)"))
+	}
+	if strings.Contains(text, "CONTINUED:") {
+		t.Fatalf("continuation context must not have a prefix, got %q", text)
 	}
 	if strings.Count(text, "% Source ID") != 3 {
 		t.Fatalf("repeated header count = %d, want 3", strings.Count(text, "% Source ID"))
@@ -709,14 +712,15 @@ func TestGopdfDocumentLayoutBranches(t *testing.T) {
 	if err := startedDocument.AddAnnexPageBreak(); err != nil {
 		t.Fatalf("page break: %v", err)
 	}
-	if err := startedDocument.addContinuationPage(""); err != nil {
-		t.Fatalf("continuation page: %v", err)
-	}
+	startedDocument.addPage()
 	var payload = string(startedDocument.Bytes())
-	for _, expected := range []string{"% ghostfolio-cryptogains text extract", "% Title", "% Label: Value", "% A", "% CONTINUED: Continued"} {
+	for _, expected := range []string{"% ghostfolio-cryptogains text extract", "% Title", "% Label: Value", "% A"} {
 		if !strings.Contains(payload, expected) {
 			t.Fatalf("expected Bytes comments to contain %q, got %q", expected, payload)
 		}
+	}
+	if strings.Contains(payload, "CONTINUED:") || strings.Contains(payload, "Continued: Continued") {
+		t.Fatalf("unsplit content emitted continuation context: %q", payload)
 	}
 
 	var continuationDocument = startedTestDocument(t)
@@ -769,14 +773,17 @@ func TestGopdfDocumentInjectedFailureBranches(t *testing.T) {
 	if err := regularOnlyDocument.AddTTFFont(fontRegular, goregular.TTF); err != nil {
 		t.Fatalf("load regular font: %v", err)
 	}
-	assertErrorContains(t, func() error { return regularOnlyDocument.addContinuationPage("continued") }, "font")
-	regularOnlyDocument.y = pageBottom
+	assertErrorContains(t, func() error { return regularOnlyDocument.addTableContinuationPage("continued") }, "font")
+	drawTableForGopdfDocument = func(gopdf.TableLayout) error { return nil }
 	assertErrorContains(t, func() error {
 		return regularOnlyDocument.AddTable(pdfTable{
-			Columns: []pdfColumn{{Header: "Entry", Width: 100, Align: "left"}},
-			Rows:    [][]string{{"entry"}},
+			ContinuationTitle: "Table (continued)",
+			Columns:           []pdfColumn{{Header: "Entry", Width: 100, Align: "left"}},
+			Rows:              [][]string{{"one"}, {"two"}},
+			RowHeight:         220,
 		})
 	}, "font")
+	drawTableForGopdfDocument = previousTableDrawer
 	assertErrorContains(t, func() error {
 		return startedTestDocument(t).AddTable(pdfTable{
 			Columns:   []pdfColumn{{Header: "Entry", Width: 100, Align: "left"}},
