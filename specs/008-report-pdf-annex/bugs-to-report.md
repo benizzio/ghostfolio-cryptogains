@@ -64,7 +64,7 @@ In the `Annex 1 - Audit`
 - The `Gains-And-Losses Summary`, `Rate Source Summary`, `Reference Section`, `Asset Detail: <asset symbol>` and `In-Year Activity` are not correctly not overlapping with the previous sections, but still have a too narrow top margin, so the legibility is still compromised. We need to improve it by increasing that marging, so the previous section has a bigger distance from those subheadings
 - In the `Annex 1 - Audit` > `Detailed Per-Asset Audit Report` > `Per-Asset Audit Activity`, some tables that are split in the first line for a page brake have negative bottom margin, so the page break overlaps it and cuts the table line information and show no bottom margin blank space. Even when there is a table being split in the page, all page's bottom margins should be consistent and there should be no information being cut. Example: ![table-page-break-problem.png](table-page-break-problem.png)
 
-## [ ] 6 - PDF layout problems:
+## [x] 6 - PDF layout problems:
 
 - The `Gains-And-Losses Summary`, `Rate Source Summary`, `Reference Section`, `Asset Detail: <asset symbol>` and `In-Year Activity` subheadings top margins are still too small, so the text is too close to the segments that come before (above) them. That margin needs to be double the current value
 - When a table is split between two pages, a continuation subheading is added with a too verbose format, e.g. `Continued: Reference Section (continued)`. Only the ` (continue)` suffix is necessary
