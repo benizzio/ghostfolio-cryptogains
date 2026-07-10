@@ -49,6 +49,8 @@ BUG-004 reassessment, 2026-07-09: `gopdf` remains suitable only when configured 
 
 BUG-005 reassessment, 2026-07-09: `gopdf` remains suitable only when the renderer allocates every table across the complete landscape printable width between equal left and right margins, retains at least 12 points of separation before affected section titles, subheadings, and tables, and preflights each complete table row and its borders before drawing. When a row would cross the bottom margin, the renderer must advance it to a continuation page before drawing any part of that row, then repeat visible table or section context. No local-only alternative is needed unless `gopdf` cannot provide these width, spacing, and atomic-row layout policies without remote services, browser services, external binaries, platform font paths, or rasterized report text.
 
+BUG-006 reassessment, 2026-07-10: `gopdf` remains suitable when the renderer reserves at least 24 points of vertical separation before the `Gains-And-Losses Summary`, `Rate Source Summary`, `Reference Section`, `Asset Detail: <asset symbol>`, and `In-Year Activity` subheadings when they follow preceding content on the same page. Only a table that actually advances to a continuation page may emit continuation context, using the exact format `<section or table context> (continued)` without a `Continued: ` prefix; unsplit tables must emit no continuation label. Renderer verification must exercise both split-table and unsplit-table paths.
+
 ## Embedded Font Strategy
 
 Decision: Load deterministic embedded Go font bytes through `gopdf.AddTTFFontByReader` rather than relying on local system font files.
