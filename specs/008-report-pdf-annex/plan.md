@@ -20,6 +20,8 @@ Add an output-format choice to capital gains report generation so users can gene
 
 **Bugfix**: 2026-07-09 — [BUG-005] Updated from bugfix patch. PDF rendering must allocate the full printable width with balanced outer margins, preserve at least 12 points of section separation, and preflight table rows before the bottom margin.
 
+**Bugfix**: 2026-07-10 — [BUG-006] Updated from bugfix patch. The named main-report subheadings require 24 points of separation, and only actual table continuation pages may render `<section or table context> (continued)`.
+
 ## Technical Context
 
 **Language/Version**: Go 1.26.5
@@ -29,6 +31,8 @@ Add an output-format choice to capital gains report generation so users can gene
 **PDF Renderer API Shape**: The `internal/report/pdf` renderer must construct a `gopdf.GoPdf`, initialize it with landscape A4 page dimensions through `Start(gopdf.Config{PageSize: ...})` using a library-provided landscape A4 page size or an A4 rectangle with width and height swapped, add pages with `AddPage`, register embedded regular and bold fonts with `AddTTFFontByReader`, select fonts with `SetFont`, position content with `SetXY`, `GetX`, and `GetY`, render headings and styled labels with `Text`, `Cell`, or `MultiCell`, and produce structured report tables with `NewTableLayout`, `AddColumn`, `AddRow` or `AddStyledRow`, `CellStyle`, `BorderStyle`, `RGBColor`, and `DrawTable`. Where explicit separators or section boxes are needed, use `Line`, `SetLineWidth`, `SetStrokeColor`, `RectFromUpperLeftWithStyle`, or table border styles. Table widths must be derived from the landscape printable area so columns retain right padding and never clip at the page edge. Vertical flow must add positive spacing before section titles, subheadings, and tables, or advance to a new page when the next block would collide with preceding content. The rendered PDF bytes should be obtained through `WriteTo` or `GetBytesPdf` before output writing. A renderer that only iterates report-domain strings into sequential `Text` or `Cell` lines without table layout, styled cells, wrapped cell content, and continuation context does not satisfy this plan.
 
 **BUG-005 PDF Layout Clarification**: Table widths must consume the full landscape printable width while retaining equal left and right outer margins, right padding, and wrapped cell content without clipping at the page edge. Vertical flow must use at least 12 points of separation before affected section titles, subheadings, and tables. Before drawing a table row or border, the renderer must preflight its complete height against the remaining printable height; if it would cross the bottom margin, it must advance to a continuation page before drawing any part of the row.
+
+**BUG-006 PDF Layout Clarification**: The `Gains-And-Losses Summary`, `Rate Source Summary`, `Reference Section`, `Asset Detail: <asset symbol>`, and `In-Year Activity` subheadings must reserve at least 24 points of vertical separation from preceding same-page content. Only a table that has advanced to a new page may emit continuation context, in the exact format `<section or table context> (continued)` without a `Continued: ` prefix.
 
 **Storage**: User-requested cleartext report export files in the resolved local Documents directory. These exports are outside the application-managed persistence boundary: the application writes them only after an explicit generation request, does not manage them as cache or durable application state, and does not re-ingest them automatically. Markdown output writes one main `.md` file and one Annex 1 `.md` file. PDF output writes one `.pdf` file. No synced-data persistence, protected snapshot persistence, report history cache, rate cache, remote persistence, telemetry, or background report storage is added.
 
@@ -153,6 +157,7 @@ Security posture:
 - BUG-003 follow-up must verify the implementation actually calls the selected `gopdf` layout APIs for headings, styled labels, tables, rows, columns, wrapped cells, and continuation context, and must reject an implementation that only emits sequential report lines.
 - BUG-004 follow-up must verify `gopdf` is configured for landscape A4 pages and that renderer layout policy prevents clipped tables, overlapping adjacent text blocks, misplaced summary totals, and generated helper subheadings that are not part of the report contract.
 - BUG-005 follow-up must verify table layouts consume the available landscape printable width with balanced outer margins, section transitions retain at least 12 points of separation, and table-row preflight prevents any row or border from crossing the bottom printable margin.
+- BUG-006 follow-up must verify the named main-report subheadings retain at least 24 points of separation, a continued table uses only `<section or table context> (continued)`, and an unsplit table emits no continuation label.
 
 Alternatives rejected:
 
@@ -178,6 +183,7 @@ Alternatives rejected:
 - PDF renderer tests must fail if the PDF path is only a selectable text line dump; tests must require visible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context through the `gopdf` layout boundary.
 - PDF renderer tests must fail if pages are not landscape A4, if table columns exceed the printable width or clip at the right edge, if adjacent section text overlaps, if `Overall Yearly Net Total` is outside the Gains-And-Losses Summary table, if Rate Source Summary renders as a table instead of bold label/value lines, if `Reference Table` is generated, or if main-report and Annex 1 asset subheadings have insufficient top margin.
 - BUG-005 PDF renderer tests must fail if tables do not consume the available printable width with balanced outer margins, affected section transitions have less than 12 points of separation, or a continued table row or border crosses the bottom margin.
+- BUG-006 PDF renderer tests must fail if the named main-report subheadings have less than 24 points of separation, a continued table has a `Continued: ` prefix or an incorrect label, or an unsplit table emits continuation context.
 - Markdown renderer and contract tests must assert exact initial detail list-item labels `- **Year:**`, `- **Cost Basis Method:**`, `- **Generated At:**`, and `- **Report Calculation Currency:**` before report values.
 - Contract tests verify that the user can select an output format and start generation from the report generation step without waiting on rendering or file IO in the Bubble Tea event loop; this is the automated workflow evidence for SC-001's 30-second bound.
 - Integration tests generate Markdown and PDF from the same deterministic protected cache and assert shared report data matches between formats except for pagination, page titles, and Markdown annex splitting.
@@ -193,6 +199,8 @@ Alternatives rejected:
 BUG-004 adds concrete layout edge-case validation for wide tables, section transitions, and section-specific PDF presentation. It does not add a constitution violation.
 
 BUG-005 adds layout-width allocation, readable spacing, and page-bottom row-continuation validation. It does not add a constitution violation.
+
+BUG-006 adds a stricter subheading spacing threshold and a continuation-label predicate. It does not add a constitution violation.
 
 No constitution violations are planned.
 
