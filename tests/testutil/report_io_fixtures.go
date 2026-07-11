@@ -33,11 +33,9 @@ type ReportOutputFilenameFixture struct {
 	Year                  int
 	CostBasisMethod       reportmodel.CostBasisMethod
 	GeneratedAt           time.Time
-	TimestampSlug         string
 	MarkdownMainFilename  string
 	MarkdownAnnexFilename string
 	PDFCombinedFilename   string
-	CollisionSuffix       int
 	CollidedMarkdownMain  string
 	CollidedMarkdownAnnex string
 	CollidedPDFCombined   string
@@ -126,18 +124,13 @@ func DeterministicReportOutputFilenameFixture() ReportOutputFilenameFixture {
 	var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
 	var year = 2024
 	var method = reportmodel.CostBasisMethodFIFO
-	const timestampSlug = "2026-05-21_12-34-56"
-	const collisionSuffix = 2
-
 	return ReportOutputFilenameFixture{
 		Year:                  year,
 		CostBasisMethod:       method,
 		GeneratedAt:           generatedAt,
-		TimestampSlug:         timestampSlug,
 		MarkdownMainFilename:  "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56.md",
 		MarkdownAnnexFilename: "ghostfolio-capital-gains-2024-fifo-annex-1-2026-05-21_12-34-56.md",
 		PDFCombinedFilename:   "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56.pdf",
-		CollisionSuffix:       collisionSuffix,
 		CollidedMarkdownMain:  "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56-2.md",
 		CollidedMarkdownAnnex: "ghostfolio-capital-gains-2024-fifo-annex-1-2026-05-21_12-34-56-2.md",
 		CollidedPDFCombined:   "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56-2.pdf",

@@ -95,12 +95,12 @@ func TestWriteReportDocumentUsesTimestampedFilenameAndSuffix(t *testing.T) {
 	var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.Local)
 	var documents = outputMarkdownDocuments(reportmodel.CostBasisMethodAverageCost, "# Report\n", generatedAt)
 
-	var firstBundle, err = reportoutput.WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, documents)
+	var firstBundle, err = reportoutput.WriteReportOutputBundle(reportmodel.ReportOutputFormatMarkdown, documents)
 	if err != nil {
 		t.Fatalf("write first report document: %v", err)
 	}
 	var secondBundle reportmodel.ReportOutputBundle
-	secondBundle, err = reportoutput.WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, documents)
+	secondBundle, err = reportoutput.WriteReportOutputBundle(reportmodel.ReportOutputFormatMarkdown, documents)
 	if err != nil {
 		t.Fatalf("write second report document: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestWriteReportDocumentUsesExclusiveCreate(t *testing.T) {
 	var existingPath = fixture.ReportPath("ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56.md")
 	testutil.WriteFixtureFile(t, existingPath, "existing")
 
-	var bundle, err = reportoutput.WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, outputMarkdownDocuments(reportmodel.CostBasisMethodFIFO, "new", generatedAt))
+	var bundle, err = reportoutput.WriteReportOutputBundle(reportmodel.ReportOutputFormatMarkdown, outputMarkdownDocuments(reportmodel.CostBasisMethodFIFO, "new", generatedAt))
 	if err != nil {
 		t.Fatalf("write report document with existing base path: %v", err)
 	}

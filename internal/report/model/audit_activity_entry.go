@@ -34,7 +34,10 @@ type AuditActivityEntry struct {
 	Note                   string
 }
 
-// Validate verifies one Annex 1 audit activity entry.
+// Validate verifies that an Annex 1 activity has the required identity, exact
+// decimal values, replay state, and optional conversion classification in the
+// documented validation order. For example, call `err := entry.Validate()`
+// before adding entry to a PerAssetAuditSection.
 // Authored by: OpenCode
 func (entry AuditActivityEntry) Validate() error {
 	if err := entry.validateIdentity(); err != nil {

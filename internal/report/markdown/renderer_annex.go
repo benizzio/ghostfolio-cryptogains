@@ -20,7 +20,8 @@ var (
 )
 
 // RenderAnnex converts one calculated report's audit annex into the separate
-// Annex 1 Markdown document required for Markdown output.
+// Annex 1 Markdown document required for Markdown output. For example, call
+// `annexDocument, err := markdown.RenderAnnex(report)` after report calculation.
 // Authored by: OpenCode
 func RenderAnnex(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
 	if err := report.Validate(); err != nil {

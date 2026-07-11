@@ -580,9 +580,9 @@ func TestRenderReportOutputBundleCoversPDFSelectionFailures(t *testing.T) {
 	}
 }
 
-// TestReportServiceWriteReportDocumentsBranches verifies bundle-writer seams.
+// TestReportServiceWriteReportOutputBundleBranches verifies bundle-writer seams.
 // Authored by: OpenCode
-func TestReportServiceWriteReportDocumentsLegacyBranches(t *testing.T) {
+func TestReportServiceWriteReportOutputBundleBranches(t *testing.T) {
 	var request = reportRequestFixture(t, 2024)
 	var report = capitalGainsReportFixture(t, request)
 	var documents = reportDocumentBundleFixture(t, report)

@@ -98,8 +98,7 @@ func (document ReportDocument) Validate() error {
 	if err := validateReportDocumentType(document.DocumentType); err != nil {
 		return fmt.Errorf("report document type: %w", err)
 	}
-	var role = effectiveReportDocumentRole(document)
-	if err := validateReportDocumentRole(role); err != nil {
+	if err := validateReportDocumentRole(document.Role); err != nil {
 		return fmt.Errorf("report document role: %w", err)
 	}
 	if err := document.validateContent(); err != nil {
@@ -141,27 +140,16 @@ func (document ReportDocument) validateContent() error {
 // validateRoleCompatibility verifies document type and role combinations.
 // Authored by: OpenCode
 func (document ReportDocument) validateRoleCompatibility() error {
-	var role = effectiveReportDocumentRole(document)
 	switch document.DocumentType {
 	case ReportDocumentTypeMarkdown:
-		if role != ReportDocumentRoleMain && role != ReportDocumentRoleAnnex {
+		if document.Role != ReportDocumentRoleMain && document.Role != ReportDocumentRoleAnnex {
 			return fmt.Errorf("markdown report document role must be main or annex")
 		}
 	case ReportDocumentTypePDF:
-		if role != ReportDocumentRoleCombined {
+		if document.Role != ReportDocumentRoleCombined {
 			return fmt.Errorf("pdf report document role must be combined")
 		}
 	}
 
 	return nil
-}
-
-// effectiveReportDocumentRole returns the implicit main role for legacy
-// Markdown document struct literals while keeping PDF role validation explicit.
-// Authored by: OpenCode
-func effectiveReportDocumentRole(document ReportDocument) ReportDocumentRole {
-	if document.Role == "" && document.DocumentType == ReportDocumentTypeMarkdown {
-		return ReportDocumentRoleMain
-	}
-	return document.Role
 }

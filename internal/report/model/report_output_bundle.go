@@ -54,8 +54,9 @@ func NewReportOutputBundle(
 	return bundle, nil
 }
 
-// Validate verifies one successful output bundle shape before runtime reports
-// saved paths to the user.
+// Validate verifies one successful persisted output bundle shape before runtime
+// reports saved paths to the user. For example, call `err := bundle.Validate()`
+// after a writer has recorded its files and optional open warning.
 // Authored by: OpenCode
 func (bundle ReportOutputBundle) Validate() error {
 	if err := validateReportOutputFormat(bundle.OutputFormat); err != nil {

@@ -59,7 +59,9 @@ func NewPerAssetAuditSection(assetIdentityKey string, displayLabel string, entri
 	return section, nil
 }
 
-// Validate verifies one Annex 1 per-asset audit section.
+// Validate verifies one Annex 1 per-asset section and every entry in report
+// replay order. For example, call `err := section.Validate()` before assigning
+// section to AuditAnnex.PerAssetAuditSections.
 // Authored by: OpenCode
 func (section PerAssetAuditSection) Validate() error {
 	if strings.TrimSpace(section.AssetIdentityKey) == "" {
@@ -113,7 +115,8 @@ func NewAuditAnnex(title string, sectionOrder []AuditAnnexSection) (AuditAnnex, 
 }
 
 // DefaultAuditAnnex creates the required empty Annex 1 shell for a newly
-// calculated report.
+// calculated report. For example, use `annex := DefaultAuditAnnex()` before
+// attaching calculated audit evidence.
 // Authored by: OpenCode
 func DefaultAuditAnnex() AuditAnnex {
 	return AuditAnnex{
@@ -122,14 +125,16 @@ func DefaultAuditAnnex() AuditAnnex {
 	}
 }
 
-// AuditAnnexTitle returns the required Annex 1 title.
+// AuditAnnexTitle returns the required Annex 1 title. For example, use
+// `title := AuditAnnexTitle()` when constructing a validated AuditAnnex.
 // Authored by: OpenCode
 func AuditAnnexTitle() string {
 	return auditAnnexTitle
 }
 
-// RequiredAuditAnnexSectionOrder returns the required top-level Annex 1 section
-// order.
+// RequiredAuditAnnexSectionOrder returns an independent copy of the required
+// top-level Annex 1 section order. For example, use
+// `order := RequiredAuditAnnexSectionOrder()` when constructing an AuditAnnex.
 // Authored by: OpenCode
 func RequiredAuditAnnexSectionOrder() []AuditAnnexSection {
 	return []AuditAnnexSection{
@@ -138,7 +143,9 @@ func RequiredAuditAnnexSectionOrder() []AuditAnnexSection {
 	}
 }
 
-// Validate verifies the required Annex 1 title and top-level section order.
+// Validate verifies the required Annex 1 title, section order, and nested audit
+// evidence. For example, call `err := annex.Validate()` before rendering the
+// annex in either output format.
 // Authored by: OpenCode
 func (annex AuditAnnex) Validate() error {
 	if annex.Title != auditAnnexTitle {

@@ -264,7 +264,7 @@ func TestMarkdownReportOutputFileContract(t *testing.T) {
 		t.Fatalf("render Markdown report bundle: %v", renderErr)
 	}
 	var outputBundle reportmodel.ReportOutputBundle
-	outputBundle, err = reportoutput.WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, documents)
+	outputBundle, err = reportoutput.WriteReportOutputBundle(reportmodel.ReportOutputFormatMarkdown, documents)
 	if err != nil {
 		t.Fatalf("write Markdown report bundle: %v", err)
 	}

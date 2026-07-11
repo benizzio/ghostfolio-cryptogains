@@ -49,13 +49,6 @@ type writeSyncCloser interface {
 // close fails, every file created by the attempt is removed before returning.
 // Authored by: OpenCode
 func WriteReportOutputBundle(outputFormat reportmodel.ReportOutputFormat, documents []reportmodel.ReportDocument) (reportmodel.ReportOutputBundle, error) {
-	return WriteReportDocuments(outputFormat, documents)
-}
-
-// WriteReportDocuments is the package-level bundle writer used by tests and the
-// runtime while the output bundle API is rolled through the application.
-// Authored by: OpenCode
-func WriteReportDocuments(outputFormat reportmodel.ReportOutputFormat, documents []reportmodel.ReportDocument) (reportmodel.ReportOutputBundle, error) {
 	var savedAt = normalizeReportDocumentSavedAt(documents)
 	if err := outputFormat.Validate(); err != nil {
 		return reportmodel.ReportOutputBundle{}, err
@@ -208,79 +201,6 @@ func reserveReportFile(documentsDir string, year int, method reportmodel.CostBas
 			fmt.Errorf("reserve report file %q: %w", path, err),
 		)
 	}
-}
-
-// validateBundleDocuments verifies the selected output format's required
-// rendered document roles before any filesystem writes begin.
-// Authored by: OpenCode
-func validateBundleDocuments(outputFormat reportmodel.ReportOutputFormat, documents []reportmodel.ReportDocument) error {
-	for index, document := range documents {
-		if err := document.Validate(); err != nil {
-			return fmt.Errorf("report document %d: %w", index, err)
-		}
-	}
-
-	switch outputFormat {
-	case reportmodel.ReportOutputFormatMarkdown:
-		return validateMarkdownBundleDocuments(documents)
-	case reportmodel.ReportOutputFormatPDF:
-		return validatePDFBundleDocuments(documents)
-	}
-
-	return validateBundleDocumentMetadata(documents)
-}
-
-// validateMarkdownBundleDocuments verifies the two Markdown output documents.
-// Authored by: OpenCode
-func validateMarkdownBundleDocuments(documents []reportmodel.ReportDocument) error {
-	if len(documents) != 2 {
-		return fmt.Errorf("markdown report output requires exactly two documents")
-	}
-	if documents[0].DocumentType != reportmodel.ReportDocumentTypeMarkdown || documents[0].Role != reportmodel.ReportDocumentRoleMain {
-		return fmt.Errorf("markdown report output document 0 must be the main Markdown document")
-	}
-	if documents[1].DocumentType != reportmodel.ReportDocumentTypeMarkdown || documents[1].Role != reportmodel.ReportDocumentRoleAnnex {
-		return fmt.Errorf("markdown report output document 1 must be the Annex 1 Markdown document")
-	}
-
-	return validateBundleDocumentMetadata(documents)
-}
-
-// validatePDFBundleDocuments verifies the combined PDF output document.
-// Authored by: OpenCode
-func validatePDFBundleDocuments(documents []reportmodel.ReportDocument) error {
-	if len(documents) != 1 {
-		return fmt.Errorf("pdf report output requires exactly one document")
-	}
-	if documents[0].DocumentType != reportmodel.ReportDocumentTypePDF || documents[0].Role != reportmodel.ReportDocumentRoleCombined {
-		return fmt.Errorf("pdf report output document must be the combined PDF document")
-	}
-
-	return validateBundleDocumentMetadata(documents)
-}
-
-// validateBundleDocumentMetadata verifies that all documents in one bundle share
-// the same naming metadata.
-// Authored by: OpenCode
-func validateBundleDocumentMetadata(documents []reportmodel.ReportDocument) error {
-	if len(documents) == 0 {
-		return fmt.Errorf("report output requires at least one document")
-	}
-
-	var first = documents[0]
-	for index := 1; index < len(documents); index++ {
-		if documents[index].Year != first.Year {
-			return fmt.Errorf("report document %d year does not match the first document", index)
-		}
-		if documents[index].CostBasisMethod != first.CostBasisMethod {
-			return fmt.Errorf("report document %d cost basis method does not match the first document", index)
-		}
-		if !documents[index].GeneratedAt.Equal(first.GeneratedAt) {
-			return fmt.Errorf("report document %d generated-at timestamp does not match the first document", index)
-		}
-	}
-
-	return nil
 }
 
 // validateDocumentsDirectory verifies the resolved Documents directory before

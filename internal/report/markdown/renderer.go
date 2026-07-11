@@ -66,8 +66,9 @@ func Render(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, 
 	)
 }
 
-// RenderDocuments converts one calculated report into the selected Markdown
-// output documents: the main report and a separate Annex 1 document.
+// RenderDocuments converts one calculated report into its ordered Markdown
+// bundle: the main report followed by a separate Annex 1 document. For example,
+// pass its result to `output.WriteReportOutputBundle(model.ReportOutputFormatMarkdown, documents)`.
 // Authored by: OpenCode
 func RenderDocuments(report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
 	var mainDocument, err = Render(report)

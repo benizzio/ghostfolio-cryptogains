@@ -58,16 +58,6 @@ type ReportRequestFixture struct {
 	RequestedAt        time.Time
 }
 
-// ReportConversionFixture stores deterministic report conversion audit evidence
-// for renderer, annex, and output contract tests.
-// Authored by: OpenCode
-type ReportConversionFixture struct {
-	RateSource         reportmodel.ExchangeRateEvidence
-	ConversionEntry    reportmodel.ConversionAuditEntry
-	ConvertedAmount    reportmodel.ConvertedActivityAmount
-	SameCurrencyAmount reportmodel.ConvertedActivityAmount
-}
-
 // ExpectedReportLedger stores one deterministic expected yearly report outcome
 // for one cost-basis method.
 // Authored by: OpenCode
@@ -532,67 +522,6 @@ func DeterministicReportRequestFixture(outputFormat reportmodel.ReportOutputForm
 		ReportBaseCurrency: reportBaseCurrency,
 		OutputFormat:       outputFormat,
 		RequestedAt:        requestedAt,
-	}
-}
-
-// DeterministicReportConversionFixture returns valid same-currency and
-// converted amount evidence for tests that need report conversion audit data.
-//
-// Authored by: OpenCode
-func DeterministicReportConversionFixture() ReportConversionFixture {
-	var activityDate = time.Date(2024, time.February, 5, 14, 30, 0, 0, time.UTC)
-	var rateDate = time.Date(2024, time.February, 5, 0, 0, 0, 0, time.UTC)
-	var rateValue = decimalValue("1.08")
-	var evidence = reportmodel.ExchangeRateEvidence{
-		SourceCurrency:   "EUR",
-		BaseCurrency:     reportmodel.ReportBaseCurrencyUSD,
-		ActivityDate:     activityDate,
-		RateDate:         rateDate,
-		Authority:        reportmodel.RateAuthorityFederalReserve,
-		ProviderID:       reportmodel.RateProviderIDFederalReserveH10,
-		RateKind:         "daily noon buying rate",
-		QuoteDirection:   reportmodel.QuoteDirectionBasePerSource,
-		RateValue:        rateValue,
-		DatasetReference: "Federal Reserve H.10 2024-02-05",
-	}
-	var convertedAmount = reportmodel.ConvertedActivityAmount{
-		SourceID:             "eur-sell-2024-converted-001",
-		AmountKind:           reportmodel.ConvertedAmountKindGrossValue,
-		OriginalCurrency:     "EUR",
-		OriginalAmount:       decimalValue("100"),
-		ReportBaseCurrency:   reportmodel.ReportBaseCurrencyUSD,
-		ConvertedAmount:      decimalValue("108"),
-		ExchangeRateEvidence: &evidence,
-		ConversionStatus:     reportmodel.ConversionStatusConverted,
-	}
-	var sameCurrencyAmount = reportmodel.ConvertedActivityAmount{
-		SourceID:           "usd-sell-2024-same-currency-001",
-		AmountKind:         reportmodel.ConvertedAmountKindGrossValue,
-		OriginalCurrency:   "USD",
-		OriginalAmount:     decimalValue("250"),
-		ReportBaseCurrency: reportmodel.ReportBaseCurrencyUSD,
-		ConvertedAmount:    decimalValue("250"),
-		ConversionStatus:   reportmodel.ConversionStatusSameCurrency,
-	}
-	var conversionEntry = reportmodel.ConversionAuditEntry{
-		SourceID:           convertedAmount.SourceID,
-		AssetLabel:         "EUR Asset",
-		ActivityDate:       activityDate,
-		SourceCurrency:     "EUR",
-		ReportBaseCurrency: reportmodel.ReportBaseCurrencyUSD,
-		RateDate:           rateDate,
-		RateAuthority:      reportmodel.RateAuthorityFederalReserve,
-		RateKind:           "daily noon buying rate",
-		RateValue:          rateValue,
-		QuoteDirection:     reportmodel.QuoteDirectionBasePerSource,
-		Amounts:            []reportmodel.ConvertedActivityAmount{convertedAmount},
-	}
-
-	return ReportConversionFixture{
-		RateSource:         evidence,
-		ConversionEntry:    conversionEntry,
-		ConvertedAmount:    convertedAmount,
-		SameCurrencyAmount: sameCurrencyAmount,
 	}
 }
 

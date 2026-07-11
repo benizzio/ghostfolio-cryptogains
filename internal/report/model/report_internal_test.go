@@ -832,10 +832,10 @@ func TestValidateRenderedDocumentsValidatesBundleShapeAndMetadata(t *testing.T) 
 	}
 }
 
-// TestReportDocumentDefaultsBlankMarkdownRoleToMain verifies legacy Markdown
-// struct literals retain their implicit main-document role.
+// TestReportDocumentRequiresExplicitMarkdownRole verifies bundle documents do
+// not infer a compatibility role from their type.
 // Authored by: OpenCode
-func TestReportDocumentDefaultsBlankMarkdownRoleToMain(t *testing.T) {
+func TestReportDocumentRequiresExplicitMarkdownRole(t *testing.T) {
 	t.Parallel()
 
 	var document = ReportDocument{
@@ -845,8 +845,8 @@ func TestReportDocumentDefaultsBlankMarkdownRoleToMain(t *testing.T) {
 		CostBasisMethod: CostBasisMethodFIFO,
 		GeneratedAt:     time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC),
 	}
-	if err := document.Validate(); err != nil {
-		t.Fatalf("validate implicit main Markdown document: %v", err)
+	if err := document.Validate(); err == nil {
+		t.Fatal("expected blank Markdown role to fail validation")
 	}
 }
 

@@ -241,18 +241,11 @@ func TestRenderAnnexUsesStructuredLayoutPrimitives(t *testing.T) {
 	var recorder = &layoutRecorder{}
 	var report = pdfAnnexReportFixture(t)
 
-	var err = recorder.AddAnnexPageBreak()
-	if err != nil {
-		t.Fatalf("record page break: %v", err)
-	}
-	err = renderAnnex(recorder, report.AuditAnnex)
+	var err = renderAnnex(recorder, report.AuditAnnex)
 	if err != nil {
 		t.Fatalf("render annex: %v", err)
 	}
 
-	if recorder.pageBreaks != 1 {
-		t.Fatalf("page breaks = %d, want 1", recorder.pageBreaks)
-	}
 	assertContains(t, recorder.titles, AnnexTitle)
 	assertContains(t, recorder.sections, "Detailed Per-Asset Audit Report")
 	assertContains(t, recorder.sections, "Currency Conversion Audit")
@@ -825,28 +818,27 @@ type layoutRecorder struct {
 	keyValues   map[string]string
 	paragraphs  []string
 	tables      []pdfTable
-	pageBreaks  int
 }
 
-func (recorder *layoutRecorder) StartPDF(string) error           { return nil }
-func (recorder *layoutRecorder) AddTTFFont(string, []byte) error { return nil }
-func (recorder *layoutRecorder) Bytes() []byte                   { return nil }
-
+// AddTitle records one title emitted by a renderer helper. Authored by: OpenCode
 func (recorder *layoutRecorder) AddTitle(text string) error {
 	recorder.titles = append(recorder.titles, text)
 	return nil
 }
 
+// AddSectionHeading records one section heading. Authored by: OpenCode
 func (recorder *layoutRecorder) AddSectionHeading(text string) error {
 	recorder.sections = append(recorder.sections, text)
 	return nil
 }
 
+// AddSubsectionHeading records one subsection heading. Authored by: OpenCode
 func (recorder *layoutRecorder) AddSubsectionHeading(text string) error {
 	recorder.subsections = append(recorder.subsections, text)
 	return nil
 }
 
+// AddKeyValue records one label/value presentation fact. Authored by: OpenCode
 func (recorder *layoutRecorder) AddKeyValue(label string, value string) error {
 	if recorder.keyValues == nil {
 		recorder.keyValues = make(map[string]string)
@@ -855,21 +847,19 @@ func (recorder *layoutRecorder) AddKeyValue(label string, value string) error {
 	return nil
 }
 
+// AddParagraph records one paragraph emitted by a renderer helper. Authored by: OpenCode
 func (recorder *layoutRecorder) AddParagraph(text string) error {
 	recorder.paragraphs = append(recorder.paragraphs, text)
 	return nil
 }
 
+// AddTable records one structured table emitted by a renderer helper. Authored by: OpenCode
 func (recorder *layoutRecorder) AddTable(table pdfTable) error {
 	recorder.tables = append(recorder.tables, table)
 	return nil
 }
 
-func (recorder *layoutRecorder) AddAnnexPageBreak() error {
-	recorder.pageBreaks++
-	return nil
-}
-
+// allText flattens recorded content for presentation assertions. Authored by: OpenCode
 func (recorder *layoutRecorder) allText() []string {
 	var texts []string
 	texts = append(texts, recorder.titles...)
