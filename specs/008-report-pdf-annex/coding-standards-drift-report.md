@@ -44,6 +44,10 @@
 
 The completed feature retains parallel legacy single-document and current output-bundle renderer/writer seams in runtime and output production code. The model constructors similarly accept old and current call shapes through runtime-parsed `...any` arguments. These paths are explicitly described as migration or older-test compatibility code. They duplicate report-generation architecture, mix compatibility dispatch with construction and orchestration, replace compile-time parameter checking with vague dynamic arguments, and leave multiple production paths that must evolve together.
 
+**Remediation plan**:
+
+Retain only the current output-bundle path: replace the three variadic model constructors with explicit typed signatures, migrate their call sites, remove the legacy single-document runtime renderer/writer branches and result fallbacks, and make bundle writing the sole output API. Update compatibility-oriented tests to exercise the bundle path while preserving Markdown pair naming, collision handling, cleanup, automatic opening of the primary file, result-path display, and generated-time behavior; then run the affected model, runtime, output, TUI, contract, integration, and empirical tests.
+
 ### CODE-STAND-DRIFT-002: Filesystem Output Package Owns Report-Domain Bundle Policy
 
 **Status**: Pending
@@ -62,6 +66,10 @@ The completed feature retains parallel legacy single-document and current output
 **Description**:
 
 The filesystem writer validates Markdown/PDF document counts, types, ordering, roles, and shared report metadata before writing. Those are report-domain composition rules, while the same output-shape concepts already exist in model validation. Placing this policy in `internal/report/output` mixes domain validation with filesystem infrastructure and makes document-bundle rules span two package authorities.
+
+**Remediation plan**:
+
+Move rendered-document bundle validation into `internal/report/model` as the single authority for format validity, document validity, required count/order/type/role, and shared report metadata. Keep timestamp normalization and all directory, reservation, naming, writing, cleanup, and saved-file metadata work in `internal/report/output`; move the validation matrix to model tests and retain a focused writer test proving invalid bundles fail before filesystem work.
 
 ### CODE-STAND-DRIFT-003: Markdown And PDF Duplicate Format-Independent Presentation Transformations
 
@@ -87,6 +95,10 @@ The filesystem writer validates Markdown/PDF document counts, types, ordering, r
 
 Both renderers independently canonicalize the same decimal fields, derive the same labels and timestamps, build the same logical rows, and shape equivalent error context. Only the final table encoding is format-specific. Keeping these transformations in both output adapters requires report-visible semantics to remain synchronized by convention and creates clear maintenance risk whenever a row or label changes.
 
+**Remediation plan**:
+
+Introduce a narrowly scoped `internal/report/presentation` package with typed builders for the duplicated activity, liquidation, annex-activity, and conversion-audit rows. Move only format-independent decimal canonicalization, timestamp and label derivation, optional-value handling, grouped converted amounts, redaction, and contextual errors there; keep Markdown escaping and table syntax in `internal/report/markdown` and PDF cell sanitization, widths, and layout in `internal/report/pdf`. Add table-driven presentation tests and preserve existing renderer contract and integration output assertions.
+
 ### CODE-STAND-DRIFT-004: Conversion Audit Evidence Has Two Mutable Sources Of Truth
 
 **Status**: Pending
@@ -106,6 +118,10 @@ Both renderers independently canonicalize the same decimal fields, derive the sa
 **Description**:
 
 `CapitalGainsReport` stores conversion audit entries both directly and inside `AuditAnnex`. Calculation populates both slices, while validation copies the top-level slice only when the annex slice is empty and establishes no equality invariant when both are populated. One report value can therefore carry divergent copies of the same domain evidence, contrary to the repository's DRY and consistency requirements.
+
+**Remediation plan**:
+
+Make `AuditAnnex.ConversionAuditEntries` the sole source of conversion audit evidence, remove the duplicate top-level report field and validation fallback, and update calculation, cross-validation, cloning assumptions, fixtures, and renderer tests to read the annex value. Preserve rate-source and same-currency contradiction checks, keep the main Markdown report free of audit rows, retain annex output in both formats, and rerun model, calculation, renderer, contract, integration, and empirical tests.
 
 ### CODE-STAND-DRIFT-005: Production Paths Contain Test-Only Control And Transcript Mechanisms
 
@@ -129,6 +145,10 @@ Both renderers independently canonicalize the same decimal fields, derive the sa
 
 Runtime changes production PDF rendering when the test-specific `GHOSTFOLIO_CRYPTOGAINS_PDF_RENDER_FAILURE` environment variable is set, despite existing injectable renderer seams. Separately, the PDF adapter maintains a second text transcript for deterministic assertions and appends it as comments to every production PDF payload. These mechanisms give production orchestration and rendering additional test-support responsibilities instead of keeping failure injection and assertions behind test seams.
 
+**Remediation plan**:
+
+Remove the test-only environment branch and mutable PDF failure controls from runtime, and inject render failures through the existing bundle-renderer seam while asserting that writing and opening are not reached. Remove the PDF adapter's transcript state and appended comment payload; move semantic content assertions to the test-only layout recorder and keep concrete PDF checks limited to real PDF structure, page/layout state, and output behavior. Preserve the actual Annex page break and existing cleanup coverage, and verify runtime, PDF, and focused integration tests.
+
 ### CODE-STAND-DRIFT-006: Report Screen Reconstructs Workflow-Owned Output Format State
 
 **Status**: Pending
@@ -148,6 +168,10 @@ Runtime changes production PDF rendering when the test-specific `GHOSTFOLIO_CRYP
 **Description**:
 
 The flow layer already builds the supported output-format menu and maps stable selection indexes to domain values. The screen layer independently rebuilds the same menu and re-derives a format by comparing display labels and indexes. This duplicates mapping policy and makes rendering interpret workflow state that belongs to `internal/tui/flow`.
+
+**Remediation plan**:
+
+Pass the flow-owned selected `ReportOutputFormat` into `ReportSelectionScreenParams`, render the flow-provided menu items directly, and use the index only for row highlighting. Delete the screen helpers that rebuild choices or map labels/indexes back to domain values, preserve empty-selection guidance and flow fallback behavior, and add a focused test proving explanatory copy follows the semantic selected value.
 
 ### CODE-STAND-DRIFT-007: Shared Test Fixtures Duplicate Policy And Include Unconsumed Subsystems
 
@@ -171,6 +195,10 @@ The flow layer already builds the supported output-format menu and maps stable s
 
 The exported Annex fixture types and `DeterministicReportAnnexFixture` have no consumers outside their declaration file, while feature tests construct their own report data. The IO fixture also reimplements production filename construction, and the dedicated filename contract test validates those fixture-generated strings against hard-coded expressions instead of exercising the production naming result. This leaves unused fixture code and a second filename-policy implementation that can pass while production behavior drifts.
 
+**Remediation plan**:
+
+Delete the unconsumed Annex fixture types and builder. Simplify the output filename fixture to literal oracle paths needed for collision setup and bundle metadata, remove its duplicated filename-prefix algorithms and the fixture-only filename-pattern contract, and retain the contract tests that call the production bundle writer for Markdown/PDF names and collision suffixes. Verify test utilities, output unit tests, and report-output contracts without exporting production naming helpers.
+
 ### CODE-STAND-DRIFT-008: Two Production Functions Exceed The Cognitive-Complexity Baseline
 
 **Status**: Pending
@@ -187,6 +215,10 @@ The exported Annex fixture types and `DeterministicReportAnnexFixture` have no c
 **Description**:
 
 `gocognit v1.2.1` reports complexity 16 for both `AuditActivityEntry.Validate` and `renderDetailSections`. The validator combines required fields, decimal groups, currency checks, and optional conversion validation. The PDF function combines collection traversal, historical/active classification, four rendering stages, and contextual error shaping. Both exceed the explicit repository baseline and retain multiple responsibilities in one function.
+
+**Remediation plan**:
+
+Decompose `AuditActivityEntry.Validate` into ordered private validation groups while preserving first-error precedence and error text, and split `renderDetailSections` into traversal plus historical and active section helpers while preserving operation order and contextual wrapping. Keep methods with their owning types/files, run targeted model and PDF tests, and confirm `gocognit -over 14` reports neither remediated function nor any new helper.
 
 ### CODE-STAND-DRIFT-009: PDF Renderers Depend On An Over-Broad Lifecycle Interface
 
@@ -208,6 +240,10 @@ The exported Annex fixture types and `DeterministicReportAnnexFixture` have no c
 **Description**:
 
 `pdfLayoutDocument` combines document startup, font registration, report-content layout, page breaking, and byte serialization. Main-report and annex rendering depend on the complete lifecycle interface even though they use only content-layout operations. Test doubles consequently implement unrelated startup, font, and serialization methods as no-ops, providing concrete evidence that the interface is not segregated by consumer responsibility.
+
+**Remediation plan**:
+
+Split the private PDF contract into consumer-specific content-layout, Annex-page-break, startup/font, and serialization interfaces, with one aggregate interface retained only for top-level renderer orchestration. Narrow main-report and annex helpers to the content interface, keep page breaking and serialization in their current orchestration order, remove unrelated no-op lifecycle methods from content recorders, and validate through PDF package, contract, and focused integration tests.
 
 ### CODE-STAND-DRIFT-010: AI-Authored APIs Lack Required Function-Level Documentation
 
@@ -233,9 +269,13 @@ The exported Annex fixture types and `DeterministicReportAnnexFixture` have no c
 
 Multiple exported, explicitly AI-authored functions and methods have only one-line descriptions and no usage examples, including model validation APIs and Markdown rendering entry points. `WriteReportDocuments` also lacks the detailed usage guidance required for public APIs. In PDF tests, AI-authored recorder and failure-double methods have no function-level purpose comments or attribution at all. File-level or type-level attribution does not satisfy the baseline's explicit method/function-level documentation requirement.
 
+**Remediation plan**:
+
+After the structural remediations above, add standards-compliant function-level documentation and authoring attribution to every surviving cited AI-authored public API, including concrete usage examples and accurate validation/ordering guarantees, and add concise purpose documentation plus attribution to the remaining private PDF test-double methods. Document any new helpers or interfaces introduced by the remediation under the same policy, preserve existing authorship history without inventing human authors, and use formatting, package tests, and the changed-source quality gate as behavior-neutral validation.
+
 ## Notes
 
 - No prior `coding-standards-drift-report.md` existed, so all findings are newly assigned and `Pending`.
 - Prerequisite validation used the local Spec Kit task syntax and found no unchecked implementation task in `tasks.md`; previously reopened tasks are checked.
 - Cognitive complexity was measured with `go run github.com/uudashr/gocognit/cmd/gocognit@v1.2.1 -over 15` over the active production packages. Test-function results were excluded because `AGENTS.md` exempts tests from the cognitive-complexity rule.
-- No finding status was set to `Resolved`, and no remediation plan or task checkbox was added.
+- All pending findings now include remediation plans, and tasks T068 through T079 in `tasks.md` schedule implementation, validation, and conditional resolution. Every finding remains `Pending` until that work completes successfully.
