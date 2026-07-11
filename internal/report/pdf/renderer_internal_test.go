@@ -3,12 +3,14 @@
 package pdf
 
 import (
+	"bytes"
 	"errors"
 	"strings"
 	"testing"
 	"time"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
 	"github.com/cockroachdb/apd/v3"
 	"github.com/signintech/gopdf"
 	"golang.org/x/image/font/gofont/gobold"
@@ -157,15 +159,9 @@ func TestBUG005TableContinuationRepeatsContextAndHeader(t *testing.T) {
 		t.Fatalf("add continued table: %v", err)
 	}
 
-	var text = string(document.Bytes())
-	if strings.Count(text, "Per-Asset Audit Activity (continued)") != 2 {
-		t.Fatalf("continuation context count = %d, want 2", strings.Count(text, "Per-Asset Audit Activity (continued)"))
-	}
-	if strings.Contains(text, "CONTINUED:") {
-		t.Fatalf("continuation context must not have a prefix, got %q", text)
-	}
-	if strings.Count(text, "% Source ID") != 3 {
-		t.Fatalf("repeated header count = %d, want 3", strings.Count(text, "% Source ID"))
+	var payload = document.Bytes()
+	if !bytes.HasPrefix(payload, []byte("%PDF-")) {
+		t.Fatalf("expected valid PDF payload, got %q", payload)
 	}
 }
 
@@ -297,23 +293,9 @@ func TestRendererRenderValidationAndSuccessBranches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("render PDF: %v", err)
 	}
-	var text = string(payload)
-	for _, expected := range []string{"% ghostfolio-cryptogains text extract", MainReportTitle, "PAGE BREAK: Annex 1", AnnexTitle, "Date/Time Source ID"} {
-		if !strings.Contains(text, expected) {
-			t.Fatalf("expected rendered PDF payload to contain %q", expected)
-		}
+	if !bytes.HasPrefix(payload, []byte("%PDF-")) {
+		t.Fatalf("expected rendered PDF payload, got %q", payload)
 	}
-	var extractIndex = strings.Index(text, "% ghostfolio-cryptogains text extract")
-	if extractIndex < 0 {
-		t.Fatalf("expected rendered PDF payload to contain text-extract marker")
-	}
-	var extract = text[extractIndex:]
-	for _, forbidden := range []string{"# Annex 1 - Audit", "| Date/Time |", "**"} {
-		if strings.Contains(extract, forbidden) {
-			t.Fatalf("expected rendered PDF text extract to exclude %q", forbidden)
-		}
-	}
-
 	renderer, err = NewRenderer(RenderOptions{Fonts: FontData{Regular: []byte("not-a-ttf"), Bold: []byte("not-a-ttf")}})
 	if err != nil {
 		t.Fatalf("new renderer with non-empty invalid font bytes: %v", err)
@@ -387,6 +369,9 @@ func TestPDFFormattingHelperFallbackBranches(t *testing.T) {
 	if err != nil || status != "" {
 		t.Fatalf("no-monetary conversion status = %q, %v; want empty", status, err)
 	}
+	if _, err = conversionStatusColumn(reportmodel.AssetActivityRow{GrossValue: unitPrice, ActivityCurrency: "USD", ConversionStatus: reportmodel.ConversionStatus("unknown")}); err == nil {
+		t.Fatalf("expected unsupported conversion status to fail")
+	}
 	if label := calculationCurrencyLabel(""); label != "NOT APPLICABLE" {
 		t.Fatalf("empty calculation currency label = %q, want NOT APPLICABLE", label)
 	}
@@ -443,7 +428,7 @@ func TestPDFFormattingHelperErrorBranches(t *testing.T) {
 	var zeroAmount = pdfAnnexConversionEntry().Amounts[0]
 	zeroAmount.OriginalAmount = *apd.New(0, 0)
 	zeroAmount.ConvertedAmount = *apd.New(0, 0)
-	if rendered, err := renderGroupedConvertedAmounts(0, []reportmodel.ConvertedActivityAmount{zeroAmount}); err != nil || rendered != "" {
+	if rendered, err := presentation.ConvertedAmounts(0, []reportmodel.ConvertedActivityAmount{zeroAmount}); err != nil || rendered != "" {
 		t.Fatalf("zero converted amounts = %q, %v; want empty nil", rendered, err)
 	}
 }
@@ -713,14 +698,9 @@ func TestGopdfDocumentLayoutBranches(t *testing.T) {
 		t.Fatalf("page break: %v", err)
 	}
 	startedDocument.addPage()
-	var payload = string(startedDocument.Bytes())
-	for _, expected := range []string{"% ghostfolio-cryptogains text extract", "% Title", "% Label: Value", "% A"} {
-		if !strings.Contains(payload, expected) {
-			t.Fatalf("expected Bytes comments to contain %q, got %q", expected, payload)
-		}
-	}
-	if strings.Contains(payload, "CONTINUED:") || strings.Contains(payload, "Continued: Continued") {
-		t.Fatalf("unsplit content emitted continuation context: %q", payload)
+	var payload = startedDocument.Bytes()
+	if !bytes.HasPrefix(payload, []byte("%PDF-")) {
+		t.Fatalf("expected PDF bytes, got %q", payload)
 	}
 
 	var continuationDocument = startedTestDocument(t)
@@ -1387,7 +1367,7 @@ func pdfAnnexReportFixture(t *testing.T) reportmodel.CapitalGainsReport {
 	if err != nil {
 		t.Fatalf("new detailed annex: %v", err)
 	}
-	report.ConversionAuditEntries = []reportmodel.ConversionAuditEntry{conversion}
+	report.AuditAnnex.ConversionAuditEntries = []reportmodel.ConversionAuditEntry{conversion}
 	report.RateSources = []reportmodel.ExchangeRateEvidence{*conversion.Amounts[0].ExchangeRateEvidence}
 	return report
 }

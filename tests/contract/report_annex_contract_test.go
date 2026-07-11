@@ -106,7 +106,7 @@ func contractDetailedAuditAnnex() reportmodel.AuditAnnex {
 				Note:                  "reference-only acquisition",
 			})},
 		},
-	}, contractMarkdownReportFixture(reportmodel.ReportBaseCurrencyEUR.Label()).ConversionAuditEntries)
+	}, contractMarkdownReportFixture(reportmodel.ReportBaseCurrencyEUR.Label()).AuditAnnex.ConversionAuditEntries)
 	if err != nil {
 		panic(err)
 	}

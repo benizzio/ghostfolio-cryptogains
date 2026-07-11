@@ -8,8 +8,7 @@ import (
 	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
-	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
-	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
 )
 
 // writeRateSourceSummary renders the official rate-provider summary disclosed
@@ -44,14 +43,14 @@ func writeRateSourceSummary(builder *strings.Builder, report reportmodel.Capital
 // activity disclosed by the report model.
 // Authored by: OpenCode
 func writeConversionAuditSection(builder *strings.Builder, report reportmodel.CapitalGainsReport) error {
-	if len(report.ConversionAuditEntries) == 0 {
+	if len(report.AuditAnnex.ConversionAuditEntries) == 0 {
 		return nil
 	}
 
 	builder.WriteString("## Currency Conversion Audit\n\n")
 	builder.WriteString("| Date | Source ID | Asset | Rate Date | Source Currency | Report Base Currency | Converted Amounts | Quote Direction | Rate Value |\n")
 	builder.WriteString("|------|-----------|-------|-----------|-----------------|----------------------|-------------------|-----------------|------------|\n")
-	for entryIndex, entry := range report.ConversionAuditEntries {
+	for entryIndex, entry := range report.AuditAnnex.ConversionAuditEntries {
 		if err := writeConversionAuditRow(builder, entryIndex, entry); err != nil {
 			return err
 		}
@@ -64,58 +63,16 @@ func writeConversionAuditSection(builder *strings.Builder, report reportmodel.Ca
 // writeConversionAuditRow renders one grouped activity-level conversion audit row.
 // Authored by: OpenCode
 func writeConversionAuditRow(builder *strings.Builder, entryIndex int, entry reportmodel.ConversionAuditEntry) error {
-	var rateValue, err = decimalsupport.CanonicalString(entry.RateValue)
-	if err != nil {
-		return fmt.Errorf("render conversion audit entry %d rate value: %w", entryIndex, err)
-	}
-	var convertedAmounts string
-	convertedAmounts, err = renderGroupedConvertedAmounts(entryIndex, entry.Amounts)
+	var row, err = presentation.BuildConversionAuditRow(entryIndex, entry)
 	if err != nil {
 		return err
-	}
-	var quoteDirection string
-	quoteDirection, err = reportmodel.RenderQuoteDirectionLabel(entry.QuoteDirection)
-	if err != nil {
-		return fmt.Errorf("render conversion audit entry %d quote direction: %w", entryIndex, err)
 	}
 
 	fmt.Fprintf(builder,
 		"| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
-		datesupport.FormatCalendarDate(entry.ActivityDate),
-		sanitizeInlineText(entry.SourceID),
-		sanitizeInlineText(entry.AssetLabel),
-		datesupport.FormatCalendarDate(entry.RateDate),
-		sanitizeInlineText(entry.SourceCurrency),
-		sanitizeInlineText(entry.ReportBaseCurrency.Label()),
-		convertedAmounts,
-		sanitizeInlineText(quoteDirection),
-		rateValue,
+		sanitizeInlineText(row.Date), sanitizeInlineText(row.SourceID), sanitizeInlineText(row.Asset), sanitizeInlineText(row.RateDate), sanitizeInlineText(row.SourceCurrency), sanitizeInlineText(row.ReportBaseCurrency), sanitizeInlineText(row.ConvertedAmounts), sanitizeInlineText(row.QuoteDirection), sanitizeInlineText(row.RateValue),
 	)
 	return nil
-}
-
-// renderGroupedConvertedAmounts formats non-zero conversion amount slots for one
-// source activity and omits zero-to-zero slots from report-visible audit output.
-// Authored by: OpenCode
-func renderGroupedConvertedAmounts(entryIndex int, amounts []reportmodel.ConvertedActivityAmount) (string, error) {
-	var rendered []string
-	for amountIndex, amount := range amounts {
-		if amount.OriginalAmount.Sign() == 0 && amount.ConvertedAmount.Sign() == 0 {
-			continue
-		}
-		var originalAmount, err = decimalsupport.CanonicalString(amount.OriginalAmount)
-		if err != nil {
-			return "", fmt.Errorf("render conversion audit entry %d amount %d original amount: %w", entryIndex, amountIndex, err)
-		}
-		var convertedAmount string
-		convertedAmount, err = decimalsupport.CanonicalString(amount.ConvertedAmount)
-		if err != nil {
-			return "", fmt.Errorf("render conversion audit entry %d amount %d converted amount: %w", entryIndex, amountIndex, err)
-		}
-		rendered = append(rendered, fmt.Sprintf("%s: %s -> %s", sanitizeInlineText(string(amount.AmountKind)), originalAmount, convertedAmount))
-	}
-
-	return strings.Join(rendered, "; "), nil
 }
 
 // rateAuthorityLabel returns report-facing authority labels for canonical rate

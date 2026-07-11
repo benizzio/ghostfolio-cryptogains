@@ -283,11 +283,11 @@ func TestReportScreenViewsCoverSelectionBusyAndResultBranches(t *testing.T) {
 		t.Fatalf("expected report busy content, got %q", busy)
 	}
 
-	request, err := reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
+	request, err := reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
-	outputFile, err := reportmodel.NewReportOutputFile("/tmp/Documents", "ghostfolio-capital-gains-2024-fifo.md", "/tmp/Documents/ghostfolio-capital-gains-2024-fifo.md", time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC), true, "")
+	outputFile, err := reportmodel.NewReportOutputFile("/tmp/Documents", "ghostfolio-capital-gains-2024-fifo.md", "/tmp/Documents/ghostfolio-capital-gains-2024-fifo.md", reportmodel.ReportDocumentRoleMain, reportmodel.ReportMediaTypeMarkdown, time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report output file: %v", err)
 	}
@@ -305,6 +305,10 @@ func TestReportScreenViewsCoverSelectionBusyAndResultBranches(t *testing.T) {
 			Message:    "Saved the report to \"/tmp/report.md\" and requested automatic opening.",
 			Request:    request,
 			OutputFile: outputFile,
+			OutputBundle: reportmodel.ReportOutputBundle{
+				OutputFormat: reportmodel.ReportOutputFormatMarkdown,
+				Files:        []reportmodel.ReportOutputFile{outputFile},
+			},
 		},
 	})
 	if !strings.Contains(result, "Saved Markdown Path: /tmp/Documents/ghostfolio-capital-gains-2024-fifo.md") || !strings.Contains(result, "Back To Sync and Reports") || !strings.Contains(result, "Generate Another Report") {
@@ -413,11 +417,11 @@ func TestSyncResultScreenViewCoversIncompatibleContractBranch(t *testing.T) {
 func TestReportScreenHelperBranches(t *testing.T) {
 	t.Parallel()
 
-	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
+	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
-	var outputFile, outputErr = reportmodel.NewReportOutputFile("/tmp/Documents", "ghostfolio-capital-gains-2024-fifo.md", "/tmp/Documents/ghostfolio-capital-gains-2024-fifo.md", time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC), true, "open boom")
+	var outputFile, outputErr = reportmodel.NewReportOutputFile("/tmp/Documents", "ghostfolio-capital-gains-2024-fifo.md", "/tmp/Documents/ghostfolio-capital-gains-2024-fifo.md", reportmodel.ReportDocumentRoleMain, reportmodel.ReportMediaTypeMarkdown, time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC))
 	if outputErr != nil {
 		t.Fatalf("new report output file: %v", outputErr)
 	}

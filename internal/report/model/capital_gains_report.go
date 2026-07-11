@@ -82,9 +82,8 @@ func NewCapitalGainsReportWithConversionArtifacts(
 		YearlyNetTotal:            yearlyNetTotal,
 		ReferenceEntries:          append([]ReferenceLiquidationEntry(nil), referenceEntries...),
 		DetailSections:            cloneAssetDetailSections(detailSections),
-		ConversionAuditEntries:    cloneConversionAuditEntries(conversionAuditEntries),
 		RateSources:               cloneExchangeRateEvidence(rateSources),
-		AuditAnnex:                DefaultAuditAnnex(),
+		AuditAnnex:                AuditAnnex{Title: AuditAnnexTitle(), SectionOrder: RequiredAuditAnnexSectionOrder(), ConversionAuditEntries: cloneConversionAuditEntries(conversionAuditEntries)},
 	}
 
 	if err := report.Validate(); err != nil {
@@ -157,17 +156,10 @@ func (report CapitalGainsReport) validateSections() error {
 	return nil
 }
 
-// validateAuditAnnex verifies the detailed audit annex, filling legacy default
-// values for reports without explicit annex content.
+// validateAuditAnnex verifies the detailed audit annex.
 // Authored by: OpenCode
 func (report CapitalGainsReport) validateAuditAnnex() error {
 	var annex = report.AuditAnnex
-	if annex.Title == "" && len(annex.SectionOrder) == 0 {
-		annex = DefaultAuditAnnex()
-	}
-	if len(annex.ConversionAuditEntries) == 0 && len(report.ConversionAuditEntries) > 0 {
-		annex.ConversionAuditEntries = cloneConversionAuditEntries(report.ConversionAuditEntries)
-	}
 	if err := annex.Validate(); err != nil {
 		return fmt.Errorf("capital gains report audit annex: %w", err)
 	}
@@ -188,7 +180,7 @@ func (report CapitalGainsReport) validateConversionArtifacts() error {
 		}
 	}
 
-	for index, entry := range report.ConversionAuditEntries {
+	for index, entry := range report.AuditAnnex.ConversionAuditEntries {
 		if err := entry.Validate(); err != nil {
 			return fmt.Errorf("capital gains report conversion audit entry %d: %w", index, err)
 		}

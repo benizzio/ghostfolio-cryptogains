@@ -77,6 +77,80 @@ func (bundle ReportOutputBundle) Validate() error {
 	return bundle.validateFileShape()
 }
 
+// ValidateRenderedDocuments validates the complete rendered bundle before any
+// filesystem reservation occurs. For example, Markdown requires main then Annex
+// documents with shared report metadata, while PDF requires one combined PDF.
+// Authored by: OpenCode
+func ValidateRenderedDocuments(outputFormat ReportOutputFormat, documents []ReportDocument) error {
+	if err := validateReportOutputFormat(outputFormat); err != nil {
+		return err
+	}
+	if err := validateRenderedDocumentContents(documents); err != nil {
+		return err
+	}
+	if err := validateRenderedDocumentShape(outputFormat, documents); err != nil {
+		return err
+	}
+	return validateRenderedDocumentMetadata(documents)
+}
+
+// validateRenderedDocumentContents verifies every rendered payload before its
+// format-specific bundle shape is evaluated.
+// Authored by: OpenCode
+func validateRenderedDocumentContents(documents []ReportDocument) error {
+	for index, document := range documents {
+		if err := document.Validate(); err != nil {
+			return fmt.Errorf("report document %d: %w", index, err)
+		}
+	}
+	return nil
+}
+
+// validateRenderedDocumentShape verifies the selected output format has its
+// required main, annex, or combined document roles.
+// Authored by: OpenCode
+func validateRenderedDocumentShape(outputFormat ReportOutputFormat, documents []ReportDocument) error {
+	switch outputFormat {
+	case ReportOutputFormatMarkdown:
+		if len(documents) != 2 {
+			return fmt.Errorf("markdown report output requires exactly two documents")
+		}
+		if documents[0].DocumentType != ReportDocumentTypeMarkdown || documents[0].Role != ReportDocumentRoleMain {
+			return fmt.Errorf("markdown report output document 0 must be the main Markdown document")
+		}
+		if documents[1].DocumentType != ReportDocumentTypeMarkdown || documents[1].Role != ReportDocumentRoleAnnex {
+			return fmt.Errorf("markdown report output document 1 must be the Annex 1 Markdown document")
+		}
+	case ReportOutputFormatPDF:
+		if len(documents) != 1 {
+			return fmt.Errorf("pdf report output requires exactly one document")
+		}
+		if documents[0].DocumentType != ReportDocumentTypePDF || documents[0].Role != ReportDocumentRoleCombined {
+			return fmt.Errorf("pdf report output document must be the combined PDF document")
+		}
+	}
+	return nil
+}
+
+// validateRenderedDocumentMetadata verifies documents in one bundle describe
+// the same calculated report.
+// Authored by: OpenCode
+func validateRenderedDocumentMetadata(documents []ReportDocument) error {
+	var first = documents[0]
+	for index := 1; index < len(documents); index++ {
+		if documents[index].Year != first.Year {
+			return fmt.Errorf("report document %d year does not match the first document", index)
+		}
+		if documents[index].CostBasisMethod != first.CostBasisMethod {
+			return fmt.Errorf("report document %d cost basis method does not match the first document", index)
+		}
+		if !documents[index].GeneratedAt.Equal(first.GeneratedAt) {
+			return fmt.Errorf("report document %d generated-at timestamp does not match the first document", index)
+		}
+	}
+	return nil
+}
+
 // validateFileShape verifies the selected format's required persisted files.
 // Authored by: OpenCode
 func (bundle ReportOutputBundle) validateFileShape() error {

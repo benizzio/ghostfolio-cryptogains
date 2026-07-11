@@ -27,6 +27,7 @@ type ReportSelectionScreenParams struct {
 	SelectedBaseCurrencyIndex int
 	OutputFormatItems         []component.MenuItem
 	SelectedOutputFormatIndex int
+	SelectedOutputFormat      reportmodel.ReportOutputFormat
 	MethodExplanation         string
 	MenuItems                 []component.MenuItem
 	SelectedAction            int
@@ -78,10 +79,10 @@ func ReportSelectionScreenView(params ReportSelectionScreenParams) string {
 		renderReportYears(params.Theme, params.AvailableYears, params.SelectedYearIndex),
 		component.RenderMenu(params.Theme, params.MethodItems, params.SelectedMethod),
 		component.RenderMenu(params.Theme, reportBaseCurrencyItems(params.BaseCurrencyItems), params.SelectedBaseCurrencyIndex),
-		component.RenderMenu(params.Theme, reportOutputFormatItems(params.OutputFormatItems), params.SelectedOutputFormatIndex),
+		component.RenderMenu(params.Theme, params.OutputFormatItems, params.SelectedOutputFormatIndex),
 		reportMethodExplanation(params.MethodExplanation),
 		reportBaseCurrencyExplanation(),
-		reportOutputFormatExplanation(reportOutputFormatForIndex(params.SelectedOutputFormatIndex, params.OutputFormatItems)),
+		reportOutputFormatExplanation(params.SelectedOutputFormat),
 		component.RenderMenu(params.Theme, params.MenuItems, params.SelectedAction),
 	)
 
@@ -211,40 +212,6 @@ func reportBaseCurrencyItems(items []component.MenuItem) []component.MenuItem {
 	return defaultItems
 }
 
-// reportOutputFormatItems returns the explicit output-format menu or the
-// default Markdown/PDF report output-format menu.
-// Authored by: OpenCode
-func reportOutputFormatItems(items []component.MenuItem) []component.MenuItem {
-	if len(items) > 0 {
-		return items
-	}
-
-	var formats = reportmodel.SupportedReportOutputFormats()
-	var defaultItems = make([]component.MenuItem, 0, len(formats))
-	for _, format := range formats {
-		defaultItems = append(defaultItems, component.MenuItem{Label: format.Label(), Enabled: true})
-	}
-	return defaultItems
-}
-
-// reportOutputFormatForIndex returns the selected report output format for one
-// render index.
-// Authored by: OpenCode
-func reportOutputFormatForIndex(index int, items []component.MenuItem) reportmodel.ReportOutputFormat {
-	var formats = reportmodel.SupportedReportOutputFormats()
-	if len(items) > 0 {
-		for _, format := range formats {
-			if index >= 0 && index < len(items) && items[index].Label == format.Label() {
-				return format
-			}
-		}
-	}
-	if index < 0 || index >= len(formats) {
-		return ""
-	}
-	return formats[index]
-}
-
 // reportBaseCurrencyExplanation formats the static base-currency explanation.
 // Authored by: OpenCode
 func reportBaseCurrencyExplanation() string {
@@ -303,13 +270,6 @@ func reportResultSummary(outcome runtime.ReportOutcome) string {
 	if outcome.Success {
 		if len(outcome.OutputBundle.Files) > 0 {
 			return reportOutputBundleSummary(outcome)
-		}
-		if strings.TrimSpace(outcome.OutputFile.Path) != "" {
-			var label = "Saved Markdown Path"
-			if outcome.Request.OutputFormat == reportmodel.ReportOutputFormatPDF || outcome.OutputFile.MediaType == reportmodel.ReportMediaTypePDF {
-				label = "Saved PDF Path"
-			}
-			return fmt.Sprintf("%s: %s\n\n%s", label, outcome.OutputFile.Path, outcome.Message)
 		}
 		return outcome.Message
 	}

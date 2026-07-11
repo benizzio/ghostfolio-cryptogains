@@ -195,7 +195,7 @@ func TestReportCalculationRetainsFragmentLevelPricedLiquidationMatchesAcrossMeth
 	for _, method := range methods {
 		var method = method
 		t.Run(string(method), func(t *testing.T) {
-			var request, err = reportmodel.NewReportRequest(2024, method, reportmodel.ReportBaseCurrencyUSD, mustIntegrationTime())
+			var request, err = reportmodel.NewReportRequest(2024, method, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown, mustIntegrationTime())
 			if err != nil {
 				t.Fatalf("new report request: %v", err)
 			}

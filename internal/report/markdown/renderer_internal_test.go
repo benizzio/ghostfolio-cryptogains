@@ -73,6 +73,9 @@ func TestRendererHelperFallbacks(t *testing.T) {
 	if got, err := conversionStatusColumn(blankRow); err != nil || got != "" {
 		t.Fatalf("expected blank status without rendered activity currency, got %q", got)
 	}
+	if _, err := conversionStatusColumn(reportmodel.AssetActivityRow{GrossValue: apdDecimalPointer(1), ActivityCurrency: "USD", ConversionStatus: reportmodel.ConversionStatus("unknown")}); err == nil {
+		t.Fatalf("expected unsupported conversion status to fail")
+	}
 
 	if got := rateAuthorityLabel(reportmodel.RateAuthorityEuropeanCentralBank); got != "European Central Bank" {
 		t.Fatalf("unexpected ECB authority label %q", got)
@@ -295,7 +298,7 @@ func TestRenderRejectsInvalidReport(t *testing.T) {
 func TestRenderWrapsInjectedHelperFailures(t *testing.T) {
 	t.Parallel()
 
-	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
+	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
@@ -383,7 +386,7 @@ func TestRenderWrapsInjectedHelperFailures(t *testing.T) {
 // in the final Markdown document.
 // Authored by: OpenCode
 func TestRenderRendersReferenceEmptyState(t *testing.T) {
-	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
+	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
@@ -462,7 +465,7 @@ func TestRenderAnnexRendersSeparateDetailedAuditDocument(t *testing.T) {
 // Authored by: OpenCode
 func TestRenderCoversDetailAndLiquidationBranches(t *testing.T) {
 	t.Run("renders full detail and liquidation sections", func(t *testing.T) {
-		var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodHIFO, reportmodel.ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
+		var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodHIFO, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
 		if err != nil {
 			t.Fatalf("new report request: %v", err)
 		}
@@ -626,7 +629,7 @@ func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 				DatasetReference: "H10 fixture second rate",
 			},
 		},
-		ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{
+		AuditAnnex: reportmodel.AuditAnnex{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{
 			SourceID:           "eur-buy-1",
 			AssetLabel:         "BTC",
 			ActivityDate:       activityDate,
@@ -654,7 +657,7 @@ func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 					ConvertedAmount: *apd.New(0, 0),
 				},
 			},
-		}},
+		}}},
 	}
 
 	var builder strings.Builder
@@ -821,24 +824,24 @@ func TestRendererRateSourceAndConversionAuditErrors(t *testing.T) {
 
 	var invalid apd.Decimal
 	invalid.Form = apd.Infinite
-	var report = reportmodel.CapitalGainsReport{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{RateValue: invalid}}}
+	var report = reportmodel.CapitalGainsReport{AuditAnnex: reportmodel.AuditAnnex{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{RateValue: invalid}}}}
 	var builder strings.Builder
 	builder.Reset()
 	if err := writeConversionAuditSection(&builder, report); err == nil || !strings.Contains(err.Error(), "render conversion audit entry 0 rate value") {
 		t.Fatalf("expected audit rate invalid-decimal error, got %v", err)
 	}
 
-	report = reportmodel.CapitalGainsReport{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{
+	report = reportmodel.CapitalGainsReport{AuditAnnex: reportmodel.AuditAnnex{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{
 		RateValue: *apd.New(1, 0),
 		Amounts:   []reportmodel.ConvertedActivityAmount{{OriginalAmount: invalid}},
-	}}}
+	}}}}
 	builder.Reset()
 	if err := writeConversionAuditSection(&builder, report); err == nil || !strings.Contains(err.Error(), "amount 0 original amount") {
 		t.Fatalf("expected audit original amount invalid-decimal error, got %v", err)
 	}
 
-	report.ConversionAuditEntries[0].Amounts[0].OriginalAmount = *apd.New(1, 0)
-	report.ConversionAuditEntries[0].Amounts[0].ConvertedAmount = invalid
+	report.AuditAnnex.ConversionAuditEntries[0].Amounts[0].OriginalAmount = *apd.New(1, 0)
+	report.AuditAnnex.ConversionAuditEntries[0].Amounts[0].ConvertedAmount = invalid
 	builder.Reset()
 	if err := writeConversionAuditSection(&builder, report); err == nil || !strings.Contains(err.Error(), "amount 0 converted amount") {
 		t.Fatalf("expected audit converted amount invalid-decimal error, got %v", err)
@@ -957,7 +960,7 @@ func TestRenderDocumentsAndAnnexFallbackBranches(t *testing.T) {
 	}
 
 	var report = minimalMarkdownReportFixture(t)
-	report.AuditAnnex = reportmodel.AuditAnnex{}
+	report.AuditAnnex = reportmodel.DefaultAuditAnnex()
 	var document reportmodel.ReportDocument
 	document, err = RenderAnnex(report)
 	if err != nil {
@@ -1214,7 +1217,7 @@ func minimalMarkdownReportFixture(t *testing.T) reportmodel.CapitalGainsReport {
 	t.Helper()
 
 	var requestedAt = time.Date(2026, time.July, 5, 9, 0, 0, 0, time.UTC)
-	var request, requestErr = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, requestedAt)
+	var request, requestErr = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown, requestedAt)
 	if requestErr != nil {
 		t.Fatalf("new report request: %v", requestErr)
 	}
@@ -1252,7 +1255,7 @@ func markdownAnnexReportFixture(t *testing.T) reportmodel.CapitalGainsReport {
 	t.Helper()
 
 	var requestedAt = time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC)
-	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, requestedAt)
+	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown, requestedAt)
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
@@ -1286,7 +1289,7 @@ func markdownAnnexReportFixture(t *testing.T) reportmodel.CapitalGainsReport {
 	if err != nil {
 		t.Fatalf("new detailed annex: %v", err)
 	}
-	report.ConversionAuditEntries = []reportmodel.ConversionAuditEntry{conversion}
+	report.AuditAnnex.ConversionAuditEntries = []reportmodel.ConversionAuditEntry{conversion}
 	report.RateSources = []reportmodel.ExchangeRateEvidence{*conversion.Amounts[0].ExchangeRateEvidence}
 	return report
 }

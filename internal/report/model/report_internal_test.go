@@ -290,21 +290,10 @@ func TestReportOutputFormatContract(t *testing.T) {
 	}
 }
 
-// TestReportDocumentConstructorsCoverCompatibilityBranches verifies legacy
-// argument parsing and invalid document role/content combinations.
+// TestReportDocumentConstructorsCoverValidation verifies document role/content combinations.
 // Authored by: OpenCode
 func TestReportDocumentConstructorsCoverCompatibilityBranches(t *testing.T) {
 	var generatedAt = time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC)
-
-	if _, err := NewReportDocument(ReportDocumentTypeMarkdown, 123, 2024, CostBasisMethodFIFO, generatedAt); err == nil || !strings.Contains(err.Error(), "content, year, method") {
-		t.Fatalf("expected legacy argument type failure, got %v", err)
-	}
-	if _, err := NewReportDocument(ReportDocumentTypeMarkdown, ReportDocumentRoleMain, "# Report", "2024", CostBasisMethodFIFO, generatedAt); err == nil || !strings.Contains(err.Error(), "role, content, year") {
-		t.Fatalf("expected role-aware argument type failure, got %v", err)
-	}
-	if _, err := NewReportDocument(ReportDocumentTypeMarkdown, "# Report", 2024); err == nil || !strings.Contains(err.Error(), "requires content") {
-		t.Fatalf("expected argument count failure, got %v", err)
-	}
 
 	var pdfAsMarkdownRole = ReportDocument{
 		DocumentType:    ReportDocumentTypePDF,
@@ -336,23 +325,12 @@ func TestReportDocumentConstructorsCoverCompatibilityBranches(t *testing.T) {
 	}
 }
 
-// TestReportOutputFileConstructorsCoverCompatibilityBranches verifies legacy
-// output metadata parsing and remaining validation guardrails.
+// TestReportOutputFileConstructorsCoverValidation verifies output metadata guardrails.
 // Authored by: OpenCode
 func TestReportOutputFileConstructorsCoverCompatibilityBranches(t *testing.T) {
 	var savedAt = time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC)
 	var dir = t.TempDir()
 	var path = dir + "/report.md"
-
-	if _, err := NewReportOutputFile(dir, "report.md", path, "not-time", "legacy", "args", "ignored", "ignored"); err == nil || !strings.Contains(err.Error(), "saved-at timestamp") {
-		t.Fatalf("expected legacy saved-at type failure, got %v", err)
-	}
-	if _, err := NewReportOutputFile(dir, "report.md", path, savedAt, "legacy", "args", "ignored", "ignored"); err != nil {
-		t.Fatalf("expected legacy output file arguments to validate, got %v", err)
-	}
-	if _, err := NewReportOutputFile(dir, "report.md", path, ReportDocumentRoleMain, 123, savedAt); err == nil || !strings.Contains(err.Error(), "requires role") {
-		t.Fatalf("expected role metadata type failure, got %v", err)
-	}
 
 	var invalidRole = ReportOutputFile{DocumentsDirectory: dir, Filename: "report.md", Path: path, Role: ReportDocumentRole("bad"), MediaType: ReportMediaTypeMarkdown, SavedAt: savedAt}
 	if err := invalidRole.Validate(); err == nil || !strings.Contains(err.Error(), "report output role") {
@@ -789,6 +767,86 @@ func TestReportDocumentAndOutputValidation(t *testing.T) {
 	_, err = NewPDFReportDocument(ReportDocumentRoleMain, []byte("%PDF-1.7"), 2024, CostBasisMethodFIFO, time.Now())
 	if err == nil || !strings.Contains(err.Error(), "pdf report document role must be combined") {
 		t.Fatalf("expected PDF role validation failure, got %v", err)
+	}
+}
+
+// TestValidateRenderedDocumentsValidatesBundleShapeAndMetadata verifies that
+// output formats reject incomplete document roles and inconsistent report
+// metadata before output files are reserved.
+// Authored by: OpenCode
+func TestValidateRenderedDocumentsValidatesBundleShapeAndMetadata(t *testing.T) {
+	t.Parallel()
+
+	var generatedAt = time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC)
+	var main, mainErr = NewReportDocument(ReportDocumentTypeMarkdown, ReportDocumentRoleMain, "# Report\n", 2024, CostBasisMethodFIFO, generatedAt)
+	if mainErr != nil {
+		t.Fatalf("new main document: %v", mainErr)
+	}
+	var annex, annexErr = NewReportDocument(ReportDocumentTypeMarkdown, ReportDocumentRoleAnnex, "# Annex\n", 2024, CostBasisMethodFIFO, generatedAt)
+	if annexErr != nil {
+		t.Fatalf("new annex document: %v", annexErr)
+	}
+	var pdf, pdfErr = NewPDFReportDocument(ReportDocumentRoleCombined, []byte("%PDF-1.7"), 2024, CostBasisMethodFIFO, generatedAt)
+	if pdfErr != nil {
+		t.Fatalf("new PDF document: %v", pdfErr)
+	}
+
+	var testCases = []struct {
+		name         string
+		outputFormat ReportOutputFormat
+		documents    []ReportDocument
+		want         string
+	}{
+		{name: "invalid format", outputFormat: ReportOutputFormat("html"), documents: []ReportDocument{main}, want: "unsupported report output format"},
+		{name: "markdown count", outputFormat: ReportOutputFormatMarkdown, documents: []ReportDocument{main}, want: "exactly two documents"},
+		{name: "markdown main", outputFormat: ReportOutputFormatMarkdown, documents: []ReportDocument{annex, annex}, want: "document 0 must be the main"},
+		{name: "markdown annex", outputFormat: ReportOutputFormatMarkdown, documents: []ReportDocument{main, main}, want: "document 1 must be the Annex"},
+		{name: "pdf count", outputFormat: ReportOutputFormatPDF, documents: []ReportDocument{pdf, pdf}, want: "exactly one document"},
+		{name: "pdf combined", outputFormat: ReportOutputFormatPDF, documents: []ReportDocument{main}, want: "must be the combined PDF document"},
+		{name: "year mismatch", outputFormat: ReportOutputFormatMarkdown, documents: []ReportDocument{main, func() ReportDocument { var document = annex; document.Year = 2025; return document }()}, want: "year does not match"},
+		{name: "method mismatch", outputFormat: ReportOutputFormatMarkdown, documents: []ReportDocument{main, func() ReportDocument {
+			var document = annex
+			document.CostBasisMethod = CostBasisMethodLIFO
+			return document
+		}()}, want: "cost basis method does not match"},
+		{name: "timestamp mismatch", outputFormat: ReportOutputFormatMarkdown, documents: []ReportDocument{main, func() ReportDocument {
+			var document = annex
+			document.GeneratedAt = generatedAt.Add(time.Second)
+			return document
+		}()}, want: "generated-at timestamp does not match"},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var err = ValidateRenderedDocuments(testCase.outputFormat, testCase.documents)
+			if err == nil || !strings.Contains(err.Error(), testCase.want) {
+				t.Fatalf("expected error containing %q, got %v", testCase.want, err)
+			}
+		})
+	}
+
+	if err := ValidateRenderedDocuments(ReportOutputFormatMarkdown, []ReportDocument{main, annex}); err != nil {
+		t.Fatalf("validate Markdown documents: %v", err)
+	}
+	if err := ValidateRenderedDocuments(ReportOutputFormatPDF, []ReportDocument{pdf}); err != nil {
+		t.Fatalf("validate PDF document: %v", err)
+	}
+}
+
+// TestReportDocumentDefaultsBlankMarkdownRoleToMain verifies legacy Markdown
+// struct literals retain their implicit main-document role.
+// Authored by: OpenCode
+func TestReportDocumentDefaultsBlankMarkdownRoleToMain(t *testing.T) {
+	t.Parallel()
+
+	var document = ReportDocument{
+		DocumentType:    ReportDocumentTypeMarkdown,
+		Content:         "# Report\n",
+		Year:            2024,
+		CostBasisMethod: CostBasisMethodFIFO,
+		GeneratedAt:     time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC),
+	}
+	if err := document.Validate(); err != nil {
+		t.Fatalf("validate implicit main Markdown document: %v", err)
 	}
 }
 
@@ -1564,19 +1622,19 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 	report.ReportCalculationCurrency = "USD"
 	invalidEntry = entry
 	invalidEntry.SourceID = " "
-	report.ConversionAuditEntries = []ConversionAuditEntry{invalidEntry}
+	report.AuditAnnex.ConversionAuditEntries = []ConversionAuditEntry{invalidEntry}
 	if err := report.Validate(); err == nil || !strings.Contains(err.Error(), "conversion audit entry 0") {
 		t.Fatalf("expected invalid report audit entry rejection, got %v", err)
 	}
 
-	report.ConversionAuditEntries = []ConversionAuditEntry{entry}
+	report.AuditAnnex.ConversionAuditEntries = []ConversionAuditEntry{entry}
 	report.RateSources = nil
 	if err := report.Validate(); err == nil || !strings.Contains(err.Error(), "matching rate source") {
 		t.Fatalf("expected missing report rate source rejection, got %v", err)
 	}
 
 	report.RateSources = []ExchangeRateEvidence{evidence}
-	report.ConversionAuditEntries = []ConversionAuditEntry{entry}
+	report.AuditAnnex.ConversionAuditEntries = []ConversionAuditEntry{entry}
 	report.DetailSections = []AssetDetailSection{{
 		AssetIdentityKey:    "asset-btc",
 		DisplayLabel:        "BTC",
@@ -1608,7 +1666,7 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 
 	report.ReportCalculationCurrency = ""
 	report.RateSources = []ExchangeRateEvidence{evidence}
-	report.ConversionAuditEntries = nil
+	report.AuditAnnex.ConversionAuditEntries = nil
 	report.DetailSections = nil
 	if err := report.Validate(); err == nil || !strings.Contains(err.Error(), "calculation currency") {
 		t.Fatalf("expected empty report currency rejection, got %v", err)
@@ -1622,7 +1680,7 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 	sameCalendarEntry.ActivityDate = time.Date(2024, time.January, 5, 9, 0, 0, 0, time.UTC)
 	sameCalendarEntry.RateDate = time.Date(2024, time.January, 5, 7, 0, 0, 0, time.UTC)
 	report.RateSources = []ExchangeRateEvidence{sameCalendarSource}
-	report.ConversionAuditEntries = []ConversionAuditEntry{sameCalendarEntry}
+	report.AuditAnnex.ConversionAuditEntries = []ConversionAuditEntry{sameCalendarEntry}
 	if !report.hasMatchingRateSource(sameCalendarEntry) {
 		t.Fatalf("expected same calendar dates in different zones to match rate source")
 	}
@@ -1653,27 +1711,6 @@ func TestReportModelCoverageGapBranches(t *testing.T) {
 		t.Fatalf("new PDF output file: %v", pdfErr)
 	}
 
-	if _, err := NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, "not-time"); err == nil || !strings.Contains(err.Error(), "requested-at timestamp") {
-		t.Fatalf("expected legacy request timestamp argument failure, got %v", err)
-	}
-	if _, err := NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, "pdf", savedAt); err == nil || !strings.Contains(err.Error(), "output format argument") {
-		t.Fatalf("expected request output-format argument failure, got %v", err)
-	}
-	if _, err := NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, ReportOutputFormatPDF, "not-time"); err == nil || !strings.Contains(err.Error(), "requested-at timestamp") {
-		t.Fatalf("expected request timestamp argument failure, got %v", err)
-	}
-	if _, err := NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD); err == nil || !strings.Contains(err.Error(), "requires requested-at") {
-		t.Fatalf("expected request argument count failure, got %v", err)
-	}
-	var legacyRequest, legacyErr = NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, savedAt)
-	if legacyErr != nil || legacyRequest.OutputFormat != ReportOutputFormatMarkdown {
-		t.Fatalf("expected legacy request to default to Markdown, request=%#v err=%v", legacyRequest, legacyErr)
-	}
-
-	var legacyDocument, legacyDocumentErr = NewReportDocument(ReportDocumentTypeMarkdown, "# Report", 2024, CostBasisMethodFIFO, savedAt)
-	if legacyDocumentErr != nil || legacyDocument.Role != ReportDocumentRoleMain {
-		t.Fatalf("expected legacy document to default to main role, document=%#v err=%v", legacyDocument, legacyDocumentErr)
-	}
 	if err := (ReportDocument{DocumentType: ReportDocumentTypePDF, PDFContent: []byte("%PDF"), Year: 2024, CostBasisMethod: CostBasisMethodFIFO, GeneratedAt: savedAt}).Validate(); err == nil || !strings.Contains(err.Error(), "report document role") {
 		t.Fatalf("expected missing PDF document role failure, got %v", err)
 	}

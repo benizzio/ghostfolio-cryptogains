@@ -37,6 +37,21 @@ type AuditActivityEntry struct {
 // Validate verifies one Annex 1 audit activity entry.
 // Authored by: OpenCode
 func (entry AuditActivityEntry) Validate() error {
+	if err := entry.validateIdentity(); err != nil {
+		return err
+	}
+	if err := entry.validateAmounts(); err != nil {
+		return err
+	}
+	if err := entry.validateReplayState(); err != nil {
+		return err
+	}
+	return entry.validateConversionStatus()
+}
+
+// validateIdentity verifies the required source identity and activity fields.
+// Authored by: OpenCode
+func (entry AuditActivityEntry) validateIdentity() error {
 	if strings.TrimSpace(entry.SourceID) == "" {
 		return fmt.Errorf("audit activity entry source ID is required")
 	}
@@ -46,6 +61,12 @@ func (entry AuditActivityEntry) Validate() error {
 	if err := validateActivityType(entry.ActivityType); err != nil {
 		return fmt.Errorf("audit activity entry activity type: %w", err)
 	}
+	return nil
+}
+
+// validateAmounts verifies activity monetary values in their existing order.
+// Authored by: OpenCode
+func (entry AuditActivityEntry) validateAmounts() error {
 	if err := validatePositiveDecimal(entry.Quantity, "audit activity entry quantity"); err != nil {
 		return err
 	}
@@ -58,6 +79,12 @@ func (entry AuditActivityEntry) Validate() error {
 	if err := validateOptionalDecimal(entry.FeeAmount, "audit activity entry fee amount"); err != nil {
 		return err
 	}
+	return nil
+}
+
+// validateReplayState verifies the post-activity holdings evidence.
+// Authored by: OpenCode
+func (entry AuditActivityEntry) validateReplayState() error {
 	if strings.TrimSpace(entry.CalculationCurrency) == "" {
 		return fmt.Errorf("audit activity entry calculation currency is required")
 	}
@@ -76,12 +103,18 @@ func (entry AuditActivityEntry) Validate() error {
 	if err := validateOptionalDecimal(entry.GainOrLoss, "audit activity entry gain or loss"); err != nil {
 		return err
 	}
-	if strings.TrimSpace(string(entry.ConversionStatus)) != "" {
-		if err := validateConversionStatus(entry.ConversionStatus); err != nil {
-			return fmt.Errorf("audit activity entry conversion status: %w", err)
-		}
-	}
+	return nil
+}
 
+// validateConversionStatus verifies the optional visible conversion classification.
+// Authored by: OpenCode
+func (entry AuditActivityEntry) validateConversionStatus() error {
+	if strings.TrimSpace(string(entry.ConversionStatus)) == "" {
+		return nil
+	}
+	if err := validateConversionStatus(entry.ConversionStatus); err != nil {
+		return fmt.Errorf("audit activity entry conversion status: %w", err)
+	}
 	return nil
 }
 

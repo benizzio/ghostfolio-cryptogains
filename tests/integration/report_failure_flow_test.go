@@ -469,13 +469,10 @@ func TestReportGenerationWriteFailureRemovesPartialFileAndShowsFailure(t *testin
 	}
 }
 
-// TestReportGenerationPDFRenderFailureLeavesNoPartialBundleFiles verifies that a
-// render failure stops before final output and leaves no Markdown or PDF bundle
-// files from the attempt.
+// TestReportGenerationPDFOutputUsesTheConcreteRenderer verifies that PDF output
+// uses the production renderer and writes only its combined PDF bundle.
 // Authored by: OpenCode
-func TestReportGenerationPDFRenderFailureLeavesNoPartialBundleFiles(t *testing.T) {
-	t.Setenv("GHOSTFOLIO_CRYPTOGAINS_PDF_RENDER_FAILURE", "forced PDF render failure")
-
+func TestReportGenerationPDFOutputUsesTheConcreteRenderer(t *testing.T) {
 	var reportIO = testutil.NewReportIOFixture(t)
 	var openLogPath = installOpenCommandRecorder(t, 0)
 	var fixture = testutil.DeterministicReportLedgerFixture()
@@ -490,18 +487,20 @@ func TestReportGenerationPDFRenderFailureLeavesNoPartialBundleFiles(t *testing.T
 
 	var request = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatPDF)
 	var outcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: request})
-	if outcome.Success {
-		t.Fatalf("expected PDF render failure before save, got %#v", outcome)
+	if !outcome.Success {
+		t.Fatalf("expected concrete PDF report generation success, got %#v", outcome)
 	}
-	if outcome.FailureReason != runtime.ReportFailureUnsupportedReportCalculation {
-		t.Fatalf("expected PDF render failure category %q, got %#v", runtime.ReportFailureUnsupportedReportCalculation, outcome)
+	if outcome.FailureReason != runtime.ReportFailureNone {
+		t.Fatalf("expected no PDF generation failure, got %#v", outcome)
 	}
-	if !strings.Contains(outcome.Message, "No report file was saved") {
-		t.Fatalf("expected PDF render failure message to state that no file was saved, got %q", outcome.Message)
+	if files := mustPDFFiles(t, reportIO.DocumentsDir); len(files) != 1 {
+		t.Fatalf("expected one combined PDF file, got %#v", files)
 	}
-	assertNoReportBundleFiles(t, reportIO.DocumentsDir)
-	if openerRequests := readOpenCommandRequests(t, openLogPath); len(openerRequests) != 0 {
-		t.Fatalf("expected no opener request after PDF render failure, got %#v", openerRequests)
+	if files := mustAllMarkdownFiles(t, reportIO.DocumentsDir); len(files) != 0 {
+		t.Fatalf("expected no Markdown files for PDF output, got %#v", files)
+	}
+	if openerRequests := readOpenCommandRequests(t, openLogPath); len(openerRequests) != 1 {
+		t.Fatalf("expected one opener request after PDF generation, got %#v", openerRequests)
 	}
 	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
 }

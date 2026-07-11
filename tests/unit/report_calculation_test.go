@@ -23,9 +23,8 @@ import (
 func TestCalculateUsesSelectedYearCutoffForOpeningClosingAndLaterActivityExclusion(t *testing.T) {
 	t.Parallel()
 
-	var request = mustReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO)
+	var request = mustReportRequest(t, reportmodel.CostBasisMethodFIFO)
 	var report, err = reportcalculate.Calculate(request, calculationCache(
-		2024,
 		calculationActivity(t, calculationActivityInput{
 			SourceID:         "btc-buy-2023-001",
 			OccurredAt:       "2023-06-01T10:00:00Z",
@@ -110,9 +109,8 @@ func TestCalculateUsesSelectedYearCutoffForOpeningClosingAndLaterActivityExclusi
 func TestCalculateExcludesAssetsWhoseFirstAcquisitionIsAfterSelectedYear(t *testing.T) {
 	t.Parallel()
 
-	var request = mustReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO)
+	var request = mustReportRequest(t, reportmodel.CostBasisMethodFIFO)
 	var report, err = reportcalculate.Calculate(request, calculationCache(
-		2024,
 		calculationActivity(t, calculationActivityInput{
 			SourceID:         "main-buy-2023-001",
 			OccurredAt:       "2023-01-01T10:00:00Z",
@@ -184,9 +182,8 @@ func TestCalculateExcludesAssetsWhoseFirstAcquisitionIsAfterSelectedYear(t *test
 func TestCalculateMarksPreYearLiquidationAsReferenceOnlyAndDoesNotTreatSameDateBuyAsReopen(t *testing.T) {
 	t.Parallel()
 
-	var request = mustReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO)
+	var request = mustReportRequest(t, reportmodel.CostBasisMethodFIFO)
 	var report, err = reportcalculate.Calculate(request, calculationCache(
-		2024,
 		calculationActivity(t, calculationActivityInput{
 			SourceID:         "eth-buy-2023-001",
 			OccurredAt:       "2023-01-01T10:00:00Z",
@@ -256,9 +253,8 @@ func TestCalculateMarksPreYearLiquidationAsReferenceOnlyAndDoesNotTreatSameDateB
 func TestCalculateIncludesZeroResultLossAndHoldingReductionDetails(t *testing.T) {
 	t.Parallel()
 
-	var request = mustReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO)
+	var request = mustReportRequest(t, reportmodel.CostBasisMethodFIFO)
 	var report, err = reportcalculate.Calculate(request, calculationCache(
-		2024,
 		calculationActivity(t, calculationActivityInput{
 			SourceID:         "zero-buy-2023-001",
 			OccurredAt:       "2023-01-01T10:00:00Z",
@@ -392,9 +388,8 @@ func TestCalculateIncludesZeroResultLossAndHoldingReductionDetails(t *testing.T)
 func TestCalculateReturnsStructuredActivityReferencesForInputFailures(t *testing.T) {
 	t.Parallel()
 
-	var request = mustReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO)
+	var request = mustReportRequest(t, reportmodel.CostBasisMethodFIFO)
 	_, err := reportcalculate.Calculate(request, calculationCache(
-		2024,
 		calculationActivity(t, calculationActivityInput{
 			SourceID:         "bad-buy-2024-001",
 			OccurredAt:       "2024-01-01T10:00:00Z",
@@ -435,9 +430,8 @@ func TestCalculateReturnsStructuredActivityReferencesForInputFailures(t *testing
 func TestCalculateRoundsPartialLotBasisAllocation(t *testing.T) {
 	t.Parallel()
 
-	var request = mustReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO)
+	var request = mustReportRequest(t, reportmodel.CostBasisMethodFIFO)
 	var report, err = reportcalculate.Calculate(request, calculationCache(
-		2024,
 		calculationActivity(t, calculationActivityInput{
 			SourceID:         "lot-buy-2023-001",
 			OccurredAt:       "2023-01-01T10:00:00Z",
@@ -489,9 +483,8 @@ func TestCalculateRoundsPartialLotBasisAllocation(t *testing.T) {
 func TestCalculateRetainsFragmentLevelPricedLiquidationMatches(t *testing.T) {
 	t.Parallel()
 
-	var request = mustReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO)
+	var request = mustReportRequest(t, reportmodel.CostBasisMethodFIFO)
 	var report, err = reportcalculate.Calculate(request, calculationCache(
-		2024,
 		calculationActivity(t, calculationActivityInput{
 			SourceID:         "frag-buy-2023-001",
 			OccurredAt:       "2023-01-01T10:00:00Z",
@@ -562,9 +555,8 @@ func TestCalculateRetainsFragmentLevelPricedLiquidationMatches(t *testing.T) {
 func TestCalculateRoundsFragmentLevelProceedsWithRoundedIntermediate(t *testing.T) {
 	t.Parallel()
 
-	var request = mustReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO)
+	var request = mustReportRequest(t, reportmodel.CostBasisMethodFIFO)
 	var report, err = reportcalculate.Calculate(request, calculationCache(
-		2024,
 		calculationActivity(t, calculationActivityInput{
 			SourceID:         "round-buy-2023-001",
 			OccurredAt:       "2023-01-01T10:00:00Z",
@@ -645,10 +637,10 @@ type calculationActivityInput struct {
 // calculationCache creates one protected-activity cache fixture for calculation
 // tests.
 // Authored by: OpenCode
-func calculationCache(reportYear int, activities ...syncmodel.ActivityRecord) syncmodel.ProtectedActivityCache {
+func calculationCache(activities ...syncmodel.ActivityRecord) syncmodel.ProtectedActivityCache {
 	return syncmodel.ProtectedActivityCache{
 		ActivityCount:        len(activities),
-		AvailableReportYears: []int{reportYear},
+		AvailableReportYears: []int{2024},
 		Activities:           activities,
 	}
 }
@@ -677,10 +669,10 @@ func calculationActivity(t *testing.T, input calculationActivityInput) syncmodel
 
 // mustReportRequest creates one validated report request for calculation tests.
 // Authored by: OpenCode
-func mustReportRequest(t *testing.T, year int, method reportmodel.CostBasisMethod) reportmodel.ReportRequest {
+func mustReportRequest(t *testing.T, method reportmodel.CostBasisMethod) reportmodel.ReportRequest {
 	t.Helper()
 
-	var request, err = reportmodel.NewReportRequest(year, method, reportmodel.ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
+	var request, err = reportmodel.NewReportRequest(2024, method, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}

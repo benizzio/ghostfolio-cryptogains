@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
@@ -40,16 +39,6 @@ type reportCalculator func(context.Context, reportmodel.ReportRequest, syncmodel
 	error,
 )
 
-// reportRenderer defines the Markdown rendering seam used by the runtime report
-// service.
-// Authored by: OpenCode
-type reportRenderer func(reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error)
-
-// reportDocumentWriter defines the final file-save seam used by the runtime
-// report service.
-// Authored by: OpenCode
-type reportDocumentWriter func(reportmodel.ReportDocument) (reportmodel.ReportOutputFile, error)
-
 // reportBundleRenderer defines the selected-format rendering seam used by the
 // runtime report service.
 // Authored by: OpenCode
@@ -74,8 +63,6 @@ type reportService struct {
 	diagnosticReports diagnosticReportService
 	currencyRates     reportcalculate.CurrencyRateService
 	calculate         reportCalculator
-	render            reportRenderer
-	write             reportDocumentWriter
 	renderBundle      reportBundleRenderer
 	writeBundle       reportBundleWriter
 	open              reportPathOpener
@@ -98,8 +85,6 @@ func newReportService(
 		diagnosticReports: newDiagnosticReportService(baseConfigDir),
 		currencyRates:     currencyRates,
 		calculate:         calculator.Calculate,
-		render:            reportmarkdown.Render,
-		write:             reportoutput.WriteReportDocument,
 		renderBundle:      renderReportOutputBundle,
 		writeBundle:       reportoutput.WriteReportOutputBundle,
 		open:              reportoutput.OpenPath,
@@ -148,10 +133,6 @@ func (s *reportService) Generate(ctx context.Context, request ReportGenerationRe
 			reportDiagnosticContextFromError(wrappedErr),
 		)
 	}
-	if s.writeBundle == nil {
-		return s.generateLegacySingleDocumentOutcome(ctx, request, outcomeAttempt, documents)
-	}
-
 	var outputBundle reportmodel.ReportOutputBundle
 	outputBundle, err = s.writeReportDocuments(request.Request.OutputFormat, documents)
 	if err != nil {
@@ -186,89 +167,22 @@ func (s *reportService) Generate(ctx context.Context, request ReportGenerationRe
 	}
 }
 
-// generateLegacySingleDocumentOutcome preserves the older render/write seams
-// used by runtime unit tests that predate output bundles.
-// Authored by: OpenCode
-func (s *reportService) generateLegacySingleDocumentOutcome(
-	ctx context.Context,
-	request ReportGenerationRequest,
-	outcomeAttempt SyncAttempt,
-	documents []reportmodel.ReportDocument,
-) ReportOutcome {
-	if s.write == nil || len(documents) != 1 {
-		return s.reportFailureOutcome(
-			ctx,
-			request,
-			outcomeAttempt,
-			ReportFailureReportFileWriteFailed,
-			"Could not save the report file: report writer is unavailable. No report file was saved.",
-			syncmodel.DiagnosticContext{},
-		)
-	}
-
-	var outputFile, err = s.write(documents[0])
-	if err != nil {
-		var reason = reportWriteFailureReason(err)
-		var wrappedErr = reportWriteDiagnosticError(reason, err)
-		return s.reportFailureOutcome(
-			ctx,
-			request,
-			outcomeAttempt,
-			reason,
-			reportWriteFailureMessage(reason, err),
-			reportDiagnosticContextFromError(wrappedErr),
-		)
-	}
-
-	var openedOutputFile, openedOutcome = requestAutomaticOpen(request.Request, outputFile, s.open)
-	if openedOutcome != nil {
-		openedOutcome.Attempt = outcomeAttempt
-		return *openedOutcome
-	}
-
-	return ReportOutcome{
-		Success:       true,
-		Message:       reportSuccessMessage(openedOutputFile.Path),
-		FailureReason: ReportFailureNone,
-		Attempt:       outcomeAttempt,
-		Request:       request.Request,
-		OutputFormat:  request.Request.OutputFormat,
-		OutputFile:    openedOutputFile,
-	}
-}
-
-// renderReportDocuments renders one report through the selected-format seam or
-// legacy Markdown seam used by older tests.
+// renderReportDocuments renders one report through the selected-format bundle seam.
 // Authored by: OpenCode
 func (s *reportService) renderReportDocuments(outputFormat reportmodel.ReportOutputFormat, report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
-	if s.renderBundle != nil {
-		return s.renderBundle(outputFormat, report)
-	}
-	if s.render == nil {
+	if s.renderBundle == nil {
 		return nil, fmt.Errorf("report renderer is unavailable")
 	}
-	var document, err = s.render(report)
-	if err != nil {
-		return nil, err
-	}
-	return []reportmodel.ReportDocument{document}, nil
+	return s.renderBundle(outputFormat, report)
 }
 
-// writeReportDocuments writes rendered documents through the bundle seam or
-// legacy single-document seam used by older tests.
+// writeReportDocuments writes rendered documents through the bundle seam.
 // Authored by: OpenCode
 func (s *reportService) writeReportDocuments(outputFormat reportmodel.ReportOutputFormat, documents []reportmodel.ReportDocument) (reportmodel.ReportOutputBundle, error) {
-	if s.writeBundle != nil {
-		return s.writeBundle(outputFormat, documents)
-	}
-	if s.write == nil || len(documents) != 1 {
+	if s.writeBundle == nil {
 		return reportmodel.ReportOutputBundle{}, fmt.Errorf("report writer is unavailable")
 	}
-	var outputFile, err = s.write(documents[0])
-	if err != nil {
-		return reportmodel.ReportOutputBundle{}, err
-	}
-	return reportmodel.NewReportOutputBundle(outputFormat, []reportmodel.ReportOutputFile{outputFile}, outputFile.SavedAt, false, "")
+	return s.writeBundle(outputFormat, documents)
 }
 
 // renderReportOutputBundle selects the local renderer for the requested output
@@ -279,9 +193,6 @@ func renderReportOutputBundle(outputFormat reportmodel.ReportOutputFormat, repor
 	case reportmodel.ReportOutputFormatMarkdown:
 		return reportmarkdown.RenderDocuments(report)
 	case reportmodel.ReportOutputFormatPDF:
-		if detail := strings.TrimSpace(os.Getenv("GHOSTFOLIO_CRYPTOGAINS_PDF_RENDER_FAILURE")); detail != "" {
-			return nil, fmt.Errorf("forced PDF render failure: %s", detail)
-		}
 		var renderer, err = reportpdf.NewRenderer(reportPDFRenderOptions())
 		if err != nil {
 			return nil, err

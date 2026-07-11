@@ -11,66 +11,6 @@ import (
 	reportoutput "github.com/benizzio/ghostfolio-cryptogains/internal/report/output"
 )
 
-// requestAutomaticOpen performs the single post-save opener request and keeps
-// the saved file when the opener fails.
-// Authored by: OpenCode
-func requestAutomaticOpen(
-	request reportmodel.ReportRequest,
-	outputFile reportmodel.ReportOutputFile,
-	open reportPathOpener,
-) (reportmodel.ReportOutputFile, *ReportOutcome) {
-	var updatedOutputFile, updateErr = reportmodel.NewReportOutputFile(
-		outputFile.DocumentsDirectory,
-		outputFile.Filename,
-		outputFile.Path,
-		outputFile.Role,
-		outputFile.MediaType,
-		outputFile.SavedAt,
-	)
-	if updateErr != nil {
-		return reportmodel.ReportOutputFile{}, pointerToReportOutcome(
-			reportFailureOutcome(
-				request,
-				ReportFailureReportFileWriteFailed,
-				fmt.Sprintf(
-					"Could not finalize the saved report result for %q: %s. The saved file may still exist at %q.",
-					outputFile.Filename,
-					strings.TrimSpace(updateErr.Error()),
-					outputFile.Path,
-				),
-			),
-		)
-	}
-	if open == nil {
-		var outcome = reportFailureOutcome(
-			request,
-			ReportFailureAutomaticOpenFailedAfterSave,
-			reportOpenFailureMessage(outputFile.Path, "automatic opening is unavailable in this runtime"),
-		)
-		outcome.OutputFormat = request.OutputFormat
-		outcome.OutputFile = updatedOutputFile
-		outcome.OutputBundle = reportOutputBundleForOpen(request.OutputFormat, []reportmodel.ReportOutputFile{updatedOutputFile}, true, "automatic opening is unavailable in this runtime")
-		return updatedOutputFile, pointerToReportOutcome(outcome)
-	}
-
-	var err = open(outputFile.Path)
-	if err == nil {
-		return updatedOutputFile, nil
-	}
-
-	return updatedOutputFile, pointerToReportOutcome(
-		ReportOutcome{
-			Success:       true,
-			Message:       reportOpenFailureMessage(outputFile.Path, strings.TrimSpace(err.Error())),
-			FailureReason: ReportFailureAutomaticOpenFailedAfterSave,
-			Request:       request,
-			OutputFormat:  request.OutputFormat,
-			OutputBundle:  reportOutputBundleForOpen(request.OutputFormat, []reportmodel.ReportOutputFile{updatedOutputFile}, true, strings.TrimSpace(err.Error())),
-			OutputFile:    updatedOutputFile,
-		},
-	)
-}
-
 // requestAutomaticOpenBundle performs one post-save opener request for the first
 // saved file in a valid output bundle and keeps all saved files when opening
 // fails.
@@ -96,19 +36,19 @@ func requestAutomaticOpenBundle(
 		var outcome = reportFailureOutcome(request, ReportFailureAutomaticOpenFailedAfterSave, reportOpenFailureMessage(primaryPath, openErr))
 		outcome.Success = true
 		outcome.OutputFormat = request.OutputFormat
-		outcome.OutputBundle = reportOutputBundleForOpen(request.OutputFormat, outputBundle.Files, true, openErr)
+		outcome.OutputBundle = reportOutputBundleForOpen(request.OutputFormat, outputBundle.Files, openErr)
 		outcome.OutputFile = outputBundle.Files[0]
 		return outcome.OutputBundle, pointerToReportOutcome(outcome)
 	}
 
 	var err = open(primaryPath)
 	if err == nil {
-		var openedBundle = reportOutputBundleForOpen(request.OutputFormat, outputBundle.Files, true, "")
+		var openedBundle = reportOutputBundleForOpen(request.OutputFormat, outputBundle.Files, "")
 		return openedBundle, nil
 	}
 
 	var detail = strings.TrimSpace(err.Error())
-	var openedBundle = reportOutputBundleForOpen(request.OutputFormat, outputBundle.Files, true, detail)
+	var openedBundle = reportOutputBundleForOpen(request.OutputFormat, outputBundle.Files, detail)
 	return openedBundle, pointerToReportOutcome(ReportOutcome{
 		Success:       true,
 		Message:       reportOpenFailureMessage(primaryPath, detail),
@@ -128,7 +68,6 @@ func requestAutomaticOpenBundle(
 func reportOutputBundleForOpen(
 	outputFormat reportmodel.ReportOutputFormat,
 	files []reportmodel.ReportOutputFile,
-	_ bool,
 	openError string,
 ) reportmodel.ReportOutputBundle {
 	var savedAt = reportOutputBundleSavedAt(files)
@@ -213,16 +152,6 @@ func reportOpenFailureMessage(path string, detail string) string {
 		"Saved the report to %q, but automatic opening failed: %s. Open the file manually. To remove this cleartext report later, delete %q.",
 		path,
 		detail,
-		path,
-	)
-}
-
-// reportSuccessMessage formats one successful report outcome.
-// Authored by: OpenCode
-func reportSuccessMessage(path string) string {
-	return fmt.Sprintf(
-		"Saved the report to %q and requested automatic opening. To remove this cleartext report later, delete %q.",
-		path,
 		path,
 	)
 }

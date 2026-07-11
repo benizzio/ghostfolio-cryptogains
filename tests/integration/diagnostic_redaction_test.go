@@ -51,7 +51,7 @@ func TestGeneratedDiagnosticsRedactSecretBearingFailureCauseChain(t *testing.T) 
 		t.Fatalf("generate diagnostic report: %v", err)
 	}
 
-	var raw, readErr = os.ReadFile(path)
+	var raw, readErr = os.ReadFile(path) // #nosec G304 -- test reads the diagnostic path returned by the controlled runtime fixture.
 	if readErr != nil {
 		t.Fatalf("read diagnostic report: %v", readErr)
 	}
@@ -97,6 +97,7 @@ func TestProductionConversionFailureDiagnosticsRedactFinancialValues(t *testing.
 		2024,
 		reportmodel.CostBasisMethodFIFO,
 		reportmodel.ReportBaseCurrencyUSD,
+		reportmodel.ReportOutputFormatMarkdown,
 		time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
 	)
 	if requestErr != nil {
@@ -120,7 +121,7 @@ func TestProductionConversionFailureDiagnosticsRedactFinancialValues(t *testing.
 		t.Fatalf("generate conversion failure diagnostic report: %v", err)
 	}
 	testutil.AssertRegularFile(t, path)
-	var raw, readErr = os.ReadFile(path)
+	var raw, readErr = os.ReadFile(path) // #nosec G304 -- test reads the diagnostic path returned by the controlled runtime fixture.
 	if readErr != nil {
 		t.Fatalf("read conversion failure diagnostic report: %v", readErr)
 	}

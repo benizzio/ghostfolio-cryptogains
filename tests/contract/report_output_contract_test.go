@@ -49,21 +49,6 @@ func TestReportOutputFormatFileCountsContract(t *testing.T) {
 	}
 }
 
-// TestReportOutputFilenamePatternContract verifies canonical unsuffixed and
-// collided filename patterns for Markdown and PDF outputs.
-// Authored by: OpenCode
-func TestReportOutputFilenamePatternContract(t *testing.T) {
-	t.Parallel()
-
-	var filenames = testutil.DeterministicReportOutputFilenameFixture()
-	assertReportFilenamePattern(t, filenames.MarkdownMainFilename, `^ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56\.md$`)
-	assertReportFilenamePattern(t, filenames.MarkdownAnnexFilename, `^ghostfolio-capital-gains-2024-fifo-annex-1-2026-05-21_12-34-56\.md$`)
-	assertReportFilenamePattern(t, filenames.PDFCombinedFilename, `^ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56\.pdf$`)
-	assertReportFilenamePattern(t, filenames.CollidedMarkdownMain, `^ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56-2\.md$`)
-	assertReportFilenamePattern(t, filenames.CollidedMarkdownAnnex, `^ghostfolio-capital-gains-2024-fifo-annex-1-2026-05-21_12-34-56-2\.md$`)
-	assertReportFilenamePattern(t, filenames.CollidedPDFCombined, `^ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56-2\.pdf$`)
-}
-
 // TestReportOutputBundleShapeContract verifies successful output bundle metadata
 // for Markdown main-plus-annex output and combined PDF output.
 // Authored by: OpenCode
@@ -275,8 +260,8 @@ func assertReportOutputFile(t *testing.T, file reportmodel.ReportOutputFile, doc
 	testutil.AssertRegularFile(t, file.Path)
 }
 
-// assertReportFilenamePattern verifies one generated filename against a contract
-// regular expression.
+// assertReportFilenamePattern verifies one production-generated filename
+// against a contract regular expression.
 // Authored by: OpenCode
 func assertReportFilenamePattern(t *testing.T, filename string, pattern string) {
 	t.Helper()

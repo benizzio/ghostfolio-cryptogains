@@ -68,7 +68,7 @@ func TestWriteReportDocumentRemovesPartialFileOnWriteFailure(t *testing.T) {
 		GeneratedAt:     time.Date(2026, time.May, 21, 12, 30, 0, 0, time.Local),
 	}
 
-	_, err := WriteReportDocument(document)
+	_, err := WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, markdownDocumentPair(document))
 	if err == nil {
 		t.Fatalf("expected write to fail")
 	}
@@ -151,7 +151,7 @@ func TestWriteReportDocumentFailureBranches(t *testing.T) {
 		}
 		removePath = os.Remove
 
-		_, err := WriteReportDocument(validReportDocument(time.Now()))
+		_, err := WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, markdownDocumentPair(validReportDocument(time.Now())))
 		if err == nil || !strings.Contains(err.Error(), "is not a directory") {
 			t.Fatalf("expected non-directory documents error, got %v", err)
 		}
@@ -166,7 +166,7 @@ func TestWriteReportDocumentFailureBranches(t *testing.T) {
 			return nil, errors.New("stat boom")
 		}
 
-		_, err := WriteReportDocument(validReportDocument(time.Now()))
+		_, err := WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, markdownDocumentPair(validReportDocument(time.Now())))
 		if err == nil || !strings.Contains(err.Error(), "inspect documents directory") {
 			t.Fatalf("expected wrapped stat failure, got %v", err)
 		}
@@ -224,7 +224,7 @@ func TestWriteReportDocumentFailureBranches(t *testing.T) {
 			return failingSyncFile{File: file, syncErr: errors.New("sync boom")}, nil
 		}
 
-		_, err := WriteReportDocument(validReportDocument(time.Now()))
+		_, err := WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, markdownDocumentPair(validReportDocument(time.Now())))
 		if err == nil || !strings.Contains(err.Error(), "sync report file") {
 			t.Fatalf("expected wrapped sync failure, got %v", err)
 		}
@@ -247,7 +247,7 @@ func TestWriteReportDocumentFailureBranches(t *testing.T) {
 			return failingCloseFile{File: file, closeErr: errors.New("close boom")}, nil
 		}
 
-		_, err := WriteReportDocument(validReportDocument(time.Now()))
+		_, err := WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, markdownDocumentPair(validReportDocument(time.Now())))
 		if err == nil || !strings.Contains(err.Error(), "close report file") {
 			t.Fatalf("expected wrapped close failure, got %v", err)
 		}
@@ -266,10 +266,11 @@ func TestWriteReportDocumentAdditionalBranches(t *testing.T) {
 		defer restoreOutputSeams()
 		currentTime = func() time.Time { return fallbackTime }
 
-		var outputFile, err = WriteReportDocument(validReportDocument(time.Time{}))
+		var bundle, err = WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, markdownDocumentPair(validReportDocument(time.Time{})))
 		if err != nil {
 			t.Fatalf("write report document: %v", err)
 		}
+		var outputFile = bundle.Files[0]
 		if outputFile.SavedAt != fallbackTime {
 			t.Fatalf("expected saved-at timestamp fallback, got %#v", outputFile)
 		}
@@ -283,7 +284,7 @@ func TestWriteReportDocumentAdditionalBranches(t *testing.T) {
 	})
 
 	t.Run("wraps invalid document before filesystem work", func(t *testing.T) {
-		_, err := WriteReportDocument(reportmodel.ReportDocument{})
+		_, err := WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, markdownDocumentPair(reportmodel.ReportDocument{}))
 		if err == nil || !strings.Contains(err.Error(), "report document type") {
 			t.Fatalf("expected invalid document validation failure, got %v", err)
 		}
@@ -336,7 +337,7 @@ func TestWriteReportDocumentAdditionalBranches(t *testing.T) {
 		}()
 
 		currentGOOS = func() string { return "plan9" }
-		if _, err := WriteReportDocument(validReportDocument(time.Now())); err == nil || !strings.Contains(err.Error(), "documents directory resolution is unsupported") {
+		if _, err := WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, markdownDocumentPair(validReportDocument(time.Now()))); err == nil || !strings.Contains(err.Error(), "documents directory resolution is unsupported") {
 			t.Fatalf("expected documents resolution failure to be wrapped, got %v", err)
 		}
 	})
@@ -350,7 +351,7 @@ func TestWriteReportDocumentAdditionalBranches(t *testing.T) {
 			return nil, errors.New("reserve boom")
 		}
 
-		if _, err := WriteReportDocument(validReportDocument(time.Now())); err == nil || !strings.Contains(err.Error(), "reserve report file") {
+		if _, err := WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, markdownDocumentPair(validReportDocument(time.Now()))); err == nil || !strings.Contains(err.Error(), "reserve report file") {
 			t.Fatalf("expected write path to surface reservation failure, got %v", err)
 		}
 	})
@@ -540,7 +541,7 @@ func TestWriteReportDocumentsCleansUpBundleOnFinalizationFailure(t *testing.T) {
 
 		var previousConstructor = newReportOutputFileForWrite
 		defer func() { newReportOutputFileForWrite = previousConstructor }()
-		newReportOutputFileForWrite = func(string, string, string, ...any) (reportmodel.ReportOutputFile, error) {
+		newReportOutputFileForWrite = func(string, string, string, reportmodel.ReportDocumentRole, string, time.Time) (reportmodel.ReportOutputFile, error) {
 			return reportmodel.ReportOutputFile{}, errors.New("output file finalization boom")
 		}
 
@@ -588,6 +589,15 @@ func TestWriteReportDocumentsValidationBranches(t *testing.T) {
 	var mainDocument = validMarkdownReportDocument(reportmodel.ReportDocumentRoleMain, "# Main Report\n", generatedAt)
 	var annexDocument = validMarkdownReportDocument(reportmodel.ReportDocumentRoleAnnex, "# Annex 1 - Audit\n", generatedAt)
 	var pdfDocument = validPDFReportDocument([]byte("%PDF-1.7\n"), generatedAt)
+	if err := validateBundleDocuments(reportmodel.ReportOutputFormatMarkdown, []reportmodel.ReportDocument{mainDocument, annexDocument}); err != nil {
+		t.Fatalf("validate Markdown document bundle: %v", err)
+	}
+	if err := validateBundleDocuments(reportmodel.ReportOutputFormatPDF, []reportmodel.ReportDocument{pdfDocument}); err != nil {
+		t.Fatalf("validate PDF document bundle: %v", err)
+	}
+	if err := validateBundleDocuments(reportmodel.ReportOutputFormatMarkdown, []reportmodel.ReportDocument{{}}); err == nil || !strings.Contains(err.Error(), "report document 0") {
+		t.Fatalf("expected invalid document validation failure, got %v", err)
+	}
 
 	if err := validateBundleDocuments(reportmodel.ReportOutputFormatMarkdown, []reportmodel.ReportDocument{mainDocument}); err == nil || !strings.Contains(err.Error(), "exactly two") {
 		t.Fatalf("expected Markdown document count failure, got %v", err)
@@ -816,11 +826,24 @@ func (file failingCloseFile) Close() error {
 func validReportDocument(generatedAt time.Time) reportmodel.ReportDocument {
 	return reportmodel.ReportDocument{
 		DocumentType:    reportmodel.ReportDocumentTypeMarkdown,
+		Role:            reportmodel.ReportDocumentRoleMain,
 		Content:         "# Report\n",
 		Year:            2024,
 		CostBasisMethod: reportmodel.CostBasisMethodFIFO,
 		GeneratedAt:     generatedAt,
 	}
+}
+
+// markdownDocumentPair builds the required main-plus-annex bundle for legacy
+// writer failure-path tests.
+// Authored by: OpenCode
+func markdownDocumentPair(document reportmodel.ReportDocument) []reportmodel.ReportDocument {
+	var main = document
+	main.Role = reportmodel.ReportDocumentRoleMain
+	var annex = document
+	annex.Role = reportmodel.ReportDocumentRoleAnnex
+	annex.Content = "# Annex 1 - Audit\n"
+	return []reportmodel.ReportDocument{main, annex}
 }
 
 // validMarkdownReportDocument returns one role-specific Markdown report

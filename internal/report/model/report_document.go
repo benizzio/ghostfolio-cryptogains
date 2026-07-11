@@ -35,13 +35,12 @@ type ReportDocument struct {
 // Authored by: OpenCode
 func NewReportDocument(
 	documentType ReportDocumentType,
-	args ...any,
+	role ReportDocumentRole,
+	content string,
+	year int,
+	method CostBasisMethod,
+	generatedAt time.Time,
 ) (ReportDocument, error) {
-	var role, content, year, method, generatedAt, argErr = parseMarkdownReportDocumentArgs(args)
-	if argErr != nil {
-		return ReportDocument{}, argErr
-	}
-
 	var document = ReportDocument{
 		DocumentType:    documentType,
 		Role:            role,
@@ -56,35 +55,6 @@ func NewReportDocument(
 	}
 
 	return document, nil
-}
-
-// parseMarkdownReportDocumentArgs accepts current role-aware document calls and
-// legacy Markdown-only calls that are migrated in later story tasks.
-// Authored by: OpenCode
-func parseMarkdownReportDocumentArgs(args []any) (ReportDocumentRole, string, int, CostBasisMethod, time.Time, error) {
-	if len(args) == 4 {
-		var content, contentOK = args[0].(string)
-		var year, yearOK = args[1].(int)
-		var method, methodOK = args[2].(CostBasisMethod)
-		var generatedAt, timeOK = args[3].(time.Time)
-		if !contentOK || !yearOK || !methodOK || !timeOK {
-			return "", "", 0, "", time.Time{}, fmt.Errorf("report document content, year, method, and generated-at arguments are required")
-		}
-		return ReportDocumentRoleMain, content, year, method, generatedAt, nil
-	}
-	if len(args) == 5 {
-		var role, roleOK = args[0].(ReportDocumentRole)
-		var content, contentOK = args[1].(string)
-		var year, yearOK = args[2].(int)
-		var method, methodOK = args[3].(CostBasisMethod)
-		var generatedAt, timeOK = args[4].(time.Time)
-		if !roleOK || !contentOK || !yearOK || !methodOK || !timeOK {
-			return "", "", 0, "", time.Time{}, fmt.Errorf("report document role, content, year, method, and generated-at arguments are required")
-		}
-		return role, content, year, method, generatedAt, nil
-	}
-
-	return "", "", 0, "", time.Time{}, fmt.Errorf("report document requires content, year, method, and generated-at arguments")
 }
 
 // NewPDFReportDocument creates one validated PDF report document from rendered

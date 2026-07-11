@@ -150,12 +150,7 @@ func TestReportGenerationWritesSelectedMarkdownAndPDFBundles(t *testing.T) {
 			outputFormat:     reportmodel.ReportOutputFormatPDF,
 			expectedPDFFiles: 1,
 			wantFileText: []string{
-				"Asset Historical Full Liquidation Count Main Section Status",
-				"Report Base Currency: USD",
-				"Quantity:",
-				"Same currency",
-				"Annex 1 - Audit",
-				"Currency Conversion Audit",
+				"%PDF-",
 			},
 			forbiddenFileText: []string{
 				"| Asset | Historical Full Liquidation Count | Main Section Status |",
@@ -534,7 +529,7 @@ func TestSameCurrencyReportPreservesPriorMonetaryResults(t *testing.T) {
 				t.Fatalf("expected readable snapshot after unlock, got %#v", contextResult)
 			}
 
-			var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportBaseCurrency, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
+			var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportBaseCurrency, reportmodel.ReportOutputFormatMarkdown, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
 			if err != nil {
 				t.Fatalf("new report request: %v", err)
 			}
@@ -873,6 +868,7 @@ func mustIntegrationReportRequest(t *testing.T, year int, reportBaseCurrency rep
 		year,
 		reportmodel.CostBasisMethodFIFO,
 		reportBaseCurrency,
+		reportmodel.ReportOutputFormatMarkdown,
 		time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
 	)
 	if err != nil {

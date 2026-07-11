@@ -45,6 +45,24 @@ func TestReportSelectionScreenViewRendersBaseCurrencyMenu(t *testing.T) {
 	}
 }
 
+// TestReportOutputFormatExplanationRejectsUnsupportedFormats verifies the
+// selection screen provides corrective copy before report generation starts.
+// Authored by: OpenCode
+func TestReportOutputFormatExplanationRejectsUnsupportedFormats(t *testing.T) {
+	t.Parallel()
+
+	if explanation := reportOutputFormatExplanation(reportmodel.ReportOutputFormatPDF); !strings.Contains(explanation, "one local A4 text PDF") {
+		t.Fatalf("unexpected PDF explanation: %q", explanation)
+	}
+	if explanation := reportOutputFormatExplanation(reportmodel.ReportOutputFormatMarkdown); !strings.Contains(explanation, "separate Annex 1 Markdown") {
+		t.Fatalf("unexpected Markdown explanation: %q", explanation)
+	}
+	var explanation = reportOutputFormatExplanation(reportmodel.ReportOutputFormat("html"))
+	if !strings.Contains(explanation, "Choose Markdown or PDF") {
+		t.Fatalf("unexpected unsupported-format explanation: %q", explanation)
+	}
+}
+
 // TestReportBusyScreenViewRendersSelectedBaseCurrency verifies the busy screen
 // keeps the selected report base currency visible during asynchronous work.
 // Authored by: OpenCode
@@ -77,6 +95,7 @@ func TestReportResultScreenViewRendersSelectedBaseCurrency(t *testing.T) {
 		2024,
 		reportmodel.CostBasisMethodFIFO,
 		reportmodel.ReportBaseCurrencyEUR,
+		reportmodel.ReportOutputFormatMarkdown,
 		time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC),
 	)
 	if err != nil {
@@ -86,9 +105,9 @@ func TestReportResultScreenViewRendersSelectedBaseCurrency(t *testing.T) {
 		"/tmp/Documents",
 		"ghostfolio-capital-gains-2024-fifo.md",
 		"/tmp/Documents/ghostfolio-capital-gains-2024-fifo.md",
+		reportmodel.ReportDocumentRoleMain,
+		reportmodel.ReportMediaTypeMarkdown,
 		time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC),
-		true,
-		"",
 	)
 	if outputErr != nil {
 		t.Fatalf("new report output file: %v", outputErr)
@@ -123,6 +142,7 @@ func TestReportResultScreenViewRendersFailureBaseCurrency(t *testing.T) {
 		2024,
 		reportmodel.CostBasisMethodFIFO,
 		reportmodel.ReportBaseCurrencyUSD,
+		reportmodel.ReportOutputFormatMarkdown,
 		time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC),
 	)
 	if err != nil {

@@ -3,7 +3,6 @@ package pdf
 import (
 	"bytes"
 	"fmt"
-	"strings"
 
 	"github.com/signintech/gopdf"
 )
@@ -33,15 +32,13 @@ var drawTableForGopdfDocument = func(table gopdf.TableLayout) error {
 	return table.DrawTable()
 }
 
-// gopdfDocument renders selectable text through gopdf while retaining extracted
-// report text comments for deterministic automated assertions.
+// gopdfDocument renders selectable text through gopdf.
 // Authored by: OpenCode
 type gopdfDocument struct {
 	pdf        gopdf.GoPdf
 	y          float64
 	pageWidth  float64
 	pageHeight float64
-	texts      []string
 	started    bool
 }
 
@@ -115,7 +112,6 @@ func (document *gopdfDocument) AddKeyValue(label string, value string) error {
 	if err := writeTextForGopdfDocument(document, valueText); err != nil {
 		return err
 	}
-	document.recordText(labelText + " " + valueText)
 	document.y += 14
 	return nil
 }
@@ -134,7 +130,6 @@ func (document *gopdfDocument) AddParagraph(text string) error {
 	if err := writeMultiCellForGopdfDocument(document, &gopdf.Rect{W: contentWide, H: 30}, sanitized); err != nil {
 		return err
 	}
-	document.recordText(sanitized)
 	document.y += 34
 	return nil
 }
@@ -182,7 +177,6 @@ func (document *gopdfDocument) AddTable(table pdfTable) error {
 func (document *gopdfDocument) AddAnnexPageBreak() error {
 	document.pdf.AddPage()
 	document.y = pageMargin
-	document.recordText("PAGE BREAK: Annex 1")
 	return nil
 }
 
@@ -200,7 +194,6 @@ func (document *gopdfDocument) addTextBlock(text string, font string, size float
 	if err := writeTextForGopdfDocument(document, sanitized); err != nil {
 		return err
 	}
-	document.recordText(sanitized)
 	document.y += verticalAdvance
 	return nil
 }
@@ -264,7 +257,6 @@ func (document *gopdfDocument) drawTableChunk(table pdfTable, columns []pdfColum
 	if err := drawTableForGopdfDocument(layout); err != nil {
 		return err
 	}
-	document.recordTable(columns, rows)
 	document.y += rowHeight*float64(len(rows)+1) + 12
 	return nil
 }
@@ -290,7 +282,6 @@ func (document *gopdfDocument) addTableContinuationPage(context string) error {
 		return err
 	}
 	document.y += 16
-	document.recordText(label)
 	return nil
 }
 
@@ -346,37 +337,10 @@ func printableWidthColumns(columns []pdfColumn) []pdfColumn {
 	return scaled
 }
 
-// recordTable records table headers and rows for deterministic test assertions.
-// Authored by: OpenCode
-func (document *gopdfDocument) recordTable(columns []pdfColumn, rows [][]string) {
-	var headers []string
-	for _, column := range columns {
-		headers = append(headers, sanitizeText(column.Header))
-	}
-	document.recordText(strings.Join(headers, "\t"))
-	for _, row := range rows {
-		document.recordText(strings.Join(sanitizeRow(row), "\t"))
-	}
-}
-
-// recordText appends one sanitized extract line.
-// Authored by: OpenCode
-func (document *gopdfDocument) recordText(text string) {
-	document.texts = append(document.texts, sanitizeText(text))
-}
-
-// Bytes returns the PDF byte payload with deterministic text comments for tests.
+// Bytes returns the concrete PDF byte payload.
 // Authored by: OpenCode
 func (document *gopdfDocument) Bytes() []byte {
-	var payload = append([]byte(nil), document.pdf.GetBytesPdf()...)
-	var comments bytes.Buffer
-	comments.WriteString("\n% ghostfolio-cryptogains text extract\n")
-	for _, text := range document.texts {
-		comments.WriteString("% ")
-		comments.WriteString(strings.ReplaceAll(text, "\n", " "))
-		comments.WriteByte('\n')
-	}
-	return append(payload, comments.Bytes()...)
+	return append([]byte(nil), document.pdf.GetBytesPdf()...)
 }
 
 // tableStyle returns the base table border style.

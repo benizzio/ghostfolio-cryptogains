@@ -37,13 +37,10 @@ func NewReportOutputFile(
 	documentsDirectory string,
 	filename string,
 	path string,
-	args ...any,
+	role ReportDocumentRole,
+	mediaType string,
+	savedAt time.Time,
 ) (ReportOutputFile, error) {
-	var role, mediaType, savedAt, argErr = parseReportOutputFileArgs(args)
-	if argErr != nil {
-		return ReportOutputFile{}, argErr
-	}
-
 	var outputFile = ReportOutputFile{
 		DocumentsDirectory: strings.TrimSpace(documentsDirectory),
 		Filename:           strings.TrimSpace(filename),
@@ -58,32 +55,6 @@ func NewReportOutputFile(
 	}
 
 	return outputFile, nil
-}
-
-// parseReportOutputFileArgs accepts the current role/media metadata and legacy
-// Markdown main output call sites that are migrated in later tasks.
-// Authored by: OpenCode
-func parseReportOutputFileArgs(args []any) (ReportDocumentRole, string, time.Time, error) {
-	if len(args) == 3 {
-		if savedAt, ok := args[0].(time.Time); ok {
-			return ReportDocumentRoleMain, ReportMediaTypeMarkdown, savedAt, nil
-		}
-		var role, roleOK = args[0].(ReportDocumentRole)
-		var mediaType, mediaTypeOK = args[1].(string)
-		var savedAt, timeOK = args[2].(time.Time)
-		if roleOK && mediaTypeOK && timeOK {
-			return role, mediaType, savedAt, nil
-		}
-	}
-	if len(args) == 5 {
-		var savedAt, ok = args[0].(time.Time)
-		if !ok {
-			return "", "", time.Time{}, fmt.Errorf("report output saved-at timestamp argument is required")
-		}
-		return ReportDocumentRoleMain, ReportMediaTypeMarkdown, savedAt, nil
-	}
-
-	return "", "", time.Time{}, fmt.Errorf("report output requires role, media type, and saved-at timestamp")
 }
 
 // Validate verifies one persisted-output outcome returned to runtime code.

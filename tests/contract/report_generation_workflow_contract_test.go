@@ -105,6 +105,7 @@ func TestReportGenerationWorkflowContract(t *testing.T) {
 			Request:      request,
 			OutputFormat: reportmodel.ReportOutputFormatPDF,
 			OutputFile:   outputFile,
+			OutputBundle: reportmodel.ReportOutputBundle{OutputFormat: reportmodel.ReportOutputFormatPDF, Files: []reportmodel.ReportOutputFile{outputFile}},
 		},
 	})
 	assertContains(t, result, "Report Result")
@@ -183,7 +184,7 @@ func TestReportBaseCurrencyChoiceContract(t *testing.T) {
 
 	var err error
 	for _, unsupported := range []reportmodel.ReportBaseCurrency{"", "GBP"} {
-		_, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, unsupported, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
+		_, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, unsupported, reportmodel.ReportOutputFormatMarkdown, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
 		if err == nil {
 			t.Fatalf("expected unsupported report base currency %q to fail request validation", unsupported)
 		}

@@ -192,7 +192,7 @@ func buildCalculatedReport(
 		aggregation.YearlyNetTotal,
 		aggregation.ReferenceEntries,
 		aggregation.DetailSections,
-		currencyBoundaryResult.ConversionAuditEntries,
+		nil,
 		currencyBoundaryResult.RateSources,
 	)
 	if reportErr != nil {

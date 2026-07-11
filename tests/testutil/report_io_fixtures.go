@@ -126,9 +126,7 @@ func DeterministicReportOutputFilenameFixture() ReportOutputFilenameFixture {
 	var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
 	var year = 2024
 	var method = reportmodel.CostBasisMethodFIFO
-	var timestampSlug = "2026-05-21_12-34-56"
-	var prefix = reportOutputFilenamePrefix(year, method, timestampSlug)
-	var annexPrefix = reportOutputAnnexFilenamePrefix(year, method, timestampSlug)
+	const timestampSlug = "2026-05-21_12-34-56"
 	const collisionSuffix = 2
 
 	return ReportOutputFilenameFixture{
@@ -136,13 +134,13 @@ func DeterministicReportOutputFilenameFixture() ReportOutputFilenameFixture {
 		CostBasisMethod:       method,
 		GeneratedAt:           generatedAt,
 		TimestampSlug:         timestampSlug,
-		MarkdownMainFilename:  prefix + ".md",
-		MarkdownAnnexFilename: annexPrefix + ".md",
-		PDFCombinedFilename:   prefix + ".pdf",
+		MarkdownMainFilename:  "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56.md",
+		MarkdownAnnexFilename: "ghostfolio-capital-gains-2024-fifo-annex-1-2026-05-21_12-34-56.md",
+		PDFCombinedFilename:   "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56.pdf",
 		CollisionSuffix:       collisionSuffix,
-		CollidedMarkdownMain:  fmt.Sprintf("%s-%d.md", prefix, collisionSuffix),
-		CollidedMarkdownAnnex: fmt.Sprintf("%s-%d.md", annexPrefix, collisionSuffix),
-		CollidedPDFCombined:   fmt.Sprintf("%s-%d.pdf", prefix, collisionSuffix),
+		CollidedMarkdownMain:  "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56-2.md",
+		CollidedMarkdownAnnex: "ghostfolio-capital-gains-2024-fifo-annex-1-2026-05-21_12-34-56-2.md",
+		CollidedPDFCombined:   "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56-2.pdf",
 	}
 }
 
@@ -455,18 +453,4 @@ func mustMkdirAll(t *testing.T, path string) {
 func escapeXDGDirValue(path string) string {
 	var escaped = strings.ReplaceAll(path, `\`, `\\`)
 	return strings.ReplaceAll(escaped, `"`, `\"`)
-}
-
-// reportOutputFilenamePrefix returns the deterministic main report filename stem
-// from the report-output contract.
-// Authored by: OpenCode
-func reportOutputFilenamePrefix(year int, method reportmodel.CostBasisMethod, timestampSlug string) string {
-	return fmt.Sprintf("ghostfolio-capital-gains-%d-%s-%s", year, method.FilenameSlug(), timestampSlug)
-}
-
-// reportOutputAnnexFilenamePrefix returns the deterministic Annex 1 filename
-// stem from the report-output contract.
-// Authored by: OpenCode
-func reportOutputAnnexFilenamePrefix(year int, method reportmodel.CostBasisMethod, timestampSlug string) string {
-	return fmt.Sprintf("ghostfolio-capital-gains-%d-%s-annex-1-%s", year, method.FilenameSlug(), timestampSlug)
 }

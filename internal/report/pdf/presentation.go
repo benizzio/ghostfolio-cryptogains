@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
 	textsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/text"
 )
 
@@ -41,39 +42,6 @@ func renderDisplayLabel(displayLabel string, assetIdentityKey string) string {
 	return "Unknown Asset"
 }
 
-// activityCurrencyColumn renders activity currency only for monetary rows.
-// Authored by: OpenCode
-func activityCurrencyColumn(row reportmodel.AssetActivityRow) string {
-	if strings.TrimSpace(row.ActivityCurrency) == "" {
-		return ""
-	}
-	if row.GrossValue == nil && row.FeeAmount == nil && row.UnitPrice == nil {
-		return ""
-	}
-	return sanitizeText(row.ActivityCurrency)
-}
-
-// conversionStatusColumn returns the report-facing conversion status label.
-// Authored by: OpenCode
-func conversionStatusColumn(row reportmodel.AssetActivityRow) (string, error) {
-	if activityCurrencyColumn(row) == "" {
-		return "", nil
-	}
-	if strings.TrimSpace(string(row.ConversionStatus)) != "" {
-		var label, err = reportmodel.RenderConversionStatusLabel(row.ConversionStatus)
-		if err != nil {
-			return "", err
-		}
-		return sanitizeText(label), nil
-	}
-	if strings.TrimSpace(row.ActivityCurrency) == strings.TrimSpace(row.CalculationCurrency) {
-		var label, _ = reportmodel.RenderConversionStatusLabel(reportmodel.ConversionStatusSameCurrency)
-		return sanitizeText(label), nil
-	}
-	var label, _ = reportmodel.RenderConversionStatusLabel(reportmodel.ConversionStatusConverted)
-	return sanitizeText(label), nil
-}
-
 // rateProviderLabel returns a report-facing provider label.
 // Authored by: OpenCode
 func rateProviderLabel(provider reportmodel.RateProviderID) string {
@@ -81,6 +49,17 @@ func rateProviderLabel(provider reportmodel.RateProviderID) string {
 		return sanitizeText("ECB Data Portal EXR")
 	}
 	return sanitizeText(reportmodel.RateProviderDisplayLabel(provider))
+}
+
+// conversionStatusColumn exposes shared conversion-status derivation to the
+// PDF renderer tests while retaining PDF text sanitization.
+// Authored by: OpenCode
+func conversionStatusColumn(row reportmodel.AssetActivityRow) (string, error) {
+	var label, err = presentation.ActivityConversionStatus(row)
+	if err != nil {
+		return "", err
+	}
+	return sanitizeText(label), nil
 }
 
 // sanitizeText redacts obvious secret-shaped fragments and normalizes one line.

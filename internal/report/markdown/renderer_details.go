@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/cockroachdb/apd/v3"
 )
@@ -96,61 +97,14 @@ func writeActivityBlock(builder *strings.Builder, section reportmodel.AssetDetai
 // writeActivityRow renders one priced or explanatory activity row.
 // Authored by: OpenCode
 func writeActivityRow(builder *strings.Builder, row reportmodel.AssetActivityRow) error {
-	var quantityText, err = decimalsupport.CanonicalString(row.Quantity)
+	var rendered, err = presentation.BuildActivityRow(row)
 	if err != nil {
-		return fmt.Errorf("render activity row %q quantity: %w", row.SourceID, err)
-	}
-	var unitPriceText string
-	unitPriceText, err = decimalsupport.CanonicalStringPointer(row.UnitPrice)
-	if err != nil {
-		return fmt.Errorf("render activity row %q unit price: %w", row.SourceID, err)
-	}
-	var grossValueText string
-	grossValueText, err = decimalsupport.CanonicalStringPointer(row.GrossValue)
-	if err != nil {
-		return fmt.Errorf("render activity row %q gross value: %w", row.SourceID, err)
-	}
-	var feeText string
-	feeText, err = decimalsupport.CanonicalStringPointer(row.FeeAmount)
-	if err != nil {
-		return fmt.Errorf("render activity row %q fee: %w", row.SourceID, err)
-	}
-	var basisAfterRowText string
-	basisAfterRowText, err = decimalsupport.CanonicalString(row.BasisAfterRow)
-	if err != nil {
-		return fmt.Errorf("render activity row %q basis after row: %w", row.SourceID, err)
-	}
-	var quantityAfterRowText string
-	quantityAfterRowText, err = decimalsupport.CanonicalString(row.QuantityAfterRow)
-	if err != nil {
-		return fmt.Errorf("render activity row %q quantity after row: %w", row.SourceID, err)
-	}
-
-	var activityTypeLabel, labelErr = reportmodel.RenderActivityTypeLabel(row)
-	if labelErr != nil {
-		return fmt.Errorf("render activity row %q type label: %w", row.SourceID, labelErr)
-	}
-	var conversionStatusText string
-	conversionStatusText, labelErr = conversionStatusColumn(row)
-	if labelErr != nil {
-		return fmt.Errorf("render activity row %q conversion status label: %w", row.SourceID, labelErr)
+		return err
 	}
 
 	fmt.Fprintf(builder,
 		"| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
-		row.OccurredAt.UTC().Format("2006-01-02 15:04:05"),
-		sanitizeInlineText(row.SourceID),
-		sanitizeInlineText(activityTypeLabel),
-		quantityText,
-		unitPriceText,
-		grossValueText,
-		feeText,
-		quantityAfterRowText,
-		basisAfterRowText,
-		activityCurrencyColumn(row),
-		calculationCurrencyLabel(row.CalculationCurrency),
-		conversionStatusText,
-		sanitizeInlineText(row.HoldingReductionExplanation),
+		rendered.Date, sanitizeInlineText(rendered.SourceID), sanitizeInlineText(rendered.ActivityType), rendered.Quantity, rendered.UnitPrice, rendered.GrossValue, rendered.Fee, rendered.QuantityAfterRow, rendered.BasisAfterRow, sanitizeInlineText(rendered.ActivityCurrency), sanitizeInlineText(rendered.CalculationCurrency), sanitizeInlineText(rendered.ConversionStatus), sanitizeInlineText(rendered.Note),
 	)
 	return nil
 }
@@ -179,58 +133,25 @@ func writeLiquidationBlock(builder *strings.Builder, section reportmodel.AssetDe
 // writeLiquidationRow renders one liquidation calculation row.
 // Authored by: OpenCode
 func writeLiquidationRow(builder *strings.Builder, liquidation reportmodel.LiquidationCalculation, fallbackCurrency string) error {
-	var disposedQuantityText, err = decimalsupport.CanonicalString(liquidation.DisposedQuantity)
+	var rendered, err = presentation.BuildLiquidationRow(liquidation, fallbackCurrency)
 	if err != nil {
-		return fmt.Errorf("render liquidation %q disposed quantity: %w", liquidation.SourceID, err)
-	}
-	var allocatedBasisText string
-	allocatedBasisText, err = decimalsupport.CanonicalString(liquidation.AllocatedBasis)
-	if err != nil {
-		return fmt.Errorf("render liquidation %q allocated basis: %w", liquidation.SourceID, err)
-	}
-	var proceedsText string
-	proceedsText, err = decimalsupport.CanonicalString(liquidation.NetLiquidationProceeds)
-	if err != nil {
-		return fmt.Errorf("render liquidation %q net proceeds: %w", liquidation.SourceID, err)
-	}
-	var gainOrLossText string
-	gainOrLossText, err = decimalsupport.CanonicalString(liquidation.GainOrLoss)
-	if err != nil {
-		return fmt.Errorf("render liquidation %q gain or loss: %w", liquidation.SourceID, err)
+		return err
 	}
 
 	fmt.Fprintf(builder,
 		"| %s | %s | %s | %s | %s | %s | %s |\n",
-		liquidation.OccurredAt.UTC().Format("2006-01-02 15:04:05"),
-		sanitizeInlineText(liquidation.SourceID),
-		disposedQuantityText,
-		allocatedBasisText,
-		proceedsText,
-		gainOrLossText,
-		calculationCurrencyLabelWithFallback(liquidation.CalculationCurrency, fallbackCurrency),
+		rendered.Date, sanitizeInlineText(rendered.SourceID), rendered.DisposedQuantity, rendered.AllocatedBasis, rendered.NetProceeds, rendered.GainOrLoss, sanitizeInlineText(rendered.CalculationCurrency),
 	)
 	return nil
 }
 
-// conversionStatusColumn classifies rendered priced activity rows without
-// exposing provider implementation details.
+// conversionStatusColumn exposes the shared conversion-status derivation to
+// existing Markdown renderer tests while preserving Markdown-specific escaping.
 // Authored by: OpenCode
 func conversionStatusColumn(row reportmodel.AssetActivityRow) (string, error) {
-	if activityCurrencyColumn(row) == "" {
-		return "", nil
+	var label, err = presentation.ActivityConversionStatus(row)
+	if err != nil {
+		return "", err
 	}
-	if strings.TrimSpace(string(row.ConversionStatus)) != "" {
-		var label, err = reportmodel.RenderConversionStatusLabel(row.ConversionStatus)
-		if err != nil {
-			return "", err
-		}
-		return sanitizeInlineText(label), nil
-	}
-	if strings.TrimSpace(row.ActivityCurrency) == strings.TrimSpace(row.CalculationCurrency) {
-		var label, _ = reportmodel.RenderConversionStatusLabel(reportmodel.ConversionStatusSameCurrency)
-		return sanitizeInlineText(label), nil
-	}
-
-	var label, _ = reportmodel.RenderConversionStatusLabel(reportmodel.ConversionStatusConverted)
 	return sanitizeInlineText(label), nil
 }

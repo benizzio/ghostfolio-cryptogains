@@ -33,104 +33,6 @@ type writeSyncCloser interface {
 	Close() error
 }
 
-// WriteReportDocument reserves a unique Markdown report filename inside the
-// user's Documents directory, writes the rendered content, and cleans up any
-// partial file when the write fails.
-//
-// Example:
-//
-//	document := reportmodel.ReportDocument{
-//		DocumentType:    reportmodel.ReportDocumentTypeMarkdown,
-//		Content:         "# Report\n",
-//		Year:            2024,
-//		CostBasisMethod: reportmodel.CostBasisMethodFIFO,
-//		GeneratedAt:     time.Now(),
-//	}
-//	outputFile, err := output.WriteReportDocument(document)
-//	if err != nil {
-//		panic(err)
-//	}
-//	_ = outputFile.Path
-//
-// The resulting filename follows the deterministic report naming convention and
-// uses `-2`, `-3`, and later suffixes when the same-second base name already
-// exists.
-// Authored by: OpenCode
-func WriteReportDocument(document reportmodel.ReportDocument) (reportmodel.ReportOutputFile, error) {
-	var savedAt = document.GeneratedAt
-	if savedAt.IsZero() {
-		savedAt = currentTime()
-		document.GeneratedAt = savedAt
-	}
-
-	if err := document.Validate(); err != nil {
-		return reportmodel.ReportOutputFile{}, err
-	}
-
-	var documentsDir, err = ResolveDocumentsDirectory()
-	if err != nil {
-		return reportmodel.ReportOutputFile{}, err
-	}
-
-	var info, statErr = statPath(documentsDir)
-	if statErr != nil {
-		return reportmodel.ReportOutputFile{}, wrapFailure(
-			FailureCategoryDocumentsDirectoryUnavailable,
-			fmt.Errorf("inspect documents directory %q: %w", documentsDir, statErr),
-		)
-	}
-	if !info.IsDir() {
-		return reportmodel.ReportOutputFile{}, wrapFailure(
-			FailureCategoryDocumentsDirectoryUnavailable,
-			fmt.Errorf("documents path %q is not a directory", documentsDir),
-		)
-	}
-
-	var filename, path, file, reserveErr = reserveReportFile(documentsDir, document.Year, document.CostBasisMethod, savedAt)
-	if reserveErr != nil {
-		return reportmodel.ReportOutputFile{}, reserveErr
-	}
-
-	var cleanupPath = true
-	defer func() {
-		if !cleanupPath {
-			return
-		}
-		_ = file.Close()
-		_ = removePath(path)
-	}()
-
-	if _, err = file.Write([]byte(document.Content)); err != nil {
-		return reportmodel.ReportOutputFile{}, wrapFailure(
-			FailureCategoryReportFileWriteFailed,
-			fmt.Errorf("write report file %q: %w", path, err),
-		)
-	}
-	if err = file.Sync(); err != nil {
-		return reportmodel.ReportOutputFile{}, wrapFailure(
-			FailureCategoryReportFileWriteFailed,
-			fmt.Errorf("sync report file %q: %w", path, err),
-		)
-	}
-	if err = file.Close(); err != nil {
-		return reportmodel.ReportOutputFile{}, wrapFailure(
-			FailureCategoryReportFileWriteFailed,
-			fmt.Errorf("close report file %q: %w", path, err),
-		)
-	}
-
-	cleanupPath = false
-
-	return reportmodel.NewReportOutputFile(
-		documentsDir,
-		filename,
-		path,
-		reportmodel.ReportDocumentRoleMain,
-		reportmodel.ReportMediaTypeMarkdown,
-		savedAt,
-	)
-}
-
 // WriteReportOutputBundle reserves and writes every rendered report document for
 // the selected output format as one success-or-cleanup operation.
 //
@@ -158,7 +60,7 @@ func WriteReportDocuments(outputFormat reportmodel.ReportOutputFormat, documents
 	if err := outputFormat.Validate(); err != nil {
 		return reportmodel.ReportOutputBundle{}, err
 	}
-	if err := validateBundleDocuments(outputFormat, documents); err != nil {
+	if err := reportmodel.ValidateRenderedDocuments(outputFormat, documents); err != nil {
 		return reportmodel.ReportOutputBundle{}, err
 	}
 

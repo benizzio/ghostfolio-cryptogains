@@ -58,50 +58,6 @@ type ReportRequestFixture struct {
 	RequestedAt        time.Time
 }
 
-// ReportAnnexFixture stores deterministic Annex 1 expected content with the
-// validated model shell required by calculated reports.
-// Authored by: OpenCode
-type ReportAnnexFixture struct {
-	Annex                          reportmodel.AuditAnnex
-	Title                          string
-	SectionOrder                   []reportmodel.AuditAnnexSection
-	PerAssetSections               []ExpectedPerAssetAuditSection
-	CurrencyConversionEntries      []reportmodel.ConversionAuditEntry
-	CurrencyConversionEmptyMessage string
-}
-
-// ExpectedPerAssetAuditSection stores one deterministic expected Annex 1 asset
-// section.
-// Authored by: OpenCode
-type ExpectedPerAssetAuditSection struct {
-	AssetIdentityKey string
-	DisplayLabel     string
-	Entries          []ExpectedAuditActivityEntry
-}
-
-// ExpectedAuditActivityEntry stores one deterministic expected Annex 1 activity
-// row or subsection.
-// Authored by: OpenCode
-type ExpectedAuditActivityEntry struct {
-	SourceID               string
-	OccurredAt             time.Time
-	ActivityType           syncmodel.ActivityType
-	Quantity               string
-	UnitPrice              string
-	GrossValue             string
-	FeeAmount              string
-	ActivityCurrency       string
-	CalculationCurrency    string
-	QuantityAfterActivity  string
-	BasisAfterActivity     string
-	FullLiquidationEvent   bool
-	AllocatedBasis         string
-	NetLiquidationProceeds string
-	GainOrLoss             string
-	ConversionStatus       reportmodel.ConversionStatus
-	Note                   string
-}
-
 // ReportConversionFixture stores deterministic report conversion audit evidence
 // for renderer, annex, and output contract tests.
 // Authored by: OpenCode
@@ -576,82 +532,6 @@ func DeterministicReportRequestFixture(outputFormat reportmodel.ReportOutputForm
 		ReportBaseCurrency: reportBaseCurrency,
 		OutputFormat:       outputFormat,
 		RequestedAt:        requestedAt,
-	}
-}
-
-// DeterministicReportAnnexFixture returns expected Annex 1 audit data tied to
-// DeterministicReportLedgerFixture's primary report year.
-//
-// Authored by: OpenCode
-func DeterministicReportAnnexFixture() ReportAnnexFixture {
-	var conversion = DeterministicReportConversionFixture()
-	var annex = reportmodel.DefaultAuditAnnex()
-
-	return ReportAnnexFixture{
-		Annex:        annex,
-		Title:        annex.Title,
-		SectionOrder: append([]reportmodel.AuditAnnexSection(nil), annex.SectionOrder...),
-		PerAssetSections: []ExpectedPerAssetAuditSection{
-			{
-				AssetIdentityKey: "asset-btc-001",
-				DisplayLabel:     "BTC",
-				Entries: []ExpectedAuditActivityEntry{
-					{
-						SourceID:              "btc-buy-2023-boundary-001",
-						OccurredAt:            time.Date(2024, time.January, 1, 1, 30, 0, 0, time.UTC),
-						ActivityType:          syncmodel.ActivityTypeBuy,
-						Quantity:              "2",
-						GrossValue:            "44000",
-						FeeAmount:             "20",
-						ActivityCurrency:      "USD",
-						CalculationCurrency:   "USD",
-						QuantityAfterActivity: "2",
-						BasisAfterActivity:    "44019.8",
-						ConversionStatus:      reportmodel.ConversionStatusConverted,
-						Note:                  "Converted asset-profile EUR evidence retained separately from selected USD calculation fields.",
-					},
-					{
-						SourceID:               "btc-sell-2024-zero-fee-001",
-						OccurredAt:             time.Date(2023, time.December, 31, 23, 15, 0, 0, time.UTC),
-						ActivityType:           syncmodel.ActivityTypeSell,
-						Quantity:               "1",
-						GrossValue:             "25000",
-						FeeAmount:              "0",
-						ActivityCurrency:       "USD",
-						CalculationCurrency:    "USD",
-						QuantityAfterActivity:  "1",
-						BasisAfterActivity:     "22009.9",
-						AllocatedBasis:         "22009.9",
-						NetLiquidationProceeds: "25000",
-						GainOrLoss:             "2990.1",
-						ConversionStatus:       reportmodel.ConversionStatusSameCurrency,
-					},
-				},
-			},
-			{
-				AssetIdentityKey: "asset-xrp-001",
-				DisplayLabel:     "XRP",
-				Entries: []ExpectedAuditActivityEntry{
-					{
-						SourceID:              "xrp-reduction-2024-001",
-						OccurredAt:            time.Date(2024, time.April, 1, 12, 0, 0, 0, time.UTC),
-						ActivityType:          syncmodel.ActivityTypeSell,
-						Quantity:              "200",
-						UnitPrice:             "0",
-						GrossValue:            "0",
-						FeeAmount:             "0",
-						ActivityCurrency:      "USD",
-						CalculationCurrency:   "USD",
-						QuantityAfterActivity: "800",
-						BasisAfterActivity:    "400.8",
-						ConversionStatus:      reportmodel.ConversionStatusSameCurrency,
-						Note:                  "Bridge migration holding reduction",
-					},
-				},
-			},
-		},
-		CurrencyConversionEntries:      []reportmodel.ConversionAuditEntry{conversion.ConversionEntry},
-		CurrencyConversionEmptyMessage: "No converted activity amounts were used for this report.",
 	}
 }
 

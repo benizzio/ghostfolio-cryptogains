@@ -729,7 +729,7 @@ func TestCalculateZeroPricedHoldingReductionDoesNotLookupCrossCurrencyRate(t *te
 	if len(service.requests) != 0 {
 		t.Fatalf("expected no lookup for zero-priced holding reduction, got %#v", service.requests)
 	}
-	if len(report.RateSources) != 0 || len(report.ConversionAuditEntries) != 0 {
+	if len(report.RateSources) != 0 || len(report.AuditAnnex.ConversionAuditEntries) != 0 {
 		t.Fatalf("expected no conversion artifacts for zero-priced holding reduction, got %#v", report)
 	}
 }
@@ -2368,6 +2368,7 @@ func validReportRequest(t *testing.T) reportmodel.ReportRequest {
 		2024,
 		reportmodel.CostBasisMethodFIFO,
 		reportmodel.ReportBaseCurrencyUSD,
+		reportmodel.ReportOutputFormatMarkdown,
 		time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
 	)
 	if err != nil {

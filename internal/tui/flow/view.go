@@ -168,6 +168,7 @@ func (m *Model) viewReportSelectionScreen() string {
 		SelectedBaseCurrencyIndex: m.report.BaseCurrencyIndex,
 		OutputFormatItems:         m.reportOutputFormatItems(),
 		SelectedOutputFormatIndex: m.report.OutputFormatIndex,
+		SelectedOutputFormat:      m.report.SelectedOutputFormat,
 		MethodExplanation:         reportMethodForIndex(m.report.MethodIndex).Explanation(),
 		MenuItems:                 m.reportSelectionMenuItems(),
 		SelectedAction:            m.report.ActionIndex,

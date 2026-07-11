@@ -15,18 +15,31 @@ type fontLoader interface {
 	AddTTFFont(name string, data []byte) error
 }
 
-// pdfLayoutDocument is the complete structured document seam used by Render.
+// pdfContentLayout supplies report content operations to main-report renderers.
 // Authored by: OpenCode
-type pdfLayoutDocument interface {
-	pdfDocumentStarter
-	fontLoader
+type pdfContentLayout interface {
 	AddTitle(text string) error
 	AddSectionHeading(text string) error
 	AddSubsectionHeading(text string) error
 	AddKeyValue(label string, value string) error
 	AddParagraph(text string) error
 	AddTable(table pdfTable) error
+}
+
+// pdfAnnexLayout supplies content layout and the Annex-specific page break.
+// Authored by: OpenCode
+type pdfAnnexLayout interface {
+	pdfContentLayout
 	AddAnnexPageBreak() error
+}
+
+// pdfLayoutDocument aggregates lifecycle and content operations for renderer
+// orchestration only.
+// Authored by: OpenCode
+type pdfLayoutDocument interface {
+	pdfDocumentStarter
+	fontLoader
+	pdfAnnexLayout
 	Bytes() []byte
 }
 

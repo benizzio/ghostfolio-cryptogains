@@ -118,7 +118,7 @@ func TestMarkdownReportRateSourceSummaryAggregatesByProvider(t *testing.T) {
 	secondEvidence.RateDate = time.Date(2024, time.January, 2, 0, 0, 0, 0, time.Local)
 	secondEvidence.RateValue = mustContractDecimal("1.16")
 	report.RateSources = append(report.RateSources, secondEvidence)
-	report.ConversionAuditEntries = append(report.ConversionAuditEntries, contractConversionAuditEntry(
+	report.AuditAnnex.ConversionAuditEntries = append(report.AuditAnnex.ConversionAuditEntries, contractConversionAuditEntry(
 		"gbp-buy-2024-001",
 		"ETH",
 		"GBP",
@@ -259,11 +259,16 @@ func TestMarkdownReportOutputFileContract(t *testing.T) {
 		t.Fatalf("render markdown report: %v", err)
 	}
 
-	var outputFile reportmodel.ReportOutputFile
-	outputFile, err = reportoutput.WriteReportDocument(document)
-	if err != nil {
-		t.Fatalf("write markdown report document: %v", err)
+	var documents, renderErr = reportmarkdown.RenderDocuments(report)
+	if renderErr != nil {
+		t.Fatalf("render Markdown report bundle: %v", renderErr)
 	}
+	var outputBundle reportmodel.ReportOutputBundle
+	outputBundle, err = reportoutput.WriteReportDocuments(reportmodel.ReportOutputFormatMarkdown, documents)
+	if err != nil {
+		t.Fatalf("write Markdown report bundle: %v", err)
+	}
+	var outputFile = outputBundle.Files[0]
 
 	if outputFile.Filename != "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56.md" {
 		t.Fatalf("unexpected output filename: %q", outputFile.Filename)
@@ -371,7 +376,7 @@ func contractMarkdownReportFixture(reportCalculationCurrency string) reportmodel
 					HoldingReductionExplanation: "custody transfer",
 				}},
 			}},
-		ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{
+		AuditAnnex: reportmodel.AuditAnnex{Title: reportmodel.AuditAnnexTitle(), SectionOrder: reportmodel.RequiredAuditAnnexSectionOrder(), ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{
 			SourceID:           "btc-sell-2024-001",
 			AssetLabel:         "BTC",
 			ActivityDate:       time.Date(2024, time.January, 1, 0, 15, 0, 0, time.Local),
@@ -387,7 +392,7 @@ func contractMarkdownReportFixture(reportCalculationCurrency string) reportmodel
 				contractConvertedActivityAmount(reportmodel.ConvertedAmountKindGrossValue, "27000", "25000"),
 				contractConvertedActivityAmount(reportmodel.ConvertedAmountKindFeeAmount, "0", "0"),
 			},
-		}},
+		}}},
 		RateSources: []reportmodel.ExchangeRateEvidence{{
 			SourceCurrency:   "USD",
 			BaseCurrency:     reportmodel.ReportBaseCurrencyEUR,

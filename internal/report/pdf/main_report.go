@@ -5,13 +5,14 @@ import (
 	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/cockroachdb/apd/v3"
 )
 
 // renderMainReport renders the main report through structured PDF operations.
 // Authored by: OpenCode
-func renderMainReport(document pdfLayoutDocument, report reportmodel.CapitalGainsReport) error {
+func renderMainReport(document pdfContentLayout, report reportmodel.CapitalGainsReport) error {
 	if document == nil {
 		return fmt.Errorf("pdf layout document is required")
 	}
@@ -49,7 +50,7 @@ func renderMainReport(document pdfLayoutDocument, report reportmodel.CapitalGain
 
 // renderSummarySection renders non-zero summary rows and the yearly total.
 // Authored by: OpenCode
-func renderSummarySection(document pdfLayoutDocument, report reportmodel.CapitalGainsReport, calculationCurrency string) error {
+func renderSummarySection(document pdfContentLayout, report reportmodel.CapitalGainsReport, calculationCurrency string) error {
 	if err := document.AddSectionHeading("Gains-And-Losses Summary"); err != nil {
 		return err
 	}
@@ -96,7 +97,7 @@ func renderSummarySection(document pdfLayoutDocument, report reportmodel.Capital
 
 // renderRateSourceSection renders provider-level rate source evidence.
 // Authored by: OpenCode
-func renderRateSourceSection(document pdfLayoutDocument, report reportmodel.CapitalGainsReport) error {
+func renderRateSourceSection(document pdfContentLayout, report reportmodel.CapitalGainsReport) error {
 	if err := document.AddSectionHeading("Rate Source Summary"); err != nil {
 		return err
 	}
@@ -132,7 +133,7 @@ func renderRateSourceSection(document pdfLayoutDocument, report reportmodel.Capi
 
 // renderReferenceSection renders the historical full-liquidation reference rows.
 // Authored by: OpenCode
-func renderReferenceSection(document pdfLayoutDocument, report reportmodel.CapitalGainsReport) error {
+func renderReferenceSection(document pdfContentLayout, report reportmodel.CapitalGainsReport) error {
 	if err := document.AddSectionHeading("Reference Section"); err != nil {
 		return err
 	}
@@ -161,36 +162,57 @@ func renderReferenceSection(document pdfLayoutDocument, report reportmodel.Capit
 
 // renderDetailSections renders asset detail sections from report-domain rows.
 // Authored by: OpenCode
-func renderDetailSections(document pdfLayoutDocument, report reportmodel.CapitalGainsReport, calculationCurrency string) error {
+func renderDetailSections(document pdfContentLayout, report reportmodel.CapitalGainsReport, calculationCurrency string) error {
 	for _, section := range report.DetailSections {
-		if err := document.AddSectionHeading("Asset Detail: " + renderDisplayLabel(section.DisplayLabel, section.AssetIdentityKey)); err != nil {
+		if err := renderDetailSection(document, section, calculationCurrency); err != nil {
 			return err
 		}
-		if len(section.ActivityRows) == 0 {
-			if err := renderPositionBlock(document, "Historical Position", section.ClosingQuantity, section.ClosingCostBasis, section.CalculationCurrency, calculationCurrency); err != nil {
-				return fmt.Errorf("render historical position for %q: %w", section.AssetIdentityKey, err)
-			}
-			continue
-		}
-		if err := renderPositionBlock(document, "Opening Position", section.OpeningQuantity, section.OpeningCostBasis, section.CalculationCurrency, calculationCurrency); err != nil {
-			return fmt.Errorf("render opening position for %q: %w", section.AssetIdentityKey, err)
-		}
-		if err := renderActivityRows(document, section); err != nil {
-			return fmt.Errorf("render in-year activity for %q: %w", section.AssetIdentityKey, err)
-		}
-		if err := renderLiquidationRows(document, section, calculationCurrency); err != nil {
-			return fmt.Errorf("render liquidation calculations for %q: %w", section.AssetIdentityKey, err)
-		}
-		if err := renderPositionBlock(document, "Closing Position", section.ClosingQuantity, section.ClosingCostBasis, section.CalculationCurrency, calculationCurrency); err != nil {
-			return fmt.Errorf("render closing position for %q: %w", section.AssetIdentityKey, err)
-		}
+	}
+	return nil
+}
+
+// renderDetailSection renders one historical or active asset detail section.
+// Authored by: OpenCode
+func renderDetailSection(document pdfContentLayout, section reportmodel.AssetDetailSection, calculationCurrency string) error {
+	if err := document.AddSectionHeading("Asset Detail: " + renderDisplayLabel(section.DisplayLabel, section.AssetIdentityKey)); err != nil {
+		return err
+	}
+	if len(section.ActivityRows) == 0 {
+		return renderHistoricalDetailSection(document, section, calculationCurrency)
+	}
+	return renderActiveDetailSection(document, section, calculationCurrency)
+}
+
+// renderHistoricalDetailSection renders an asset that has no report-year activity.
+// Authored by: OpenCode
+func renderHistoricalDetailSection(document pdfContentLayout, section reportmodel.AssetDetailSection, currency string) error {
+	if err := renderPositionBlock(document, "Historical Position", section.ClosingQuantity, section.ClosingCostBasis, section.CalculationCurrency, currency); err != nil {
+		return fmt.Errorf("render historical position for %q: %w", section.AssetIdentityKey, err)
+	}
+	return nil
+}
+
+// renderActiveDetailSection renders all normal activity, liquidation, and closing blocks.
+// Authored by: OpenCode
+func renderActiveDetailSection(document pdfContentLayout, section reportmodel.AssetDetailSection, currency string) error {
+	if err := renderPositionBlock(document, "Opening Position", section.OpeningQuantity, section.OpeningCostBasis, section.CalculationCurrency, currency); err != nil {
+		return fmt.Errorf("render opening position for %q: %w", section.AssetIdentityKey, err)
+	}
+	if err := renderActivityRows(document, section); err != nil {
+		return fmt.Errorf("render in-year activity for %q: %w", section.AssetIdentityKey, err)
+	}
+	if err := renderLiquidationRows(document, section, currency); err != nil {
+		return fmt.Errorf("render liquidation calculations for %q: %w", section.AssetIdentityKey, err)
+	}
+	if err := renderPositionBlock(document, "Closing Position", section.ClosingQuantity, section.ClosingCostBasis, section.CalculationCurrency, currency); err != nil {
+		return fmt.Errorf("render closing position for %q: %w", section.AssetIdentityKey, err)
 	}
 	return nil
 }
 
 // renderPositionBlock renders one asset position block with styled labels.
 // Authored by: OpenCode
-func renderPositionBlock(document pdfLayoutDocument, heading string, quantity apd.Decimal, basis apd.Decimal, sectionCurrency string, fallbackCurrency string) error {
+func renderPositionBlock(document pdfContentLayout, heading string, quantity apd.Decimal, basis apd.Decimal, sectionCurrency string, fallbackCurrency string) error {
 	if err := document.AddSubsectionHeading(heading); err != nil {
 		return err
 	}
@@ -214,7 +236,7 @@ func renderPositionBlock(document pdfLayoutDocument, heading string, quantity ap
 
 // renderActivityRows renders in-year asset activity as a table.
 // Authored by: OpenCode
-func renderActivityRows(document pdfLayoutDocument, section reportmodel.AssetDetailSection) error {
+func renderActivityRows(document pdfContentLayout, section reportmodel.AssetDetailSection) error {
 	var rows [][]string
 	for _, row := range section.ActivityRows {
 		var rendered, err = renderActivityRow(row)
@@ -249,64 +271,18 @@ func renderActivityRows(document pdfLayoutDocument, section reportmodel.AssetDet
 // renderActivityRow formats one in-year activity row for a PDF table.
 // Authored by: OpenCode
 func renderActivityRow(row reportmodel.AssetActivityRow) ([]string, error) {
-	var quantityText, err = decimalsupport.CanonicalString(row.Quantity)
+	var rendered, err = presentation.BuildActivityRow(row)
 	if err != nil {
-		return nil, fmt.Errorf("render activity row %q quantity: %w", row.SourceID, err)
-	}
-	var unitPriceText string
-	unitPriceText, err = decimalsupport.CanonicalStringPointer(row.UnitPrice)
-	if err != nil {
-		return nil, fmt.Errorf("render activity row %q unit price: %w", row.SourceID, err)
-	}
-	var grossValueText string
-	grossValueText, err = decimalsupport.CanonicalStringPointer(row.GrossValue)
-	if err != nil {
-		return nil, fmt.Errorf("render activity row %q gross value: %w", row.SourceID, err)
-	}
-	var feeText string
-	feeText, err = decimalsupport.CanonicalStringPointer(row.FeeAmount)
-	if err != nil {
-		return nil, fmt.Errorf("render activity row %q fee: %w", row.SourceID, err)
-	}
-	var basisAfterRowText string
-	basisAfterRowText, err = decimalsupport.CanonicalString(row.BasisAfterRow)
-	if err != nil {
-		return nil, fmt.Errorf("render activity row %q basis after row: %w", row.SourceID, err)
-	}
-	var quantityAfterRowText string
-	quantityAfterRowText, err = decimalsupport.CanonicalString(row.QuantityAfterRow)
-	if err != nil {
-		return nil, fmt.Errorf("render activity row %q quantity after row: %w", row.SourceID, err)
-	}
-	var activityTypeLabel, labelErr = reportmodel.RenderActivityTypeLabel(row)
-	if labelErr != nil {
-		return nil, fmt.Errorf("render activity row %q type label: %w", row.SourceID, labelErr)
-	}
-	var conversionStatusText string
-	conversionStatusText, labelErr = conversionStatusColumn(row)
-	if labelErr != nil {
-		return nil, fmt.Errorf("render activity row %q conversion status label: %w", row.SourceID, labelErr)
+		return nil, err
 	}
 	return []string{
-		row.OccurredAt.UTC().Format("2006-01-02 15:04:05"),
-		sanitizeText(row.SourceID),
-		sanitizeText(activityTypeLabel),
-		quantityText,
-		unitPriceText,
-		grossValueText,
-		feeText,
-		quantityAfterRowText,
-		basisAfterRowText,
-		activityCurrencyColumn(row),
-		calculationCurrencyLabel(row.CalculationCurrency),
-		conversionStatusText,
-		sanitizeText(row.HoldingReductionExplanation),
+		rendered.Date, sanitizeText(rendered.SourceID), sanitizeText(rendered.ActivityType), rendered.Quantity, rendered.UnitPrice, rendered.GrossValue, rendered.Fee, rendered.QuantityAfterRow, rendered.BasisAfterRow, sanitizeText(rendered.ActivityCurrency), sanitizeText(rendered.CalculationCurrency), sanitizeText(rendered.ConversionStatus), sanitizeText(rendered.Note),
 	}, nil
 }
 
 // renderLiquidationRows renders priced liquidation rows when present.
 // Authored by: OpenCode
-func renderLiquidationRows(document pdfLayoutDocument, section reportmodel.AssetDetailSection, fallbackCurrency string) error {
+func renderLiquidationRows(document pdfContentLayout, section reportmodel.AssetDetailSection, fallbackCurrency string) error {
 	if len(section.LiquidationSummaries) == 0 {
 		return nil
 	}
@@ -337,32 +313,11 @@ func renderLiquidationRows(document pdfLayoutDocument, section reportmodel.Asset
 // renderLiquidationRow formats one liquidation calculation row.
 // Authored by: OpenCode
 func renderLiquidationRow(liquidation reportmodel.LiquidationCalculation, fallbackCurrency string) ([]string, error) {
-	var disposedQuantityText, err = decimalsupport.CanonicalString(liquidation.DisposedQuantity)
+	var rendered, err = presentation.BuildLiquidationRow(liquidation, fallbackCurrency)
 	if err != nil {
-		return nil, fmt.Errorf("render liquidation %q disposed quantity: %w", liquidation.SourceID, err)
-	}
-	var allocatedBasisText string
-	allocatedBasisText, err = decimalsupport.CanonicalString(liquidation.AllocatedBasis)
-	if err != nil {
-		return nil, fmt.Errorf("render liquidation %q allocated basis: %w", liquidation.SourceID, err)
-	}
-	var proceedsText string
-	proceedsText, err = decimalsupport.CanonicalString(liquidation.NetLiquidationProceeds)
-	if err != nil {
-		return nil, fmt.Errorf("render liquidation %q net proceeds: %w", liquidation.SourceID, err)
-	}
-	var gainOrLossText string
-	gainOrLossText, err = decimalsupport.CanonicalString(liquidation.GainOrLoss)
-	if err != nil {
-		return nil, fmt.Errorf("render liquidation %q gain or loss: %w", liquidation.SourceID, err)
+		return nil, err
 	}
 	return []string{
-		liquidation.OccurredAt.UTC().Format("2006-01-02 15:04:05"),
-		sanitizeText(liquidation.SourceID),
-		disposedQuantityText,
-		allocatedBasisText,
-		proceedsText,
-		gainOrLossText,
-		calculationCurrencyLabelWithFallback(liquidation.CalculationCurrency, fallbackCurrency),
+		rendered.Date, sanitizeText(rendered.SourceID), rendered.DisposedQuantity, rendered.AllocatedBasis, rendered.NetProceeds, rendered.GainOrLoss, sanitizeText(rendered.CalculationCurrency),
 	}, nil
 }

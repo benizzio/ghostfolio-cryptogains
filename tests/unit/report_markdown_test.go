@@ -151,6 +151,7 @@ func populatedMarkdownReportFixture() reportmodel.CapitalGainsReport {
 			},
 		},
 		YearlyNetTotal: mustMarkdownDecimal(nil, "1240.500"),
+		AuditAnnex:     reportmodel.DefaultAuditAnnex(),
 		ReferenceEntries: []reportmodel.ReferenceLiquidationEntry{
 			{
 				AssetIdentityKey:                   "asset-eth",
@@ -234,6 +235,7 @@ func emptyMarkdownReportFixture() reportmodel.CapitalGainsReport {
 		GeneratedAt:               time.Date(2026, time.May, 21, 12, 34, 56, 0, time.Local),
 		ReportCalculationCurrency: "USD",
 		YearlyNetTotal:            mustMarkdownDecimal(nil, "0.000"),
+		AuditAnnex:                reportmodel.DefaultAuditAnnex(),
 	}
 }
 

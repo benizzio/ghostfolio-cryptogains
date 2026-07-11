@@ -2,16 +2,14 @@ package pdf
 
 import (
 	"fmt"
-	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
-	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
-	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
 )
 
 // renderAnnex renders Annex 1 after the required PDF page break.
 // Authored by: OpenCode
-func renderAnnex(document pdfLayoutDocument, annex reportmodel.AuditAnnex) error {
+func renderAnnex(document pdfContentLayout, annex reportmodel.AuditAnnex) error {
 	if document == nil {
 		return fmt.Errorf("pdf layout document is required")
 	}
@@ -32,7 +30,7 @@ func renderAnnex(document pdfLayoutDocument, annex reportmodel.AuditAnnex) error
 
 // renderAnnexPerAssetAudit renders the Detailed Per-Asset Audit Report section.
 // Authored by: OpenCode
-func renderAnnexPerAssetAudit(document pdfLayoutDocument, annex reportmodel.AuditAnnex) error {
+func renderAnnexPerAssetAudit(document pdfContentLayout, annex reportmodel.AuditAnnex) error {
 	if err := document.AddSectionHeading("Detailed Per-Asset Audit Report"); err != nil {
 		return err
 	}
@@ -85,86 +83,18 @@ func renderAnnexPerAssetAudit(document pdfLayoutDocument, annex reportmodel.Audi
 // renderAnnexActivityRow formats one detailed audit activity row for a PDF table.
 // Authored by: OpenCode
 func renderAnnexActivityRow(entry reportmodel.AuditActivityEntry) ([]string, error) {
-	var quantity, err = decimalsupport.CanonicalString(entry.Quantity)
+	var rendered, err = presentation.BuildAnnexActivityRow(entry)
 	if err != nil {
-		return nil, fmt.Errorf("quantity: %w", err)
-	}
-	var unitPrice string
-	unitPrice, err = decimalsupport.CanonicalStringPointer(entry.UnitPrice)
-	if err != nil {
-		return nil, fmt.Errorf("unit price: %w", err)
-	}
-	var grossValue string
-	grossValue, err = decimalsupport.CanonicalStringPointer(entry.GrossValue)
-	if err != nil {
-		return nil, fmt.Errorf("gross value: %w", err)
-	}
-	var fee string
-	fee, err = decimalsupport.CanonicalStringPointer(entry.FeeAmount)
-	if err != nil {
-		return nil, fmt.Errorf("fee: %w", err)
-	}
-	var quantityAfter string
-	quantityAfter, err = decimalsupport.CanonicalString(entry.QuantityAfterActivity)
-	if err != nil {
-		return nil, fmt.Errorf("quantity after activity: %w", err)
-	}
-	var basisAfter string
-	basisAfter, err = decimalsupport.CanonicalString(entry.BasisAfterActivity)
-	if err != nil {
-		return nil, fmt.Errorf("basis after activity: %w", err)
-	}
-	var allocatedBasis string
-	allocatedBasis, err = decimalsupport.CanonicalStringPointer(entry.AllocatedBasis)
-	if err != nil {
-		return nil, fmt.Errorf("allocated basis: %w", err)
-	}
-	var proceeds string
-	proceeds, err = decimalsupport.CanonicalStringPointer(entry.NetLiquidationProceeds)
-	if err != nil {
-		return nil, fmt.Errorf("net liquidation proceeds: %w", err)
-	}
-	var gainOrLoss string
-	gainOrLoss, err = decimalsupport.CanonicalStringPointer(entry.GainOrLoss)
-	if err != nil {
-		return nil, fmt.Errorf("gain or loss: %w", err)
-	}
-	var activityTypeLabel string
-	activityTypeLabel, err = reportmodel.RenderAuditActivityTypeLabel(entry)
-	if err != nil {
-		return nil, fmt.Errorf("activity type label: %w", err)
-	}
-	var conversionStatus string
-	if strings.TrimSpace(string(entry.ConversionStatus)) != "" {
-		conversionStatus, err = reportmodel.RenderConversionStatusLabel(entry.ConversionStatus)
-		if err != nil {
-			return nil, fmt.Errorf("conversion status label: %w", err)
-		}
+		return nil, err
 	}
 	return []string{
-		entry.OccurredAt.UTC().Format("2006-01-02 15:04:05"),
-		sanitizeText(entry.SourceID),
-		sanitizeText(activityTypeLabel),
-		quantity,
-		unitPrice,
-		grossValue,
-		fee,
-		sanitizeText(entry.ActivityCurrency),
-		sanitizeText(entry.CalculationCurrency),
-		quantityAfter,
-		basisAfter,
-		fmt.Sprintf("%t", entry.FullLiquidationEvent),
-		allocatedBasis,
-		proceeds,
-		gainOrLoss,
-		sanitizeText(conversionStatus),
-		sanitizeText(entry.Note),
+		rendered.Date, sanitizeText(rendered.SourceID), sanitizeText(rendered.ActivityType), rendered.Quantity, rendered.UnitPrice, rendered.GrossValue, rendered.Fee, sanitizeText(rendered.ActivityCurrency), sanitizeText(rendered.CalculationCurrency), rendered.QuantityAfter, rendered.BasisAfter, rendered.FullLiquidationEvent, rendered.AllocatedBasis, rendered.NetProceeds, rendered.GainOrLoss, sanitizeText(rendered.ConversionStatus), sanitizeText(rendered.Note),
 	}, nil
 }
 
 // renderAnnexConversionAudit renders Annex 1 currency conversion evidence.
 // Authored by: OpenCode
-func renderAnnexConversionAudit(document pdfLayoutDocument, annex reportmodel.AuditAnnex) error {
+func renderAnnexConversionAudit(document pdfContentLayout, annex reportmodel.AuditAnnex) error {
 	if err := document.AddSectionHeading("Currency Conversion Audit"); err != nil {
 		return err
 	}
@@ -202,51 +132,9 @@ func renderAnnexConversionAudit(document pdfLayoutDocument, annex reportmodel.Au
 // renderConversionAuditRow formats one conversion audit row.
 // Authored by: OpenCode
 func renderConversionAuditRow(index int, entry reportmodel.ConversionAuditEntry) ([]string, error) {
-	var rateValue, err = decimalsupport.CanonicalString(entry.RateValue)
-	if err != nil {
-		return nil, fmt.Errorf("render conversion audit entry %d rate value: %w", index, err)
-	}
-	var convertedAmounts string
-	convertedAmounts, err = renderGroupedConvertedAmounts(index, entry.Amounts)
+	var row, err = presentation.BuildConversionAuditRow(index, entry)
 	if err != nil {
 		return nil, err
 	}
-	var quoteDirection string
-	quoteDirection, err = reportmodel.RenderQuoteDirectionLabel(entry.QuoteDirection)
-	if err != nil {
-		return nil, fmt.Errorf("render conversion audit entry %d quote direction: %w", index, err)
-	}
-	return []string{
-		datesupport.FormatCalendarDate(entry.ActivityDate),
-		sanitizeText(entry.SourceID),
-		sanitizeText(entry.AssetLabel),
-		datesupport.FormatCalendarDate(entry.RateDate),
-		sanitizeText(entry.SourceCurrency),
-		sanitizeText(entry.ReportBaseCurrency.Label()),
-		convertedAmounts,
-		sanitizeText(quoteDirection),
-		rateValue,
-	}, nil
-}
-
-// renderGroupedConvertedAmounts formats non-zero converted amount evidence.
-// Authored by: OpenCode
-func renderGroupedConvertedAmounts(entryIndex int, amounts []reportmodel.ConvertedActivityAmount) (string, error) {
-	var rendered []string
-	for amountIndex, amount := range amounts {
-		if amount.OriginalAmount.Sign() == 0 && amount.ConvertedAmount.Sign() == 0 {
-			continue
-		}
-		var originalAmount, err = decimalsupport.CanonicalString(amount.OriginalAmount)
-		if err != nil {
-			return "", fmt.Errorf("render conversion audit entry %d amount %d original amount: %w", entryIndex, amountIndex, err)
-		}
-		var convertedAmount string
-		convertedAmount, err = decimalsupport.CanonicalString(amount.ConvertedAmount)
-		if err != nil {
-			return "", fmt.Errorf("render conversion audit entry %d amount %d converted amount: %w", entryIndex, amountIndex, err)
-		}
-		rendered = append(rendered, fmt.Sprintf("%s: %s -> %s", sanitizeText(string(amount.AmountKind)), originalAmount, convertedAmount))
-	}
-	return strings.Join(rendered, "; "), nil
+	return sanitizeRow([]string{row.Date, row.SourceID, row.Asset, row.RateDate, row.SourceCurrency, row.ReportBaseCurrency, row.ConvertedAmounts, row.QuoteDirection, row.RateValue}), nil
 }

@@ -72,7 +72,6 @@ type CapitalGainsReport struct {
 	YearlyNetTotal            apd.Decimal
 	ReferenceEntries          []ReferenceLiquidationEntry
 	DetailSections            []AssetDetailSection
-	ConversionAuditEntries    []ConversionAuditEntry
 	RateSources               []ExchangeRateEvidence
 	AuditAnnex                AuditAnnex
 }
