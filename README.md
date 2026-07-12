@@ -19,16 +19,66 @@ Supported runtime flags:
 ## Verification
 
 ```bash
+# Isolated package behavior
+make test-unit
+# Externally visible workflows and storage
+make test-contract
+# Cross-package offline workflows
+make test-integration
+# Synthetic financial oracle datasets
+make test-empirical
+# Repository-local tool behavior
+make test-tools
+# Aggregate deterministic offline verification
 make test
+
+# Isolated package diagnostic profile
+make coverage-unit
+# Workflow and storage diagnostic profile
+make coverage-contract
+# Cross-package offline diagnostic profile
+make coverage-integration
+# Financial oracle dataset diagnostic profile
+make coverage-empirical
+# Repository-local tool diagnostic profile
+make coverage-tools
+# Canonical production coverage enforcement
 make coverage
+
+# Tagged 10,000-activity resource scenarios
+make test-performance
+
+# Opt-in live-network integration checks
+make test-external-integration
+# Live-network integration diagnostic profile
+make coverage-external-integration
+
+# Changed Go and module source scanning
 make quality QUALITY_BASE_REF=origin/main
-GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1 go test ./tests/integration -run TestReportPerformanceFlowLargeHistoryFixture -count=1 -v
 ```
 
-`make coverage` writes `dist/coverage/coverage.out` and `dist/coverage/coverage.xml` using the maintained coverage gate configuration in `.cov.json`.
-The coverage run instruments project-owned packages from `cmd/` and `internal/` so execution driven by contract and integration tests counts toward the repository coverage gate.
+`make test` is the exact deterministic aggregate of `test-unit`, `test-contract`, `test-integration`, `test-empirical`, and `test-tools`. It excludes external integration and performance.
+
+| Target | Scope and boundary |
+| --- | --- |
+| `make test-unit` | `./cmd/...`, `./internal/...`, and `./tests/unit`; deterministic and offline. |
+| `make test-contract` | `tests/contract`; deterministic offline external contracts. |
+| `make test-integration` | `tests/integration`; deterministic cross-package flows with no live provider network. |
+| `make test-empirical` | `tests/empirical/...` against committed synthetic datasets and golden fixtures; ordinary execution is read-only. |
+| `make test-tools` | Ordinary `tools/empiricaloracle` tests; no oracle regeneration or download. |
+| `make test-performance` | Only `./tests/performance`, with `-tags=performance -count=1 -v -parallel=1 -timeout=10m`; deterministic local-fixture scenarios with no live provider network. It provides timing, responsiveness, bounded-lookup, and resource evidence. |
+| `make test-external-integration` | Opt-in live ECB/Fed checks in `tests/externalintegration`; excluded from pull-request CI. |
+
+`tests/performance` is excluded from `make test`, `make coverage`, and ordinary `go test ./...`. It has no coverage target, profile, CI coverage job, or coverage context, and performance evidence must never be merged into canonical coverage.
+
+Coverage leaf artifacts are `unit.out`, `contract.out`, `integration.out`, `empirical.out`, `tools.out`, and `external-integration.out` under `dist/coverage/`. They are diagnostic only and do not run `coveragegate`; external-integration coverage is live opt-in.
+`make coverage` clears and writes `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`. It uses deterministic unit, contract, integration, and empirical drivers with a production denominator limited to `cmd/` and `internal/`; `coveragegate` enforces the canonical 100% statement, global line, global branch, per-file line, and per-file branch requirements. Tool coverage runs separately and does not expand that denominator. External integration and performance are excluded.
+
+`tests/testutil/` is shared integration/performance infrastructure: `runtimeapp` creates test runtime applications, while `runtimeflow` provides the runtime-backed harness, deterministic conversion, protected snapshot, TUI flow driver, and report output/artifact helpers. Scenario fixtures remain local.
+Empirical data and golden oracle fixtures live under `testdata/empirical/`; ordinary tests neither download data nor invoke rotki or oracle regeneration. `tools/empiricaloracle` is regeneration-only tooling. An explicit regeneration may use local Python and the pinned rotki cache.
+
+`.github/workflows/test.yml` invokes the reusable test-suite workflow. Its check names are `test / run`, `coverage / run`, and `test-performance / run`; the separate changed-source check is `quality`. These checks run independently on fresh Ubuntu runners, and none runs external integration.
 `make quality` runs the changed-source quality gate for `*.go`, `go.mod`, and `go.sum` changes using `golangci-lint`, `govulncheck`, and `gitleaks`. It must pass for every feature, including the explicit skip path when no source inputs changed.
-The explicit performance command runs the deterministic `SC-007` verification path for one 10,000-activity yearly report generation from protected synced data, including request validation, calculation, Markdown rendering, final save, and opener invocation.
 
 ## Local Storage
 

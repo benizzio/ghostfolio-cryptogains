@@ -17,7 +17,6 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
-	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	ghostfolioclient "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/client"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
@@ -27,6 +26,7 @@ import (
 	syncvalidate "github.com/benizzio/ghostfolio-cryptogains/internal/sync/validate"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeflow"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -35,24 +35,24 @@ import (
 // Authored by: OpenCode
 func TestReportGenerationSuccessWritesMarkdownAndReturnsToUnlockedContext(t *testing.T) {
 	var reportIO = testutil.NewReportIOFixture(t)
-	var openLogPath = installOpenCommandRecorder(t, 0)
+	var openLogPath = runtimeflow.InstallOpenCommandRecorder(t, 0)
 	var fixture = testutil.DeterministicReportLedgerFixture()
-	var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
+	var harness = runtimeflow.NewRuntimeBackedFlowHarness(t, t.TempDir(), runtimeflow.MustCloudSetupConfig(t), false)
 
-	seedProtectedSnapshot(t, harness, "token-123", fixture.ProtectedActivityCache)
+	runtimeflow.SeedProtectedSnapshot(t, harness, "token-123", fixture.ProtectedActivityCache)
 
-	var model = unlockSyncReportsContext(t, harness.Model, "token-123")
-	model = openReportSelectionFromContext(t, model)
-	model = selectReportYear(t, model, fixture.PrimaryReportYear)
-	model = selectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
-	model, cmd := startReportGenerationAfterBaseCurrencySelection(t, model)
-	model = applyBatchCmd(t, model, cmd)
+	var model = runtimeflow.UnlockSyncReportsContext(t, harness.Model, "token-123")
+	model = runtimeflow.OpenReportSelection(t, model)
+	model = runtimeflow.SelectReportYear(t, model, fixture.PrimaryReportYear)
+	model = runtimeflow.SelectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
+	model, cmd := runtimeflow.StartReportGeneration(t, model)
+	model = runtimeflow.ApplyBatchCmd(t, model, cmd)
 
 	if model.ActiveScreen() != "report_result" {
 		t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
 	}
 
-	var content = normalizeRenderedText(model.View().Content)
+	var content = runtimeflow.NormalizeRenderedText(model.View().Content)
 	if !strings.Contains(content, "Saved Markdown Path: ") {
 		t.Fatalf("expected saved Markdown path in result view, got %q", content)
 	}
@@ -60,7 +60,7 @@ func TestReportGenerationSuccessWritesMarkdownAndReturnsToUnlockedContext(t *tes
 		t.Fatalf("expected selected year, method, and report base currency in result view, got %q", content)
 	}
 
-	var files = mustMarkdownFiles(t, reportIO.DocumentsDir)
+	var files = runtimeflow.MarkdownFiles(t, reportIO.DocumentsDir)
 	if len(files) != 1 {
 		t.Fatalf("expected one saved Markdown file, got %#v", files)
 	}
@@ -72,11 +72,12 @@ func TestReportGenerationSuccessWritesMarkdownAndReturnsToUnlockedContext(t *tes
 		t.Fatalf("expected FIFO report filename slug, got %q", filepath.Base(reportPath))
 	}
 
-	var openerRequests = readOpenCommandRequests(t, openLogPath)
+	var openerRequests = runtimeflow.ReadOpenCommandRequests(t, openLogPath)
 	if len(openerRequests) != 1 || openerRequests[0] != reportPath {
 		t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
 	}
 
+	// #nosec G304 -- reportPath is created in the test-owned Documents fixture.
 	var rawReport, err = os.ReadFile(reportPath)
 	if err != nil {
 		t.Fatalf("read saved report %q: %v", reportPath, err)
@@ -96,14 +97,14 @@ func TestReportGenerationSuccessWritesMarkdownAndReturnsToUnlockedContext(t *tes
 		}
 	}
 	assertTextOmitted(t, reportText, "token-123", reportPath)
-	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
+	runtimeflow.AssertNoCleartextReportInAppStorage(t, harness.BaseDir)
 
 	var updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	model = assertFlowModel(t, updated)
+	model = runtimeflow.AssertFlowModel(t, updated)
 	if model.ActiveScreen() != "sync_reports_menu" {
 		t.Fatalf("expected result dismissal to return to sync and reports menu, got %s", model.ActiveScreen())
 	}
-	var syncReportsContent = normalizeRenderedText(model.View().Content)
+	var syncReportsContent = runtimeflow.NormalizeRenderedText(model.View().Content)
 	if strings.Contains(syncReportsContent, reportPath) {
 		t.Fatalf("expected no report history after result dismissal, got %q", syncReportsContent)
 	}
@@ -131,7 +132,7 @@ func TestReportGenerationOpenWarningPreservesSavedReportAndAllowsAnotherRun(t *t
 	model = openReportSelectionFromContext(t, model)
 	model = selectReportYear(t, model, fixture.PrimaryReportYear)
 	model = selectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
-	model, cmd := startReportGenerationAfterBaseCurrencySelection(t, model)
+	model, cmd := runtimeflow.StartReportGeneration(t, model)
 	model = applyBatchCmd(t, model, cmd)
 
 	if model.ActiveScreen() != "report_result" {
@@ -194,7 +195,7 @@ func TestReportGenerationSkipsCurrencylessOrderTier(t *testing.T) {
 	model = openReportSelectionFromContext(t, model)
 	model = selectReportYear(t, model, fixture.CurrencylessOrderReportYear)
 	model = selectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyEUR)
-	model, cmd := startReportGenerationAfterBaseCurrencySelection(t, model)
+	model, cmd := runtimeflow.StartReportGeneration(t, model)
 	model = applyBatchCmd(t, model, cmd)
 
 	if model.ActiveScreen() != "report_result" {
@@ -217,6 +218,7 @@ func TestReportGenerationSkipsCurrencylessOrderTier(t *testing.T) {
 		t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
 	}
 
+	// #nosec G304 -- reportPath is created in the test-owned Documents fixture.
 	var rawReport, err = os.ReadFile(reportPath)
 	if err != nil {
 		t.Fatalf("read saved report %q: %v", reportPath, err)
@@ -247,7 +249,7 @@ func TestReportGenerationRoundsSameTierUnitPriceDerivation(t *testing.T) {
 	model = openReportSelectionFromContext(t, model)
 	model = selectReportYear(t, model, 2024)
 	model = selectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
-	model, cmd := startReportGenerationAfterBaseCurrencySelection(t, model)
+	model, cmd := runtimeflow.StartReportGeneration(t, model)
 	model = applyBatchCmd(t, model, cmd)
 
 	if model.ActiveScreen() != "report_result" {
@@ -264,6 +266,7 @@ func TestReportGenerationRoundsSameTierUnitPriceDerivation(t *testing.T) {
 		t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
 	}
 
+	// #nosec G304 -- reportPath is created in the test-owned Documents fixture.
 	var rawReport, err = os.ReadFile(reportPath)
 	if err != nil {
 		t.Fatalf("read saved report %q: %v", reportPath, err)
@@ -320,7 +323,7 @@ func TestReportGenerationAfterSyncAllowsRepeatingGrossValueOnlyUnitPriceDerivati
 	model = openReportSelectionFromContext(t, model)
 	model = selectReportYear(t, model, 2024)
 	model = selectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
-	model, cmd := startReportGenerationAfterBaseCurrencySelection(t, model)
+	model, cmd := runtimeflow.StartReportGeneration(t, model)
 	model = applyBatchCmd(t, model, cmd)
 
 	if model.ActiveScreen() != "report_result" {
@@ -337,6 +340,7 @@ func TestReportGenerationAfterSyncAllowsRepeatingGrossValueOnlyUnitPriceDerivati
 		t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
 	}
 
+	// #nosec G304 -- reportPath is created in the test-owned Documents fixture.
 	var rawReport, err = os.ReadFile(reportPath)
 	if err != nil {
 		t.Fatalf("read saved report %q: %v", reportPath, err)
@@ -375,7 +379,7 @@ func TestReportGenerationFlowSendsSelectedBaseCurrencyToRuntime(t *testing.T) {
 			model = openReportSelectionFromContext(t, model)
 			model = selectReportYear(t, model, 2024)
 			model = selectReportBaseCurrency(t, model, reportBaseCurrency)
-			model, cmd := startReportGenerationAfterBaseCurrencySelection(t, model)
+			model, cmd := runtimeflow.StartReportGeneration(t, model)
 			model = applyBatchCmd(t, model, cmd)
 
 			if model.ActiveScreen() != "report_result" {
@@ -439,6 +443,7 @@ func TestSameCurrencyReportPreservesPriorMonetaryResults(t *testing.T) {
 				t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
 			}
 
+			// #nosec G304 -- reportPath is created in the test-owned Documents fixture.
 			var rawReport, readErr = os.ReadFile(reportPath)
 			if readErr != nil {
 				t.Fatalf("read saved report %q: %v", reportPath, readErr)
@@ -504,6 +509,7 @@ func TestReportGenerationConvertsDeterministicMixedCurrencyFixture(t *testing.T)
 
 	var combinedReportText strings.Builder
 	for _, reportPath := range files {
+		// #nosec G304 -- reportPath is created in the test-owned Documents fixture.
 		var rawReport, err = os.ReadFile(reportPath)
 		if err != nil {
 			t.Fatalf("read saved report %q: %v", reportPath, err)
@@ -792,109 +798,18 @@ func newReportCaptureFlowHarness(
 	config configmodel.AppSetupConfig,
 	allowDevHTTP bool,
 	reportService runtime.ReportService,
-) runtimeBackedFlowHarness {
+) runtimeflow.RuntimeBackedFlowHarness {
 	t.Helper()
 
-	var options = bootstrap.DefaultOptions()
-	options.ConfigDir = baseDir
-	options.AllowDevHTTP = allowDevHTTP
-
-	var app, err = runtime.New(options)
-	if err != nil {
-		t.Fatalf("runtime new: %v", err)
-	}
-
-	var store = configstore.NewJSONStore(baseDir)
-	if err := store.Save(context.Background(), config); err != nil {
-		t.Fatalf("save setup config: %v", err)
-	}
-
-	var model = flow.NewModel(flow.Dependencies{
-		Options:       options,
+	var harness = runtimeflow.NewRuntimeBackedFlowHarness(t, baseDir, config, allowDevHTTP)
+	harness.Model = flow.NewModel(flow.Dependencies{
+		Options:       harness.App.Options,
 		Startup:       bootstrap.StartupState{ActiveConfig: &config},
-		SetupService:  app.SetupService,
-		SyncService:   app.SyncService,
+		SetupService:  harness.App.SetupService,
+		SyncService:   harness.App.SyncService,
 		ReportService: reportService,
 	})
-
-	return runtimeBackedFlowHarness{
-		BaseDir: baseDir,
-		App:     app,
-		Config:  config,
-		Store:   store,
-		Model:   model,
-	}
-}
-
-// selectReportBaseCurrency moves focus to the report base-currency list and
-// selects the requested currency.
-// Authored by: OpenCode
-func selectReportBaseCurrency(t *testing.T, model *flow.Model, reportBaseCurrency reportmodel.ReportBaseCurrency) *flow.Model {
-	t.Helper()
-
-	for focusStep := 0; focusStep < 2; focusStep++ {
-		var updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
-		model = assertFlowModel(t, updated)
-	}
-
-	var marker = "> " + reportBaseCurrency.Label()
-	for attempt := 0; attempt < len(reportmodel.SupportedReportBaseCurrencies())+1; attempt++ {
-		var content = normalizeRenderedText(model.View().Content)
-		if strings.Contains(content, "Report Base Currency") && strings.Contains(content, marker) {
-			return model
-		}
-
-		var updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
-		model = assertFlowModel(t, updated)
-	}
-
-	t.Fatalf("expected report base currency %q to be selected, got %q", reportBaseCurrency.Label(), model.View().Content)
-	return model
-}
-
-// selectReportBaseCurrencyFromMethodFocus moves from method focus to the report
-// base-currency list and selects the requested currency.
-// Authored by: OpenCode
-func selectReportBaseCurrencyFromMethodFocus(t *testing.T, model *flow.Model, reportBaseCurrency reportmodel.ReportBaseCurrency) *flow.Model {
-	t.Helper()
-
-	var updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
-	model = assertFlowModel(t, updated)
-
-	var marker = "> " + reportBaseCurrency.Label()
-	for attempt := 0; attempt < len(reportmodel.SupportedReportBaseCurrencies())+1; attempt++ {
-		var content = normalizeRenderedText(model.View().Content)
-		if strings.Contains(content, "Report Base Currency") && strings.Contains(content, marker) {
-			return model
-		}
-
-		updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
-		model = assertFlowModel(t, updated)
-	}
-
-	t.Fatalf("expected report base currency %q to be selected from method focus, got %q", reportBaseCurrency.Label(), model.View().Content)
-	return model
-}
-
-// startReportGenerationAfterBaseCurrencySelection advances from base-currency
-// focus to generation and returns the asynchronous report command.
-// Authored by: OpenCode
-func startReportGenerationAfterBaseCurrencySelection(t *testing.T, model *flow.Model) (*flow.Model, tea.Cmd) {
-	t.Helper()
-
-	for attempt := 0; attempt < 4; attempt++ {
-		var updated tea.Model
-		var cmd tea.Cmd
-		updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-		model = assertFlowModel(t, updated)
-
-		if model.ActiveScreen() == "report_busy" {
-			return model, cmd
-		}
-	}
-
-	t.Fatalf("expected report busy screen after base-currency selection, got %s", model.ActiveScreen())
-	return model, nil
+	return harness
 }
 
 // roundedReportActivityInput stores one compact rounded-division integration

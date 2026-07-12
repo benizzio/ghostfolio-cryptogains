@@ -15,16 +15,12 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
-	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
-	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
-	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
-	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeapp"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeflow"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -57,6 +53,7 @@ func TestReportGenerationEmptyMainSectionWritesEmptyMarkdownReport(t *testing.T)
 	var reportPath = files[0]
 	testutil.AssertRegularFile(t, reportPath)
 
+	// #nosec G304 -- reportPath is created in the test-owned Documents fixture.
 	var reportBytes, err = os.ReadFile(reportPath)
 	if err != nil {
 		t.Fatalf("read saved report %q: %v", reportPath, err)
@@ -94,7 +91,8 @@ func TestReportGenerationWriteFailureGeneratesWrappedDiagnosticCauseChain(t *tes
 		return
 	}
 
-	var command = exec.Command(os.Args[0], "-test.run=TestReportGenerationWriteFailureGeneratesWrappedDiagnosticCauseChain$")
+	// #nosec G204,G702 -- os.Args[0] re-executes the current test binary with a fixed test name.
+	var command = exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestReportGenerationWriteFailureGeneratesWrappedDiagnosticCauseChain$")
 	command.Env = append(
 		os.Environ(),
 		"GHOSTFOLIO_CRYPTOGAINS_HELPER_WRITE_FAILURE=2",
@@ -362,7 +360,7 @@ func TestReportGenerationConversionFailureMatrixShowsSafeFailure(t *testing.T) {
 			var reportIO = testutil.NewReportIOFixture(t)
 			var openLogPath = installOpenCommandRecorder(t, 0)
 			var rateService = &failingIntegrationCurrencyRates{failures: testCase.failures}
-			var harness = newRuntimeBackedFlowHarnessWithCurrencyRateService(t, t.TempDir(), mustCloudSetupConfig(t), false, rateService)
+			var harness = runtimeflow.NewRuntimeBackedFlowHarnessWithCurrencyRateService(t, t.TempDir(), runtimeflow.MustCloudSetupConfig(t), false, rateService)
 
 			seedProtectedSnapshot(t, harness, "token-123", testCase.cache)
 
@@ -370,7 +368,7 @@ func TestReportGenerationConversionFailureMatrixShowsSafeFailure(t *testing.T) {
 			model = openReportSelectionFromContext(t, model)
 			model = selectReportYear(t, model, 2024)
 			model = selectReportBaseCurrency(t, model, testCase.reportBaseCurrency)
-			model, cmd := startReportGenerationAfterBaseCurrencySelection(t, model)
+			model, cmd := runtimeflow.StartReportGeneration(t, model)
 			model = applyBatchCmd(t, model, cmd)
 
 			if model.ActiveScreen() != "report_result" {
@@ -453,7 +451,8 @@ func TestReportGenerationWriteFailureRemovesPartialFileAndShowsFailure(t *testin
 		return
 	}
 
-	var command = exec.Command(os.Args[0], "-test.run=TestReportGenerationWriteFailureRemovesPartialFileAndShowsFailure$")
+	// #nosec G204,G702 -- os.Args[0] re-executes the current test binary with a fixed test name.
+	var command = exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestReportGenerationWriteFailureRemovesPartialFileAndShowsFailure$")
 	command.Env = append(
 		os.Environ(),
 		"GHOSTFOLIO_CRYPTOGAINS_HELPER_WRITE_FAILURE=1",
@@ -560,7 +559,7 @@ func runReportGenerationWriteFailureDiagnosticScenario(t *testing.T) {
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = assertFlowModel(t, updated)
 	updated, _ = model.Update(testutil.RunCmd(cmd))
-	model = assertFlowModel(t, updated)
+	_ = assertFlowModel(t, updated)
 
 	var diagnosticFiles = mustDiagnosticFiles(t, harness.BaseDir)
 	if len(diagnosticFiles) != 1 {
@@ -655,56 +654,14 @@ func (service *failingIntegrationCurrencyRates) LookupRate(_ context.Context, re
 		}
 	}
 
-	return deterministicIntegrationCurrencyRates{}.LookupRate(context.Background(), request)
+	return runtimeflow.DeterministicCurrencyRates{}.LookupRate(context.Background(), request)
 }
 
 // ProviderCategoryForBaseCurrency returns deterministic provider metadata for
 // failing conversion integration tests.
 // Authored by: OpenCode
 func (service *failingIntegrationCurrencyRates) ProviderCategoryForBaseCurrency(baseCurrency string) string {
-	return deterministicIntegrationCurrencyRates{}.ProviderCategoryForBaseCurrency(baseCurrency)
-}
-
-// newRuntimeBackedFlowHarnessWithCurrencyRateService creates a runtime-backed
-// TUI harness with a caller-provided currency rate service.
-// Authored by: OpenCode
-func newRuntimeBackedFlowHarnessWithCurrencyRateService(
-	t *testing.T,
-	baseDir string,
-	config configmodel.AppSetupConfig,
-	allowDevHTTP bool,
-	currencyRates interface {
-		LookupRate(context.Context, currencyintegration.RateLookupRequest) (currencyintegration.ExchangeRateEvidence, error)
-	},
-) runtimeBackedFlowHarness {
-	t.Helper()
-
-	var options = bootstrap.DefaultOptions()
-	options.ConfigDir = baseDir
-	options.AllowDevHTTP = allowDevHTTP
-
-	var app = runtimeapp.NewWithReportCurrencyRateService(t, options, currencyRates)
-
-	var store = configstore.NewJSONStore(baseDir)
-	if err := store.Save(context.Background(), config); err != nil {
-		t.Fatalf("save setup config: %v", err)
-	}
-
-	var model = flow.NewModel(flow.Dependencies{
-		Options:       options,
-		Startup:       bootstrap.StartupState{ActiveConfig: &config},
-		SetupService:  app.SetupService,
-		SyncService:   app.SyncService,
-		ReportService: app.ReportService,
-	})
-
-	return runtimeBackedFlowHarness{
-		BaseDir: baseDir,
-		App:     app,
-		Config:  config,
-		Store:   store,
-		Model:   model,
-	}
+	return runtimeflow.DeterministicCurrencyRates{}.ProviderCategoryForBaseCurrency(baseCurrency)
 }
 
 // conversionFailureProtectedActivityCache returns one priced cross-currency row
@@ -834,6 +791,7 @@ func assertReportFailureDiagnosticArtifact(t *testing.T, path string, expectFina
 	if filepath.Ext(path) != ".json" {
 		t.Fatalf("expected diagnostic artifact path, got %q", path)
 	}
+	// #nosec G304 -- path is selected from the test-owned diagnostics fixture.
 	var raw, err = os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read report diagnostics artifact: %v", err)
