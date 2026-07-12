@@ -19,41 +19,41 @@ Supported runtime flags:
 ## Verification
 
 ```bash
-# Unit suite
+# Isolated package behavior
 make test-unit
-# Contract suite
+# Externally visible workflows and storage
 make test-contract
-# Deterministic integration suite
+# Cross-package offline workflows
 make test-integration
-# Empirical calculation suite
+# Synthetic financial oracle datasets
 make test-empirical
-# Repository tools suite
+# Repository-local tool behavior
 make test-tools
-# All deterministic offline suites
+# Aggregate deterministic offline verification
 make test
 
-# Unit coverage profile
+# Isolated package diagnostic profile
 make coverage-unit
-# Contract coverage profile
+# Workflow and storage diagnostic profile
 make coverage-contract
-# Integration coverage profile
+# Cross-package offline diagnostic profile
 make coverage-integration
-# Empirical coverage profile
+# Financial oracle dataset diagnostic profile
 make coverage-empirical
-# Tools coverage profile
+# Repository-local tool diagnostic profile
 make coverage-tools
-# Canonical deterministic coverage
+# Canonical production coverage enforcement
 make coverage
 
-# Resource-sensitive performance suite
+# Tagged 10,000-activity resource scenarios
 make test-performance
 
-# Opt-in live integration suite
+# Opt-in live-network integration checks
 make test-external-integration
-# Live integration coverage profile
+# Live-network integration diagnostic profile
 make coverage-external-integration
 
-# Changed-source quality checks
+# Changed Go and module source scanning
 make quality QUALITY_BASE_REF=origin/main
 ```
 
