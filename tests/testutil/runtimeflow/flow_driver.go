@@ -92,13 +92,13 @@ func SelectReportYear(t *testing.T, model *flow.Model, year int) *flow.Model {
 	t.Helper()
 	var marker = "> " + strconv.Itoa(year)
 	for attempt := 0; attempt < 32; attempt++ {
-		if strings.Contains(model.View().Content, marker) {
+		if strings.Contains(NormalizeRenderedText(model.View().Content), marker) {
 			return model
 		}
 		var updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 		model = AssertFlowModel(t, updated)
 	}
-	t.Fatalf("expected report year %d to be selected, got %q", year, model.View().Content)
+	t.Fatalf("expected report year %d to be selected, got %q", year, NormalizeRenderedText(model.View().Content))
 	return model
 }
 
