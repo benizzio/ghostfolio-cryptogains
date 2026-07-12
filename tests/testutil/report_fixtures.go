@@ -1,8 +1,6 @@
 package testutil
 
 import (
-	"strconv"
-	"strings"
 	"time"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
@@ -21,17 +19,6 @@ type ReportLedgerFixture struct {
 	IncompleteContextReportYear int
 	CurrencylessOrderReportYear int
 	ExpectedReports             map[reportmodel.CostBasisMethod]ExpectedReportLedger
-}
-
-// ReportPerformanceFixture stores one deterministic large-history protected
-// cache and request metadata for the opt-in report performance verification
-// path.
-// Authored by: OpenCode
-type ReportPerformanceFixture struct {
-	ProtectedActivityCache syncmodel.ProtectedActivityCache
-	ReportYear             int
-	ActivityCount          int
-	CalendarYearSpan       int
 }
 
 // ExpectedReportLedger stores one deterministic expected yearly report outcome
@@ -389,132 +376,6 @@ func DeterministicReportLedgerFixture() ReportLedgerFixture {
 	}
 }
 
-// DeterministicLargeReportPerformanceFixture returns one deterministic
-// 10,000-activity cache shaped for the opt-in large-history report performance
-// verification path.
-//
-// The fixture spans at least five calendar years, forces heavy open-lot
-// fragmentation for HIFO, and broadens the scope-local hybrid method back to
-// asset-level scope by mixing reliable and unavailable source scope entries on
-// the same asset timeline.
-//
-// Authored by: OpenCode
-func DeterministicLargeReportPerformanceFixture() ReportPerformanceFixture {
-	const activityCount = 10000
-	const assetActivityCount = activityCount / 2
-	const preReportBuyCountPerAsset = assetActivityCount / 2
-	const inYearSellCountPerAsset = assetActivityCount / 2
-	const startYear = 2020
-	const calendarYearSpan = 6
-	const reportYear = 2025
-
-	var activities = make([]syncmodel.ActivityRecord, 0, activityCount)
-	var years = make([]int, 0, calendarYearSpan)
-	for year := startYear; year < startYear+calendarYearSpan; year++ {
-		years = append(years, year)
-	}
-
-	activities = append(activities, appendPerformanceAssetActivities(performanceAssetInput{
-		AssetIdentityKey:      "asset-btc-performance-001",
-		AssetSymbol:           "BTC",
-		AssetName:             "Bitcoin",
-		PreReportBuyCount:     preReportBuyCountPerAsset,
-		InYearSellCount:       inYearSellCountPerAsset,
-		PreReportValueOffset:  100,
-		InYearSellValueOffset: 1200,
-		ReliableScope:         reliableWalletScope("wallet-performance-main", "Performance Main Wallet"),
-	})...)
-	activities = append(activities, appendPerformanceAssetActivities(performanceAssetInput{
-		AssetIdentityKey:      "asset-eth-performance-001",
-		AssetSymbol:           "ETH",
-		AssetName:             "Ethereum",
-		PreReportBuyCount:     preReportBuyCountPerAsset,
-		InYearSellCount:       inYearSellCountPerAsset,
-		PreReportValueOffset:  300,
-		InYearSellValueOffset: 900,
-		ReliableScope:         reliableWalletScope("wallet-performance-fallback", "Performance Fallback Wallet"),
-		ForceFallbackScope:    true,
-	})...)
-
-	return ReportPerformanceFixture{
-		ProtectedActivityCache: syncmodel.ProtectedActivityCache{
-			SyncedAt:             time.Date(2026, time.May, 20, 15, 4, 5, 0, time.UTC),
-			RetrievedCount:       len(activities),
-			ActivityCount:        len(activities),
-			AvailableReportYears: years,
-			ScopeReliability:     syncmodel.ScopeReliabilityPartial,
-			Activities:           activities,
-		},
-		ReportYear:       reportYear,
-		ActivityCount:    len(activities),
-		CalendarYearSpan: calendarYearSpan,
-	}
-}
-
-// performanceAssetInput collects one large-history asset timeline declaration.
-// Authored by: OpenCode
-type performanceAssetInput struct {
-	AssetIdentityKey      string
-	AssetSymbol           string
-	AssetName             string
-	PreReportBuyCount     int
-	InYearSellCount       int
-	PreReportValueOffset  int
-	InYearSellValueOffset int
-	ReliableScope         *syncmodel.SourceScope
-	ForceFallbackScope    bool
-}
-
-// appendPerformanceAssetActivities builds one deterministic asset timeline for
-// the large-history report performance fixture.
-// Authored by: OpenCode
-func appendPerformanceAssetActivities(input performanceAssetInput) []syncmodel.ActivityRecord {
-	var activities = make([]syncmodel.ActivityRecord, 0, input.PreReportBuyCount+input.InYearSellCount)
-
-	for index := 0; index < input.PreReportBuyCount; index++ {
-		var year = 2020 + (index % 5)
-		var occurredAt = performanceOccurredAt(year, index)
-		var grossValue = input.PreReportValueOffset + (index % 900)
-		var feeAmount = (index % 5) + 1
-
-		activities = append(activities, reportActivity(reportActivityInput{
-			SourceID:         performanceActivitySourceID(input.AssetSymbol, "buy", index+1),
-			OccurredAt:       occurredAt,
-			ActivityType:     syncmodel.ActivityTypeBuy,
-			AssetIdentityKey: input.AssetIdentityKey,
-			AssetSymbol:      input.AssetSymbol,
-			AssetName:        input.AssetName,
-			Quantity:         "1",
-			OrderCurrency:    "USD",
-			OrderGrossValue:  decimalStringFromInt(grossValue),
-			OrderFeeAmount:   decimalStringFromInt(feeAmount),
-			SourceScope:      performanceAssetScope(input, index),
-		}))
-	}
-
-	for index := 0; index < input.InYearSellCount; index++ {
-		var occurredAt = performanceOccurredAt(2025, index+input.PreReportBuyCount)
-		var grossValue = input.InYearSellValueOffset + (index % 700)
-		var feeAmount = (index % 5) + 1
-
-		activities = append(activities, reportActivity(reportActivityInput{
-			SourceID:         performanceActivitySourceID(input.AssetSymbol, "sell", index+1),
-			OccurredAt:       occurredAt,
-			ActivityType:     syncmodel.ActivityTypeSell,
-			AssetIdentityKey: input.AssetIdentityKey,
-			AssetSymbol:      input.AssetSymbol,
-			AssetName:        input.AssetName,
-			Quantity:         "1",
-			OrderCurrency:    "USD",
-			OrderGrossValue:  decimalStringFromInt(grossValue),
-			OrderFeeAmount:   decimalStringFromInt(feeAmount),
-			SourceScope:      performanceAssetScope(input, index+input.PreReportBuyCount),
-		}))
-	}
-
-	return activities
-}
-
 // deterministicExpectedReportsByMethod returns one controlled expected report
 // ledger for each supported cost-basis method.
 // Authored by: OpenCode
@@ -601,10 +462,10 @@ func expectedBTCDetail() ExpectedAssetDetail {
 		CalculationCurrency:          "USD",
 		ExpectedFullLiquidationCount: 0,
 		ActivityRows: []ExpectedAssetActivityRow{
-			expectedPricedRow("btc-sell-2024-zero-fee-001", syncmodel.ActivityTypeSell, "1", "25000", "0", "USD", "22009.9", "1"),
+			expectedPricedRow("btc-sell-2024-zero-fee-001", syncmodel.ActivityTypeSell, "1", "25000", "0", "22009.9", "1"),
 		},
 		LiquidationSummaries: []ExpectedLiquidationSummary{
-			expectedLiquidation("btc-sell-2024-zero-fee-001", "1", "22009.9", "25000", "2990.1", "USD"),
+			expectedLiquidation("btc-sell-2024-zero-fee-001", "1", "22009.9", "25000", "2990.1"),
 		},
 	}
 }
@@ -622,7 +483,7 @@ func expectedXRPDetail() ExpectedAssetDetail {
 		CalculationCurrency:          "USD",
 		ExpectedFullLiquidationCount: 0,
 		ActivityRows: []ExpectedAssetActivityRow{
-			expectedPricedRow("xrp-buy-2024-001", syncmodel.ActivityTypeBuy, "1000", "500", "1", "USD", "501", "1000"),
+			expectedPricedRow("xrp-buy-2024-001", syncmodel.ActivityTypeBuy, "1000", "500", "1", "501", "1000"),
 			expectedHoldingReductionRow("xrp-reduction-2024-001", "200", "400.8", "800", "Bridge migration holding reduction"),
 		},
 	}
@@ -672,12 +533,12 @@ func expectedADADetail(closingBasis string, allocatedBasis string, gain string) 
 		CalculationCurrency:          "USD",
 		ExpectedFullLiquidationCount: 0,
 		ActivityRows: []ExpectedAssetActivityRow{
-			expectedPricedRow("ada-buy-2024-001", syncmodel.ActivityTypeBuy, "1000", "250", "2", "USD", "252", "1000"),
-			expectedPricedRow("ada-buy-2024-002", syncmodel.ActivityTypeBuy, "500", "140", "1", "USD", "393", "1500"),
-			expectedPricedRow("ada-sell-2024-001", syncmodel.ActivityTypeSell, "1000", "300", "3", "USD", closingBasis, "500"),
+			expectedPricedRow("ada-buy-2024-001", syncmodel.ActivityTypeBuy, "1000", "250", "2", "252", "1000"),
+			expectedPricedRow("ada-buy-2024-002", syncmodel.ActivityTypeBuy, "500", "140", "1", "393", "1500"),
+			expectedPricedRow("ada-sell-2024-001", syncmodel.ActivityTypeSell, "1000", "300", "3", closingBasis, "500"),
 		},
 		LiquidationSummaries: []ExpectedLiquidationSummary{
-			expectedLiquidation("ada-sell-2024-001", "1000", allocatedBasis, "297", gain, "USD"),
+			expectedLiquidation("ada-sell-2024-001", "1000", allocatedBasis, "297", gain),
 		},
 	}
 }
@@ -726,10 +587,10 @@ func expectedLTCDetail(closingBasis string, allocatedBasis string, gain string) 
 		CalculationCurrency:          "USD",
 		ExpectedFullLiquidationCount: 0,
 		ActivityRows: []ExpectedAssetActivityRow{
-			expectedPricedRow("ltc-sell-2024-001", syncmodel.ActivityTypeSell, "1", "250", "0", "USD", closingBasis, "1"),
+			expectedPricedRow("ltc-sell-2024-001", syncmodel.ActivityTypeSell, "1", "250", "0", closingBasis, "1"),
 		},
 		LiquidationSummaries: []ExpectedLiquidationSummary{
-			expectedLiquidation("ltc-sell-2024-001", "1", allocatedBasis, "250", gain, "USD"),
+			expectedLiquidation("ltc-sell-2024-001", "1", allocatedBasis, "250", gain),
 		},
 	}
 }
@@ -778,10 +639,10 @@ func expectedAVAXDetail(closingBasis string, allocatedBasis string, gain string,
 		CalculationCurrency:          "USD",
 		ExpectedFullLiquidationCount: fullLiquidationCount,
 		ActivityRows: []ExpectedAssetActivityRow{
-			expectedPricedRow("avax-sell-alpha-2024-001", syncmodel.ActivityTypeSell, "1", "250", "0", "USD", closingBasis, "1"),
+			expectedPricedRow("avax-sell-alpha-2024-001", syncmodel.ActivityTypeSell, "1", "250", "0", closingBasis, "1"),
 		},
 		LiquidationSummaries: []ExpectedLiquidationSummary{
-			expectedLiquidation("avax-sell-alpha-2024-001", "1", allocatedBasis, "250", gain, "USD"),
+			expectedLiquidation("avax-sell-alpha-2024-001", "1", allocatedBasis, "250", gain),
 		},
 	}
 }
@@ -806,7 +667,7 @@ func netGainFromDetail(detail ExpectedAssetDetail) string {
 
 // expectedPricedRow returns one expected priced activity row.
 // Authored by: OpenCode
-func expectedPricedRow(sourceID string, activityType syncmodel.ActivityType, quantity string, grossValue string, feeAmount string, activityCurrency string, basisAfterRow string, quantityAfterRow string) ExpectedAssetActivityRow {
+func expectedPricedRow(sourceID string, activityType syncmodel.ActivityType, quantity string, grossValue string, feeAmount string, basisAfterRow string, quantityAfterRow string) ExpectedAssetActivityRow {
 	return ExpectedAssetActivityRow{
 		SourceID:            sourceID,
 		ActivityType:        activityType,
@@ -814,7 +675,7 @@ func expectedPricedRow(sourceID string, activityType syncmodel.ActivityType, qua
 		UnitPrice:           "",
 		GrossValue:          grossValue,
 		FeeAmount:           feeAmount,
-		ActivityCurrency:    activityCurrency,
+		ActivityCurrency:    "USD",
 		BasisAfterRow:       basisAfterRow,
 		CalculationCurrency: "USD",
 		QuantityAfterRow:    quantityAfterRow,
@@ -841,14 +702,14 @@ func expectedHoldingReductionRow(sourceID string, quantity string, basisAfterRow
 
 // expectedLiquidation returns one expected priced-liquidation summary row.
 // Authored by: OpenCode
-func expectedLiquidation(sourceID string, disposedQuantity string, allocatedBasis string, netLiquidationProceeds string, gainOrLoss string, activityCurrency string) ExpectedLiquidationSummary {
+func expectedLiquidation(sourceID string, disposedQuantity string, allocatedBasis string, netLiquidationProceeds string, gainOrLoss string) ExpectedLiquidationSummary {
 	return ExpectedLiquidationSummary{
 		SourceID:               sourceID,
 		DisposedQuantity:       disposedQuantity,
 		AllocatedBasis:         allocatedBasis,
 		NetLiquidationProceeds: netLiquidationProceeds,
 		GainOrLoss:             gainOrLoss,
-		ActivityCurrency:       activityCurrency,
+		ActivityCurrency:       "USD",
 		CalculationCurrency:    "USD",
 	}
 }
@@ -929,42 +790,6 @@ func reliableWalletScope(id string, name string) *syncmodel.SourceScope {
 		Kind:        syncmodel.SourceScopeKindWallet,
 		Reliability: syncmodel.ScopeReliabilityReliable,
 	}
-}
-
-// performanceScopeForIndex returns one deterministic scope pattern that keeps
-// scope-local fallback active on the large-history performance asset.
-// Authored by: OpenCode
-func performanceAssetScope(input performanceAssetInput, index int) *syncmodel.SourceScope {
-	if input.ForceFallbackScope && index%4 == 0 {
-		return nil
-	}
-
-	return input.ReliableScope
-}
-
-// performanceActivitySourceID returns one stable large-history activity
-// identifier.
-// Authored by: OpenCode
-func performanceActivitySourceID(symbol string, prefix string, sequence int) string {
-	return strings.ToLower(symbol) + "-" + prefix + "-performance-" + decimalStringFromInt(sequence)
-}
-
-// performanceOccurredAt returns one deterministic timestamp for the large-
-// history report performance fixture.
-// Authored by: OpenCode
-func performanceOccurredAt(year int, index int) string {
-	var month = time.Month((index % 12) + 1)
-	var day = (index % 28) + 1
-	var hour = index % 24
-	var minute = index % 60
-	return time.Date(year, month, day, hour, minute, 0, 0, time.UTC).Format(time.RFC3339)
-}
-
-// decimalStringFromInt formats one positive integer for deterministic fixture
-// decimal fields.
-// Authored by: OpenCode
-func decimalStringFromInt(value int) string {
-	return strconv.Itoa(value)
 }
 
 // decimalValue parses one fixture decimal string and panics when the fixture is

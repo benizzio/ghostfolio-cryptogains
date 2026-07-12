@@ -45,13 +45,13 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
 
 ### Tech Stack
 
-- Language: Go 1.26.3
+- Language: Go 1.26.5
 - Application type: single-module terminal UI application
 - UI stack: `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`
 - Domain and precision: `github.com/cockroachdb/apd/v3` for exact decimal handling
 - Security and storage: Go standard library crypto plus `golang.org/x/crypto/argon2` for token-derived protected snapshots
 - Transport: Go standard library `net/http` and `encoding/json` against Ghostfolio `api/v1`
-- Testing: Go standard `testing` with contract, integration, and unit suites under `tests/`
+- Testing: Go standard `testing` with package-local, unit, contract, deterministic integration, empirical, tool, external integration, and isolated performance suites under `tests/`
 - Coverage tooling: `github.com/Fabianexe/gocoverageplus` plus repository-local tools in `tools/coveragegate` and `tools/coverpkg`
 - CI: GitHub Actions workflow `.github/workflows/`
 
@@ -63,6 +63,7 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
 - Every new feature must pass this changed-source quality gate before completion or cite the successful `Quality` GitHub Actions check.
 - The changed-source gate does not mean the full historical `golangci-lint run ./...` baseline is clean.
 - For full project validation, still run `make test` and `make coverage` when relevant to the change.
+- Use `make test-performance` and `make coverage-performance` for resource-sensitive scenarios only. They run `tests/performance` with its required build tag and must not be folded into deterministic test or coverage aggregates.
 - Document the current changed-source quality gate here; keep scanner/tool selection open until issue #40's evaluation is complete.
 
 ### Project/repo structure and extended agent instructions
@@ -126,6 +127,7 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
 - Tests:
   - `tests/contract/` verifies externally visible workflow and storage contracts.
   - `tests/integration/` verifies end-to-end runtime flows across packages.
+  - `tests/performance/` verifies resource-sensitive large-history scenarios with the `performance` build tag. It must remain isolated from ordinary `go test ./...`, `make test`, `make coverage`, and non-performance CI jobs.
   - `tests/unit/` targets isolated domain and storage behavior.
   - `tests/empirical/` verifies synthetic empirical financial datasets against generated oracle fixtures.
   - `tests/empirical/fixture/` contains reusable empirical dataset parsers, validators, oracle fixture helpers, project-output translators, and comparison helpers.

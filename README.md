@@ -19,16 +19,36 @@ Supported runtime flags:
 ## Verification
 
 ```bash
+make test-unit
+make test-contract
+make test-integration
+make test-empirical
+make test-tools
 make test
+
+make coverage-unit
+make coverage-contract
+make coverage-integration
+make coverage-empirical
+make coverage-tools
 make coverage
+
+make test-performance
+make coverage-performance
+
+make test-external-integration
+make coverage-external-integration
+
 make quality QUALITY_BASE_REF=origin/main
-GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1 go test ./tests/integration -run TestReportPerformanceFlowLargeHistoryFixture -count=1 -v
 ```
 
-`make coverage` writes `dist/coverage/coverage.out` and `dist/coverage/coverage.xml` using the maintained coverage gate configuration in `.cov.json`.
-The coverage run instruments project-owned packages from `cmd/` and `internal/` so execution driven by contract and integration tests counts toward the repository coverage gate.
+`make test` is the canonical deterministic offline aggregate. It runs unit, contract, deterministic integration, empirical, and tool suites once. It excludes live external integration and resource-sensitive performance checks.
+`make coverage` is the canonical deterministic aggregate. It writes fresh `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`, instruments project-owned packages from `cmd/` and `internal/` so black-box contract and integration execution counts, enforces the repository-wide 100% gate, and separately executes tool coverage without expanding the production denominator.
+`coverage-unit`, `coverage-contract`, `coverage-integration`, `coverage-empirical`, `coverage-tools`, `coverage-external-integration`, and `coverage-performance` write partial diagnostic profiles under `dist/coverage/`. They do not run the repository percentage gate.
+`tests/performance` contains timed 10,000-activity scenarios. Its build tag and maintained commands keep it isolated from `make test`, `make coverage`, and ordinary `go test ./...`; run `make test-performance` or `make coverage-performance` only when the dedicated resources are available. Pull requests run those commands on fresh, independent runners.
+`make test-external-integration` and `make coverage-external-integration` are opt-in live-network checks and are excluded from pull-request CI.
+Pull-request checks map to `test` (`make test`), `coverage` (`make coverage`), `test-performance` (`make test-performance`), `coverage-performance` (`make coverage-performance`), and the separate `quality` check.
 `make quality` runs the changed-source quality gate for `*.go`, `go.mod`, and `go.sum` changes using `golangci-lint`, `govulncheck`, and `gitleaks`. It must pass for every feature, including the explicit skip path when no source inputs changed.
-The explicit performance command runs the deterministic `SC-007` verification path for one 10,000-activity yearly report generation from protected synced data, including request validation, calculation, Markdown rendering, final save, and opener invocation.
 
 ## Local Storage
 

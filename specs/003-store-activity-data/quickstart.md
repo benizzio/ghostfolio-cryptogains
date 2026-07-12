@@ -29,7 +29,7 @@ Run:
 ```bash
 make test
 make coverage
-GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1 go test ./tests/integration -run TestSyncPerformanceFlowLargeHistoryFixture -count=1 -v
+make test-performance
 ```
 
 Expected automated coverage scope for this slice includes:
@@ -274,7 +274,7 @@ Expected result:
 Run:
 
 ```bash
-GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1 go test ./tests/integration -run TestSyncPerformanceFlowLargeHistoryFixture -count=1 -v
+make test-performance
 ```
 
 Expected result:
