@@ -26,27 +26,18 @@ func selectReportBaseCurrency(t *testing.T, model *flow.Model, currency reportmo
 	t.Helper()
 	var updated tea.Model
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
-	model = mustFlowModel(t, updated)
+	model = runtimeflow.AssertFlowModel(t, updated)
 	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
-	model = mustFlowModel(t, updated)
+	model = runtimeflow.AssertFlowModel(t, updated)
 	var marker = "> " + currency.Label()
 	for attempt := 0; attempt < len(reportmodel.SupportedReportBaseCurrencies())+1; attempt++ {
 		if strings.Contains(runtimeflow.NormalizeRenderedText(model.View().Content), marker) {
 			return model
 		}
 		updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
-		model = mustFlowModel(t, updated)
+		model = runtimeflow.AssertFlowModel(t, updated)
 	}
 	t.Fatalf("expected report base currency %q to be selected", currency.Label())
-	return model
-}
-
-func mustFlowModel(t *testing.T, updated tea.Model) *flow.Model {
-	t.Helper()
-	var model, ok = updated.(*flow.Model)
-	if !ok {
-		t.Fatalf("expected updated model to be *flow.Model, got %T", updated)
-	}
 	return model
 }
 
