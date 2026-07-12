@@ -31,7 +31,7 @@ Run:
 ```bash
 make test
 make coverage
-make test-performance
+GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1 go test ./tests/integration -run TestReportPerformanceFlowLargeHistoryFixture -count=1 -v
 ```
 
 Expected result:
@@ -446,7 +446,7 @@ Expected result:
 Run:
 
 ```bash
-make test-performance
+GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1 go test ./tests/integration -run TestReportPerformanceFlowLargeHistoryFixture -count=1 -v
 ```
 
 Expected result:
