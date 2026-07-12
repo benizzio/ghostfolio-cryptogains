@@ -18,7 +18,7 @@ CHANGED_SOURCE_FILES = $$({ git diff --name-only --diff-filter=ACMR $(QUALITY_BA
 QUALITY_CHANGED_SOURCE_CACHE ?=
 READ_CHANGED_SOURCE_FILES = $$(if [ -n "$(QUALITY_CHANGED_SOURCE_CACHE)" ] && [ -f "$(QUALITY_CHANGED_SOURCE_CACHE)" ]; then while IFS= read -r file; do printf '%s\n' "$$file"; done < "$(QUALITY_CHANGED_SOURCE_CACHE)"; else printf '%s\n' "$(CHANGED_SOURCE_FILES)"; fi)
 
-.PHONY: run run-dev test test-unit test-contract test-integration test-empirical test-tools test-external-integration test-performance regenerate-empirical-fixtures coverage coverage-unit coverage-contract coverage-integration coverage-empirical coverage-tools coverage-external-integration coverage-performance quality quality-changed-source-files lint-changed vuln-changed secrets-changed
+.PHONY: run run-dev test test-unit test-contract test-integration test-empirical test-tools test-external-integration test-performance regenerate-empirical-fixtures coverage coverage-unit coverage-contract coverage-integration coverage-empirical coverage-tools coverage-external-integration quality quality-changed-source-files lint-changed vuln-changed secrets-changed
 
 run:
 	$(GO) run ./cmd/ghostfolio-cryptogains $(ARGS)
@@ -83,10 +83,6 @@ coverage-tools:
 coverage-external-integration:
 	mkdir -p dist/coverage
 	GHOSTFOLIO_CRYPTOGAINS_RUN_EXTERNAL_INTEGRATION=1 $(GO) test $(TEST_EXTERNAL_INTEGRATION_PACKAGES) -count=1 -v -covermode=atomic -coverpkg=$(PRODUCTION_PACKAGES) -coverprofile=dist/coverage/external-integration.out
-
-coverage-performance:
-	mkdir -p dist/coverage
-	$(GO) test -tags=performance $(TEST_PERFORMANCE_PACKAGES) -count=1 -v -parallel=1 -timeout=15m -covermode=atomic -coverpkg=$(PRODUCTION_PACKAGES) -coverprofile=dist/coverage/performance.out
 
 quality:
 	@tmp=$$(mktemp) || exit 1; \

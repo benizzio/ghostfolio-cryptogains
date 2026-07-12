@@ -63,7 +63,7 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
 - Every new feature must pass this changed-source quality gate before completion or cite the successful `Quality` GitHub Actions check.
 - The changed-source gate does not mean the full historical `golangci-lint run ./...` baseline is clean.
 - For full project validation, still run `make test` and `make coverage` when relevant to the change.
-- Use `make test-performance` and `make coverage-performance` for resource-sensitive scenarios only. They run `tests/performance` with its required build tag and must not be folded into deterministic test or coverage aggregates.
+- Use `make test-performance` for resource-sensitive scenarios only. It runs `tests/performance` with its required build tag and must not be folded into deterministic test or coverage aggregates. Performance tests provide timing and resource evidence, not separate production coverage evidence.
 - Document the current changed-source quality gate here; keep scanner/tool selection open until issue #40's evaluation is complete.
 
 ### Project/repo structure and extended agent instructions
