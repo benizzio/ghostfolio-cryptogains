@@ -87,10 +87,13 @@ func ReadOpenCommandRequests(t *testing.T, logPath string) []string {
 	return strings.Split(content, "\n")
 }
 
-// AssertNoCleartextReportInAppStorage verifies app-managed artifacts do not contain a report.
+// PersistedArtifactPaths returns sorted non-directory artifact paths under the
+// app-managed storage root. For example, use it to inspect every persisted
+// artifact written below a test-owned base directory.
 // Authored by: OpenCode
-func AssertNoCleartextReportInAppStorage(t *testing.T, baseDir string) {
+func PersistedArtifactPaths(t *testing.T, baseDir string) []string {
 	t.Helper()
+
 	var root = filepath.Join(baseDir, "ghostfolio-cryptogains")
 	var paths []string
 	var err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
@@ -106,7 +109,14 @@ func AssertNoCleartextReportInAppStorage(t *testing.T, baseDir string) {
 		t.Fatalf("walk persisted artifacts: %v", err)
 	}
 	sort.Strings(paths)
-	for _, path := range paths {
+	return paths
+}
+
+// AssertNoCleartextReportInAppStorage verifies app-managed artifacts do not contain a report.
+// Authored by: OpenCode
+func AssertNoCleartextReportInAppStorage(t *testing.T, baseDir string) {
+	t.Helper()
+	for _, path := range PersistedArtifactPaths(t, baseDir) {
 		if strings.HasSuffix(path, ".md") {
 			t.Fatalf("expected no Markdown file in app-managed storage, found %q", path)
 		}

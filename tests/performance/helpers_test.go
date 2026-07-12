@@ -12,34 +12,11 @@ import (
 	"testing"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/cockroachdb/apd/v3"
 
-	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
-	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
-	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeflow"
 )
-
-func selectReportBaseCurrency(t *testing.T, model *flow.Model, currency reportmodel.ReportBaseCurrency) *flow.Model {
-	t.Helper()
-	var updated tea.Model
-	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
-	model = runtimeflow.AssertFlowModel(t, updated)
-	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
-	model = runtimeflow.AssertFlowModel(t, updated)
-	var marker = "> " + currency.Label()
-	for attempt := 0; attempt < len(reportmodel.SupportedReportBaseCurrencies())+1; attempt++ {
-		if strings.Contains(runtimeflow.NormalizeRenderedText(model.View().Content), marker) {
-			return model
-		}
-		updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
-		model = runtimeflow.AssertFlowModel(t, updated)
-	}
-	t.Fatalf("expected report base currency %q to be selected", currency.Label())
-	return model
-}
 
 func largeCrossCurrencyCache(t *testing.T, activityCount int) syncmodel.ProtectedActivityCache {
 	t.Helper()

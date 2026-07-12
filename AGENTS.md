@@ -51,7 +51,7 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
 - Domain and precision: `github.com/cockroachdb/apd/v3` for exact decimal handling
 - Security and storage: Go standard library crypto plus `golang.org/x/crypto/argon2` for token-derived protected snapshots
 - Transport: Go standard library `net/http` and `encoding/json` against Ghostfolio `api/v1`
-- Testing: Go standard `testing` with package-local, unit, contract, deterministic integration, empirical, tool, external integration, and isolated performance suites under `tests/`
+- Testing: Go standard `testing` with package-local tests in `cmd/` and `internal/`, suites under `tests/`, and the `tools/empiricaloracle` tool package.
 - Coverage tooling: `github.com/Fabianexe/gocoverageplus` plus repository-local tools in `tools/coveragegate` and `tools/coverpkg`
 - CI: GitHub Actions workflow `.github/workflows/`
 
@@ -60,10 +60,10 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
 - For changed-source quality checks, run `make quality QUALITY_BASE_REF=origin/main`.
 - The quality gate runs `golangci-lint`, `govulncheck`, and `gitleaks` only against source inputs changed from the base ref: `*.go`, `go.mod`, and `go.sum`.
 - If no source inputs changed, `make quality` must exit `0` with skip messages.
-- Every new feature must pass this changed-source quality gate before completion or cite the successful `Quality` GitHub Actions check.
+- Every new feature must pass this changed-source quality gate before completion or cite the successful `quality` GitHub Actions check.
 - The changed-source gate does not mean the full historical `golangci-lint run ./...` baseline is clean.
 - For full project validation, still run `make test` and `make coverage` when relevant to the change.
-- Use `make test-performance` for resource-sensitive scenarios only. It runs `tests/performance` with its required build tag and must not be folded into deterministic test or coverage aggregates. Performance tests provide timing and resource evidence, not separate production coverage evidence.
+- Use `make test-performance` for resource-sensitive scenarios only. It runs only `./tests/performance` with `-tags=performance -count=1 -v -parallel=1 -timeout=10m` and must not be folded into deterministic test or coverage aggregates. Performance tests provide timing, responsiveness, bounded-lookup, and resource evidence, not production coverage evidence. There is no performance coverage target, profile, job, or context; never merge performance evidence into canonical coverage.
 - Document the current changed-source quality gate here; keep scanner/tool selection open until issue #40's evaluation is complete.
 
 ### Project/repo structure and extended agent instructions
@@ -125,28 +125,38 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
   - Keep rendering and interaction state here. Do not move HTTP, crypto, or normalization rules into the TUI layer.
 
 - Tests:
-  - `tests/contract/` verifies externally visible workflow and storage contracts.
-  - `tests/integration/` verifies end-to-end runtime flows across packages.
-  - `tests/performance/` verifies resource-sensitive large-history scenarios with the `performance` build tag. It must remain isolated from ordinary `go test ./...`, `make test`, `make coverage`, and non-performance CI jobs.
-  - `tests/unit/` targets isolated domain and storage behavior.
-  - `tests/empirical/` verifies synthetic empirical financial datasets against generated oracle fixtures.
+  - Package-local tests in `cmd/` and `internal/`, together with `tests/unit/`, provide deterministic offline unit coverage; `make test-unit` runs `./cmd/... ./internal/... ./tests/unit`.
+  - `tests/contract/` verifies deterministic offline externally visible workflow, storage, and external-contract behavior.
+  - `tests/integration/` verifies deterministic cross-package runtime flows with no live provider network.
+  - `tests/externalintegration/` contains opt-in live ECB/Fed checks and is excluded from pull-request CI.
+  - `tests/performance/` contains deterministic local-fixture, resource-sensitive scenarios only. It requires the `performance` build tag and is invoked only by `make test-performance`; it remains isolated from ordinary `go test ./...`, `make test`, `make coverage`, and non-performance CI jobs.
+  - `tests/empirical/` verifies committed synthetic empirical financial datasets against generated golden oracle fixtures.
   - `tests/empirical/fixture/` contains reusable empirical dataset parsers, validators, oracle fixture helpers, project-output translators, and comparison helpers.
-  - `tests/testutil/` contains shared test fixtures and helpers.
-  - Many packages also keep package-local `_internal_test.go` files for narrower behavior checks.
+  - `tests/testutil/` contains shared local scenario fixtures and helpers. `runtimeapp` creates test runtime applications; `runtimeflow` owns the runtime-backed harness, deterministic conversion, protected snapshot, TUI flow driver, and report output/artifact helpers.
+  - Many `cmd/` and `internal/` packages also keep package-local `_internal_test.go` files for narrower behavior checks.
   - Any backing empirical dataset or generated oracle fixture under `testdata/empirical/` must remain read-only unless the active spec is explicitly dedicated to dataset or oracle maintenance.
 
 - Tools and operational files:
-  - `tools/coverpkg/` computes the production package set used by coverage runs.
-  - `tools/coveragegate/` enforces the repository coverage gate from generated reports.
-  - `tools/empiricaloracle/` contains the regeneration-only oracle command for empirical financial fixtures.
+  - `Makefile` owns suite targets, aggregate boundaries, and coverage artifact generation. `make test` is exactly the deterministic `test-unit`, `test-contract`, `test-integration`, `test-empirical`, and `test-tools` aggregate.
+  - `.github/workflows/test.yml` invokes the reusable test-suite workflow. Its independent fresh-Ubuntu check names are `test / run`, `coverage / run`, and `test-performance / run`; external integration is not run there. The separate changed-source workflow check is `quality`.
+  - `tools/coverpkg/` computes the `cmd/` and `internal/` production package denominator used by canonical coverage.
+  - `tools/coveragegate/` enforces canonical 100% statement, global line, global branch, per-file line, and per-file branch coverage only.
+  - `tools/empiricaloracle/` contains regeneration-only oracle tooling. Ordinary tool tests do not regenerate or download; explicit regeneration may use local Python and the pinned rotki cache.
   - `tools/tools.go` pins development-only tool dependencies.
   - `testdata/empirical/` contains the synthetic empirical dataset and generated golden oracle fixtures.
   - `third_party/rotki/` records pinned rotki provenance for empirical oracle boundaries. It is not vendored application runtime code.
   - `specs/` contains feature plans, contracts, checklists, and research. `specs/tiny/` contains lightweight active or recent TinySpec artifacts. Read the active spec before making non-trivial changes.
   - `.cov.json` defines maintained coverage expectations.
+  - `dist/` contains generated output, including leaf diagnostic profiles `unit.out`, `contract.out`, `integration.out`, `empirical.out`, `tools.out`, and live opt-in `external-integration.out`, plus canonical `coverage.out` and `coverage.xml`. No performance coverage artifact exists.
 
 - Working rules for this repository related to code structure:
   - When changing sync behavior, check matching coverage in `tests/contract/`, `tests/integration/`, and `tests/unit/` before considering the work complete.
+  - Treat deterministic coverage regressions as deterministic suite work, not performance work. Performance tests are only the `tests/performance/` package and provide resource evidence only.
+  - Use live provider checks only in `tests/externalintegration/`; deterministic integration and performance tests use local fixtures and no live provider network.
+  - Keep shared integration/performance support cohesive in `tests/testutil/runtimeapp` and `tests/testutil/runtimeflow`; do not duplicate runtime-backed support in scenario packages.
+  - Keep `testdata/empirical/` and its golden fixtures read-only except for dedicated empirical dataset or oracle maintenance.
+  - Never add or merge performance coverage into canonical coverage.
+  - Refer to CI checks by their exact names: `test / run`, `coverage / run`, `test-performance / run`, and `quality`.
   - The `dist/` directory is generated output. Prefer editing source under `cmd/`, `internal/`, `tests/`, `tools/`, and `specs/`.
 
 </CodeStructure>

@@ -14,8 +14,8 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
-	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
+	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
 	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
@@ -31,7 +31,6 @@ type RuntimeBackedFlowHarness struct {
 	BaseDir string
 	App     *runtime.App
 	Config  configmodel.AppSetupConfig
-	Store   configstore.Store
 	Model   *flow.Model
 }
 
@@ -41,28 +40,49 @@ type RuntimeBackedFlowHarness struct {
 // Authored by: OpenCode
 func NewRuntimeBackedFlowHarness(t *testing.T, baseDir string, config configmodel.AppSetupConfig, allowDevHTTP bool) RuntimeBackedFlowHarness {
 	t.Helper()
+	return NewRuntimeBackedFlowHarnessWithCurrencyRateService(t, baseDir, config, allowDevHTTP, DeterministicCurrencyRates{})
+}
+
+// NewRuntimeBackedFlowHarnessWithCurrencyRateService creates an
+// application-backed TUI harness with the supplied report currency-rate service.
+// For example, pass a custom reportcalculate.CurrencyRateService when a test
+// needs to control a rate lookup, then seed a snapshot and drive the returned
+// Model through a report flow.
+// Authored by: OpenCode
+func NewRuntimeBackedFlowHarnessWithCurrencyRateService(
+	t *testing.T,
+	baseDir string,
+	config configmodel.AppSetupConfig,
+	allowDevHTTP bool,
+	currencyRates reportcalculate.CurrencyRateService,
+) RuntimeBackedFlowHarness {
+	t.Helper()
 
 	var options = bootstrap.DefaultOptions()
 	options.ConfigDir = baseDir
 	options.AllowDevHTTP = allowDevHTTP
-	var app = runtimeapp.NewWithReportCurrencyRateService(t, options, deterministicCurrencyRates{})
-	var store = configstore.NewJSONStore(baseDir)
-	var err = store.Save(context.Background(), config)
+	var app = runtimeapp.NewWithReportCurrencyRateService(t, options, currencyRates)
+	var err = app.ConfigStore.Save(context.Background(), config)
 	if err != nil {
 		t.Fatalf("save setup config: %v", err)
 	}
 	var model = flow.NewModel(flow.Dependencies{Options: options, Startup: bootstrap.StartupState{ActiveConfig: &config}, SetupService: app.SetupService, SyncService: app.SyncService, ReportService: app.ReportService})
-	return RuntimeBackedFlowHarness{BaseDir: baseDir, App: app, Config: config, Store: store, Model: model}
+	return RuntimeBackedFlowHarness{BaseDir: baseDir, App: app, Config: config, Model: model}
 }
 
-// deterministicCurrencyRates supplies fixed currency-rate evidence to
-// runtime-backed test fixtures.
+// DeterministicCurrencyRates supplies fixed currency-rate evidence to
+// runtime-backed test fixtures. Use it with
+// NewRuntimeBackedFlowHarnessWithCurrencyRateService when a test needs the
+// standard deterministic conversion evidence.
 // Authored by: OpenCode
-type deterministicCurrencyRates struct{}
+type DeterministicCurrencyRates struct{}
 
 // LookupRate returns fixed currency-rate evidence for a requested activity.
+// For example, report calculation can call it through
+// reportcalculate.CurrencyRateService to obtain the standard deterministic
+// evidence without contacting a provider.
 // Authored by: OpenCode
-func (deterministicCurrencyRates) LookupRate(_ context.Context, request currency.RateLookupRequest) (currency.ExchangeRateEvidence, error) {
+func (DeterministicCurrencyRates) LookupRate(_ context.Context, request currency.RateLookupRequest) (currency.ExchangeRateEvidence, error) {
 	var rateDate = time.Date(request.ActivityDate.Year(), request.ActivityDate.Month(), request.ActivityDate.Day(), 0, 0, 0, 0, time.UTC)
 	// The H.10 fixture marks the 2024-01-06 observation unavailable, so use its prior available date.
 	if rateDate.Format(time.DateOnly) == "2024-01-06" {
@@ -85,9 +105,11 @@ func (deterministicCurrencyRates) LookupRate(_ context.Context, request currency
 	return currency.NewExchangeRateEvidence(request, rateDate, authority, providerID, rateKind, quoteDirection, *apd.New(11, -1), reference)
 }
 
-// ProviderCategoryForBaseCurrency returns fixed provider metadata for a base currency.
+// ProviderCategoryForBaseCurrency returns fixed provider metadata for a base
+// currency. For example, a test can call it with currency.BaseCurrencyEUR to
+// assert that the deterministic ECB provider category is selected.
 // Authored by: OpenCode
-func (deterministicCurrencyRates) ProviderCategoryForBaseCurrency(baseCurrency string) string {
+func (DeterministicCurrencyRates) ProviderCategoryForBaseCurrency(baseCurrency string) string {
 	if baseCurrency == currency.BaseCurrencyEUR {
 		return string(currency.ProviderIDECBEXR)
 	}

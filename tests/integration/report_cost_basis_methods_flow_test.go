@@ -14,8 +14,9 @@ import (
 
 	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
-	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeflow"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -83,6 +84,7 @@ func TestReportGenerationMatchesControlledLedgersAcrossCostBasisMethods(t *testi
 				t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
 			}
 
+			// #nosec G304 -- reportPath is created in the test-owned Documents fixture.
 			var rawReport, err = os.ReadFile(reportPath)
 			if err != nil {
 				t.Fatalf("read saved report %q: %v", reportPath, err)
@@ -160,6 +162,7 @@ func TestReportGenerationSupportsRoundedRepeatingDecimalHistoryAcrossMethods(t *
 				t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
 			}
 
+			// #nosec G304 -- reportPath is created in the test-owned Documents fixture.
 			var rawReport, err = os.ReadFile(reportPath)
 			if err != nil {
 				t.Fatalf("read saved report %q: %v", reportPath, err)
@@ -222,6 +225,48 @@ func TestReportCalculationRetainsFragmentLevelPricedLiquidationMatchesAcrossMeth
 	}
 }
 
+// selectReportMethod moves the method selection cursor to the provided visible
+// method label while the report selection screen keeps method focus.
+// Authored by: OpenCode
+func selectReportMethod(t *testing.T, model *flow.Model, methodLabel string) *flow.Model {
+	t.Helper()
+
+	var updated tea.Model
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+	model = runtimeflow.AssertFlowModel(t, updated)
+	var marker = "> " + methodLabel
+	for attempt := 0; attempt < 32; attempt++ {
+		if strings.Contains(runtimeflow.NormalizeRenderedText(model.View().Content), marker) {
+			return model
+		}
+		updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+		model = runtimeflow.AssertFlowModel(t, updated)
+	}
+	t.Fatalf("expected report method %q to be selected, got %q", methodLabel, model.View().Content)
+	return model
+}
+
+// selectReportBaseCurrencyFromMethodFocus moves from method focus to the report
+// base-currency list and selects the requested currency.
+// Authored by: OpenCode
+func selectReportBaseCurrencyFromMethodFocus(t *testing.T, model *flow.Model, reportBaseCurrency reportmodel.ReportBaseCurrency) *flow.Model {
+	t.Helper()
+
+	var updated tea.Model
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+	model = runtimeflow.AssertFlowModel(t, updated)
+	var marker = "> " + reportBaseCurrency.Label()
+	for attempt := 0; attempt < len(reportmodel.SupportedReportBaseCurrencies())+1; attempt++ {
+		if strings.Contains(runtimeflow.NormalizeRenderedText(model.View().Content), "Report Base Currency") && strings.Contains(runtimeflow.NormalizeRenderedText(model.View().Content), marker) {
+			return model
+		}
+		updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+		model = runtimeflow.AssertFlowModel(t, updated)
+	}
+	t.Fatalf("expected report base currency %q to be selected from method focus, got %q", reportBaseCurrency.Label(), model.View().Content)
+	return model
+}
+
 // assertExpectedReportLedger verifies the rendered Markdown against one
 // controlled expected report ledger.
 // Authored by: OpenCode
@@ -255,10 +300,6 @@ func assertExpectedReportLedger(t *testing.T, reportText string, expected testut
 			assertExpectedActivityRow(t, reportText, row)
 		}
 		for _, liquidation := range detail.LiquidationSummaries {
-			var row = "| " + liquidation.SourceID + " |"
-			if !strings.Contains(reportText, row) {
-				row = "| " + liquidation.SourceID + " |"
-			}
 			for _, part := range []string{
 				liquidation.SourceID,
 				liquidation.DisposedQuantity,
@@ -321,21 +362,6 @@ func compactWhitespace(value string) string {
 	var compact = strings.Join(strings.Fields(value), " ")
 	compact = strings.ReplaceAll(compact, "- ", "-")
 	return compact
-}
-
-// assertIntegrationDecimalString verifies one exact decimal using canonical
-// formatting.
-// Authored by: OpenCode
-func assertIntegrationDecimalString(t *testing.T, value apd.Decimal, want string, label string) {
-	t.Helper()
-
-	var canonical, err = decimalsupport.CanonicalString(value)
-	if err != nil {
-		t.Fatalf("canonicalize %s: %v", label, err)
-	}
-	if canonical != want {
-		t.Fatalf("unexpected %s: got %q want %q", label, canonical, want)
-	}
 }
 
 // mustIntegrationTime returns one stable timestamp for report requests.

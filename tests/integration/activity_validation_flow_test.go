@@ -403,6 +403,20 @@ func TestActivityValidationFlowRejectsIncompleteCurrencyContext(t *testing.T) {
 	}
 }
 
+// setTokenAwareCurrencyContextFixtures applies one reusable user/body
+// permutation to the token-aware Ghostfolio test server.
+// Authored by: OpenCode
+func setTokenAwareCurrencyContextFixtures(server *tokenAwareStorageServer, token string, userBody string, activities ...string) {
+	if userBody == "" {
+		userBody = testutil.GhostfolioUserBody("USD")
+	}
+	server.SetTokenUserBody(token, userBody)
+	server.SetTokenPages(token, []storagePageFixture{{
+		Count:          len(activities),
+		ActivitiesJSON: "[" + strings.Join(activities, ",") + "]",
+	}})
+}
+
 func newActivityValidationSyncService(baseDir string, server *tokenAwareStorageServer) runtime.SyncService {
 	return runtime.NewSyncService(
 		ghostfolioclient.New(server.Client()),

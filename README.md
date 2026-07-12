@@ -57,12 +57,27 @@ make coverage-external-integration
 make quality QUALITY_BASE_REF=origin/main
 ```
 
-`make test` is the canonical deterministic offline aggregate. It runs unit, contract, deterministic integration, empirical, and tool suites once. It excludes live external integration and resource-sensitive performance checks.
-`make coverage` is the canonical deterministic aggregate. It writes fresh `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`, instruments project-owned packages from `cmd/` and `internal/` so black-box contract and integration execution counts, enforces the repository-wide 100% gate, and separately executes tool coverage without expanding the production denominator.
-`coverage-unit`, `coverage-contract`, `coverage-integration`, `coverage-empirical`, `coverage-tools`, and `coverage-external-integration` write partial diagnostic profiles under `dist/coverage/`. They do not run the repository percentage gate.
-`tests/performance` contains timed 10,000-activity scenarios. Its build tag and maintained command keep it isolated from `make test`, `make coverage`, and ordinary `go test ./...`; run `make test-performance` only when the dedicated resources are available. Performance scenarios provide timing, responsiveness, and resource evidence. They do not produce a separate coverage profile because canonical deterministic coverage already proves the complete production denominator independently. Pull requests run the performance command on a fresh, independent runner.
-`make test-external-integration` and `make coverage-external-integration` are opt-in live-network checks and are excluded from pull-request CI.
-Pull-request checks map to `test` (`make test`), `coverage` (`make coverage`), `test-performance` (`make test-performance`), and the separate `quality` check.
+`make test` is the exact deterministic aggregate of `test-unit`, `test-contract`, `test-integration`, `test-empirical`, and `test-tools`. It excludes external integration and performance.
+
+| Target | Scope and boundary |
+| --- | --- |
+| `make test-unit` | `./cmd/...`, `./internal/...`, and `./tests/unit`; deterministic and offline. |
+| `make test-contract` | `tests/contract`; deterministic offline external contracts. |
+| `make test-integration` | `tests/integration`; deterministic cross-package flows with no live provider network. |
+| `make test-empirical` | `tests/empirical/...` against committed synthetic datasets and golden fixtures; ordinary execution is read-only. |
+| `make test-tools` | Ordinary `tools/empiricaloracle` tests; no oracle regeneration or download. |
+| `make test-performance` | Only `./tests/performance`, with `-tags=performance -count=1 -v -parallel=1 -timeout=10m`; deterministic local-fixture scenarios with no live provider network. It provides timing, responsiveness, bounded-lookup, and resource evidence. |
+| `make test-external-integration` | Opt-in live ECB/Fed checks in `tests/externalintegration`; excluded from pull-request CI. |
+
+`tests/performance` is excluded from `make test`, `make coverage`, and ordinary `go test ./...`. It has no coverage target, profile, CI coverage job, or coverage context, and performance evidence must never be merged into canonical coverage.
+
+Coverage leaf artifacts are `unit.out`, `contract.out`, `integration.out`, `empirical.out`, `tools.out`, and `external-integration.out` under `dist/coverage/`. They are diagnostic only and do not run `coveragegate`; external-integration coverage is live opt-in.
+`make coverage` clears and writes `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`. It uses deterministic unit, contract, integration, and empirical drivers with a production denominator limited to `cmd/` and `internal/`; `coveragegate` enforces the canonical 100% statement, global line, global branch, per-file line, and per-file branch requirements. Tool coverage runs separately and does not expand that denominator. External integration and performance are excluded.
+
+`tests/testutil/` is shared integration/performance infrastructure: `runtimeapp` creates test runtime applications, while `runtimeflow` provides the runtime-backed harness, deterministic conversion, protected snapshot, TUI flow driver, and report output/artifact helpers. Scenario fixtures remain local.
+Empirical data and golden oracle fixtures live under `testdata/empirical/`; ordinary tests neither download data nor invoke rotki or oracle regeneration. `tools/empiricaloracle` is regeneration-only tooling. An explicit regeneration may use local Python and the pinned rotki cache.
+
+`.github/workflows/test.yml` invokes the reusable test-suite workflow. Its check names are `test / run`, `coverage / run`, and `test-performance / run`; the separate changed-source check is `quality`. These checks run independently on fresh Ubuntu runners, and none runs external integration.
 `make quality` runs the changed-source quality gate for `*.go`, `go.mod`, and `go.sum` changes using `golangci-lint`, `govulncheck`, and `gitleaks`. It must pass for every feature, including the explicit skip path when no source inputs changed.
 
 ## Local Storage

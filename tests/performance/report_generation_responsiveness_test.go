@@ -26,7 +26,7 @@ func TestReportGenerationResponsivenessLargeCrossCurrencyFixture(t *testing.T) {
 	var model = runtimeflow.UnlockSyncReportsContext(t, harness.Model, "responsiveness-token")
 	model = runtimeflow.OpenReportSelection(t, model)
 	model = runtimeflow.SelectReportYear(t, model, 2025)
-	model = selectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
+	model = runtimeflow.SelectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
 	model, cmd := runtimeflow.StartReportGeneration(t, model)
 	if model.ActiveScreen() != "report_busy" {
 		t.Fatalf("expected asynchronous report busy screen, got %s", model.ActiveScreen())

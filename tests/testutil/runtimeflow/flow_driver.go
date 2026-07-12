@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 )
@@ -16,24 +17,57 @@ import (
 func UnlockSyncReportsContext(t *testing.T, model *flow.Model, token string) *flow.Model {
 	t.Helper()
 	var updated tea.Model
-	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	var cmd tea.Cmd
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	_ = testutil.RunCmd(cmd)
 	model = AssertFlowModel(t, updated)
 	if model.ActiveScreen() != "sync_reports_unlock" {
 		t.Fatalf("expected sync reports unlock screen, got %s", model.ActiveScreen())
 	}
 	// The visible token input accepts text through its dedicated input model.
 	for _, character := range token {
-		updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Text: string(character), Code: character}))
+		updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Text: string(character), Code: character}))
+		_ = testutil.RunCmd(cmd)
 		model = AssertFlowModel(t, updated)
 	}
-	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+	_ = testutil.RunCmd(cmd)
 	model = AssertFlowModel(t, updated)
-	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	_ = testutil.RunCmd(cmd)
 	model = AssertFlowModel(t, updated)
 	if model.ActiveScreen() != "sync_reports_menu" {
 		t.Fatalf("expected sync reports menu after unlock, got %s", model.ActiveScreen())
 	}
+	return model
+}
+
+// SelectReportBaseCurrency moves focus to the report base-currency list and
+// selects the requested currency. For example, call it after SelectReportYear
+// and before StartReportGeneration.
+// Authored by: OpenCode
+func SelectReportBaseCurrency(t *testing.T, model *flow.Model, reportBaseCurrency reportmodel.ReportBaseCurrency) *flow.Model {
+	t.Helper()
+
+	for focusStep := 0; focusStep < 2; focusStep++ {
+		var updated tea.Model
+		updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyTab}))
+		model = AssertFlowModel(t, updated)
+	}
+
+	var marker = "> " + reportBaseCurrency.Label()
+	for attempt := 0; attempt < len(reportmodel.SupportedReportBaseCurrencies())+1; attempt++ {
+		var content = NormalizeRenderedText(model.View().Content)
+		if strings.Contains(content, "Report Base Currency") && strings.Contains(content, marker) {
+			return model
+		}
+
+		var updated tea.Model
+		updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+		model = AssertFlowModel(t, updated)
+	}
+
+	t.Fatalf("expected report base currency %q to be selected, got %q", reportBaseCurrency.Label(), model.View().Content)
 	return model
 }
 
