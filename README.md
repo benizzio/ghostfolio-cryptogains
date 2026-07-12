@@ -19,25 +19,41 @@ Supported runtime flags:
 ## Verification
 
 ```bash
+# Unit suite
 make test-unit
+# Contract suite
 make test-contract
+# Deterministic integration suite
 make test-integration
+# Empirical calculation suite
 make test-empirical
+# Repository tools suite
 make test-tools
+# All deterministic offline suites
 make test
 
+# Unit coverage profile
 make coverage-unit
+# Contract coverage profile
 make coverage-contract
+# Integration coverage profile
 make coverage-integration
+# Empirical coverage profile
 make coverage-empirical
+# Tools coverage profile
 make coverage-tools
+# Canonical deterministic coverage
 make coverage
 
+# Resource-sensitive performance suite
 make test-performance
 
+# Opt-in live integration suite
 make test-external-integration
+# Live integration coverage profile
 make coverage-external-integration
 
+# Changed-source quality checks
 make quality QUALITY_BASE_REF=origin/main
 ```
 
