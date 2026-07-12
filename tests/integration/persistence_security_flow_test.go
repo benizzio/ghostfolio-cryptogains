@@ -7,11 +7,8 @@ package integration
 import (
 	"context"
 	"encoding/json"
-	"io/fs"
 	"net/http"
 	"os"
-	"path/filepath"
-	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -24,9 +21,11 @@ import (
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	syncnormalize "github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
 	syncvalidate "github.com/benizzio/ghostfolio-cryptogains/internal/sync/validate"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeflow"
 )
 
 const (
+	// #nosec G101 -- this is a non-secret sentinel used to assert persistence redaction.
 	persistedArtifactTokenSentinel = "TOKEN_SHOULD_NEVER_APPEAR_IN_PERSISTED_ARTIFACTS_20260516"
 	rawPayloadSentinelFragment     = `"type":"TRANSFER","quantity":123,"valueInBaseCurrency":456,"unitPriceInAssetProfileCurrency":789`
 )
@@ -100,6 +99,7 @@ func TestPersistenceSecurityFlowArtifactsStayFreeOfSecretsAndTransientFailureTex
 	if err != nil {
 		t.Fatalf("generate diagnostic report: %v", err)
 	}
+	// #nosec G304 -- reportPath is returned by the test-owned diagnostic writer.
 	var reportBytes, readErr = os.ReadFile(reportPath)
 	if readErr != nil {
 		t.Fatalf("read diagnostic report: %v", readErr)
@@ -109,7 +109,8 @@ func TestPersistenceSecurityFlowArtifactsStayFreeOfSecretsAndTransientFailureTex
 		assertTextOmitted(t, reportText, forbidden, "production diagnostic report")
 	}
 
-	for _, path := range mustPersistedArtifactPaths(t, baseDir) {
+	for _, path := range runtimeflow.PersistedArtifactPaths(t, baseDir) {
+		// #nosec G304 -- paths are enumerated below the test-owned application directory.
 		var rawBytes, artifactErr = os.ReadFile(path)
 		if artifactErr != nil {
 			t.Fatalf("read persisted artifact %q: %v", path, artifactErr)
@@ -190,32 +191,6 @@ func assertDecryptedSnapshotOmitsForbiddenText(t *testing.T, baseDir string, ser
 	for _, forbidden := range transientResultSentinels {
 		assertTextOmitted(t, payloadText, forbidden, "decrypted snapshot payload")
 	}
-}
-
-// mustPersistedArtifactPaths enumerates the plaintext application artifacts
-// written during the current integration scenario.
-// Authored by: OpenCode
-func mustPersistedArtifactPaths(t *testing.T, baseDir string) []string {
-	t.Helper()
-
-	var root = filepath.Join(baseDir, "ghostfolio-cryptogains")
-	var paths []string
-	var err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		paths = append(paths, path)
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("walk persisted artifacts: %v", err)
-	}
-
-	sort.Strings(paths)
-	return paths
 }
 
 // assertTextOmitted fails the test when one persisted artifact contains a

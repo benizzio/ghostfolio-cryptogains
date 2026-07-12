@@ -16,17 +16,13 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
-	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
-	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	currencyintegration "github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
-	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
-	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeapp"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeflow"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -59,7 +55,7 @@ func TestReportGenerationEmptyMainSectionWritesEmptyMarkdownReport(t *testing.T)
 	var reportPath = files[0]
 	testutil.AssertRegularFile(t, reportPath)
 
-	//nolint:gosec // Test reads the report path returned by the controlled output fixture.
+	// #nosec G304 -- reportPath is created in the test-owned Documents fixture.
 	var reportBytes, err = os.ReadFile(reportPath)
 	if err != nil {
 		t.Fatalf("read saved report %q: %v", reportPath, err)
@@ -97,7 +93,7 @@ func TestReportGenerationWriteFailureGeneratesWrappedDiagnosticCauseChain(t *tes
 		return
 	}
 
-	//nolint:gosec // This test intentionally re-executes the current test binary as a helper process.
+	// #nosec G204,G702 -- os.Args[0] re-executes the current test binary with a fixed test name.
 	var command = exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestReportGenerationWriteFailureGeneratesWrappedDiagnosticCauseChain$")
 	command.Env = append(
 		os.Environ(),
@@ -366,7 +362,7 @@ func TestReportGenerationConversionFailureMatrixShowsSafeFailure(t *testing.T) {
 			var reportIO = testutil.NewReportIOFixture(t)
 			var openLogPath = installOpenCommandRecorder(t, 0)
 			var rateService = &failingIntegrationCurrencyRates{failures: testCase.failures}
-			var harness = newRuntimeBackedFlowHarnessWithCurrencyRateService(t, t.TempDir(), mustCloudSetupConfig(t), false, rateService)
+			var harness = runtimeflow.NewRuntimeBackedFlowHarnessWithCurrencyRateService(t, t.TempDir(), runtimeflow.MustCloudSetupConfig(t), false, rateService)
 
 			seedProtectedSnapshot(t, harness, "token-123", testCase.cache)
 
@@ -374,7 +370,7 @@ func TestReportGenerationConversionFailureMatrixShowsSafeFailure(t *testing.T) {
 			model = openReportSelectionFromContext(t, model)
 			model = selectReportYear(t, model, 2024)
 			model = selectReportBaseCurrency(t, model, testCase.reportBaseCurrency)
-			model, cmd := startReportGenerationAfterBaseCurrencySelection(t, model)
+			model, cmd := runtimeflow.StartReportGeneration(t, model)
 			model = applyBatchCmd(t, model, cmd)
 
 			if model.ActiveScreen() != "report_result" {
@@ -457,7 +453,7 @@ func TestReportGenerationWriteFailureRemovesPartialFileAndShowsFailure(t *testin
 		return
 	}
 
-	//nolint:gosec // This test intentionally re-executes the current test binary as a helper process.
+	// #nosec G204,G702 -- os.Args[0] re-executes the current test binary with a fixed test name.
 	var command = exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestReportGenerationWriteFailureRemovesPartialFileAndShowsFailure$")
 	command.Env = append(
 		os.Environ(),
@@ -497,7 +493,7 @@ func TestReportGenerationPDFOutputUsesTheConcreteRenderer(t *testing.T) {
 	if files := mustPDFFiles(t, reportIO.DocumentsDir); len(files) != 1 {
 		t.Fatalf("expected one combined PDF file, got %#v", files)
 	}
-	if files := mustAllMarkdownFiles(t, reportIO.DocumentsDir); len(files) != 0 {
+	if files := runtimeflow.AllMarkdownFiles(t, reportIO.DocumentsDir); len(files) != 0 {
 		t.Fatalf("expected no Markdown files for PDF output, got %#v", files)
 	}
 	if openerRequests := readOpenCommandRequests(t, openLogPath); len(openerRequests) != 1 {
@@ -796,56 +792,14 @@ func (service *failingIntegrationCurrencyRates) LookupRate(_ context.Context, re
 		}
 	}
 
-	return deterministicIntegrationCurrencyRates{}.LookupRate(context.Background(), request)
+	return runtimeflow.DeterministicCurrencyRates{}.LookupRate(context.Background(), request)
 }
 
 // ProviderCategoryForBaseCurrency returns deterministic provider metadata for
 // failing conversion integration tests.
 // Authored by: OpenCode
 func (service *failingIntegrationCurrencyRates) ProviderCategoryForBaseCurrency(baseCurrency string) string {
-	return deterministicIntegrationCurrencyRates{}.ProviderCategoryForBaseCurrency(baseCurrency)
-}
-
-// newRuntimeBackedFlowHarnessWithCurrencyRateService creates a runtime-backed
-// TUI harness with a caller-provided currency rate service.
-// Authored by: OpenCode
-func newRuntimeBackedFlowHarnessWithCurrencyRateService(
-	t *testing.T,
-	baseDir string,
-	config configmodel.AppSetupConfig,
-	allowDevHTTP bool,
-	currencyRates interface {
-		LookupRate(context.Context, currencyintegration.RateLookupRequest) (currencyintegration.ExchangeRateEvidence, error)
-	},
-) runtimeBackedFlowHarness {
-	t.Helper()
-
-	var options = bootstrap.DefaultOptions()
-	options.ConfigDir = baseDir
-	options.AllowDevHTTP = allowDevHTTP
-
-	var app = runtimeapp.NewWithReportCurrencyRateService(t, options, currencyRates)
-
-	var store = configstore.NewJSONStore(baseDir)
-	if err := store.Save(context.Background(), config); err != nil {
-		t.Fatalf("save setup config: %v", err)
-	}
-
-	var model = flow.NewModel(flow.Dependencies{
-		Options:       options,
-		Startup:       bootstrap.StartupState{ActiveConfig: &config},
-		SetupService:  app.SetupService,
-		SyncService:   app.SyncService,
-		ReportService: app.ReportService,
-	})
-
-	return runtimeBackedFlowHarness{
-		BaseDir: baseDir,
-		App:     app,
-		Config:  config,
-		Store:   store,
-		Model:   model,
-	}
+	return runtimeflow.DeterministicCurrencyRates{}.ProviderCategoryForBaseCurrency(baseCurrency)
 }
 
 // conversionFailureProtectedActivityCache returns one priced cross-currency row
@@ -971,7 +925,7 @@ func reportFlowDecimalPointer(t *testing.T, raw string) *apd.Decimal {
 func assertNoReportBundleFiles(t *testing.T, documentsDir string) {
 	t.Helper()
 
-	if markdownFiles := mustAllMarkdownFiles(t, documentsDir); len(markdownFiles) != 0 {
+	if markdownFiles := runtimeflow.AllMarkdownFiles(t, documentsDir); len(markdownFiles) != 0 {
 		t.Fatalf("expected no Markdown bundle files after failed generation, got %#v", markdownFiles)
 	}
 	if pdfFiles := mustPDFFiles(t, documentsDir); len(pdfFiles) != 0 {
@@ -996,7 +950,7 @@ func assertReportFailureDiagnosticArtifact(t *testing.T, path string, expectFina
 	if filepath.Ext(path) != ".json" {
 		t.Fatalf("expected diagnostic artifact path, got %q", path)
 	}
-	//nolint:gosec // Test reads a diagnostics path discovered from the controlled fixture directory.
+	// #nosec G304 -- path is selected from the test-owned diagnostics fixture.
 	var raw, err = os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read report diagnostics artifact: %v", err)

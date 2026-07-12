@@ -1,8 +1,6 @@
 package testutil
 
 import (
-	"strconv"
-	"strings"
 	"time"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
@@ -21,17 +19,6 @@ type ReportLedgerFixture struct {
 	IncompleteContextReportYear int
 	CurrencylessOrderReportYear int
 	ExpectedReports             map[reportmodel.CostBasisMethod]ExpectedReportLedger
-}
-
-// ReportPerformanceFixture stores one deterministic large-history protected
-// cache and request metadata for the opt-in report performance verification
-// path.
-// Authored by: OpenCode
-type ReportPerformanceFixture struct {
-	ProtectedActivityCache syncmodel.ProtectedActivityCache
-	ReportYear             int
-	ActivityCount          int
-	CalendarYearSpan       int
 }
 
 // ReportOutputFormatFixture stores one deterministic supported report output
@@ -413,71 +400,6 @@ func DeterministicReportLedgerFixture() ReportLedgerFixture {
 	}
 }
 
-// DeterministicLargeReportPerformanceFixture returns one deterministic
-// 10,000-activity cache shaped for the opt-in large-history report performance
-// verification path.
-//
-// The fixture spans at least five calendar years, forces heavy open-lot
-// fragmentation for HIFO, and broadens the scope-local hybrid method back to
-// asset-level scope by mixing reliable and unavailable source scope entries on
-// the same asset timeline. Its USD, EUR, and GBP activity values also exercise
-// deterministic conversion for both Markdown and PDF report output.
-//
-// Authored by: OpenCode
-func DeterministicLargeReportPerformanceFixture() ReportPerformanceFixture {
-	const activityCount = 10000
-	const assetActivityCount = activityCount / 2
-	const preReportBuyCountPerAsset = assetActivityCount / 2
-	const inYearSellCountPerAsset = assetActivityCount / 2
-	const startYear = 2020
-	const calendarYearSpan = 6
-	const reportYear = 2025
-
-	var activities = make([]syncmodel.ActivityRecord, 0, activityCount)
-	var years = make([]int, 0, calendarYearSpan)
-	for year := startYear; year < startYear+calendarYearSpan; year++ {
-		years = append(years, year)
-	}
-
-	activities = append(activities, appendPerformanceAssetActivities(performanceAssetInput{
-		AssetIdentityKey:      "asset-btc-performance-001",
-		AssetSymbol:           "BTC",
-		AssetName:             "Bitcoin",
-		PreReportBuyCount:     preReportBuyCountPerAsset,
-		InYearSellCount:       inYearSellCountPerAsset,
-		PreReportValueOffset:  100,
-		InYearSellValueOffset: 1200,
-		Currencies:            []string{"USD", "EUR", "GBP"},
-		ReliableScope:         reliableWalletScope("wallet-performance-main", "Performance Main Wallet"),
-	})...)
-	activities = append(activities, appendPerformanceAssetActivities(performanceAssetInput{
-		AssetIdentityKey:      "asset-eth-performance-001",
-		AssetSymbol:           "ETH",
-		AssetName:             "Ethereum",
-		PreReportBuyCount:     preReportBuyCountPerAsset,
-		InYearSellCount:       inYearSellCountPerAsset,
-		PreReportValueOffset:  300,
-		InYearSellValueOffset: 900,
-		Currencies:            []string{"GBP", "USD", "EUR"},
-		ReliableScope:         reliableWalletScope("wallet-performance-fallback", "Performance Fallback Wallet"),
-		ForceFallbackScope:    true,
-	})...)
-
-	return ReportPerformanceFixture{
-		ProtectedActivityCache: syncmodel.ProtectedActivityCache{
-			SyncedAt:             time.Date(2026, time.May, 20, 15, 4, 5, 0, time.UTC),
-			RetrievedCount:       len(activities),
-			ActivityCount:        len(activities),
-			AvailableReportYears: years,
-			ScopeReliability:     syncmodel.ScopeReliabilityPartial,
-			Activities:           activities,
-		},
-		ReportYear:       reportYear,
-		ActivityCount:    len(activities),
-		CalendarYearSpan: calendarYearSpan,
-	}
-}
-
 // DeterministicReportOutputFormatFixtures returns the user-selectable output
 // formats from the report-output contract using the validated report model
 // constants.
@@ -526,80 +448,6 @@ func DeterministicReportRequestFixture(outputFormat reportmodel.ReportOutputForm
 		OutputFormat:       outputFormat,
 		RequestedAt:        requestedAt,
 	}
-}
-
-// performanceAssetInput collects one large-history asset timeline declaration.
-// Authored by: OpenCode
-type performanceAssetInput struct {
-	AssetIdentityKey      string
-	AssetSymbol           string
-	AssetName             string
-	PreReportBuyCount     int
-	InYearSellCount       int
-	PreReportValueOffset  int
-	InYearSellValueOffset int
-	Currencies            []string
-	ReliableScope         *syncmodel.SourceScope
-	ForceFallbackScope    bool
-}
-
-// appendPerformanceAssetActivities builds one deterministic asset timeline for
-// the large-history report performance fixture.
-// Authored by: OpenCode
-func appendPerformanceAssetActivities(input performanceAssetInput) []syncmodel.ActivityRecord {
-	var activities = make([]syncmodel.ActivityRecord, 0, input.PreReportBuyCount+input.InYearSellCount)
-
-	for index := 0; index < input.PreReportBuyCount; index++ {
-		var year = 2020 + (index % 5)
-		var occurredAt = performanceOccurredAt(year, index)
-		var grossValue = input.PreReportValueOffset + (index % 900)
-		var feeAmount = (index % 5) + 1
-		var currency = performanceActivityCurrency(input, index)
-
-		activities = append(activities, reportActivity(reportActivityInput{
-			SourceID:         performanceActivitySourceID(input.AssetSymbol, "buy", index+1),
-			OccurredAt:       occurredAt,
-			ActivityType:     syncmodel.ActivityTypeBuy,
-			AssetIdentityKey: input.AssetIdentityKey,
-			AssetSymbol:      input.AssetSymbol,
-			AssetName:        input.AssetName,
-			Quantity:         "1",
-			OrderCurrency:    currency,
-			OrderGrossValue:  decimalStringFromInt(grossValue),
-			OrderFeeAmount:   decimalStringFromInt(feeAmount),
-			SourceScope:      performanceAssetScope(input, index),
-		}))
-	}
-
-	for index := 0; index < input.InYearSellCount; index++ {
-		var occurredAt = performanceOccurredAt(2025, index+input.PreReportBuyCount)
-		var grossValue = input.InYearSellValueOffset + (index % 700)
-		var feeAmount = (index % 5) + 1
-		var currency = performanceActivityCurrency(input, index+input.PreReportBuyCount)
-
-		activities = append(activities, reportActivity(reportActivityInput{
-			SourceID:         performanceActivitySourceID(input.AssetSymbol, "sell", index+1),
-			OccurredAt:       occurredAt,
-			ActivityType:     syncmodel.ActivityTypeSell,
-			AssetIdentityKey: input.AssetIdentityKey,
-			AssetSymbol:      input.AssetSymbol,
-			AssetName:        input.AssetName,
-			Quantity:         "1",
-			OrderCurrency:    currency,
-			OrderGrossValue:  decimalStringFromInt(grossValue),
-			OrderFeeAmount:   decimalStringFromInt(feeAmount),
-			SourceScope:      performanceAssetScope(input, index+input.PreReportBuyCount),
-		}))
-	}
-
-	return activities
-}
-
-// performanceActivityCurrency selects a deterministic activity currency for
-// the large-history report performance fixture.
-// Authored by: OpenCode
-func performanceActivityCurrency(input performanceAssetInput, index int) string {
-	return input.Currencies[index%len(input.Currencies)]
 }
 
 // deterministicExpectedReportsByMethod returns one controlled expected report
@@ -1016,42 +864,6 @@ func reliableWalletScope(id string, name string) *syncmodel.SourceScope {
 		Kind:        syncmodel.SourceScopeKindWallet,
 		Reliability: syncmodel.ScopeReliabilityReliable,
 	}
-}
-
-// performanceScopeForIndex returns one deterministic scope pattern that keeps
-// scope-local fallback active on the large-history performance asset.
-// Authored by: OpenCode
-func performanceAssetScope(input performanceAssetInput, index int) *syncmodel.SourceScope {
-	if input.ForceFallbackScope && index%4 == 0 {
-		return nil
-	}
-
-	return input.ReliableScope
-}
-
-// performanceActivitySourceID returns one stable large-history activity
-// identifier.
-// Authored by: OpenCode
-func performanceActivitySourceID(symbol string, prefix string, sequence int) string {
-	return strings.ToLower(symbol) + "-" + prefix + "-performance-" + decimalStringFromInt(sequence)
-}
-
-// performanceOccurredAt returns one deterministic timestamp for the large-
-// history report performance fixture.
-// Authored by: OpenCode
-func performanceOccurredAt(year int, index int) string {
-	var month = time.Month((index % 12) + 1)
-	var day = (index % 28) + 1
-	var hour = index % 24
-	var minute = index % 60
-	return time.Date(year, month, day, hour, minute, 0, 0, time.UTC).Format(time.RFC3339)
-}
-
-// decimalStringFromInt formats one positive integer for deterministic fixture
-// decimal fields.
-// Authored by: OpenCode
-func decimalStringFromInt(value int) string {
-	return strconv.Itoa(value)
 }
 
 // decimalValue parses one fixture decimal string and panics when the fixture is

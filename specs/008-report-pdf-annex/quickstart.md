@@ -46,6 +46,17 @@ Expected result:
 - coverage includes contract, integration, unit, and empirical suites as configured by repository tooling
 - generated coverage artifacts are written under `dist/coverage`
 
+1. Run the isolated resource-sensitive performance scenarios.
+
+```bash
+make test-performance
+```
+
+Expected result:
+
+- the build-tagged performance suite runs separately from deterministic tests and canonical coverage
+- the 10,000-activity deterministic USD/EUR/GBP fixture generates the Markdown main-plus-Annex bundle and combined paginated PDF
+
 1. Run the changed-source quality gate from the expected base branch.
 
 ```bash
@@ -59,7 +70,7 @@ Expected result:
 
 ## Required Automated Scenarios
 
-Contract and integration coverage should prove these scenarios:
+Deterministic contract and integration suites, together with the isolated performance suite where scale is required, should prove these scenarios:
 
 - User can select `Markdown` or `PDF` before generation.
 - Markdown output remains available.

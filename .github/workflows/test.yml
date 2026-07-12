@@ -3,10 +3,6 @@ name: Test
 permissions:
   contents: read
 
-env:
-  GOCACHE: ${{ github.workspace }}/.cache/go-build
-  GOMODCACHE: ${{ github.workspace }}/.cache/go-mod
-
 on:
   pull_request:
     types:
@@ -15,31 +11,25 @@ on:
       - reopened
       - ready_for_review
 
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/test-suite.yml
+    with:
+      make-target: test
+      timeout-minutes: 10
 
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+  coverage:
+    uses: ./.github/workflows/test-suite.yml
+    with:
+      make-target: coverage
+      timeout-minutes: 15
 
-      - name: Cache Go modules and build cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.GOCACHE }}
-            ${{ env.GOMODCACHE }}
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Run test suite
-        run: make test
-
-      - name: Run coverage gate
-        run: make coverage
+  test-performance:
+    uses: ./.github/workflows/test-suite.yml
+    with:
+      make-target: test-performance
+      timeout-minutes: 15

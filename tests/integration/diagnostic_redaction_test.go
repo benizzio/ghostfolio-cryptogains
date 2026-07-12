@@ -18,6 +18,7 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeflow"
 )
 
 func TestApplicationOwnedDiagnosticsRedactSecrets(t *testing.T) {
@@ -51,7 +52,8 @@ func TestGeneratedDiagnosticsRedactSecretBearingFailureCauseChain(t *testing.T) 
 		t.Fatalf("generate diagnostic report: %v", err)
 	}
 
-	var raw, readErr = os.ReadFile(path) // #nosec G304 -- test reads the diagnostic path returned by the controlled runtime fixture.
+	// #nosec G304 -- path is returned by the test-owned diagnostic writer.
+	var raw, readErr = os.ReadFile(path)
 	if readErr != nil {
 		t.Fatalf("read diagnostic report: %v", readErr)
 	}
@@ -79,7 +81,7 @@ func TestProductionConversionFailureDiagnosticsRedactFinancialValues(t *testing.
 	var rateService = &failingIntegrationCurrencyRates{failures: map[string]error{
 		"EUR|USD|2024-07-15": errors.New("provider_unavailable: Federal Reserve H.10 failed with Bearer jwt-secret and token token-123 for amount 1000.25"),
 	}}
-	var harness = newRuntimeBackedFlowHarnessWithCurrencyRateService(t, t.TempDir(), mustCloudSetupConfig(t), false, rateService)
+	var harness = runtimeflow.NewRuntimeBackedFlowHarnessWithCurrencyRateService(t, t.TempDir(), runtimeflow.MustCloudSetupConfig(t), false, rateService)
 	var token = "token-123"
 	var cache = conversionFailureProtectedActivityCache(t, "redaction-eur-buy", currencyintegration.BaseCurrencyEUR, "2024-07-15T10:00:00Z")
 	cache.Activities[0].Comment = "Bearer jwt-secret reusable verifier token-123"
@@ -121,7 +123,8 @@ func TestProductionConversionFailureDiagnosticsRedactFinancialValues(t *testing.
 		t.Fatalf("generate conversion failure diagnostic report: %v", err)
 	}
 	testutil.AssertRegularFile(t, path)
-	var raw, readErr = os.ReadFile(path) // #nosec G304 -- test reads the diagnostic path returned by the controlled runtime fixture.
+	// #nosec G304 -- path is returned by the test-owned diagnostic writer.
+	var raw, readErr = os.ReadFile(path)
 	if readErr != nil {
 		t.Fatalf("read conversion failure diagnostic report: %v", readErr)
 	}

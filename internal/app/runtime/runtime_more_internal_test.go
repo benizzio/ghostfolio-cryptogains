@@ -218,6 +218,7 @@ func TestWriteDiagnosticReportCoversBranches(t *testing.T) {
 		if !strings.Contains(path, filepath.Join(applicationDirectoryName, diagnosticsDirectoryName)) {
 			t.Fatalf("expected diagnostics path, got %q", path)
 		}
+		// #nosec G304 -- path is returned by writeDiagnosticReport for this test-owned directory.
 		raw, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("read diagnostic report: %v", err)
@@ -650,7 +651,7 @@ func TestValidateCoversProtectedStorageFailureBranches(t *testing.T) {
 			validateSnapshotEnvelopeCompatibility = originalValidateEnvelopeCompatibility
 		}()
 
-		store := runtimeSnapshotStore{candidates: []snapshotstore.Candidate{runtimeSnapshotCandidateFixture(config.ServerOrigin, "snapshot-1")}}
+		store := runtimeSnapshotStore{candidates: []snapshotstore.Candidate{runtimeSnapshotCandidateFixture(config.ServerOrigin)}}
 		service := requireSyncService(t, NewSyncService(nil, time.Second, t.TempDir(), true, nil, nil, nil, store))
 		outcome := service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
 		if outcome.FailureReason != SyncFailureUnsupportedStoredDataVersion {
@@ -668,7 +669,7 @@ func TestValidateCoversProtectedStorageFailureBranches(t *testing.T) {
 			validateSnapshotEnvelopeCompatibility = originalValidateEnvelopeCompatibility
 		}()
 
-		store := runtimeSnapshotStore{candidates: []snapshotstore.Candidate{runtimeSnapshotCandidateFixture(config.ServerOrigin, "snapshot-1")}}
+		store := runtimeSnapshotStore{candidates: []snapshotstore.Candidate{runtimeSnapshotCandidateFixture(config.ServerOrigin)}}
 		service := requireSyncService(t, NewSyncService(nil, time.Second, t.TempDir(), true, nil, nil, nil, store))
 		outcome := service.Run(context.Background(), SyncRequest{Config: config, SecurityToken: "token"})
 		if outcome.FailureReason != SyncFailureIncompatibleNewSyncData {
@@ -679,7 +680,7 @@ func TestValidateCoversProtectedStorageFailureBranches(t *testing.T) {
 	t.Run("unlock finds unsupported payload version", func(t *testing.T) {
 		config := runtimeSetupConfigFixture(t, "https://ghostfol.io", true)
 		store := runtimeSnapshotStore{
-			candidates: []snapshotstore.Candidate{runtimeSnapshotCandidateFixture(config.ServerOrigin, "snapshot-1")},
+			candidates: []snapshotstore.Candidate{runtimeSnapshotCandidateFixture(config.ServerOrigin)},
 			read: func(context.Context, snapshotstore.ReadRequest) (snapshotmodel.Payload, error) {
 				return snapshotmodel.Payload{}, snapshotstore.ErrUnsupportedStoredDataVersion
 			},
@@ -715,7 +716,7 @@ func TestValidateCoversProtectedWriteBranches(t *testing.T) {
 
 		config := runtimeSetupConfigFixture(t, server.URL, true)
 		store := runtimeSnapshotStore{
-			candidates: []snapshotstore.Candidate{runtimeSnapshotCandidateFixture(config.ServerOrigin, "snapshot-1")},
+			candidates: []snapshotstore.Candidate{runtimeSnapshotCandidateFixture(config.ServerOrigin)},
 			read: func(context.Context, snapshotstore.ReadRequest) (snapshotmodel.Payload, error) {
 				return snapshotmodel.Payload{RegisteredLocalUser: snapshotmodel.RegisteredLocalUser{LocalUserID: "user-1"}}, nil
 			},
@@ -922,8 +923,6 @@ func TestRunPreservesIncompleteCurrencyContextDiagnosticContext(t *testing.T) {
 // and payload-build branches around protected snapshot state helpers.
 // Authored by: OpenCode
 func TestSnapshotLifecycleAndWrapperNilBranches(t *testing.T) {
-	t.Parallel()
-
 	var nilActiveState *activeSnapshotState
 	nilActiveState.Set(snapshotstore.Candidate{SnapshotID: "ignored"}, snapshotmodel.Payload{})
 	if state := nilActiveState.ProtectedDataState(); state.HasReadableSnapshot || state.ServerOrigin != "" || state.ActivityCount != 0 || !state.LastSuccessfulSyncAt.IsZero() || len(state.AvailableReportYears) != 0 {
@@ -1044,7 +1043,7 @@ func TestSnapshotLifecycleAndWrapperNilBranches(t *testing.T) {
 	}
 
 	var unsupportedStore = runtimeSnapshotStore{
-		candidates: []snapshotstore.Candidate{runtimeSnapshotCandidateFixture("https://ghostfol.io", "snapshot-1")},
+		candidates: []snapshotstore.Candidate{runtimeSnapshotCandidateFixture("https://ghostfol.io")},
 		read: func(context.Context, snapshotstore.ReadRequest) (snapshotmodel.Payload, error) {
 			return snapshotmodel.Payload{}, snapshotstore.ErrUnsupportedStoredDataVersion
 		},
@@ -1156,7 +1155,7 @@ func TestSyncReportsProtectedDataAvailabilityHelpers(t *testing.T) {
 	}
 
 	var lifecycle = newSnapshotLifecycle(runtimeSnapshotStore{
-		candidates: []snapshotstore.Candidate{runtimeSnapshotCandidateFixture("https://ghostfol.io", "snapshot-1")},
+		candidates: []snapshotstore.Candidate{runtimeSnapshotCandidateFixture("https://ghostfol.io")},
 		read: func(context.Context, snapshotstore.ReadRequest) (snapshotmodel.Payload, error) {
 			return snapshotmodel.Payload{
 				SetupProfile: snapshotmodel.SetupProfile{ServerOrigin: "https://ghostfol.io"},
@@ -1328,6 +1327,7 @@ func runtimeCurrencyMismatchRecordFixture(t *testing.T) syncmodel.ActivityRecord
 func mustRuntimeDiagnosticReportDocument(t *testing.T, path string) diagnosticReportDocument {
 	t.Helper()
 
+	// #nosec G304 -- path is a diagnostic report created by the calling test.
 	var raw, err = os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read diagnostic report: %v", err)
@@ -1374,9 +1374,9 @@ func runtimeSetupConfigFixture(t *testing.T, serverOrigin string, allowDevHTTP b
 // runtimeSnapshotCandidateFixture returns one server-scoped snapshot candidate
 // for runtime internal tests.
 // Authored by: OpenCode
-func runtimeSnapshotCandidateFixture(serverOrigin string, snapshotID string) snapshotstore.Candidate {
+func runtimeSnapshotCandidateFixture(serverOrigin string) snapshotstore.Candidate {
 	return snapshotstore.Candidate{
-		SnapshotID: snapshotID,
+		SnapshotID: "snapshot-1",
 		Header: snapshotmodel.EnvelopeHeader{
 			FormatVersion:      snapshotmodel.EnvelopeFormatVersion,
 			ServerDiscoveryKey: snapshotenvelope.DeriveServerDiscoveryKey(serverOrigin),
