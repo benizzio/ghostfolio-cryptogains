@@ -9,13 +9,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	ghostfolioclient "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/client"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/dto"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	syncnormalize "github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
@@ -31,7 +31,7 @@ func TestSyncPerformanceFlowLargeHistoryFixture(t *testing.T) {
 	const threshold = 2 * time.Minute
 	var baseDir = t.TempDir()
 	var pages = largeHistoryPages(activityCount, 250)
-	var server = newPerformanceSyncServer(t, pages)
+	var server = newPerformanceSyncServer(t, pages, activityCount)
 	var config, err = configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, server.URL, true, time.Now())
 	if err != nil {
 		t.Fatalf("new setup config: %v", err)
@@ -69,7 +69,7 @@ func TestSyncPerformanceFlowLargeHistoryFixture(t *testing.T) {
 
 type performanceSyncServer struct{ *httptest.Server }
 
-func newPerformanceSyncServer(t *testing.T, pages []string) *performanceSyncServer {
+func newPerformanceSyncServer(t *testing.T, pages [][]dto.ActivityPageEntry, totalCount int) *performanceSyncServer {
 	t.Helper()
 	var pageIndex int
 	var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -90,7 +90,14 @@ func newPerformanceSyncServer(t *testing.T, pages []string) *performanceSyncServ
 			if pageIndex >= len(pages) {
 				pageIndex = len(pages) - 1
 			}
-			_, _ = fmt.Fprintf(writer, `{"activities":%s,"count":10000}`, pages[pageIndex])
+			var response = dto.ActivityPageResponse{Activities: pages[pageIndex], Count: totalCount}
+			var responseBody, err = json.Marshal(response)
+			if err != nil {
+				t.Errorf("marshal activities response: %v", err)
+				http.Error(writer, "marshal activities response", http.StatusInternalServerError)
+				return
+			}
+			_, _ = writer.Write(responseBody)
 			pageIndex++
 		default:
 			writer.WriteHeader(http.StatusNotFound)
@@ -100,24 +107,32 @@ func newPerformanceSyncServer(t *testing.T, pages []string) *performanceSyncServ
 	return &performanceSyncServer{Server: server}
 }
 
-func largeHistoryPages(activityCount int, pageSize int) []string {
-	var pages = make([]string, 0, (activityCount+pageSize-1)/pageSize)
+func largeHistoryPages(activityCount int, pageSize int) [][]dto.ActivityPageEntry {
+	var pages = make([][]dto.ActivityPageEntry, 0, (activityCount+pageSize-1)/pageSize)
 	var startedAt = time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC)
 	for offset := 0; offset < activityCount; offset += pageSize {
 		var end = offset + pageSize
 		if end > activityCount {
 			end = activityCount
 		}
-		var builder strings.Builder
-		builder.WriteByte('[')
+		var page = make([]dto.ActivityPageEntry, 0, end-offset)
 		for index := offset; index < end; index++ {
-			if index > offset {
-				builder.WriteByte(',')
-			}
-			_, _ = fmt.Fprintf(&builder, `{"id":"activity-%05d","date":"%s","type":"BUY","quantity":1,"valueInBaseCurrency":100,"unitPriceInAssetProfileCurrency":100,"SymbolProfile":{"id":"asset-btc-performance-001","symbol":"BTC","name":"Bitcoin","currency":"USD"}}`, index+1, startedAt.Add(time.Duration(index)*5*time.Hour).Format(time.RFC3339))
+			page = append(page, dto.ActivityPageEntry{
+				ID:                              fmt.Sprintf("activity-%05d", index+1),
+				Date:                            startedAt.Add(time.Duration(index) * 5 * time.Hour).Format(time.RFC3339),
+				Type:                            "BUY",
+				Quantity:                        json.Number("1"),
+				ValueInBaseCurrency:             json.Number("100"),
+				UnitPriceInAssetProfileCurrency: json.Number("100"),
+				SymbolProfile: dto.ActivitySymbolProfile{
+					ID:       "asset-btc-performance-001",
+					Symbol:   "BTC",
+					Name:     "Bitcoin",
+					Currency: "USD",
+				},
+			})
 		}
-		builder.WriteByte(']')
-		pages = append(pages, builder.String())
+		pages = append(pages, page)
 	}
 	return pages
 }
