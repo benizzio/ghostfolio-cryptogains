@@ -3,10 +3,6 @@ name: Test
 permissions:
   contents: read
 
-env:
-  GOCACHE: ${{ github.workspace }}/.cache/go-build
-  GOMODCACHE: ${{ github.workspace }}/.cache/go-mod
-
 on:
   pull_request:
     types:
@@ -21,82 +17,19 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Check out repository
-        # actions/checkout@v4
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          persist-credentials: false
-      - name: Cache Go modules and build cache
-        # actions/cache@v4
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: |
-            ${{ env.GOCACHE }}
-            ${{ env.GOMODCACHE }}
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      - name: Set up Go
-        # actions/setup-go@v5
-        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
-        with:
-          go-version-file: go.mod
-      - name: Run deterministic test suites
-        run: make test
+    uses: ./.github/workflows/test-suite.yml
+    with:
+      make-target: test
+      timeout-minutes: 10
 
   coverage:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Check out repository
-        # actions/checkout@v4
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          persist-credentials: false
-      - name: Cache Go modules and build cache
-        # actions/cache@v4
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: |
-            ${{ env.GOCACHE }}
-            ${{ env.GOMODCACHE }}
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      - name: Set up Go
-        # actions/setup-go@v5
-        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
-        with:
-          go-version-file: go.mod
-      - name: Run deterministic coverage gate
-        run: make coverage
+    uses: ./.github/workflows/test-suite.yml
+    with:
+      make-target: coverage
+      timeout-minutes: 15
 
   test-performance:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Check out repository
-        # actions/checkout@v4
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-        with:
-          persist-credentials: false
-      - name: Cache Go modules and build cache
-        # actions/cache@v4
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
-        with:
-          path: |
-            ${{ env.GOCACHE }}
-            ${{ env.GOMODCACHE }}
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      - name: Set up Go
-        # actions/setup-go@v5
-        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff
-        with:
-          go-version-file: go.mod
-      - name: Run isolated performance tests
-        run: make test-performance
+    uses: ./.github/workflows/test-suite.yml
+    with:
+      make-target: test-performance
+      timeout-minutes: 15
