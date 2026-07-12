@@ -6,6 +6,7 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -526,6 +527,46 @@ func TestReportGenerationBundleWriteFailureLeavesNoPartialBundleFiles(t *testing
 	if err != nil {
 		t.Fatalf("run bundle write-failure helper process: %v\n%s", err, string(output))
 	}
+}
+
+// TestReportGenerationRendererFailureLeavesNoOutputFiles verifies a runtime
+// renderer failure occurs before output writing or automatic opening.
+// Authored by: OpenCode
+func TestReportGenerationRendererFailureLeavesNoOutputFiles(t *testing.T) {
+	var reportIO = testutil.NewReportIOFixture(t)
+	var openLogPath = installOpenCommandRecorder(t, 0)
+	var fixture = testutil.DeterministicReportLedgerFixture()
+	var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
+	var token = "token-123"
+
+	if err := harness.App.SetReportBundleRendererForTesting(func(reportmodel.ReportOutputFormat, reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+		return nil, errors.New("forced renderer failure")
+	}); err != nil {
+		t.Fatalf("inject renderer failure: %v", err)
+	}
+	seedProtectedSnapshot(t, harness, token, fixture.ProtectedActivityCache)
+
+	var contextResult = harness.App.SyncService.UnlockSelectedServerSnapshot(context.Background(), harness.Config, token)
+	if !contextResult.ProtectedData.HasReadableSnapshot {
+		t.Fatalf("expected readable snapshot after unlock, got %#v", contextResult)
+	}
+
+	var request = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown)
+	var outcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: request})
+	if outcome.Success {
+		t.Fatalf("expected renderer failure outcome, got %#v", outcome)
+	}
+	if outcome.FailureReason != runtime.ReportFailureUnsupportedReportCalculation {
+		t.Fatalf("expected renderer failure category %q, got %#v", runtime.ReportFailureUnsupportedReportCalculation, outcome)
+	}
+	if !strings.Contains(outcome.Message, "Could not render the") || !strings.Contains(outcome.Message, "forced renderer failure") || !strings.Contains(outcome.Message, "No report file was saved.") {
+		t.Fatalf("expected renderer failure result, got %q", outcome.Message)
+	}
+	assertNoReportBundleFiles(t, reportIO.DocumentsDir)
+	if openerRequests := readOpenCommandRequests(t, openLogPath); len(openerRequests) != 0 {
+		t.Fatalf("expected no opener request after renderer failure, got %#v", openerRequests)
+	}
+	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
 }
 
 // runReportGenerationWriteFailureScenario executes the runtime-backed write

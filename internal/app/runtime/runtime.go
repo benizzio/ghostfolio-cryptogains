@@ -3,6 +3,7 @@
 package runtime
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -37,6 +38,29 @@ type App struct {
 	SetupService   SetupService
 	SyncService    SyncService
 	ReportService  ReportService
+}
+
+// SetReportBundleRendererForTesting replaces the assembled report renderer for
+// deterministic runtime integration tests. Production assembly does not call
+// this method and does not derive renderer behavior from process environment.
+//
+// Example:
+//
+//	app.SetReportBundleRendererForTesting(func(reportmodel.ReportOutputFormat, reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+//		return nil, errors.New("forced render failure")
+//	})
+//
+// Authored by: OpenCode
+func (app *App) SetReportBundleRendererForTesting(renderer reportBundleRenderer) error {
+	if app == nil {
+		return errors.New("runtime app is unavailable")
+	}
+	var service, ok = app.ReportService.(*reportService)
+	if !ok || service == nil {
+		return errors.New("runtime report service does not support renderer replacement")
+	}
+	service.renderBundle = renderer
+	return nil
 }
 
 // New assembles the runtime dependencies required by the application.

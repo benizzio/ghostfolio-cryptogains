@@ -9,8 +9,11 @@ import (
 	"testing"
 	"time"
 
+	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
+	reportmarkdown "github.com/benizzio/ghostfolio-cryptogains/internal/report/markdown"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 	"github.com/cockroachdb/apd/v3"
 	"github.com/signintech/gopdf"
 	"golang.org/x/image/font/gofont/gobold"
@@ -165,6 +168,87 @@ func TestBUG005TableContinuationRepeatsContextAndHeader(t *testing.T) {
 	}
 }
 
+// TestTableContinuationAndWrappedCellLayout verifies long table cells retain
+// their wrapped content inside printable columns and that only actual
+// continuation pages repeat the required table context and header.
+// Authored by: OpenCode
+func TestTableContinuationAndWrappedCellLayout(t *testing.T) {
+	var longCell = strings.Repeat("long table cell content ", 24) + "WRAPPED-CELL-END"
+	var wrappedDocument = startedTestDocument(t)
+	if err := wrappedDocument.AddTable(pdfTable{
+		Title: "Wrapped Cell Table",
+		Columns: []pdfColumn{
+			{Header: "Source ID", Width: 1, Align: "left"},
+			{Header: "Note", Width: 1, Align: "left"},
+		},
+		Rows: [][]string{{"wrapped-source", longCell}},
+	}); err != nil {
+		t.Fatalf("add wrapped-cell table: %v", err)
+	}
+	var wrappedInspection, err = testutil.InspectGeneratedPDF(wrappedDocument.Bytes())
+	if err != nil {
+		t.Fatalf("inspect wrapped-cell PDF: %v", err)
+	}
+	if !wrappedInspection.ContainsSearchableText("WRAPPED-CELL-END") {
+		t.Fatalf("wrapped cell tail was clipped instead of wrapped within its column: %q", wrappedInspection.SearchableText)
+	}
+	if wrappedDocument.y <= 136 {
+		t.Fatalf("wrapped row advanced to %.0f, want more than the 136-point unwrapped table height", wrappedDocument.y)
+	}
+	if wrappedInspection.ContainsSearchableText("Wrapped Cell Table (continued)") {
+		t.Fatalf("unsplit table emitted continuation context: %q", wrappedInspection.SearchableText)
+	}
+
+	var previousTextWriter = writeTextForGopdfDocument
+	var continuationContexts []string
+	writeTextForGopdfDocument = func(document *gopdfDocument, text string) error {
+		continuationContexts = append(continuationContexts, text)
+		return previousTextWriter(document, text)
+	}
+	defer func() { writeTextForGopdfDocument = previousTextWriter }()
+
+	var continuedDocument = startedTestDocument(t)
+	if err := continuedDocument.AddTable(pdfTable{
+		ContinuationTitle: "Per-Asset Audit Activity (continued)",
+		Columns:           []pdfColumn{{Header: "Source ID", Width: 1, Align: "left"}},
+		Rows:              [][]string{{"first-complete-row"}, {"second-complete-row"}, {"third-complete-row"}},
+		RowHeight:         200,
+	}); err != nil {
+		t.Fatalf("add continued table: %v", err)
+	}
+	var continuedInspection testutil.GeneratedPDF
+	continuedInspection, err = testutil.InspectGeneratedPDF(continuedDocument.Bytes())
+	if err != nil {
+		t.Fatalf("inspect continued-table PDF: %v", err)
+	}
+	if len(continuedInspection.PageBoxes) != 3 {
+		t.Fatalf("continued table pages = %d, want 3 pages for one complete row per page", len(continuedInspection.PageBoxes))
+	}
+	if len(continuationContexts) != 2 {
+		t.Fatalf("continuation context count = %d, want 2", len(continuationContexts))
+	}
+	for _, context := range continuationContexts {
+		if context != "Per-Asset Audit Activity (continued)" {
+			t.Fatalf("continuation context = %q, want exact Per-Asset Audit Activity (continued)", context)
+		}
+	}
+	if strings.Contains(continuedInspection.SearchableText, "Continued:") {
+		t.Fatalf("forbidden continuation prefix was emitted: %q", continuedInspection.SearchableText)
+	}
+	var repeatedHeaders = strings.Count(strings.ToUpper(continuedInspection.SearchableText), "SOURCEID")
+	if repeatedHeaders < 3 {
+		t.Fatalf("repeated table headers = %d, want one header on each page", repeatedHeaders)
+	}
+	for _, row := range []string{"first-complete-row", "second-complete-row", "third-complete-row"} {
+		if !continuedInspection.ContainsSearchableText(row) {
+			t.Fatalf("complete continued row %q was not searchable in %q", row, continuedInspection.SearchableText)
+		}
+	}
+	if continuedDocument.y > pageBottom {
+		t.Fatalf("continued table ended at %.0f, beyond bottom margin %.0f", continuedDocument.y, pageBottom)
+	}
+}
+
 // TestLoadApplicationFontsValidatesAndLoadsRegularAndBoldFonts specifies the
 // application-supplied font seam.
 // Authored by: OpenCode
@@ -296,6 +380,67 @@ func TestRendererRenderValidationAndSuccessBranches(t *testing.T) {
 	_, err = renderer.Render(minimalPDFReportFixture(t))
 	if err == nil || !strings.Contains(err.Error(), "load regular font") {
 		t.Fatalf("expected render to wrap concrete font-load failure, got %v", err)
+	}
+}
+
+// TestRendererEmitsLandscapeA4SearchableSharedReportValues verifies real PDF
+// output preserves report values rendered to Markdown from the same protected
+// activity cache.
+// Authored by: OpenCode
+func TestRendererEmitsLandscapeA4SearchableSharedReportValues(t *testing.T) {
+	var fixture = testutil.DeterministicReportLedgerFixture()
+	for index := range fixture.ProtectedActivityCache.Activities {
+		fixture.ProtectedActivityCache.Activities[index].OrderCurrency = "USD"
+		fixture.ProtectedActivityCache.Activities[index].AssetProfileCurrency = "USD"
+		fixture.ProtectedActivityCache.Activities[index].BaseCurrency = "USD"
+	}
+	var request, err = reportmodel.NewReportRequest(
+		fixture.PrimaryReportYear,
+		reportmodel.CostBasisMethodFIFO,
+		reportmodel.ReportBaseCurrencyUSD,
+		reportmodel.ReportOutputFormatPDF,
+		time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("create report request: %v", err)
+	}
+	var report reportmodel.CapitalGainsReport
+	report, err = reportcalculate.Calculate(request, fixture.ProtectedActivityCache)
+	if err != nil {
+		t.Fatalf("calculate report from protected cache: %v", err)
+	}
+	var markdownDocument reportmodel.ReportDocument
+	markdownDocument, err = reportmarkdown.Render(report)
+	if err != nil {
+		t.Fatalf("render Markdown from protected cache: %v", err)
+	}
+	var renderer Renderer
+	renderer, err = NewRenderer(RenderOptions{Fonts: FontData{Regular: goregular.TTF, Bold: gobold.TTF}})
+	if err != nil {
+		t.Fatalf("create PDF renderer: %v", err)
+	}
+	var payload []byte
+	payload, err = renderer.Render(report)
+	if err != nil {
+		t.Fatalf("render PDF from protected cache: %v", err)
+	}
+	var inspection testutil.GeneratedPDF
+	inspection, err = testutil.InspectGeneratedPDF(payload)
+	if err != nil {
+		t.Fatalf("inspect rendered PDF: %v", err)
+	}
+	for index, page := range inspection.PageBoxes {
+		if page.Width != 842 || page.Height != 595 {
+			t.Fatalf("page %d dimensions = %.0fx%.0f, want landscape A4 842x595", index+1, page.Width, page.Height)
+		}
+	}
+	for _, sharedValue := range []string{"Ghostfolio Capital Gains And Losses Report", "Gains-And-Losses Summary", "Overall Yearly Net Total", "ADA", "Same currency"} {
+		if !strings.Contains(markdownDocument.Content, sharedValue) {
+			t.Fatalf("expected Markdown to contain shared value %q, got %q", sharedValue, markdownDocument.Content)
+		}
+		if !inspection.ContainsSearchableText(sharedValue) {
+			t.Fatalf("expected searchable PDF to contain shared value %q, got %q", sharedValue, inspection.SearchableText)
+		}
 	}
 }
 
@@ -717,11 +862,13 @@ func TestGopdfDocumentInjectedFailureBranches(t *testing.T) {
 	var previousCellWriter = writeCellForGopdfDocument
 	var previousMultiWriter = writeMultiCellForGopdfDocument
 	var previousTableDrawer = drawTableForGopdfDocument
+	var previousTableCellMeasurer = measureTableCellForGopdfDocument
 	defer func() {
 		writeTextForGopdfDocument = previousTextWriter
 		writeCellForGopdfDocument = previousCellWriter
 		writeMultiCellForGopdfDocument = previousMultiWriter
 		drawTableForGopdfDocument = previousTableDrawer
+		measureTableCellForGopdfDocument = previousTableCellMeasurer
 	}()
 
 	writeTextForGopdfDocument = func(*gopdfDocument, string) error { return errors.New("gopdf text failed") }
@@ -757,6 +904,13 @@ func TestGopdfDocumentInjectedFailureBranches(t *testing.T) {
 		})
 	}, "font")
 	drawTableForGopdfDocument = previousTableDrawer
+	measureTableCellForGopdfDocument = func(*gopdfDocument, *gopdf.Rect, string) (bool, float64, error) {
+		return false, 0, errors.New("gopdf table-cell measurement failed")
+	}
+	assertErrorContains(t, func() error {
+		return startedTestDocument(t).AddTable(pdfTable{Columns: []pdfColumn{{Header: "A", Width: 100, Align: "left"}}, Rows: [][]string{{"row"}}})
+	}, "gopdf table-cell measurement failed")
+	measureTableCellForGopdfDocument = previousTableCellMeasurer
 	assertErrorContains(t, func() error {
 		return startedTestDocument(t).AddTable(pdfTable{
 			Columns:   []pdfColumn{{Header: "Entry", Width: 100, Align: "left"}},
@@ -790,6 +944,33 @@ func TestGopdfDocumentInjectedFailureBranches(t *testing.T) {
 	assertErrorContains(t, func() error {
 		return startedTestDocument(t).AddTable(pdfTable{Title: "Table", Columns: []pdfColumn{{Header: "A", Width: 100, Align: "left"}}, Rows: [][]string{{"row"}}})
 	}, "gopdf table title failed")
+}
+
+// TestGopdfDocumentTableSizingFailureBranches verifies table sizing propagates
+// concrete font failures and rejects a cell taller than a page.
+// Authored by: OpenCode
+func TestGopdfDocumentTableSizingFailureBranches(t *testing.T) {
+	var boldOnlyDocument = newGopdfDocument()
+	if err := boldOnlyDocument.StartPDF(PageSizeA4); err != nil {
+		t.Fatalf("start bold-only document: %v", err)
+	}
+	if err := boldOnlyDocument.AddTTFFont(fontBold, gobold.TTF); err != nil {
+		t.Fatalf("load bold font: %v", err)
+	}
+	assertErrorContains(t, func() error {
+		return boldOnlyDocument.AddTable(pdfTable{
+			Columns: []pdfColumn{{Header: "Entry", Width: 1, Align: "left"}},
+			Rows:    [][]string{{"entry"}},
+		})
+	}, "font")
+
+	var tooTallDocument = startedTestDocument(t)
+	assertErrorContains(t, func() error {
+		return tooTallDocument.AddTable(pdfTable{
+			Columns: []pdfColumn{{Header: "Entry", Width: 1, Align: "left"}},
+			Rows:    [][]string{{strings.Repeat("sizing ", 4000)}},
+		})
+	}, "table cell does not fit within the printable page area")
 }
 
 // startedTestDocument creates one concrete document with valid fonts loaded.

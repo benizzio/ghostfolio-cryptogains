@@ -291,6 +291,20 @@ func TestReportScreenViewsCoverSelectionBusyAndResultBranches(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new report output file: %v", err)
 	}
+	annexFile, err := reportmodel.NewReportOutputFile("/tmp/Documents", "ghostfolio-capital-gains-2024-fifo-annex-1.md", "/tmp/Documents/ghostfolio-capital-gains-2024-fifo-annex-1.md", reportmodel.ReportDocumentRoleAnnex, reportmodel.ReportMediaTypeMarkdown, time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("new annex report output file: %v", err)
+	}
+	outputBundle, err := reportmodel.NewReportOutputBundle(
+		reportmodel.ReportOutputFormatMarkdown,
+		[]reportmodel.ReportOutputFile{outputFile, annexFile},
+		time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC),
+		true,
+		"",
+	)
+	if err != nil {
+		t.Fatalf("new Markdown report output bundle: %v", err)
+	}
 
 	var result = ReportResultScreenView(ReportResultScreenParams{
 		Theme:         component.DefaultTheme(),
@@ -301,17 +315,14 @@ func TestReportScreenViewsCoverSelectionBusyAndResultBranches(t *testing.T) {
 		SelectedIndex: 0,
 		HelpText:      "help",
 		Outcome: runtime.ReportOutcome{
-			Success:    true,
-			Message:    "Saved the report to \"/tmp/report.md\" and requested automatic opening.",
-			Request:    request,
-			OutputFile: outputFile,
-			OutputBundle: reportmodel.ReportOutputBundle{
-				OutputFormat: reportmodel.ReportOutputFormatMarkdown,
-				Files:        []reportmodel.ReportOutputFile{outputFile},
-			},
+			Success:      true,
+			Message:      "Saved the report to \"/tmp/report.md\" and requested automatic opening.",
+			Request:      request,
+			OutputFile:   outputFile,
+			OutputBundle: outputBundle,
 		},
 	})
-	if !strings.Contains(result, "Saved Markdown Path: /tmp/Documents/ghostfolio-capital-gains-2024-fifo.md") || !strings.Contains(result, "Back To Sync and Reports") || !strings.Contains(result, "Generate Another Report") {
+	if !strings.Contains(result, "Saved Markdown Path: /tmp/Documents/ghostfolio-capital-gains-2024-fifo.md") || !strings.Contains(result, "Saved Annex 1 Markdown Path: /tmp/Documents/ghostfolio-capital-gains-2024-fifo-annex-1.md") || !strings.Contains(result, "Back To Sync and Reports") || !strings.Contains(result, "Generate Another Report") {
 		t.Fatalf("expected report result content, got %q", result)
 	}
 }

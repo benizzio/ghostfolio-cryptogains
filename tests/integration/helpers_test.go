@@ -378,6 +378,50 @@ func mustAllMarkdownFiles(t *testing.T, dir string) []string {
 	return files
 }
 
+// markdownBundlePaths returns the main and Annex 1 paths from one complete
+// Markdown output bundle.
+// Authored by: OpenCode
+func markdownBundlePaths(t *testing.T, files []string) (string, string) {
+	t.Helper()
+
+	if len(files) != 2 {
+		t.Fatalf("expected exactly two Markdown output files, got %#v", files)
+	}
+
+	var mainPath string
+	var annexPath string
+	for _, file := range files {
+		if strings.Contains(filepath.Base(file), "-annex-1-") {
+			annexPath = file
+			continue
+		}
+		mainPath = file
+	}
+	if mainPath == "" || annexPath == "" {
+		t.Fatalf("expected one main and one Annex 1 Markdown path, got %#v", files)
+	}
+
+	return mainPath, annexPath
+}
+
+// assertSavedMarkdownBundlePaths verifies the result screen reports both
+// Markdown bundle paths with their exact user-visible labels.
+// Authored by: OpenCode
+func assertSavedMarkdownBundlePaths(t *testing.T, content string, mainPath string, annexPath string) {
+	t.Helper()
+
+	const mainLabel = "Saved Markdown Path"
+	const annexLabel = "Saved Annex 1 Markdown Path"
+	if !strings.Contains(content, mainLabel) || !strings.Contains(content, annexLabel) {
+		t.Fatalf("expected exact saved Markdown labels %q and %q, got %q", mainLabel, annexLabel, content)
+	}
+
+	var compactContent = strings.Join(strings.Fields(content), "")
+	if !strings.Contains(compactContent, mainPath) || !strings.Contains(compactContent, annexPath) {
+		t.Fatalf("expected saved Markdown paths %q and %q, got %q", mainPath, annexPath, content)
+	}
+}
+
 // assertNoCleartextReportInAppStorage verifies that app-managed storage does not
 // contain persisted Markdown report content.
 // Authored by: OpenCode

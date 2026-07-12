@@ -35,7 +35,7 @@ regenerate-empirical-fixtures:
 
 coverage:
 	mkdir -p dist/coverage
-	$(GO) test ./cmd/... ./internal/... ./tests/contract ./tests/empirical ./tests/empirical/fixture ./tests/integration ./tests/unit -covermode=atomic -coverpkg=$(PRODUCTION_PACKAGES) -coverprofile=dist/coverage/coverage.out
+	GHOSTFOLIO_CRYPTOGAINS_RUN_PERFORMANCE=1 GHOSTFOLIO_CRYPTOGAINS_PERFORMANCE_COVERAGE=1 $(GO) test ./cmd/... ./internal/... ./tests/contract ./tests/empirical ./tests/empirical/fixture ./tests/integration ./tests/unit -covermode=atomic -coverpkg=$(PRODUCTION_PACKAGES) -coverprofile=dist/coverage/coverage.out
 	$(GOCOVERAGEPLUS) -i dist/coverage/coverage.out -o dist/coverage/coverage.xml
 	$(GO) run ./tools/coveragegate -profile dist/coverage/coverage.out -cobertura dist/coverage/coverage.xml
 

@@ -32,6 +32,13 @@ var drawTableForGopdfDocument = func(table gopdf.TableLayout) error {
 	return table.DrawTable()
 }
 
+// measureTableCellForGopdfDocument keeps wrapped-cell measurement failures
+// testable before table-row preflight.
+// Authored by: OpenCode
+var measureTableCellForGopdfDocument = func(document *gopdfDocument, rectangle *gopdf.Rect, text string) (bool, float64, error) {
+	return document.pdf.IsFitMultiCell(rectangle, text)
+}
+
 // gopdfDocument renders selectable text through gopdf.
 // Authored by: OpenCode
 type gopdfDocument struct {
@@ -148,8 +155,13 @@ func (document *gopdfDocument) AddTable(table pdfTable) error {
 		rowHeight = 24
 	}
 	var columns = printableWidthColumns(table.Columns)
+	var err error
+	rowHeight, err = document.tableRowHeight(columns, table.Rows, rowHeight)
+	if err != nil {
+		return err
+	}
 	var remainingRows = table.Rows
-	if err := document.prepareTableStart(table.Title, rowHeight); err != nil {
+	if err = document.prepareTableStart(table.Title, rowHeight); err != nil {
 		return err
 	}
 	for len(remainingRows) > 0 {
@@ -170,6 +182,58 @@ func (document *gopdfDocument) AddTable(table pdfTable) error {
 		}
 	}
 	return nil
+}
+
+// tableRowHeight returns a single table row height that contains every wrapped
+// cell before the table preflight reserves its header, rows, and borders.
+// Authored by: OpenCode
+func (document *gopdfDocument) tableRowHeight(columns []pdfColumn, rows [][]string, minimum float64) (float64, error) {
+	if err := document.pdf.SetFont(fontRegular, "", 6.5); err != nil {
+		return 0, err
+	}
+	var rowHeight = minimum
+	for _, row := range rows {
+		var height, err = document.tableRowContentHeight(columns, row)
+		if err != nil {
+			return 0, err
+		}
+		if height > rowHeight {
+			rowHeight = height
+		}
+	}
+	return rowHeight, nil
+}
+
+// tableRowContentHeight measures the padded height required by one table row.
+// Authored by: OpenCode
+func (document *gopdfDocument) tableRowContentHeight(columns []pdfColumn, row []string) (float64, error) {
+	var rowHeight float64
+	for index, cell := range row {
+		var height, measured, err = document.tableCellHeight(columns, index, cell)
+		if err != nil {
+			return 0, err
+		}
+		if measured && height > rowHeight {
+			rowHeight = height
+		}
+	}
+	return rowHeight, nil
+}
+
+// tableCellHeight measures one populated cell and includes its vertical padding.
+// Authored by: OpenCode
+func (document *gopdfDocument) tableCellHeight(columns []pdfColumn, index int, cell string) (float64, bool, error) {
+	if cell == "" || index >= len(columns) {
+		return 0, false, nil
+	}
+	var fits, height, err = measureTableCellForGopdfDocument(document, &gopdf.Rect{W: columns[index].Width - 4, H: pageBottom - pageMargin}, sanitizeText(cell))
+	if err != nil {
+		return 0, false, err
+	}
+	if !fits {
+		return 0, false, fmt.Errorf("table cell does not fit within the printable page area")
+	}
+	return height + 4, true, nil
 }
 
 // AddAnnexPageBreak starts Annex 1 on a new page.

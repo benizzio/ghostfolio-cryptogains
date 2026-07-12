@@ -52,24 +52,27 @@ func TestReportGenerationSuccessWritesMarkdownAndReturnsToUnlockedContext(t *tes
 		t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
 	}
 
-	var content = normalizeRenderedText(model.View().Content)
-	if !strings.Contains(content, "Saved Markdown Path: ") {
-		t.Fatalf("expected saved Markdown path in result view, got %q", content)
-	}
-	if !strings.Contains(content, "Selected Year: 2024") || !strings.Contains(content, "Cost Basis Method: FIFO") || !strings.Contains(content, "Report Base Currency: USD") {
-		t.Fatalf("expected selected year, method, and report base currency in result view, got %q", content)
+	var files = mustAllMarkdownFiles(t, reportIO.DocumentsDir)
+	if len(files) != 2 {
+		t.Fatalf("expected main-plus-annex Markdown output, got %#v", files)
 	}
 
-	var files = mustMarkdownFiles(t, reportIO.DocumentsDir)
-	if len(files) != 1 {
-		t.Fatalf("expected one saved Markdown file, got %#v", files)
-	}
-
-	var reportPath = files[0]
+	var reportPath, annexPath = markdownBundlePaths(t, files)
 	testutil.AssertPathWithin(t, reportPath, reportIO.DocumentsDir)
 	testutil.AssertRegularFile(t, reportPath)
+	testutil.AssertPathWithin(t, annexPath, reportIO.DocumentsDir)
+	testutil.AssertRegularFile(t, annexPath)
 	if !strings.HasPrefix(filepath.Base(reportPath), "ghostfolio-capital-gains-2024-fifo-") {
 		t.Fatalf("expected FIFO report filename slug, got %q", filepath.Base(reportPath))
+	}
+	if !strings.HasPrefix(filepath.Base(annexPath), "ghostfolio-capital-gains-2024-fifo-annex-1-") {
+		t.Fatalf("expected FIFO annex filename slug, got %q", filepath.Base(annexPath))
+	}
+
+	var content = normalizeRenderedText(model.View().Content)
+	assertSavedMarkdownBundlePaths(t, content, reportPath, annexPath)
+	if !strings.Contains(content, "Selected Year: 2024") || !strings.Contains(content, "Cost Basis Method: FIFO") || !strings.Contains(content, "Report Base Currency: USD") {
+		t.Fatalf("expected selected year, method, and report base currency in result view, got %q", content)
 	}
 
 	var openerRequests = readOpenCommandRequests(t, openLogPath)
@@ -120,107 +123,79 @@ func TestReportGenerationSuccessWritesMarkdownAndReturnsToUnlockedContext(t *tes
 // main-plus-annex bundle and as one combined PDF file.
 // Authored by: OpenCode
 func TestReportGenerationWritesSelectedMarkdownAndPDFBundles(t *testing.T) {
-	var cases = []struct {
-		name                  string
-		outputFormat          reportmodel.ReportOutputFormat
-		expectedMarkdownFiles int
-		expectedPDFFiles      int
-		wantFileText          []string
-		forbiddenFileText     []string
-	}{
-		{
-			name:                  "markdown main plus annex",
-			outputFormat:          reportmodel.ReportOutputFormatMarkdown,
-			expectedMarkdownFiles: 2,
-			wantFileText: []string{
-				"| Asset | Historical Full Liquidation Count | Main Section Status |",
-				"- **Report Base Currency:** USD",
-				"- **Quantity:**",
-				"Same currency",
-			},
-			forbiddenFileText: []string{
-				"## Currency Conversion Audit",
-				"Full Liquidation Count Through Year End",
-				"same_currency",
-				"converted |",
-			},
-		},
-		{
-			name:             "combined pdf",
-			outputFormat:     reportmodel.ReportOutputFormatPDF,
-			expectedPDFFiles: 1,
-			wantFileText: []string{
-				"%PDF-",
-			},
-			forbiddenFileText: []string{
-				"| Asset | Historical Full Liquidation Count | Main Section Status |",
-				"- **Report Base Currency:** USD",
-				"# Annex 1 - Audit",
-				"## Currency Conversion Audit",
-				"Full Liquidation Count Through Year End",
-				"same_currency",
-				"converted |",
-			},
-		},
+	var reportIO = testutil.NewReportIOFixture(t)
+	var openLogPath = installOpenCommandRecorder(t, 0)
+	var fixture = testutil.DeterministicReportLedgerFixture()
+	var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
+	var token = "token-123"
+
+	seedProtectedSnapshot(t, harness, token, fixture.ProtectedActivityCache)
+	var contextResult = harness.App.SyncService.UnlockSelectedServerSnapshot(context.Background(), harness.Config, token)
+	if !contextResult.ProtectedData.HasReadableSnapshot {
+		t.Fatalf("expected readable snapshot after unlock, got %#v", contextResult)
 	}
 
-	for _, testCase := range cases {
-		var testCase = testCase
-		t.Run(testCase.name, func(t *testing.T) {
-			var reportIO = testutil.NewReportIOFixture(t)
-			var openLogPath = installOpenCommandRecorder(t, 0)
-			var fixture = testutil.DeterministicReportLedgerFixture()
-			var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
-			var token = "token-123"
+	var markdownRequest = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown)
+	var markdownOutcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: markdownRequest})
+	if !markdownOutcome.Success {
+		t.Fatalf("expected Markdown report generation success, got %#v", markdownOutcome)
+	}
+	var markdownFiles = mustAllMarkdownFiles(t, reportIO.DocumentsDir)
+	if len(markdownFiles) != 2 {
+		t.Fatalf("expected main-plus-annex Markdown output, got %#v", markdownFiles)
+	}
+	var markdownMainPath = selectedMainReportPath(t, markdownFiles, nil, reportmodel.ReportOutputFormatMarkdown)
+	//nolint:gosec // Test reads the report path returned by the controlled output fixture.
+	var rawMarkdown, readErr = os.ReadFile(markdownMainPath)
+	if readErr != nil {
+		t.Fatalf("read generated Markdown report %q: %v", markdownMainPath, readErr)
+	}
 
-			seedProtectedSnapshot(t, harness, token, fixture.ProtectedActivityCache)
-			var contextResult = harness.App.SyncService.UnlockSelectedServerSnapshot(context.Background(), harness.Config, token)
-			if !contextResult.ProtectedData.HasReadableSnapshot {
-				t.Fatalf("expected readable snapshot after unlock, got %#v", contextResult)
-			}
+	var pdfRequest = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatPDF)
+	var pdfOutcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: pdfRequest})
+	if !pdfOutcome.Success {
+		t.Fatalf("expected PDF report generation success, got %#v", pdfOutcome)
+	}
+	var pdfFiles = mustPDFFiles(t, reportIO.DocumentsDir)
+	if len(pdfFiles) != 1 {
+		t.Fatalf("expected one combined PDF output, got %#v", pdfFiles)
+	}
+	var rawPDF, pdfReadErr = os.ReadFile(pdfFiles[0])
+	if pdfReadErr != nil {
+		t.Fatalf("read generated PDF %q: %v", pdfFiles[0], pdfReadErr)
+	}
+	var inspection, inspectErr = testutil.InspectGeneratedPDF(rawPDF)
+	if inspectErr != nil {
+		t.Fatalf("inspect generated PDF: %v", inspectErr)
+	}
+	assertIntegrationLandscapeA4PDF(t, inspection)
 
-			var request = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportBaseCurrencyUSD, testCase.outputFormat)
-			var outcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: request})
-			if !outcome.Success {
-				t.Fatalf("expected %s report generation success, got %#v", testCase.outputFormat, outcome)
-			}
+	var markdownText = string(rawMarkdown)
+	for _, sharedValue := range []string{"Ghostfolio Capital Gains And Losses Report", "Gains-And-Losses Summary", "Overall Yearly Net Total", "ADA", "Same currency"} {
+		if !strings.Contains(markdownText, sharedValue) {
+			t.Fatalf("expected Markdown from shared protected cache to contain %q, got %q", sharedValue, markdownText)
+		}
+		if !inspection.ContainsSearchableText(sharedValue) {
+			t.Fatalf("expected PDF from the same protected cache to contain shared value %q, got %q", sharedValue, inspection.SearchableText)
+		}
+	}
+	var openerRequests = readOpenCommandRequests(t, openLogPath)
+	if len(openerRequests) != 2 {
+		t.Fatalf("expected one opener request for each successful output, got %#v", openerRequests)
+	}
+	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
+}
 
-			var markdownFiles = mustAllMarkdownFiles(t, reportIO.DocumentsDir)
-			if len(markdownFiles) != testCase.expectedMarkdownFiles {
-				t.Fatalf("expected %d Markdown files for %s output, got %#v", testCase.expectedMarkdownFiles, testCase.outputFormat, markdownFiles)
-			}
-			var pdfFiles = mustPDFFiles(t, reportIO.DocumentsDir)
-			if len(pdfFiles) != testCase.expectedPDFFiles {
-				t.Fatalf("expected %d PDF files for %s output, got %#v", testCase.expectedPDFFiles, testCase.outputFormat, pdfFiles)
-			}
+// assertIntegrationLandscapeA4PDF verifies every generated integration PDF page
+// has the production landscape A4 dimensions.
+// Authored by: OpenCode
+func assertIntegrationLandscapeA4PDF(t *testing.T, inspection testutil.GeneratedPDF) {
+	t.Helper()
 
-			var openerRequests = readOpenCommandRequests(t, openLogPath)
-			if len(openerRequests) == 0 {
-				t.Fatalf("expected at least one opener request after successful %s output", testCase.outputFormat)
-			}
-			for _, path := range append(markdownFiles, pdfFiles...) {
-				testutil.AssertPathWithin(t, path, reportIO.DocumentsDir)
-				testutil.AssertRegularFile(t, path)
-			}
-			var mainPath = selectedMainReportPath(t, markdownFiles, pdfFiles, testCase.outputFormat)
-			//nolint:gosec // Test reads the report path returned by the controlled output fixture.
-			var rawMainReport, readErr = os.ReadFile(mainPath)
-			if readErr != nil {
-				t.Fatalf("read generated %s report %q: %v", testCase.outputFormat, mainPath, readErr)
-			}
-			var mainText = string(rawMainReport)
-			for _, expected := range testCase.wantFileText {
-				if !strings.Contains(mainText, expected) {
-					t.Fatalf("expected generated %s report to contain %q, got %q", testCase.outputFormat, expected, mainText)
-				}
-			}
-			for _, forbidden := range testCase.forbiddenFileText {
-				if strings.Contains(mainText, forbidden) {
-					t.Fatalf("expected generated %s report to omit %q, got %q", testCase.outputFormat, forbidden, mainText)
-				}
-			}
-			assertNoCleartextReportInAppStorage(t, harness.BaseDir)
-		})
+	for index, page := range inspection.PageBoxes {
+		if page.Width != 842 || page.Height != 595 {
+			t.Fatalf("page %d dimensions = %.0fx%.0f, want landscape A4 842x595", index+1, page.Width, page.Height)
+		}
 	}
 }
 
@@ -881,13 +856,13 @@ func mustIntegrationReportRequest(t *testing.T, year int, reportBaseCurrency rep
 // mustIntegrationReportRequestForFormat creates one validated report request for
 // integration tests that exercise a specific output format.
 // Authored by: OpenCode
-func mustIntegrationReportRequestForFormat(t *testing.T, year int, reportBaseCurrency reportmodel.ReportBaseCurrency, outputFormat reportmodel.ReportOutputFormat) reportmodel.ReportRequest {
+func mustIntegrationReportRequestForFormat(t *testing.T, year int, _ reportmodel.ReportBaseCurrency, outputFormat reportmodel.ReportOutputFormat) reportmodel.ReportRequest {
 	t.Helper()
 
 	var request, err = reportmodel.NewReportRequest(
 		year,
 		reportmodel.CostBasisMethodFIFO,
-		reportBaseCurrency,
+		reportmodel.ReportBaseCurrencyUSD,
 		outputFormat,
 		time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
 	)

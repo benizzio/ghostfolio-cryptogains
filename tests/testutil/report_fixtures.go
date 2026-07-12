@@ -420,7 +420,8 @@ func DeterministicReportLedgerFixture() ReportLedgerFixture {
 // The fixture spans at least five calendar years, forces heavy open-lot
 // fragmentation for HIFO, and broadens the scope-local hybrid method back to
 // asset-level scope by mixing reliable and unavailable source scope entries on
-// the same asset timeline.
+// the same asset timeline. Its USD, EUR, and GBP activity values also exercise
+// deterministic conversion for both Markdown and PDF report output.
 //
 // Authored by: OpenCode
 func DeterministicLargeReportPerformanceFixture() ReportPerformanceFixture {
@@ -446,6 +447,7 @@ func DeterministicLargeReportPerformanceFixture() ReportPerformanceFixture {
 		InYearSellCount:       inYearSellCountPerAsset,
 		PreReportValueOffset:  100,
 		InYearSellValueOffset: 1200,
+		Currencies:            []string{"USD", "EUR", "GBP"},
 		ReliableScope:         reliableWalletScope("wallet-performance-main", "Performance Main Wallet"),
 	})...)
 	activities = append(activities, appendPerformanceAssetActivities(performanceAssetInput{
@@ -456,6 +458,7 @@ func DeterministicLargeReportPerformanceFixture() ReportPerformanceFixture {
 		InYearSellCount:       inYearSellCountPerAsset,
 		PreReportValueOffset:  300,
 		InYearSellValueOffset: 900,
+		Currencies:            []string{"GBP", "USD", "EUR"},
 		ReliableScope:         reliableWalletScope("wallet-performance-fallback", "Performance Fallback Wallet"),
 		ForceFallbackScope:    true,
 	})...)
@@ -535,6 +538,7 @@ type performanceAssetInput struct {
 	InYearSellCount       int
 	PreReportValueOffset  int
 	InYearSellValueOffset int
+	Currencies            []string
 	ReliableScope         *syncmodel.SourceScope
 	ForceFallbackScope    bool
 }
@@ -550,6 +554,7 @@ func appendPerformanceAssetActivities(input performanceAssetInput) []syncmodel.A
 		var occurredAt = performanceOccurredAt(year, index)
 		var grossValue = input.PreReportValueOffset + (index % 900)
 		var feeAmount = (index % 5) + 1
+		var currency = performanceActivityCurrency(input, index)
 
 		activities = append(activities, reportActivity(reportActivityInput{
 			SourceID:         performanceActivitySourceID(input.AssetSymbol, "buy", index+1),
@@ -559,7 +564,7 @@ func appendPerformanceAssetActivities(input performanceAssetInput) []syncmodel.A
 			AssetSymbol:      input.AssetSymbol,
 			AssetName:        input.AssetName,
 			Quantity:         "1",
-			OrderCurrency:    "USD",
+			OrderCurrency:    currency,
 			OrderGrossValue:  decimalStringFromInt(grossValue),
 			OrderFeeAmount:   decimalStringFromInt(feeAmount),
 			SourceScope:      performanceAssetScope(input, index),
@@ -570,6 +575,7 @@ func appendPerformanceAssetActivities(input performanceAssetInput) []syncmodel.A
 		var occurredAt = performanceOccurredAt(2025, index+input.PreReportBuyCount)
 		var grossValue = input.InYearSellValueOffset + (index % 700)
 		var feeAmount = (index % 5) + 1
+		var currency = performanceActivityCurrency(input, index+input.PreReportBuyCount)
 
 		activities = append(activities, reportActivity(reportActivityInput{
 			SourceID:         performanceActivitySourceID(input.AssetSymbol, "sell", index+1),
@@ -579,7 +585,7 @@ func appendPerformanceAssetActivities(input performanceAssetInput) []syncmodel.A
 			AssetSymbol:      input.AssetSymbol,
 			AssetName:        input.AssetName,
 			Quantity:         "1",
-			OrderCurrency:    "USD",
+			OrderCurrency:    currency,
 			OrderGrossValue:  decimalStringFromInt(grossValue),
 			OrderFeeAmount:   decimalStringFromInt(feeAmount),
 			SourceScope:      performanceAssetScope(input, index+input.PreReportBuyCount),
@@ -587,6 +593,13 @@ func appendPerformanceAssetActivities(input performanceAssetInput) []syncmodel.A
 	}
 
 	return activities
+}
+
+// performanceActivityCurrency selects a deterministic activity currency for
+// the large-history report performance fixture.
+// Authored by: OpenCode
+func performanceActivityCurrency(input performanceAssetInput, index int) string {
+	return input.Currencies[index%len(input.Currencies)]
 }
 
 // deterministicExpectedReportsByMethod returns one controlled expected report

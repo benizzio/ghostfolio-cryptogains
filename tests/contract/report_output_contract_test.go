@@ -4,14 +4,19 @@
 package contract
 
 import (
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 
+	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	reportoutput "github.com/benizzio/ghostfolio-cryptogains/internal/report/output"
+	reportpdf "github.com/benizzio/ghostfolio-cryptogains/internal/report/pdf"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
+	"golang.org/x/image/font/gofont/gobold"
+	"golang.org/x/image/font/gofont/goregular"
 )
 
 // TestReportOutputFormatFileCountsContract verifies the supported output formats
@@ -140,7 +145,20 @@ func TestReportOutputWritesPDFContract(t *testing.T) {
 		reportmodel.ReportMediaTypePDF,
 	})
 	assertReportOutputFile(t, bundle.Files[0], fixture.DocumentsDir, `^ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56\.pdf$`)
-	testutil.AssertFileContent(t, bundle.Files[0].Path, "%PDF-1.7\n")
+	var payload, readErr = os.ReadFile(bundle.Files[0].Path)
+	if readErr != nil {
+		t.Fatalf("read generated PDF %q: %v", bundle.Files[0].Path, readErr)
+	}
+	var inspection, inspectErr = testutil.InspectGeneratedPDF(payload)
+	if inspectErr != nil {
+		t.Fatalf("inspect generated PDF: %v", inspectErr)
+	}
+	assertLandscapeA4PDF(t, inspection)
+	for _, expected := range []string{"Ghostfolio Capital Gains And Losses Report", "Gains-And-Losses Summary", "Annex Audit"} {
+		if !inspection.ContainsSearchableText(expected) {
+			t.Fatalf("expected searchable PDF text to contain %q, got %q", expected, inspection.SearchableText)
+		}
+	}
 }
 
 // TestReportOutputUsesPDFSuffixContract verifies PDF collision handling appends
@@ -198,15 +216,36 @@ func deterministicMarkdownOutputDocuments(t *testing.T, request testutil.ReportR
 	return []reportmodel.ReportDocument{mainDocument, annexDocument}
 }
 
-// deterministicPDFOutputDocument builds the combined PDF document required by
-// the output contract tests.
+// deterministicPDFOutputDocument builds the combined PDF document through the
+// concrete local renderer required by the output contract tests.
 // Authored by: OpenCode
 func deterministicPDFOutputDocument(t *testing.T, request testutil.ReportRequestFixture) reportmodel.ReportDocument {
 	t.Helper()
 
-	var document, err = reportmodel.NewPDFReportDocument(
+	var fixture = testutil.DeterministicReportLedgerFixture()
+	for index := range fixture.ProtectedActivityCache.Activities {
+		fixture.ProtectedActivityCache.Activities[index].OrderCurrency = "USD"
+		fixture.ProtectedActivityCache.Activities[index].AssetProfileCurrency = "USD"
+		fixture.ProtectedActivityCache.Activities[index].BaseCurrency = "USD"
+	}
+	var report, err = reportcalculate.Calculate(request.Request, fixture.ProtectedActivityCache)
+	if err != nil {
+		t.Fatalf("calculate deterministic PDF report: %v", err)
+	}
+	var renderer reportpdf.Renderer
+	renderer, err = reportpdf.NewRenderer(reportpdf.RenderOptions{Fonts: reportpdf.FontData{Regular: goregular.TTF, Bold: gobold.TTF}})
+	if err != nil {
+		t.Fatalf("create concrete PDF renderer: %v", err)
+	}
+	var payload []byte
+	payload, err = renderer.Render(report)
+	if err != nil {
+		t.Fatalf("render deterministic PDF: %v", err)
+	}
+	var document reportmodel.ReportDocument
+	document, err = reportmodel.NewPDFReportDocument(
 		reportmodel.ReportDocumentRoleCombined,
-		[]byte("%PDF-1.7\n"),
+		payload,
 		request.Year,
 		request.CostBasisMethod,
 		request.RequestedAt,
@@ -216,6 +255,18 @@ func deterministicPDFOutputDocument(t *testing.T, request testutil.ReportRequest
 	}
 
 	return document
+}
+
+// assertLandscapeA4PDF verifies every recovered page has landscape A4 dimensions.
+// Authored by: OpenCode
+func assertLandscapeA4PDF(t *testing.T, inspection testutil.GeneratedPDF) {
+	t.Helper()
+
+	for index, page := range inspection.PageBoxes {
+		if page.Width != 842 || page.Height != 595 {
+			t.Fatalf("page %d dimensions = %.0fx%.0f, want landscape A4 842x595", index+1, page.Width, page.Height)
+		}
+	}
 }
 
 // assertReportOutputBundleShape verifies the selected output format's file roles

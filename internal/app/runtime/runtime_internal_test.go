@@ -12,6 +12,7 @@ import (
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	ghostfolioclient "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/client"
+	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	syncnormalize "github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
@@ -20,6 +21,39 @@ import (
 
 type failingStore struct {
 	saveErr error
+}
+
+// TestSetReportBundleRendererForTestingValidatesAndReplaces verifies the
+// test-only replacement seam rejects unavailable services and stores a valid
+// renderer.
+// Authored by: OpenCode
+func TestSetReportBundleRendererForTestingValidatesAndReplaces(t *testing.T) {
+	var nilApp *App
+	if err := nilApp.SetReportBundleRendererForTesting(nil); err == nil {
+		t.Fatal("expected nil app renderer replacement to fail")
+	}
+
+	var unsupported = &App{}
+	if err := unsupported.SetReportBundleRendererForTesting(nil); err == nil {
+		t.Fatal("expected unsupported report service renderer replacement to fail")
+	}
+
+	var service = &reportService{}
+	var app = &App{ReportService: service}
+	var called bool
+	var renderer reportBundleRenderer = func(reportmodel.ReportOutputFormat, reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+		called = true
+		return nil, nil
+	}
+	if err := app.SetReportBundleRendererForTesting(renderer); err != nil {
+		t.Fatalf("replace renderer: %v", err)
+	}
+	if _, err := service.renderBundle(reportmodel.ReportOutputFormatMarkdown, reportmodel.CapitalGainsReport{}); err != nil {
+		t.Fatalf("call replacement renderer: %v", err)
+	}
+	if !called {
+		t.Fatal("expected replacement renderer to be called")
+	}
 }
 
 func (f failingStore) Load(context.Context) (configmodel.AppSetupConfig, error) {
@@ -123,7 +157,7 @@ func TestNewFailsWithoutResolvableUserConfigDir(t *testing.T) {
 func TestRunCoversInvalidAuthPayload(t *testing.T) {
 	t.Parallel()
 
-	var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		_, _ = writer.Write([]byte(`{"authToken":""}`))
 	}))
