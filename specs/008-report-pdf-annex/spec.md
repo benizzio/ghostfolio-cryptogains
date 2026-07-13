@@ -49,6 +49,10 @@
 
 **Bugfix**: 2026-07-10 — [BUG-006] Clarified 24-point PDF subheading spacing and concise continuation labels emitted only for actual table continuations.
 
+### Session 2026-07-13
+
+**Bugfix**: 2026-07-13 — [BUG-007] Clarified independent two-minute performance measurement for each selected output format.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Choose Report Output Format (Priority: P1)
@@ -68,6 +72,7 @@ As a user generating a capital gains and losses report, I want to choose whether
 5. **Given** PDF output is selected, **When** the generated report is reviewed, **Then** the visible report uses a human-legible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context rather than a sequential dump of report lines.
 6. **Given** PDF output is selected, **When** the generated report is reviewed, **Then** every page uses landscape A4 layout and wide report tables remain inside the printable area with visible right padding, wrapped cell content, and no clipped columns.
 7. **Given** PDF output is selected, **When** a wide report table is rendered, **Then** it uses the available landscape printable width with equal left and right margins while retaining the required padding, wrapping, and no-clipping behavior.
+8. **Given** the deterministic 10,000-activity performance fixture, **When** Markdown and PDF reports are generated as separate selected-format requests, **Then** each request is timed and evaluated independently against the two-minute completion limit rather than combining both durations.
 
 ---
 
@@ -176,6 +181,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **FR-040**: ~~When PDF output is selected, the system MUST maintain at least 12 points of vertical separation at the affected transitions covered by FR-034.~~ **Superseded by BUG-006** and replaced by the 24-point definition in FR-041.
 - **FR-041**: When PDF output is selected, the system MUST maintain at least 24 points of vertical separation before the `Gains-And-Losses Summary`, `Rate Source Summary`, `Reference Section`, `Asset Detail: <asset symbol>`, and `In-Year Activity` subheadings when they follow preceding content on the same page.
 - **FR-042**: When a PDF table continues onto a new page, the system MUST render continuation context only on that continuation page, using the exact format `<section or table context> (continued)` without a `Continued: ` prefix; it MUST NOT render a continuation label when no table has continued.
+- **FR-043**: For the deterministic 10,000-activity performance scenario, the system MUST measure one selected-format report request per timing interval. Each Markdown and PDF interval MUST independently cover request validation, calculation, selected renderer execution, final save, and opener invocation, and MUST NOT aggregate elapsed time across separate output-format requests.
 
 ### Financial Calculation Evidence *(include when feature affects financial calculations)*
 
@@ -229,6 +235,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **SC-013**: PDF layout verification confirms required report samples use landscape A4 pages, keep all table columns within the printable area without right-edge clipping, avoid overlapping adjacent text sections, place `Overall Yearly Net Total` inside the Gains-And-Losses Summary table, render Rate Source Summary as label/value lines, omit the extra `Reference Table` subheading, and preserve top margin before main-report and Annex 1 asset subheadings.
 - **SC-014**: PDF layout verification confirms required wide-table samples use the available landscape printable width with equal left and right margins, ~~affected section transitions have at least 12 points of vertical separation~~ **the superseding BUG-006 24-point spacing definition in SC-015 applies**, and every continued table row and border remains wholly inside the printable area with a preserved bottom margin and visible continuation context.
 - **SC-015**: PDF layout verification confirms the named main-report subheadings have at least 24 points of vertical separation, actual table continuation pages use `<section or table context> (continued)`, and unsplit table samples contain no continuation label.
+- **SC-016**: With the deterministic 10,000-activity fixture, one Markdown report generation and one PDF report generation each complete their independently measured request validation, calculation, selected renderer execution, final save, and opener invocation in under two minutes; no assertion combines the durations of both selected-format requests.
 
 ## Assumptions
 

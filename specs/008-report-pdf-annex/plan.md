@@ -22,6 +22,8 @@ Add an output-format choice to capital gains report generation so users can gene
 
 **Bugfix**: 2026-07-10 — [BUG-006] Updated from bugfix patch. The named main-report subheadings require 24 points of separation, and only actual table continuation pages may render `<section or table context> (continued)`.
 
+**Bugfix**: 2026-07-13 — [BUG-007] Updated from bugfix patch. The 10,000-activity Markdown and PDF runs must each satisfy an independently measured two-minute limit.
+
 ## Technical Context
 
 **Language/Version**: Go 1.26.5
@@ -36,7 +38,7 @@ Add an output-format choice to capital gains report generation so users can gene
 
 **Storage**: User-requested cleartext report export files in the resolved local Documents directory. These exports are outside the application-managed persistence boundary: the application writes them only after an explicit generation request, does not manage them as cache or durable application state, and does not re-ingest them automatically. Markdown output writes one main `.md` file and one Annex 1 `.md` file. PDF output writes one `.pdf` file. No synced-data persistence, protected snapshot persistence, report history cache, rate cache, remote persistence, telemetry, or background report storage is added.
 
-**Testing**: Go `testing` with deterministic contract, integration, unit, and existing empirical suites plus isolated build-tagged performance scenarios. Contract tests cover TUI/output/rendering contracts, including the output-format selection path used as automated evidence for SC-001's 30-second user-start bound. Integration tests cover runtime generation and output cleanup. The isolated performance suite covers the 10,000 cached-activity scale. Targeted unit tests are justified for PDF pagination/text emission, filename construction, label mapping, zero-row filtering, historical-position rendering, and audit-annex model validation. Final verification uses `make test`, `make coverage`, isolated `make test-performance`, `make quality QUALITY_BASE_REF=origin/main`, and supported-OS build/test evidence for Linux, macOS, and Windows unless successful CI checks are cited.
+**Testing**: Go `testing` with deterministic contract, integration, unit, and existing empirical suites plus isolated build-tagged performance scenarios. Contract tests cover TUI/output/rendering contracts, including the output-format selection path used as automated evidence for SC-001's 30-second user-start bound. Integration tests cover runtime generation and output cleanup. The isolated performance suite covers the 10,000 cached-activity scale and independently times one Markdown generation and one PDF generation against the same two-minute limit. Targeted unit tests are justified for PDF pagination/text emission, filename construction, label mapping, zero-row filtering, historical-position rendering, and audit-annex model validation. Final verification uses `make test`, `make coverage`, isolated `make test-performance`, `make quality QUALITY_BASE_REF=origin/main`, and supported-OS build/test evidence for Linux, macOS, and Windows unless successful CI checks are cited.
 
 **Empirical Dataset**: Existing `testdata/empirical/` synthetic empirical dataset and oracle fixtures remain read-only. Existing empirical tests continue to guard financial calculation behavior. This feature adds presentation and audit-traceability coverage around calculated results and does not mutate empirical source data or generated oracle fixtures.
 
@@ -44,7 +46,7 @@ Add an output-format choice to capital gains report generation so users can gene
 
 **Project Type**: Single-module Go terminal UI application.
 
-**Performance Goals**: Preserve the existing report-generation scale target of 10,000 cached activities. Keep report generation asynchronous from the Bubble Tea event loop. Avoid a lower activity-count limit for PDF or Annex 1 generation than Markdown output. Avoid rasterizing report pages into images.
+**Performance Goals**: Preserve the existing report-generation scale target of 10,000 cached activities. One Markdown generation and one PDF generation must each complete independently in under two minutes. Each timing interval covers one selected-format request from request validation through calculation, selected rendering, final save, and opener invocation; sequential runs must reset the timer and must not share an aggregate assertion. Keep report generation asynchronous from the Bubble Tea event loop. Avoid a lower activity-count limit for PDF or Annex 1 generation than Markdown output. Avoid rasterizing report pages into images.
 
 **Constraints**: No floating-point financial logic. Exact decimals and explicit currency identity remain unchanged from the current report calculation pipeline. PDF generation must be local-only, landscape A4-sized, text-based, searchable, and selectable by PDF readers that support text selection. Generated outputs and failures must not expose Ghostfolio tokens, bearer tokens, reusable authentication material, protected payload bytes, or unrelated secrets. Failed render or write attempts must not be reported as successful and must remove partial output files created by the attempt.
 
@@ -191,6 +193,7 @@ Alternatives rejected:
 - Integration tests verify Markdown success creates exactly two files and PDF success creates exactly one file.
 - Integration tests cover render/write failures and assert partial files created by the attempt are removed.
 - The isolated performance suite covers 10,000 cached activities for Markdown and PDF generation with deterministic currency-rate fixtures from the existing conversion feature; ordinary integration and coverage targets do not run resource-sensitive scenarios.
+- The 10,000-activity performance scenario must start and stop a separate timer around each selected-format `Generate` call, assert the two-minute threshold independently for Markdown and PDF, and identify the output format and measured duration in each failure. Shared fixture preparation and output-contract assertions should remain outside the timing interval where they are not part of request validation, calculation, rendering, final save, or opener invocation.
 - Unit tests cover output filename construction, summary zero-row filtering and empty state, historical-position rendering, conversion-status and quote-direction labels, zero-priced `SELL` display as `BLOCKCHAIN OP`, PDF page-break/layout decisions, and audit-annex model validation.
 - Supported-OS evidence covers Linux, macOS, and Windows build/test compatibility for the PDF-enabled report packages, using CI matrix results or explicit local cross-OS build checks where CI evidence is unavailable.
 - Existing empirical financial tests remain unchanged and continue to verify calculation behavior.
@@ -202,6 +205,8 @@ BUG-004 adds concrete layout edge-case validation for wide tables, section trans
 BUG-005 adds layout-width allocation, readable spacing, and page-bottom row-continuation validation. It does not add a constitution violation.
 
 BUG-006 adds a stricter subheading spacing threshold and a continuation-label predicate. It does not add a constitution violation.
+
+BUG-007 adds separate timing boundaries for sequential selected-format performance runs. It does not add a constitution violation.
 
 No constitution violations are planned.
 
