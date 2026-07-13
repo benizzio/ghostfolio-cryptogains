@@ -9,11 +9,13 @@
 - Dependency evidence from GitHub MCP and `go list -m -json` for `github.com/signintech/gopdf`, `github.com/phpdave11/gofpdi`, `golang.org/x/image`, `github.com/pdfcpu/pdfcpu`, and `github.com/johnfercher/maroto/v2`
 - Context7 documentation for `/signintech/gopdf`
 
+**Bugfix**: 2026-07-13 — [BUG-007] Recorded one selected-format request as one independent performance measurement and prohibited aggregate Markdown/PDF timing.
+
 ## Output Format Selection
 
 Decision: Add a report output format to the report request and TUI workflow with two valid values: Markdown and PDF.
 
-Rationale: The user must choose the output format before generation begins, and Markdown must remain available. Modeling the choice in the report request keeps runtime generation deterministic and avoids hidden renderer defaults. The format is transient to one report run and is not persisted.
+Rationale: The user must choose the output format before generation begins, and Markdown must remain available. Modeling the choice in the report request keeps runtime generation deterministic and avoids hidden renderer defaults. The format is transient to one report run and is not persisted. One selected-format request invokes one renderer and produces one output bundle, so it also defines one performance measurement boundary; separate Markdown and PDF requests must not share an elapsed-time assertion.
 
 Alternatives considered: Use a command-line flag only, but current report generation is a TUI workflow. Generate both formats every time, but the spec requires a user choice and would create extra files the user did not request.
 
@@ -117,9 +119,9 @@ Alternatives considered: Replace underscores at render time, but that hides unma
 
 ## Testing Evidence Strategy
 
-Decision: Use deterministic project-owned fixtures for automated tests and keep existing empirical financial data read-only.
+Decision: Use deterministic project-owned fixtures for automated tests, keep existing empirical financial data read-only, and measure the 10,000-activity Markdown and PDF requests independently.
 
-Rationale: Report output format, annex, and PDF rendering can be tested without live services. Existing conversion-provider deterministic fixtures from the prior feature remain applicable for converted activity evidence. The financial empirical dataset continues to guard calculation behavior and should not be mutated for a presentation/output feature.
+Rationale: Report output format, annex, and PDF rendering can be tested without live services. Existing conversion-provider deterministic fixtures from the prior feature remain applicable for converted activity evidence. The financial empirical dataset continues to guard calculation behavior and should not be mutated for a presentation/output feature. The isolated performance suite may run Markdown and PDF sequentially against the same fixture, but each selected-format `Generate` call must have its own timing interval covering request validation, calculation, selected rendering, final save, and opener invocation. Each interval must be asserted independently against two minutes and report its selected format and measured duration; fixture setup and output-contract assertions remain outside the interval where they are not part of the request.
 
 Alternatives considered: Use live PDF viewers or OS text extraction tools in automated tests, but those are platform-dependent. Change empirical fixtures to include annex-specific assertions, but the active feature is not a dataset-maintenance spec.
 

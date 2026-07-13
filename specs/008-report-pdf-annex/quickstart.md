@@ -4,6 +4,8 @@ This document defines validation flows for the PDF output and Annex 1 feature. A
 
 **Bugfix**: 2026-07-09 — [BUG-005] Added verification for balanced printable-width tables, 12-point section separation, and bottom-margin row preflight.
 
+**Bugfix**: 2026-07-13 — [BUG-007] Added independent two-minute Markdown and PDF performance verification with format-specific elapsed-time output.
+
 ## Prerequisites
 
 - Go 1.26.5 installed.
@@ -56,6 +58,8 @@ Expected result:
 
 - the build-tagged performance suite runs separately from deterministic tests and canonical coverage
 - the 10,000-activity deterministic USD/EUR/GBP fixture generates the Markdown main-plus-Annex bundle and combined paginated PDF
+- one Markdown request and one PDF request are timed independently, with each selected-format `Generate` call covering request validation, calculation, selected rendering, final save, and opener invocation
+- each selected-format interval completes in under two minutes, and validation output identifies the format and measured duration without an aggregate Markdown/PDF assertion
 
 1. Run the changed-source quality gate from the expected base branch.
 
@@ -103,6 +107,7 @@ Deterministic contract and integration suites, together with the isolated perfor
 - Missing conversion-status or quote-direction label mappings fail before output success.
 - PDF and Markdown shared main report sections contain the same required data values for identical inputs.
 - 10,000 cached-activity report generation succeeds for both output formats using deterministic fixtures.
+- The isolated performance scenario independently measures one 10,000-activity Markdown request and one 10,000-activity PDF request, requires each to complete in under two minutes, and reports each format's elapsed duration.
 
 ## Manual TUI Verification Flow
 
