@@ -41,42 +41,46 @@ func TestReportPerformanceFlowLargeHistoryFixture(t *testing.T) {
 	if !contextResult.ProtectedData.HasReadableSnapshot || contextResult.ReportUnavailableReason != runtime.ReportFailureNone {
 		t.Fatalf("expected report availability after unlock, got %#v", contextResult)
 	}
-	var startedAt = time.Now()
-	var outcomes []runtime.ReportOutcome
-	for _, outputFormat := range []reportmodel.ReportOutputFormat{reportmodel.ReportOutputFormatMarkdown, reportmodel.ReportOutputFormatPDF} {
+	var outputFormats = []reportmodel.ReportOutputFormat{reportmodel.ReportOutputFormatMarkdown, reportmodel.ReportOutputFormatPDF}
+	var outcomes = make(map[reportmodel.ReportOutputFormat]runtime.ReportOutcome)
+	var elapsedByFormat = make(map[reportmodel.ReportOutputFormat]time.Duration)
+	for _, outputFormat := range outputFormats {
 		var request, err = reportmodel.NewReportRequest(fixture.ReportYear, reportmodel.CostBasisMethodHIFO, reportmodel.ReportBaseCurrencyUSD, outputFormat, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
 		if err != nil {
 			t.Fatalf("new %s report request: %v", outputFormat, err)
 		}
-		outcomes = append(outcomes, harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: request}))
-	}
-	var elapsed = time.Since(startedAt)
-	for _, outcome := range outcomes {
+		var startedAt = time.Now()
+		var outcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: request})
+		var elapsed = time.Since(startedAt)
+		if elapsed >= threshold {
+			t.Fatalf("expected %s large-history report generation under %s, got %s", outputFormat, threshold, elapsed)
+		}
 		if !outcome.Success || outcome.FailureReason != runtime.ReportFailureNone {
-			t.Fatalf("expected successful large-history report generation, got %#v", outcome)
+			t.Fatalf("expected successful %s large-history report generation, got %#v", outputFormat, outcome)
 		}
 		if !outcome.OutputBundle.OpenRequested {
-			t.Fatalf("expected opener request, got %#v", outcome.OutputBundle)
+			t.Fatalf("expected %s opener request, got %#v", outputFormat, outcome.OutputBundle)
 		}
 		for _, outputFile := range outcome.OutputBundle.Files {
 			testutil.AssertPathWithin(t, outputFile.Path, reportIO.DocumentsDir)
 			testutil.AssertRegularFile(t, outputFile.Path)
 		}
-	}
-	if elapsed >= threshold {
-		t.Fatalf("expected SC-007 under %s, got %s", threshold, elapsed)
+		outcomes[outputFormat] = outcome
+		elapsedByFormat[outputFormat] = elapsed
+		t.Logf("%s large-history report generation completed in %s", outputFormat, elapsed)
 	}
 	var requests = runtimeflow.ReadOpenCommandRequests(t, openLogPath)
 	if len(requests) != len(outcomes) {
 		t.Fatalf("expected one opener request per generated output, got %#v", requests)
 	}
-	for index, outcome := range outcomes {
+	for index, outputFormat := range outputFormats {
+		var outcome = outcomes[outputFormat]
 		if requests[index] != outcome.OutputBundle.Files[0].Path {
 			t.Fatalf("expected opener request %d for %q, got %#v", index, outcome.OutputBundle.Files[0].Path, requests)
 		}
 	}
 
-	var markdownOutcome = outcomes[0]
+	var markdownOutcome = outcomes[reportmodel.ReportOutputFormatMarkdown]
 	if len(markdownOutcome.OutputBundle.Files) != 2 {
 		t.Fatalf("expected main-plus-annex Markdown bundle, got %#v", markdownOutcome.OutputBundle)
 	}
@@ -99,7 +103,7 @@ func TestReportPerformanceFlowLargeHistoryFixture(t *testing.T) {
 		}
 	}
 
-	var pdfOutcome = outcomes[1]
+	var pdfOutcome = outcomes[reportmodel.ReportOutputFormatPDF]
 	if len(pdfOutcome.OutputBundle.Files) != 1 {
 		t.Fatalf("expected one combined PDF file, got %#v", pdfOutcome.OutputBundle)
 	}
@@ -109,7 +113,7 @@ func TestReportPerformanceFlowLargeHistoryFixture(t *testing.T) {
 	}
 	assertGeneratedLargeHistoryPDFContract(t, pdfBytes)
 	runtimeflow.AssertNoCleartextReportInAppStorage(t, harness.BaseDir)
-	t.Logf("SC-007 verification completed in %s for %d activities across %d calendar years", elapsed, fixture.ActivityCount, fixture.CalendarYearSpan)
+	t.Logf("10,000-activity verification completed for Markdown in %s and PDF in %s across %d calendar years", elapsedByFormat[reportmodel.ReportOutputFormatMarkdown], elapsedByFormat[reportmodel.ReportOutputFormatPDF], fixture.CalendarYearSpan)
 }
 
 // assertLargeHistoryCrossCurrencyActivity verifies the fixture exercises all
