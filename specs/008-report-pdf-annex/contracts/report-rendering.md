@@ -153,7 +153,7 @@ PDF output must satisfy these additional rules:
 - Additional page breaks are allowed only before a top-level section, per-asset annex section, table row, or content block that would not fit in the remaining printable page area.
 - Before drawing a table row or its borders, the renderer must preflight the complete rendered row height against the remaining printable height. If the row would cross the bottom margin, it must advance before drawing any part of the row, cells, or borders.
 - A continuation page must repeat visible section context or table header context before continued content.
-- Table continuation context must be emitted only after a table actually advances to a new page, using the exact format `<section or table context> (continued)` without a `Continued: ` prefix. An unsplit table must not emit a continuation label.
+- Table continuation context must be emitted only after a table actually advances to a new page, using the exact format `<section or table context> (continued)` without a `Continued:` prefix. An unsplit table must not emit a continuation label.
 - Long tables may continue across pages with repeated or clear table context.
 - The first main-report page title is `Ghostfolio Capital Gains And Losses Report`; the first Annex page title is `Annex 1 - Audit`; continuation page titles or repeated context must identify the current top-level section or table.
 - PDF generation runs locally without remote services or external document-generation APIs.
