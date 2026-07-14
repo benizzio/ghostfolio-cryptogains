@@ -230,6 +230,9 @@ func assertSavedMarkdownBundlePaths(t *testing.T, content string, mainPath strin
 func assertIntegrationLandscapeA4PDF(t *testing.T, inspection testutil.GeneratedPDF) {
 	t.Helper()
 
+	if len(inspection.PageBoxes) == 0 {
+		t.Fatal("expected generated PDF to contain page boxes")
+	}
 	for index, page := range inspection.PageBoxes {
 		if page.Width != 842 || page.Height != 595 {
 			t.Fatalf("page %d dimensions = %.0fx%.0f, want landscape A4 842x595", index+1, page.Width, page.Height)
@@ -896,13 +899,13 @@ func mustIntegrationReportRequest(t *testing.T, year int, reportBaseCurrency rep
 // mustIntegrationReportRequestForFormat creates one validated report request for
 // integration tests that exercise a specific output format.
 // Authored by: OpenCode
-func mustIntegrationReportRequestForFormat(t *testing.T, year int, _ reportmodel.ReportBaseCurrency, outputFormat reportmodel.ReportOutputFormat) reportmodel.ReportRequest {
+func mustIntegrationReportRequestForFormat(t *testing.T, year int, reportBaseCurrency reportmodel.ReportBaseCurrency, outputFormat reportmodel.ReportOutputFormat) reportmodel.ReportRequest {
 	t.Helper()
 
 	var request, err = reportmodel.NewReportRequest(
 		year,
 		reportmodel.CostBasisMethodFIFO,
-		reportmodel.ReportBaseCurrencyUSD,
+		reportBaseCurrency,
 		outputFormat,
 		time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
 	)

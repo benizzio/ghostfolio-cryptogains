@@ -6,6 +6,7 @@ package performance
 import (
 	"context"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -143,7 +144,7 @@ func assertGeneratedLargeHistoryPDFContract(t *testing.T, pdfBytes []byte) {
 			t.Fatalf("expected generated PDF to contain %q", expected)
 		}
 	}
-	if strings.Count(pdfText, "/Type /Page") < 2 {
+	if len(regexp.MustCompile(`/Type\s*/Page\b`).FindAll(pdfBytes, -1)) < 2 {
 		t.Fatalf("expected generated PDF to contain multiple report pages")
 	}
 }

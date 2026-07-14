@@ -154,7 +154,7 @@ func TestReportOutputWritesPDFContract(t *testing.T) {
 		t.Fatalf("inspect generated PDF: %v", inspectErr)
 	}
 	assertLandscapeA4PDF(t, inspection)
-	for _, expected := range []string{"Ghostfolio Capital Gains And Losses Report", "Gains-And-Losses Summary", "Annex Audit"} {
+	for _, expected := range []string{"Ghostfolio Capital Gains And Losses Report", "Gains-And-Losses Summary", "Annex 1 - Audit"} {
 		if !inspection.ContainsSearchableText(expected) {
 			t.Fatalf("expected searchable PDF text to contain %q, got %q", expected, inspection.SearchableText)
 		}

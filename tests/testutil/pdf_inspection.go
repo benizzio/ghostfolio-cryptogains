@@ -437,6 +437,12 @@ func decodePDFText(raw []byte, unicodeMap map[string]string) string {
 	}
 	var text strings.Builder
 	for index := 0; index < len(encoded); {
+		// gopdf writes the embedded Go font's digit 1 as CID 0x0014.
+		if index+1 < len(encoded) && encoded[index] == 0 && encoded[index+1] == 20 {
+			text.WriteString(decodeGoFontGlyph(string(encoded[index+1])))
+			index += 2
+			continue
+		}
 		var code = strings.ToUpper(hex.EncodeToString(encoded[index : index+1]))
 		if value, ok := unicodeMap[code]; ok {
 			text.WriteString(decodeGoFontGlyph(value))
