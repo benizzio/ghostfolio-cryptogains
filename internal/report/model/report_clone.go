@@ -5,7 +5,6 @@ package model
 
 import (
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
-	"github.com/cockroachdb/apd/v3"
 )
 
 // cloneAssetActivityRows returns a defensive copy of one activity-row slice.
@@ -14,9 +13,9 @@ func cloneAssetActivityRows(rows []AssetActivityRow) []AssetActivityRow {
 	var cloned = make([]AssetActivityRow, 0, len(rows))
 	for _, row := range rows {
 		var rowCopy = row
-		rowCopy.UnitPrice = cloneOptionalDecimal(row.UnitPrice)
-		rowCopy.GrossValue = cloneOptionalDecimal(row.GrossValue)
-		rowCopy.FeeAmount = cloneOptionalDecimal(row.FeeAmount)
+		rowCopy.UnitPrice = decimalsupport.ClonePointer(row.UnitPrice)
+		rowCopy.GrossValue = decimalsupport.ClonePointer(row.GrossValue)
+		rowCopy.FeeAmount = decimalsupport.ClonePointer(row.FeeAmount)
 		if row.LiquidationCalculation != nil {
 			var liquidationCopy = cloneLiquidationCalculation(*row.LiquidationCalculation)
 			rowCopy.LiquidationCalculation = &liquidationCopy
@@ -66,23 +65,12 @@ func cloneBasisMatches(matches []BasisMatch) []BasisMatch {
 	var cloned = make([]BasisMatch, 0, len(matches))
 	for _, match := range matches {
 		var matchCopy = match
-		matchCopy.MatchedProceeds = cloneOptionalDecimal(match.MatchedProceeds)
-		matchCopy.MatchedGainOrLoss = cloneOptionalDecimal(match.MatchedGainOrLoss)
+		matchCopy.MatchedProceeds = decimalsupport.ClonePointer(match.MatchedProceeds)
+		matchCopy.MatchedGainOrLoss = decimalsupport.ClonePointer(match.MatchedGainOrLoss)
 		cloned = append(cloned, matchCopy)
 	}
 
 	return cloned
-}
-
-// cloneOptionalDecimal returns one defensive copy of one optional decimal.
-// Authored by: OpenCode
-func cloneOptionalDecimal(value *apd.Decimal) *apd.Decimal {
-	if value == nil {
-		return nil
-	}
-
-	var cloned = decimalsupport.Clone(*value)
-	return &cloned
 }
 
 // cloneAuditAnnex returns a defensive copy of the audit annex.

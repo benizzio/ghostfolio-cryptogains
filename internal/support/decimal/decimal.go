@@ -205,6 +205,26 @@ func Clone(value apd.Decimal) apd.Decimal {
 	return cloned
 }
 
+// ClonePointer returns a defensive copy of an optional exact decimal, retaining
+// nil when no decimal is present. Use ClonePointer before retaining an optional
+// decimal from a caller that may mutate its apd coefficient storage.
+//
+// Example:
+//
+//	value, _, _ := decimal.ParseString("10.5")
+//	copy := decimal.ClonePointer(&value)
+//	_ = copy
+//
+// Authored by: OpenCode
+func ClonePointer(value *apd.Decimal) *apd.Decimal {
+	if value == nil {
+		return nil
+	}
+
+	var cloned = Clone(*value)
+	return &cloned
+}
+
 // CanonicalString converts one exact decimal into its canonical persisted
 // string form.
 //

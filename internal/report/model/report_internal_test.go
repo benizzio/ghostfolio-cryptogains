@@ -1223,11 +1223,10 @@ func TestCloneExchangeRateEvidenceCopiesRateValues(t *testing.T) {
 	}
 }
 
-// TestBasisMatchValidationAndCloneOptionalDecimalCoverRemainingBranches
-// verifies the remaining basis-match guardrails and optional-decimal clone
-// branches.
+// TestBasisMatchValidationGuardrails verifies the remaining basis-match
+// guardrails.
 // Authored by: OpenCode
-func TestBasisMatchValidationAndCloneOptionalDecimalCoverRemainingBranches(t *testing.T) {
+func TestBasisMatchValidationGuardrails(t *testing.T) {
 	t.Parallel()
 
 	if err := (BasisMatch{AcquisitionSourceID: "buy-1"}).Validate(); err == nil || !strings.Contains(err.Error(), "matched quantity") {
@@ -1243,19 +1242,6 @@ func TestBasisMatchValidationAndCloneOptionalDecimalCoverRemainingBranches(t *te
 		t.Fatalf("expected invalid matched gain or loss to fail, got %v", err)
 	}
 
-	if cloned := cloneOptionalDecimal(nil); cloned != nil {
-		t.Fatalf("expected nil optional decimal clone to stay nil, got %#v", cloned)
-	}
-
-	var original = mustReportDecimal(t, "1.5")
-	var cloned = cloneOptionalDecimal(&original)
-	if cloned == nil || cloned == &original || cloned.Cmp(&original) != 0 {
-		t.Fatalf("expected optional decimal clone to copy the original value, got original=%#v cloned=%#v", original, cloned)
-	}
-	original.Coeff.SetInt64(2)
-	if got, err := decimalsupport.CanonicalStringPointer(cloned); err != nil || got != "1.5" {
-		t.Fatalf("expected cloned optional decimal to remain independent, got %q err=%v", got, err)
-	}
 }
 
 // TestConversionAuditValidationGuardrails verifies conversion audit model

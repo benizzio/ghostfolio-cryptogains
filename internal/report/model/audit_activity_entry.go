@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -128,12 +129,12 @@ func cloneAuditActivityEntries(entries []AuditActivityEntry) []AuditActivityEntr
 	var cloned = make([]AuditActivityEntry, 0, len(entries))
 	for _, entry := range entries {
 		var entryCopy = entry
-		entryCopy.UnitPrice = cloneOptionalDecimal(entry.UnitPrice)
-		entryCopy.GrossValue = cloneOptionalDecimal(entry.GrossValue)
-		entryCopy.FeeAmount = cloneOptionalDecimal(entry.FeeAmount)
-		entryCopy.AllocatedBasis = cloneOptionalDecimal(entry.AllocatedBasis)
-		entryCopy.NetLiquidationProceeds = cloneOptionalDecimal(entry.NetLiquidationProceeds)
-		entryCopy.GainOrLoss = cloneOptionalDecimal(entry.GainOrLoss)
+		entryCopy.UnitPrice = decimalsupport.ClonePointer(entry.UnitPrice)
+		entryCopy.GrossValue = decimalsupport.ClonePointer(entry.GrossValue)
+		entryCopy.FeeAmount = decimalsupport.ClonePointer(entry.FeeAmount)
+		entryCopy.AllocatedBasis = decimalsupport.ClonePointer(entry.AllocatedBasis)
+		entryCopy.NetLiquidationProceeds = decimalsupport.ClonePointer(entry.NetLiquidationProceeds)
+		entryCopy.GainOrLoss = decimalsupport.ClonePointer(entry.GainOrLoss)
 		cloned = append(cloned, entryCopy)
 	}
 

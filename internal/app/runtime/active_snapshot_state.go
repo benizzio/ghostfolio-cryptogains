@@ -8,8 +8,8 @@ import (
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
-	"github.com/cockroachdb/apd/v3"
 )
 
 // activeReadableSnapshot stores the current run's successfully unlocked local
@@ -123,27 +123,16 @@ func cloneProtectedActivityCache(cache syncmodel.ProtectedActivityCache) syncmod
 // cloneActivityRecord copies pointer-backed activity fields for read access.
 // Authored by: OpenCode
 func cloneActivityRecord(record syncmodel.ActivityRecord) syncmodel.ActivityRecord {
-	record.OrderUnitPrice = cloneDecimal(record.OrderUnitPrice)
-	record.OrderGrossValue = cloneDecimal(record.OrderGrossValue)
-	record.OrderFeeAmount = cloneDecimal(record.OrderFeeAmount)
-	record.AssetProfileUnitPrice = cloneDecimal(record.AssetProfileUnitPrice)
-	record.AssetProfileFeeAmount = cloneDecimal(record.AssetProfileFeeAmount)
-	record.BaseGrossValue = cloneDecimal(record.BaseGrossValue)
-	record.BaseFeeAmount = cloneDecimal(record.BaseFeeAmount)
+	record.OrderUnitPrice = decimalsupport.ClonePointer(record.OrderUnitPrice)
+	record.OrderGrossValue = decimalsupport.ClonePointer(record.OrderGrossValue)
+	record.OrderFeeAmount = decimalsupport.ClonePointer(record.OrderFeeAmount)
+	record.AssetProfileUnitPrice = decimalsupport.ClonePointer(record.AssetProfileUnitPrice)
+	record.AssetProfileFeeAmount = decimalsupport.ClonePointer(record.AssetProfileFeeAmount)
+	record.BaseGrossValue = decimalsupport.ClonePointer(record.BaseGrossValue)
+	record.BaseFeeAmount = decimalsupport.ClonePointer(record.BaseFeeAmount)
 	if record.SourceScope != nil {
 		var scope = *record.SourceScope
 		record.SourceScope = &scope
 	}
 	return record
-}
-
-// cloneDecimal copies an optional decimal value.
-// Authored by: OpenCode
-func cloneDecimal(value *apd.Decimal) *apd.Decimal {
-	if value == nil {
-		return nil
-	}
-	var clone apd.Decimal
-	clone.Set(value)
-	return &clone
 }

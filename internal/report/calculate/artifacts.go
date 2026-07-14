@@ -129,9 +129,9 @@ func buildAuditActivityEntry(
 		OccurredAt:            input.OccurredAt,
 		ActivityType:          input.ActivityType,
 		Quantity:              input.Quantity,
-		UnitPrice:             cloneOptionalDecimal(input.UnitPrice),
-		GrossValue:            cloneOptionalDecimal(input.GrossValue),
-		FeeAmount:             cloneOptionalDecimal(input.FeeAmount),
+		UnitPrice:             decimalsupport.ClonePointer(input.UnitPrice),
+		GrossValue:            decimalsupport.ClonePointer(input.GrossValue),
+		FeeAmount:             decimalsupport.ClonePointer(input.FeeAmount),
 		ActivityCurrency:      inputActivityCurrency(input),
 		CalculationCurrency:   inputCalculationCurrency(input),
 		QuantityAfterActivity: quantityAfter,
@@ -141,13 +141,13 @@ func buildAuditActivityEntry(
 		Note:                  strings.TrimSpace(input.Comment),
 	}
 	if application.allocatedBasis != nil {
-		entry.AllocatedBasis = cloneOptionalDecimal(application.allocatedBasis)
+		entry.AllocatedBasis = decimalsupport.ClonePointer(application.allocatedBasis)
 	}
 	if application.netProceeds != nil {
-		entry.NetLiquidationProceeds = cloneOptionalDecimal(application.netProceeds)
+		entry.NetLiquidationProceeds = decimalsupport.ClonePointer(application.netProceeds)
 	}
 	if application.gainOrLoss != nil {
-		entry.GainOrLoss = cloneOptionalDecimal(application.gainOrLoss)
+		entry.GainOrLoss = decimalsupport.ClonePointer(application.gainOrLoss)
 	}
 	if err := entry.Validate(); err != nil {
 		return nil, newInputCalculationError(
@@ -285,17 +285,6 @@ func buildAssetCalculationResult(group assetInputGroup, replayState assetReplayS
 	result.SummaryEntry = summaryEntry
 	result.DetailSection = detailSection
 	return result, nil
-}
-
-// cloneOptionalDecimal returns one defensive copy of an optional input decimal.
-// Authored by: OpenCode
-func cloneOptionalDecimal(value *apd.Decimal) *apd.Decimal {
-	if value == nil {
-		return nil
-	}
-
-	var cloned = decimalsupport.Clone(*value)
-	return &cloned
 }
 
 // groupCalculationCurrency returns the report calculation currency prepared on

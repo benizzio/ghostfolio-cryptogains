@@ -2508,21 +2508,6 @@ func assertAuditEntrySourceIDs(t *testing.T, entries []reportmodel.AuditActivity
 	}
 }
 
-// TestCloneOptionalDecimalCopiesCoefficientStorage verifies that artifact
-// construction does not retain mutable apd coefficient storage from inputs.
-// Authored by: OpenCode
-func TestCloneOptionalDecimalCopiesCoefficientStorage(t *testing.T) {
-	t.Parallel()
-
-	var original = mustReportDecimal(t, "123456789.987654321")
-	var cloned = cloneOptionalDecimal(&original)
-	original.Coeff.SetInt64(2)
-
-	if got, err := decimalsupport.CanonicalStringPointer(cloned); err != nil || got != "123456789.987654321" {
-		t.Fatalf("expected cloned optional decimal coefficient storage to remain independent, got %q err=%v", got, err)
-	}
-}
-
 // decimalPointer returns one report-decimal pointer for calculator tests.
 // Authored by: OpenCode
 func decimalPointer(t *testing.T, raw string) *apd.Decimal {
