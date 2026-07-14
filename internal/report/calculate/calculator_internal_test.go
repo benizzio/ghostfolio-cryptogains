@@ -156,7 +156,7 @@ func TestCalculateBuildsReportFromIncludedResults(t *testing.T) {
 		calculateAssetGroupFunc = originalCalculateAssetGroupFunc
 	}()
 
-	calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ syncmodel.ProtectedActivityCache, group assetInputGroup) (assetCalculationResult, error) {
+	calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, group assetInputGroup) (assetCalculationResult, error) {
 		switch group.AssetIdentityKey {
 		case "asset-btc":
 			return assetCalculationResult{
@@ -219,7 +219,7 @@ func TestCalculateWrapsCalculatedReportValidationFailure(t *testing.T) {
 		newCapitalGainsReport = originalNewCapitalGainsReport
 	}()
 
-	calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ syncmodel.ProtectedActivityCache, _ assetInputGroup) (assetCalculationResult, error) {
+	calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ assetInputGroup) (assetCalculationResult, error) {
 		return assetCalculationResult{
 			IncludeInMain: true,
 			SummaryEntry:  validAssetSummaryEntry(t, "asset-btc", "BTC", "1"),
@@ -266,7 +266,7 @@ func TestCalculateWrapsAuditAnnexAndFinalValidationFailures(t *testing.T) {
 			calculateAssetGroupFunc = originalCalculateAssetGroupFunc
 		}()
 
-		calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ syncmodel.ProtectedActivityCache, _ assetInputGroup) (assetCalculationResult, error) {
+		calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ assetInputGroup) (assetCalculationResult, error) {
 			return assetCalculationResult{
 				IncludeInAudit: true,
 				AuditSection: reportmodel.PerAssetAuditSection{
@@ -296,7 +296,7 @@ func TestCalculateWrapsAuditAnnexAndFinalValidationFailures(t *testing.T) {
 			newCapitalGainsReport = originalNewCapitalGainsReport
 		}()
 
-		calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ syncmodel.ProtectedActivityCache, _ assetInputGroup) (assetCalculationResult, error) {
+		calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ assetInputGroup) (assetCalculationResult, error) {
 			return assetCalculationResult{}, nil
 		}
 		newCapitalGainsReport = func(
@@ -342,7 +342,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 			calculateAssetGroupFunc = originalCalculateAssetGroupFunc
 		}()
 
-		calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ syncmodel.ProtectedActivityCache, _ assetInputGroup) (assetCalculationResult, error) {
+		calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ assetInputGroup) (assetCalculationResult, error) {
 			return assetCalculationResult{}, errors.New("asset group boom")
 		}
 
@@ -366,7 +366,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 			calculateAssetGroupFunc = originalCalculateAssetGroupFunc
 		}()
 
-		calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ syncmodel.ProtectedActivityCache, _ assetInputGroup) (assetCalculationResult, error) {
+		calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ assetInputGroup) (assetCalculationResult, error) {
 			return assetCalculationResult{
 				IncludeInMain: true,
 				SummaryEntry:  validAssetSummaryEntry(t, "asset-btc", "BTC", "1"),
@@ -400,7 +400,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 			return nil, errors.New("basis constructor boom")
 		}
 
-		_, err := calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+		_, err := calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, assetInputGroup{
 			AssetIdentityKey: "asset-btc",
 			DisplayLabel:     "BTC",
 		})
@@ -420,7 +420,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 			return nil, errors.New("scope resolution boom")
 		}
 
-		_, err := calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+		_, err := calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, assetInputGroup{
 			AssetIdentityKey: "asset-btc",
 			DisplayLabel:     "BTC",
 		})
@@ -456,7 +456,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 			}}}, nil
 		}
 
-		_, err := calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+		_, err := calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, assetInputGroup{
 			AssetIdentityKey: "asset-btc",
 			DisplayLabel:     "BTC",
 		})
@@ -493,7 +493,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 			}}}, nil
 		}
 
-		_, err := calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+		_, err := calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, assetInputGroup{
 			AssetIdentityKey: "asset-btc",
 			DisplayLabel:     "BTC",
 		})
@@ -535,7 +535,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 				openBasisFunc:    func() (apd.Decimal, error) { return mustReportDecimal(t, "10"), nil },
 			}, nil
 		}
-		_, err := calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+		_, err := calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, assetInputGroup{
 			AssetIdentityKey: "asset-btc",
 			DisplayLabel:     "BTC",
 		})
@@ -552,7 +552,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 				openBasisFunc:    func() (apd.Decimal, error) { return mustReportDecimal(t, "10"), nil },
 			}, nil
 		}
-		_, err = calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+		_, err = calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, assetInputGroup{
 			AssetIdentityKey: "asset-btc",
 			DisplayLabel:     "BTC",
 		})
@@ -569,7 +569,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 				openBasisFunc:    func() (apd.Decimal, error) { return apd.Decimal{}, errors.New("closing basis boom") },
 			}, nil
 		}
-		_, err = calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+		_, err = calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, assetInputGroup{
 			AssetIdentityKey: "asset-btc",
 			DisplayLabel:     "BTC",
 		})
@@ -587,7 +587,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 				openBasisFunc:    func() (apd.Decimal, error) { return mustReportDecimal(t, "10"), nil },
 			}, nil
 		}
-		_, err = calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+		_, err = calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, assetInputGroup{
 			AssetIdentityKey: "asset-btc",
 			DisplayLabel:     "BTC",
 		})

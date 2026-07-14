@@ -87,7 +87,7 @@ func calculateReport(
 	groups = currencyBoundaryResult.Groups
 
 	var aggregation reportCalculationAggregation
-	aggregation, err = calculateReportAssetGroups(request, cache, groups)
+	aggregation, err = calculateReportAssetGroups(request, groups)
 	if err != nil {
 		return reportmodel.CapitalGainsReport{}, err
 	}
@@ -126,14 +126,13 @@ func validateReportCalculationRequest(request reportmodel.ReportRequest, availab
 // Authored by: OpenCode
 func calculateReportAssetGroups(
 	request reportmodel.ReportRequest,
-	cache syncmodel.ProtectedActivityCache,
 	groups []assetInputGroup,
 ) (reportCalculationAggregation, error) {
 	var aggregation reportCalculationAggregation
 	for _, group := range groups {
 		var assetResult assetCalculationResult
 		var err error
-		assetResult, err = calculateAssetGroupFunc(request.CostBasisMethod, request.Year, cache, group)
+		assetResult, err = calculateAssetGroupFunc(request.CostBasisMethod, request.Year, group)
 		if err != nil {
 			return reportCalculationAggregation{}, err
 		}
