@@ -3,7 +3,10 @@
 // Authored by: OpenCode
 package model
 
-import "github.com/cockroachdb/apd/v3"
+import (
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	"github.com/cockroachdb/apd/v3"
+)
 
 // cloneAssetActivityRows returns a defensive copy of one activity-row slice.
 // Authored by: OpenCode
@@ -78,7 +81,7 @@ func cloneOptionalDecimal(value *apd.Decimal) *apd.Decimal {
 		return nil
 	}
 
-	var cloned = *value
+	var cloned = decimalsupport.Clone(*value)
 	return &cloned
 }
 

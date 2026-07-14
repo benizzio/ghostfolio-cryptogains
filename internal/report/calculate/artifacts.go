@@ -294,7 +294,7 @@ func cloneOptionalDecimal(value *apd.Decimal) *apd.Decimal {
 		return nil
 	}
 
-	var cloned = *value
+	var cloned = decimalsupport.Clone(*value)
 	return &cloned
 }
 

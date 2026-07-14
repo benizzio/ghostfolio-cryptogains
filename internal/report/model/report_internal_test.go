@@ -267,6 +267,11 @@ func TestRenderLabels(t *testing.T) {
 	if err != nil || activityLabel != "BUY" {
 		t.Fatalf("buy label = %q, err = %v", activityLabel, err)
 	}
+	var invalidDecimal apd.Decimal
+	invalidDecimal.Form = apd.NaNSignaling
+	if _, err = RenderActivityTypeLabel(AssetActivityRow{ActivityType: ActivityTypeSell, UnitPrice: &invalidDecimal}); err == nil || !strings.Contains(err.Error(), "zero-priced fields") {
+		t.Fatalf("expected invalid zero-priced monetary field to fail, got %v", err)
+	}
 }
 
 // TestReportOutputFormatContract verifies supported output formats, labels, and
@@ -1232,7 +1237,7 @@ func TestBasisMatchValidationAndCloneOptionalDecimalCoverRemainingBranches(t *te
 	if cloned == nil || cloned == &original || cloned.Cmp(&original) != 0 {
 		t.Fatalf("expected optional decimal clone to copy the original value, got original=%#v cloned=%#v", original, cloned)
 	}
-	original = mustReportDecimal(t, "2")
+	original.Coeff.SetInt64(2)
 	if got, err := decimalsupport.CanonicalStringPointer(cloned); err != nil || got != "1.5" {
 		t.Fatalf("expected cloned optional decimal to remain independent, got %q err=%v", got, err)
 	}

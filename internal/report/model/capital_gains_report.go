@@ -181,9 +181,6 @@ func (report CapitalGainsReport) validateConversionArtifacts() error {
 	}
 
 	for index, entry := range report.AuditAnnex.ConversionAuditEntries {
-		if err := entry.Validate(); err != nil {
-			return fmt.Errorf("capital gains report conversion audit entry %d: %w", index, err)
-		}
 		if !report.hasMatchingRateSource(entry) {
 			return fmt.Errorf("capital gains report conversion audit entry %d: matching rate source is required", index)
 		}

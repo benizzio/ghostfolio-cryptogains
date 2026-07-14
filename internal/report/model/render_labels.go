@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -72,8 +73,14 @@ func RenderQuoteDirectionLabel(direction QuoteDirection) (string, error) {
 //
 // Authored by: OpenCode
 func RenderActivityTypeLabel(row AssetActivityRow) (string, error) {
-	if row.ActivityType == ActivityTypeSell && isZeroPricedActivity(row) {
-		return zeroPricedSellActivityLabel, nil
+	if row.ActivityType == ActivityTypeSell {
+		var zeroPriced, err = isZeroPricedActivity(row)
+		if err != nil {
+			return "", fmt.Errorf("render activity type label zero-priced fields: %w", err)
+		}
+		if zeroPriced {
+			return zeroPricedSellActivityLabel, nil
+		}
 	}
 	if err := validateActivityType(row.ActivityType); err != nil {
 		return "", err
@@ -95,8 +102,14 @@ func RenderActivityTypeLabel(row AssetActivityRow) (string, error) {
 //
 // Authored by: OpenCode
 func RenderAuditActivityTypeLabel(entry AuditActivityEntry) (string, error) {
-	if entry.ActivityType == ActivityTypeSell && auditEntryIsZeroPriced(entry) {
-		return zeroPricedSellActivityLabel, nil
+	if entry.ActivityType == ActivityTypeSell {
+		var zeroPriced, err = auditEntryIsZeroPriced(entry)
+		if err != nil {
+			return "", fmt.Errorf("render audit activity type label zero-priced fields: %w", err)
+		}
+		if zeroPriced {
+			return zeroPricedSellActivityLabel, nil
+		}
 	}
 	if err := validateActivityType(entry.ActivityType); err != nil {
 		return "", err
@@ -108,19 +121,35 @@ func RenderAuditActivityTypeLabel(entry AuditActivityEntry) (string, error) {
 // auditEntryIsZeroPriced reports whether an audit entry carries explicit zero
 // monetary slots for the custody-operation display rule.
 // Authored by: OpenCode
-func auditEntryIsZeroPriced(entry AuditActivityEntry) bool {
-	return decimalPointerIsZero(entry.UnitPrice) && decimalPointerIsZero(entry.GrossValue) && decimalPointerIsZero(entry.FeeAmount)
+func auditEntryIsZeroPriced(entry AuditActivityEntry) (bool, error) {
+	return monetaryFieldsAreZero(entry.UnitPrice, entry.GrossValue, entry.FeeAmount)
 }
 
 // isZeroPricedActivity reports whether a row carries explicit zero monetary
 // slots for the custody-operation display rule.
 // Authored by: OpenCode
-func isZeroPricedActivity(row AssetActivityRow) bool {
-	return decimalPointerIsZero(row.UnitPrice) && decimalPointerIsZero(row.GrossValue) && decimalPointerIsZero(row.FeeAmount)
+func isZeroPricedActivity(row AssetActivityRow) (bool, error) {
+	return monetaryFieldsAreZero(row.UnitPrice, row.GrossValue, row.FeeAmount)
 }
 
-// decimalPointerIsZero reports whether an optional decimal is present and zero.
+// monetaryFieldsAreZero verifies that all optional monetary fields are explicit
+// finite zero values.
 // Authored by: OpenCode
-func decimalPointerIsZero(value *apd.Decimal) bool {
-	return value != nil && value.Sign() == 0
+func monetaryFieldsAreZero(unitPrice *apd.Decimal, grossValue *apd.Decimal, feeAmount *apd.Decimal) (bool, error) {
+	var unitPriceIsZero, err = supportmath.IsZeroPointer(unitPrice)
+	if err != nil {
+		return false, err
+	}
+	var grossValueIsZero bool
+	grossValueIsZero, err = supportmath.IsZeroPointer(grossValue)
+	if err != nil {
+		return false, err
+	}
+	var feeAmountIsZero bool
+	feeAmountIsZero, err = supportmath.IsZeroPointer(feeAmount)
+	if err != nil {
+		return false, err
+	}
+
+	return unitPriceIsZero && grossValueIsZero && feeAmountIsZero, nil
 }
