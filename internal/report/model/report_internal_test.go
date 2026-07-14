@@ -272,6 +272,12 @@ func TestRenderLabels(t *testing.T) {
 	if _, err = RenderActivityTypeLabel(AssetActivityRow{ActivityType: ActivityTypeSell, UnitPrice: &invalidDecimal}); err == nil || !strings.Contains(err.Error(), "zero-priced fields") {
 		t.Fatalf("expected invalid zero-priced monetary field to fail, got %v", err)
 	}
+	if _, err = RenderAuditActivityTypeLabel(AuditActivityEntry{ActivityType: ActivityTypeSell, GrossValue: &invalidDecimal}); err == nil || !strings.Contains(err.Error(), "render audit activity type label zero-priced fields") {
+		t.Fatalf("expected invalid audit gross value to fail, got %v", err)
+	}
+	if _, err = RenderAuditActivityTypeLabel(AuditActivityEntry{ActivityType: ActivityTypeSell, FeeAmount: &invalidDecimal}); err == nil || !strings.Contains(err.Error(), "render audit activity type label zero-priced fields") {
+		t.Fatalf("expected invalid audit fee amount to fail, got %v", err)
+	}
 }
 
 // TestReportOutputFormatContract verifies supported output formats, labels, and

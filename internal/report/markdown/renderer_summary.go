@@ -9,7 +9,6 @@ import (
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
-	supportmath "github.com/benizzio/ghostfolio-cryptogains/internal/support/math"
 )
 
 // writeSummarySection renders the summary heading, optional empty state, and
@@ -17,16 +16,22 @@ import (
 // Authored by: OpenCode
 func writeSummarySection(builder *strings.Builder, report reportmodel.CapitalGainsReport, calculationCurrency string) error {
 	builder.WriteString("## Gains-And-Losses Summary\n\n")
-	var renderedEntries []reportmodel.AssetSummaryEntry
+	var renderedEntries []struct {
+		entry         reportmodel.AssetSummaryEntry
+		netGainOrLoss string
+	}
 	for _, entry := range report.SummaryEntries {
-		var isZero, err = supportmath.IsZero(entry.NetGainOrLoss)
+		var netGainOrLoss, err = decimalsupport.CanonicalString(entry.NetGainOrLoss)
 		if err != nil {
 			return fmt.Errorf("render summary entry %q net gain or loss: %w", entry.AssetIdentityKey, err)
 		}
-		if isZero {
+		if netGainOrLoss == "0" {
 			continue
 		}
-		renderedEntries = append(renderedEntries, entry)
+		renderedEntries = append(renderedEntries, struct {
+			entry         reportmodel.AssetSummaryEntry
+			netGainOrLoss string
+		}{entry: entry, netGainOrLoss: netGainOrLoss})
 	}
 	if len(renderedEntries) == 0 {
 		builder.WriteString("No assets had a non-zero net gain or loss in the selected year.\n\n")
@@ -34,15 +39,12 @@ func writeSummarySection(builder *strings.Builder, report reportmodel.CapitalGai
 
 	builder.WriteString("| Asset | Net Gain Or Loss | Report Calculation Currency |\n")
 	builder.WriteString("|-------|------------------|-----------------------------|\n")
-	for _, entry := range renderedEntries {
-		var netGainOrLoss, err = decimalsupport.CanonicalString(entry.NetGainOrLoss)
-		if err != nil {
-			return fmt.Errorf("render summary entry %q net gain or loss: %w", entry.AssetIdentityKey, err)
-		}
+	for _, renderedEntry := range renderedEntries {
+		var entry = renderedEntry.entry
 		fmt.Fprintf(builder,
 			"| %s | %s | %s |\n",
 			renderDisplayLabel(entry.DisplayLabel, entry.AssetIdentityKey),
-			netGainOrLoss,
+			renderedEntry.netGainOrLoss,
 			calculationCurrencyLabelWithFallback(entry.ReportCalculationCurrency, calculationCurrency),
 		)
 	}
