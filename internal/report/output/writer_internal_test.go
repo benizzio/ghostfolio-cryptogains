@@ -172,42 +172,6 @@ func TestWriteReportDocumentFailureBranches(t *testing.T) {
 		}
 	})
 
-	t.Run("reserve file skips existing suffix and wraps non-exist errors", func(t *testing.T) {
-		var fixtureDir = t.TempDir()
-		var generatedAt = time.Date(2026, time.May, 21, 12, 30, 0, 0, time.UTC)
-		var baseName = buildReportFilenameBase(2024, reportmodel.CostBasisMethodFIFO, generatedAt)
-		if err := os.WriteFile(filepath.Join(fixtureDir, baseName+".md"), []byte("existing"), 0o600); err != nil {
-			t.Fatalf("seed existing file: %v", err)
-		}
-
-		var filename, path, file, err = reserveReportFile(fixtureDir, 2024, reportmodel.CostBasisMethodFIFO, generatedAt)
-		if err != nil {
-			t.Fatalf("reserve report file after existing path: %v", err)
-		}
-		if filename != baseName+"-2.md" {
-			t.Fatalf("expected suffixed filename, got %q", filename)
-		}
-		if closeErr := file.Close(); closeErr != nil {
-			t.Fatalf("close reserved file: %v", closeErr)
-		}
-		if removeErr := os.Remove(path); removeErr != nil {
-			t.Fatalf("remove reserved file: %v", removeErr)
-		}
-
-		var previousOpenWritableFile = openWritableFile
-		defer func() {
-			openWritableFile = previousOpenWritableFile
-		}()
-		openWritableFile = func(string, int, os.FileMode) (writeSyncCloser, error) {
-			return nil, errors.New("open boom")
-		}
-
-		_, _, _, err = reserveReportFile(fixtureDir, 2024, reportmodel.CostBasisMethodFIFO, generatedAt)
-		if err == nil || !strings.Contains(err.Error(), "reserve report file") {
-			t.Fatalf("expected wrapped reservation failure, got %v", err)
-		}
-	})
-
 	t.Run("sync failure removes partial file", func(t *testing.T) {
 		var fixtureDir = t.TempDir()
 		restoreOutputSeams := installWriterTestSeams(t, fixtureDir)
@@ -538,6 +502,16 @@ func TestWriteReportOutputBundleCleansUpBundleOnFinalizationFailure(t *testing.T
 		var fixtureDir = t.TempDir()
 		var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
 		defer restoreOutputSeams()
+		var openedPaths []string
+		openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+			//nolint:gosec // Test seam intentionally opens the writer-provided path.
+			var file, err = os.OpenFile(path, flag, perm)
+			if err != nil {
+				return nil, err
+			}
+			openedPaths = append(openedPaths, path)
+			return file, nil
+		}
 
 		var previousConstructor = newReportOutputFileForWrite
 		defer func() { newReportOutputFileForWrite = previousConstructor }()
@@ -555,12 +529,23 @@ func TestWriteReportOutputBundleCleansUpBundleOnFinalizationFailure(t *testing.T
 		if err == nil || !strings.Contains(err.Error(), "output file finalization boom") {
 			t.Fatalf("expected output file finalization failure, got %v", err)
 		}
+		assertPathsRemoved(t, openedPaths, 2)
 	})
 
 	t.Run("output bundle finalization", func(t *testing.T) {
 		var fixtureDir = t.TempDir()
 		var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
 		defer restoreOutputSeams()
+		var openedPaths []string
+		openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+			//nolint:gosec // Test seam intentionally opens the writer-provided path.
+			var file, err = os.OpenFile(path, flag, perm)
+			if err != nil {
+				return nil, err
+			}
+			openedPaths = append(openedPaths, path)
+			return file, nil
+		}
 
 		var previousConstructor = newReportOutputBundleForWrite
 		defer func() { newReportOutputBundleForWrite = previousConstructor }()
@@ -578,6 +563,7 @@ func TestWriteReportOutputBundleCleansUpBundleOnFinalizationFailure(t *testing.T
 		if err == nil || !strings.Contains(err.Error(), "output bundle finalization boom") {
 			t.Fatalf("expected output bundle finalization failure, got %v", err)
 		}
+		assertPathsRemoved(t, openedPaths, 2)
 	})
 }
 
@@ -675,7 +661,6 @@ func TestWriteReportOutputBundleCleansUpOnSyncAndCloseFailures(t *testing.T) {
 			message: "close report file",
 		},
 	} {
-		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			var fixtureDir = t.TempDir()
 			var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
@@ -879,6 +864,20 @@ func assertPathRemoved(t *testing.T, path string) {
 	}
 	if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
 		t.Fatalf("expected partial file cleanup for %q, stat error: %v", path, statErr)
+	}
+}
+
+// assertPathsRemoved verifies that every reserved path was cleaned up after a
+// failed bundle write.
+// Authored by: OpenCode
+func assertPathsRemoved(t *testing.T, paths []string, expectedCount int) {
+	t.Helper()
+
+	if len(paths) != expectedCount {
+		t.Fatalf("expected %d reserved paths before failure, got %d", expectedCount, len(paths))
+	}
+	for _, path := range paths {
+		assertPathRemoved(t, path)
 	}
 }
 

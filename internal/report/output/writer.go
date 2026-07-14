@@ -175,34 +175,6 @@ type reservedReportFile struct {
 	file     writeSyncCloser
 }
 
-// reserveReportFile reserves a unique final report path using exclusive file
-// creation.
-// Authored by: OpenCode
-func reserveReportFile(documentsDir string, year int, method reportmodel.CostBasisMethod, generatedAt time.Time) (string, string, writeSyncCloser, error) {
-	var baseName = buildReportFilenameBase(year, method, generatedAt)
-
-	for suffix := 1; ; suffix++ {
-		var filename = baseName + ".md"
-		if suffix > 1 {
-			filename = fmt.Sprintf("%s-%d.md", baseName, suffix)
-		}
-
-		var path = filepath.Join(documentsDir, filename)
-		var file, err = openWritableFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, reportFileMode)
-		if err == nil {
-			return filename, path, file, nil
-		}
-		if errors.Is(err, os.ErrExist) {
-			continue
-		}
-
-		return "", "", nil, wrapFailure(
-			FailureCategoryReportFileWriteFailed,
-			fmt.Errorf("reserve report file %q: %w", path, err),
-		)
-	}
-}
-
 // validateDocumentsDirectory verifies the resolved Documents directory before
 // reserving output files.
 // Authored by: OpenCode
