@@ -136,7 +136,7 @@ func TestReportGenerationWritesSelectedMarkdownAndPDFBundles(t *testing.T) {
 		t.Fatalf("expected readable snapshot after unlock, got %#v", contextResult)
 	}
 
-	var markdownRequest = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown)
+	var markdownRequest = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportOutputFormatMarkdown)
 	var markdownOutcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: markdownRequest})
 	if !markdownOutcome.Success {
 		t.Fatalf("expected Markdown report generation success, got %#v", markdownOutcome)
@@ -152,7 +152,7 @@ func TestReportGenerationWritesSelectedMarkdownAndPDFBundles(t *testing.T) {
 		t.Fatalf("read generated Markdown report %q: %v", markdownMainPath, readErr)
 	}
 
-	var pdfRequest = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatPDF)
+	var pdfRequest = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportOutputFormatPDF)
 	var pdfOutcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: pdfRequest})
 	if !pdfOutcome.Success {
 		t.Fatalf("expected PDF report generation success, got %#v", pdfOutcome)
@@ -899,13 +899,13 @@ func mustIntegrationReportRequest(t *testing.T, year int, reportBaseCurrency rep
 // mustIntegrationReportRequestForFormat creates one validated report request for
 // integration tests that exercise a specific output format.
 // Authored by: OpenCode
-func mustIntegrationReportRequestForFormat(t *testing.T, year int, reportBaseCurrency reportmodel.ReportBaseCurrency, outputFormat reportmodel.ReportOutputFormat) reportmodel.ReportRequest {
+func mustIntegrationReportRequestForFormat(t *testing.T, year int, outputFormat reportmodel.ReportOutputFormat) reportmodel.ReportRequest {
 	t.Helper()
 
 	var request, err = reportmodel.NewReportRequest(
 		year,
 		reportmodel.CostBasisMethodFIFO,
-		reportBaseCurrency,
+		reportmodel.ReportBaseCurrencyUSD,
 		outputFormat,
 		time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
 	)

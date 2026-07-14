@@ -481,7 +481,7 @@ func TestReportGenerationPDFOutputUsesTheConcreteRenderer(t *testing.T) {
 		t.Fatalf("expected readable snapshot after unlock, got %#v", contextResult)
 	}
 
-	var request = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatPDF)
+	var request = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportOutputFormatPDF)
 	var outcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: request})
 	if !outcome.Success {
 		t.Fatalf("expected concrete PDF report generation success, got %#v", outcome)
@@ -604,7 +604,7 @@ func runReportGenerationBundleWriteFailureScenario(t *testing.T) {
 		t.Fatalf("expected readable snapshot after unlock, got %#v", contextResult)
 	}
 
-	var request = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown)
+	var request = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportOutputFormatMarkdown)
 	var outcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: request})
 	if outcome.Success {
 		t.Fatalf("expected bundle write failure, got %#v", outcome)

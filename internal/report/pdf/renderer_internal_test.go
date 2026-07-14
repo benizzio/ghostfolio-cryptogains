@@ -60,11 +60,11 @@ func TestGopdfDocumentUsesLandscapeA4AndPrintableWidth(t *testing.T) {
 	}
 }
 
-// TestBUG005TableWidthSpacingAndRowPreflight verifies that the concrete layout
+// TestTableLayoutUsesPrintableWidthSpacingAndRowPreflight verifies that the concrete layout
 // adapter uses balanced printable-width tables, 24-point block separation, and
 // advances before a header-and-row chunk could cross the bottom margin.
 // Authored by: OpenCode
-func TestBUG005TableWidthSpacingAndRowPreflight(t *testing.T) {
+func TestTableLayoutUsesPrintableWidthSpacingAndRowPreflight(t *testing.T) {
 	var columns = printableWidthColumns([]pdfColumn{
 		{Header: "Wide", Width: 3, Align: "left"},
 		{Header: "Narrow", Width: 1, Align: "right"},
@@ -148,10 +148,10 @@ func TestBUG005TableWidthSpacingAndRowPreflight(t *testing.T) {
 	}, "does not fit within the printable page area")
 }
 
-// TestBUG005TableContinuationRepeatsContextAndHeader verifies each continued
+// TestContinuedTableRepeatsContextAndHeader verifies each continued
 // page identifies the table and redraws its header before its next whole row.
 // Authored by: OpenCode
-func TestBUG005TableContinuationRepeatsContextAndHeader(t *testing.T) {
+func TestContinuedTableRepeatsContextAndHeader(t *testing.T) {
 	var document = startedTestDocument(t)
 	if err := document.AddTable(pdfTable{
 		ContinuationTitle: "Per-Asset Audit Activity (continued)",
@@ -296,10 +296,10 @@ func TestRenderMainReportUsesStructuredLayoutPrimitives(t *testing.T) {
 	assertNoMarkdownStructuralSyntax(t, recorder.allText())
 }
 
-// TestBUG004PDFLayoutRegressionRules verifies the renderer seams for the
+// TestPDFLayoutSatisfiesRegressionRules verifies the renderer seams for the
 // production layout defects patched by BUG-004.
 // Authored by: OpenCode
-func TestBUG004PDFLayoutRegressionRules(t *testing.T) {
+func TestPDFLayoutSatisfiesRegressionRules(t *testing.T) {
 	var recorder = &layoutRecorder{}
 	var report = pdfNonZeroLiquidationReportFixture(t)
 	var conversion = pdfAnnexConversionEntry()
