@@ -305,12 +305,7 @@ func buildAnnexReportFilenameBase(baseName string) string {
 // writeReservedReportFile writes, syncs, and closes one reserved output file.
 // Authored by: OpenCode
 func writeReservedReportFile(reservation reservedReportFile, document reportmodel.ReportDocument) error {
-	var payload = []byte(document.Content)
-	if document.DocumentType == reportmodel.ReportDocumentTypePDF {
-		payload = document.PDFContent
-	}
-
-	if _, err := reservation.file.Write(payload); err != nil {
+	if _, err := reservation.file.Write(document.Content); err != nil {
 		return wrapFailure(
 			FailureCategoryReportFileWriteFailed,
 			fmt.Errorf("write report file %q: %w", reservation.path, err),

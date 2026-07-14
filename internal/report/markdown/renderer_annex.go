@@ -44,7 +44,7 @@ func RenderAnnex(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocum
 	return reportmodel.NewReportDocument(
 		reportmodel.ReportDocumentTypeMarkdown,
 		reportmodel.ReportDocumentRoleAnnex,
-		builder.String(),
+		[]byte(builder.String()),
 		report.Year,
 		report.CostBasisMethod,
 		report.GeneratedAt,

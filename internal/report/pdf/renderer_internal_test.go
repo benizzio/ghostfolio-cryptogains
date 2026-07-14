@@ -435,7 +435,7 @@ func TestRendererEmitsLandscapeA4SearchableSharedReportValues(t *testing.T) {
 		}
 	}
 	for _, sharedValue := range []string{"Ghostfolio Capital Gains And Losses Report", "Gains-And-Losses Summary", "Overall Yearly Net Total", "ADA", "Same currency"} {
-		if !strings.Contains(markdownDocument.Content, sharedValue) {
+		if !strings.Contains(string(markdownDocument.Content), sharedValue) {
 			t.Fatalf("expected Markdown to contain shared value %q, got %q", sharedValue, markdownDocument.Content)
 		}
 		if !inspection.ContainsSearchableText(sharedValue) {

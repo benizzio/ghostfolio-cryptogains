@@ -6,7 +6,6 @@ package model
 import (
 	"bytes"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -15,8 +14,7 @@ import (
 type ReportDocument struct {
 	DocumentType    ReportDocumentType
 	Role            ReportDocumentRole
-	Content         string
-	PDFContent      []byte
+	Content         []byte
 	Year            int
 	CostBasisMethod CostBasisMethod
 	GeneratedAt     time.Time
@@ -26,7 +24,7 @@ type ReportDocument struct {
 //
 // Example:
 //
-//	document, err := model.NewReportDocument(model.ReportDocumentTypeMarkdown, model.ReportDocumentRoleMain, "# Report\n", 2024, model.CostBasisMethodFIFO, time.Now())
+//	document, err := model.NewReportDocument(model.ReportDocumentTypeMarkdown, model.ReportDocumentRoleMain, []byte("# Report\n"), 2024, model.CostBasisMethodFIFO, time.Now())
 //	if err != nil {
 //		panic(err)
 //	}
@@ -36,7 +34,7 @@ type ReportDocument struct {
 func NewReportDocument(
 	documentType ReportDocumentType,
 	role ReportDocumentRole,
-	content string,
+	content []byte,
 	year int,
 	method CostBasisMethod,
 	generatedAt time.Time,
@@ -44,42 +42,7 @@ func NewReportDocument(
 	var document = ReportDocument{
 		DocumentType:    documentType,
 		Role:            role,
-		Content:         content,
-		Year:            year,
-		CostBasisMethod: method,
-		GeneratedAt:     generatedAt,
-	}
-
-	if err := document.Validate(); err != nil {
-		return ReportDocument{}, err
-	}
-
-	return document, nil
-}
-
-// NewPDFReportDocument creates one validated PDF report document from rendered
-// bytes.
-//
-// Example:
-//
-//	document, err := model.NewPDFReportDocument(model.ReportDocumentRoleCombined, []byte("%PDF"), 2024, model.CostBasisMethodFIFO, time.Now())
-//	if err != nil {
-//		panic(err)
-//	}
-//	_ = document.PDFContent
-//
-// Authored by: OpenCode
-func NewPDFReportDocument(
-	role ReportDocumentRole,
-	content []byte,
-	year int,
-	method CostBasisMethod,
-	generatedAt time.Time,
-) (ReportDocument, error) {
-	var document = ReportDocument{
-		DocumentType:    ReportDocumentTypePDF,
-		Role:            role,
-		PDFContent:      append([]byte(nil), content...),
+		Content:         append([]byte(nil), content...),
 		Year:            year,
 		CostBasisMethod: method,
 		GeneratedAt:     generatedAt,
@@ -125,11 +88,11 @@ func (document ReportDocument) Validate() error {
 func (document ReportDocument) validateContent() error {
 	switch document.DocumentType {
 	case ReportDocumentTypeMarkdown:
-		if strings.TrimSpace(document.Content) == "" {
+		if len(bytes.TrimSpace(document.Content)) == 0 {
 			return fmt.Errorf("report document content is required")
 		}
 	case ReportDocumentTypePDF:
-		if len(bytes.TrimSpace(document.PDFContent)) == 0 {
+		if len(bytes.TrimSpace(document.Content)) == 0 {
 			return fmt.Errorf("report document PDF content is required")
 		}
 	}

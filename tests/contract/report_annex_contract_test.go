@@ -122,11 +122,13 @@ func contractAuditEntry(entry reportmodel.AuditActivityEntry) reportmodel.AuditA
 
 // assertSectionOrder verifies that the first section appears before the second.
 // Authored by: OpenCode
-func assertSectionOrder(t *testing.T, content string, first string, second string) {
+func assertSectionOrder(t *testing.T, content any, first string, second string) {
 	t.Helper()
 
-	var firstIndex = strings.Index(content, first)
-	var secondIndex = strings.Index(content, second)
+	var rendered = string(reportDocumentContent(content))
+
+	var firstIndex = strings.Index(rendered, first)
+	var secondIndex = strings.Index(rendered, second)
 	if firstIndex < 0 || secondIndex < 0 || firstIndex >= secondIndex {
 		t.Fatalf("expected %q before %q in %q", first, second, content)
 	}

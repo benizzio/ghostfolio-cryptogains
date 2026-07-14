@@ -192,7 +192,7 @@ func deterministicMarkdownOutputDocuments(t *testing.T, request testutil.ReportR
 	var mainDocument, err = reportmodel.NewReportDocument(
 		reportmodel.ReportDocumentTypeMarkdown,
 		reportmodel.ReportDocumentRoleMain,
-		"# Main Report\n",
+		[]byte("# Main Report\n"),
 		request.Year,
 		request.CostBasisMethod,
 		request.RequestedAt,
@@ -204,7 +204,7 @@ func deterministicMarkdownOutputDocuments(t *testing.T, request testutil.ReportR
 	annexDocument, err = reportmodel.NewReportDocument(
 		reportmodel.ReportDocumentTypeMarkdown,
 		reportmodel.ReportDocumentRoleAnnex,
-		"# Annex 1 - Audit\n",
+		[]byte("# Annex 1 - Audit\n"),
 		request.Year,
 		request.CostBasisMethod,
 		request.RequestedAt,
@@ -243,7 +243,8 @@ func deterministicPDFOutputDocument(t *testing.T, request testutil.ReportRequest
 		t.Fatalf("render deterministic PDF: %v", err)
 	}
 	var document reportmodel.ReportDocument
-	document, err = reportmodel.NewPDFReportDocument(
+	document, err = reportmodel.NewReportDocument(
+		reportmodel.ReportDocumentTypePDF,
 		reportmodel.ReportDocumentRoleCombined,
 		payload,
 		request.Year,

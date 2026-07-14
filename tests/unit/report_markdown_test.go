@@ -269,14 +269,15 @@ func markdownDecimalPointer(raw string) *apd.Decimal {
 // assertContainsInOrder verifies that all expected substrings appear in the
 // rendered Markdown in the required order.
 // Authored by: OpenCode
-func assertContainsInOrder(t *testing.T, content string, expected ...string) {
+func assertContainsInOrder(t *testing.T, content any, expected ...string) {
 	t.Helper()
 
+	var rendered = string(reportDocumentContent(content))
 	var offset int
 	for _, current := range expected {
-		var index = strings.Index(content[offset:], current)
+		var index = strings.Index(rendered[offset:], current)
 		if index < 0 {
-			t.Fatalf("expected %q after offset %d in content %q", current, offset, content)
+			t.Fatalf("expected %q after offset %d in content %q", current, offset, rendered)
 		}
 		offset += index + len(current)
 	}
@@ -285,9 +286,9 @@ func assertContainsInOrder(t *testing.T, content string, expected ...string) {
 // assertContainsString verifies that the rendered Markdown includes one required
 // substring.
 // Authored by: OpenCode
-func assertContainsString(t *testing.T, content string, expected string) {
+func assertContainsString(t *testing.T, content any, expected string) {
 	t.Helper()
-	if !strings.Contains(content, expected) {
+	if !strings.Contains(string(reportDocumentContent(content)), expected) {
 		t.Fatalf("expected content to contain %q", expected)
 	}
 }
@@ -295,9 +296,22 @@ func assertContainsString(t *testing.T, content string, expected string) {
 // assertNotContainsString verifies that the rendered Markdown excludes one
 // forbidden substring.
 // Authored by: OpenCode
-func assertNotContainsString(t *testing.T, content string, unexpected string) {
+func assertNotContainsString(t *testing.T, content any, unexpected string) {
 	t.Helper()
-	if strings.Contains(content, unexpected) {
+	if strings.Contains(string(reportDocumentContent(content)), unexpected) {
 		t.Fatalf("expected content not to contain %q", unexpected)
+	}
+}
+
+// reportDocumentContent normalizes Markdown payloads for test assertions.
+// Authored by: OpenCode
+func reportDocumentContent(content any) []byte {
+	switch value := content.(type) {
+	case string:
+		return []byte(value)
+	case []byte:
+		return value
+	default:
+		panic("unsupported report document content")
 	}
 }

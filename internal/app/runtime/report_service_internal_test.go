@@ -568,11 +568,11 @@ func TestRenderReportOutputBundleCoversPDFSelectionFailures(t *testing.T) {
 	}
 
 	reportPDFRenderOptions = previousOptions
-	var previousPDFDocumentConstructor = newPDFReportDocumentForRuntime
+	var previousReportDocumentConstructor = newReportDocumentForRuntime
 	defer func() {
-		newPDFReportDocumentForRuntime = previousPDFDocumentConstructor
+		newReportDocumentForRuntime = previousReportDocumentConstructor
 	}()
-	newPDFReportDocumentForRuntime = func(reportmodel.ReportDocumentRole, []byte, int, reportmodel.CostBasisMethod, time.Time) (reportmodel.ReportDocument, error) {
+	newReportDocumentForRuntime = func(reportmodel.ReportDocumentType, reportmodel.ReportDocumentRole, []byte, int, reportmodel.CostBasisMethod, time.Time) (reportmodel.ReportDocument, error) {
 		return reportmodel.ReportDocument{}, errors.New("pdf document finalization boom")
 	}
 	if _, err := renderReportOutputBundle(reportmodel.ReportOutputFormatPDF, report); err == nil || !strings.Contains(err.Error(), "pdf document finalization boom") {
@@ -783,7 +783,7 @@ func capitalGainsReportFixture(t *testing.T, request reportmodel.ReportRequest) 
 func reportDocumentFixture(t *testing.T, report reportmodel.CapitalGainsReport) reportmodel.ReportDocument {
 	t.Helper()
 
-	var document, err = reportmodel.NewReportDocument(reportmodel.ReportDocumentTypeMarkdown, reportmodel.ReportDocumentRoleMain, "# Report\n", report.Year, report.CostBasisMethod, report.GeneratedAt)
+	var document, err = reportmodel.NewReportDocument(reportmodel.ReportDocumentTypeMarkdown, reportmodel.ReportDocumentRoleMain, []byte("# Report\n"), report.Year, report.CostBasisMethod, report.GeneratedAt)
 	if err != nil {
 		t.Fatalf("new report document: %v", err)
 	}
@@ -796,7 +796,7 @@ func reportDocumentFixture(t *testing.T, report reportmodel.CapitalGainsReport) 
 // Authored by: OpenCode
 func reportDocumentBundleFixture(t *testing.T, report reportmodel.CapitalGainsReport) []reportmodel.ReportDocument {
 	var main = reportDocumentFixture(t, report)
-	var annex, err = reportmodel.NewReportDocument(reportmodel.ReportDocumentTypeMarkdown, reportmodel.ReportDocumentRoleAnnex, "# Annex 1 - Audit\n", report.Year, report.CostBasisMethod, report.GeneratedAt)
+	var annex, err = reportmodel.NewReportDocument(reportmodel.ReportDocumentTypeMarkdown, reportmodel.ReportDocumentRoleAnnex, []byte("# Annex 1 - Audit\n"), report.Year, report.CostBasisMethod, report.GeneratedAt)
 	if err != nil {
 		t.Fatalf("new annex report document: %v", err)
 	}

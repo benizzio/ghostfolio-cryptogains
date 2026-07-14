@@ -26,10 +26,10 @@ var reportPDFRenderOptions = func() reportpdf.RenderOptions {
 	return reportpdf.RenderOptions{Fonts: reportpdf.FontData{Regular: goregular.TTF, Bold: gobold.TTF}}
 }
 
-// newPDFReportDocumentForRuntime keeps the defensive runtime finalization branch
-// testable after renderer validation has guaranteed normal PDF document inputs.
+// newReportDocumentForRuntime keeps the defensive runtime finalization branch
+// testable after renderer validation has guaranteed normal document inputs.
 // Authored by: OpenCode
-var newPDFReportDocumentForRuntime = reportmodel.NewPDFReportDocument
+var newReportDocumentForRuntime = reportmodel.NewReportDocument
 
 // reportCalculator defines the calculation seam used by the runtime report
 // service.
@@ -203,7 +203,7 @@ func renderReportOutputBundle(outputFormat reportmodel.ReportOutputFormat, repor
 			return nil, err
 		}
 		var document reportmodel.ReportDocument
-		document, err = newPDFReportDocumentForRuntime(reportmodel.ReportDocumentRoleCombined, payload, report.Year, report.CostBasisMethod, report.GeneratedAt)
+		document, err = newReportDocumentForRuntime(reportmodel.ReportDocumentTypePDF, reportmodel.ReportDocumentRoleCombined, payload, report.Year, report.CostBasisMethod, report.GeneratedAt)
 		if err != nil {
 			return nil, err
 		}

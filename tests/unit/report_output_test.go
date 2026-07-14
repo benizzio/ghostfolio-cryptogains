@@ -151,8 +151,8 @@ func TestWriteReportDocumentUsesExclusiveCreate(t *testing.T) {
 // Authored by: OpenCode
 func outputMarkdownDocuments(method reportmodel.CostBasisMethod, content string, generatedAt time.Time) []reportmodel.ReportDocument {
 	return []reportmodel.ReportDocument{
-		{DocumentType: reportmodel.ReportDocumentTypeMarkdown, Role: reportmodel.ReportDocumentRoleMain, Content: content, Year: 2024, CostBasisMethod: method, GeneratedAt: generatedAt},
-		{DocumentType: reportmodel.ReportDocumentTypeMarkdown, Role: reportmodel.ReportDocumentRoleAnnex, Content: "# Annex 1 - Audit\n", Year: 2024, CostBasisMethod: method, GeneratedAt: generatedAt},
+		{DocumentType: reportmodel.ReportDocumentTypeMarkdown, Role: reportmodel.ReportDocumentRoleMain, Content: []byte(content), Year: 2024, CostBasisMethod: method, GeneratedAt: generatedAt},
+		{DocumentType: reportmodel.ReportDocumentTypeMarkdown, Role: reportmodel.ReportDocumentRoleAnnex, Content: []byte("# Annex 1 - Audit\n"), Year: 2024, CostBasisMethod: method, GeneratedAt: generatedAt},
 	}
 }
 

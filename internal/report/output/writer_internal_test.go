@@ -62,7 +62,7 @@ func TestWriteReportDocumentRemovesPartialFileOnWriteFailure(t *testing.T) {
 
 	var document = reportmodel.ReportDocument{
 		DocumentType:    reportmodel.ReportDocumentTypeMarkdown,
-		Content:         "# Report\n",
+		Content:         []byte("# Report\n"),
 		Year:            2024,
 		CostBasisMethod: reportmodel.CostBasisMethodFIFO,
 		GeneratedAt:     time.Date(2026, time.May, 21, 12, 30, 0, 0, time.Local),
@@ -612,7 +612,7 @@ func TestWriteReportOutputBundleAdditionalFailureBranches(t *testing.T) {
 
 	t.Run("rejects invalid document before resolving documents", func(t *testing.T) {
 		var invalidDocument = mainDocument
-		invalidDocument.Content = "   "
+		invalidDocument.Content = []byte("   ")
 		if _, err := WriteReportOutputBundle(reportmodel.ReportOutputFormatMarkdown, []reportmodel.ReportDocument{invalidDocument, annexDocument}); err == nil || !strings.Contains(err.Error(), "report document 0") {
 			t.Fatalf("expected document validation failure, got %v", err)
 		}
@@ -776,7 +776,7 @@ func validReportDocument(generatedAt time.Time) reportmodel.ReportDocument {
 	return reportmodel.ReportDocument{
 		DocumentType:    reportmodel.ReportDocumentTypeMarkdown,
 		Role:            reportmodel.ReportDocumentRoleMain,
-		Content:         "# Report\n",
+		Content:         []byte("# Report\n"),
 		Year:            2024,
 		CostBasisMethod: reportmodel.CostBasisMethodFIFO,
 		GeneratedAt:     generatedAt,
@@ -791,7 +791,7 @@ func markdownDocumentPair(document reportmodel.ReportDocument) []reportmodel.Rep
 	main.Role = reportmodel.ReportDocumentRoleMain
 	var annex = document
 	annex.Role = reportmodel.ReportDocumentRoleAnnex
-	annex.Content = "# Annex 1 - Audit\n"
+	annex.Content = []byte("# Annex 1 - Audit\n")
 	return []reportmodel.ReportDocument{main, annex}
 }
 
@@ -802,7 +802,7 @@ func validMarkdownReportDocument(role reportmodel.ReportDocumentRole, content st
 	return reportmodel.ReportDocument{
 		DocumentType:    reportmodel.ReportDocumentTypeMarkdown,
 		Role:            role,
-		Content:         content,
+		Content:         []byte(content),
 		Year:            2024,
 		CostBasisMethod: reportmodel.CostBasisMethodFIFO,
 		GeneratedAt:     generatedAt,
@@ -816,7 +816,7 @@ func validPDFReportDocument(content []byte, generatedAt time.Time) reportmodel.R
 	return reportmodel.ReportDocument{
 		DocumentType:    reportmodel.ReportDocumentTypePDF,
 		Role:            reportmodel.ReportDocumentRoleCombined,
-		PDFContent:      append([]byte(nil), content...),
+		Content:         append([]byte(nil), content...),
 		Year:            2024,
 		CostBasisMethod: reportmodel.CostBasisMethodFIFO,
 		GeneratedAt:     generatedAt,

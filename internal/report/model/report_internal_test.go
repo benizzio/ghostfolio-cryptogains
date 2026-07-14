@@ -303,7 +303,7 @@ func TestReportDocumentConstructorsCoverCompatibilityBranches(t *testing.T) {
 	var pdfAsMarkdownRole = ReportDocument{
 		DocumentType:    ReportDocumentTypePDF,
 		Role:            ReportDocumentRoleMain,
-		PDFContent:      []byte("%PDF-1.7"),
+		Content:         []byte("%PDF-1.7"),
 		Year:            2024,
 		CostBasisMethod: CostBasisMethodFIFO,
 		GeneratedAt:     generatedAt,
@@ -315,7 +315,7 @@ func TestReportDocumentConstructorsCoverCompatibilityBranches(t *testing.T) {
 	var markdownAsCombined = ReportDocument{
 		DocumentType:    ReportDocumentTypeMarkdown,
 		Role:            ReportDocumentRoleCombined,
-		Content:         "# Report",
+		Content:         []byte("# Report"),
 		Year:            2024,
 		CostBasisMethod: CostBasisMethodFIFO,
 		GeneratedAt:     generatedAt,
@@ -735,12 +735,12 @@ func TestReferenceAndDetailValidationGuardrails(t *testing.T) {
 func TestReportDocumentAndOutputValidation(t *testing.T) {
 	t.Parallel()
 
-	_, err := NewReportDocument(ReportDocumentType("html"), ReportDocumentRoleMain, "# Report\n", 2024, CostBasisMethodFIFO, time.Now())
+	_, err := NewReportDocument(ReportDocumentType("html"), ReportDocumentRoleMain, []byte("# Report\n"), 2024, CostBasisMethodFIFO, time.Now())
 	if err == nil || !strings.Contains(err.Error(), "unsupported report document type") {
 		t.Fatalf("expected invalid document type error, got %v", err)
 	}
 
-	document, err := NewReportDocument(ReportDocumentTypeMarkdown, ReportDocumentRoleMain, "# Report\n", 2024, CostBasisMethodFIFO, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
+	document, err := NewReportDocument(ReportDocumentTypeMarkdown, ReportDocumentRoleMain, []byte("# Report\n"), 2024, CostBasisMethodFIFO, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report document: %v", err)
 	}
@@ -761,15 +761,24 @@ func TestReportDocumentAndOutputValidation(t *testing.T) {
 		t.Fatalf("validate report output file: %v", err)
 	}
 
-	pdfDocument, err := NewPDFReportDocument(ReportDocumentRoleCombined, []byte("%PDF-1.7"), 2024, CostBasisMethodFIFO, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
+	pdfDocument, err := NewReportDocument(ReportDocumentTypePDF, ReportDocumentRoleCombined, []byte("%PDF-1.7"), 2024, CostBasisMethodFIFO, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new PDF report document: %v", err)
 	}
 	if err = pdfDocument.Validate(); err != nil {
 		t.Fatalf("validate PDF report document: %v", err)
 	}
+	var payload = []byte("%PDF-1.7")
+	var copiedDocument, copyErr = NewReportDocument(ReportDocumentTypePDF, ReportDocumentRoleCombined, payload, 2024, CostBasisMethodFIFO, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
+	if copyErr != nil {
+		t.Fatalf("new copied PDF report document: %v", copyErr)
+	}
+	payload[0] = '!'
+	if string(copiedDocument.Content) != "%PDF-1.7" {
+		t.Fatalf("expected report document content to be independent of input mutation, got %q", copiedDocument.Content)
+	}
 
-	_, err = NewPDFReportDocument(ReportDocumentRoleMain, []byte("%PDF-1.7"), 2024, CostBasisMethodFIFO, time.Now())
+	_, err = NewReportDocument(ReportDocumentTypePDF, ReportDocumentRoleMain, []byte("%PDF-1.7"), 2024, CostBasisMethodFIFO, time.Now())
 	if err == nil || !strings.Contains(err.Error(), "pdf report document role must be combined") {
 		t.Fatalf("expected PDF role validation failure, got %v", err)
 	}
@@ -783,15 +792,15 @@ func TestValidateRenderedDocumentsValidatesBundleShapeAndMetadata(t *testing.T) 
 	t.Parallel()
 
 	var generatedAt = time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC)
-	var main, mainErr = NewReportDocument(ReportDocumentTypeMarkdown, ReportDocumentRoleMain, "# Report\n", 2024, CostBasisMethodFIFO, generatedAt)
+	var main, mainErr = NewReportDocument(ReportDocumentTypeMarkdown, ReportDocumentRoleMain, []byte("# Report\n"), 2024, CostBasisMethodFIFO, generatedAt)
 	if mainErr != nil {
 		t.Fatalf("new main document: %v", mainErr)
 	}
-	var annex, annexErr = NewReportDocument(ReportDocumentTypeMarkdown, ReportDocumentRoleAnnex, "# Annex\n", 2024, CostBasisMethodFIFO, generatedAt)
+	var annex, annexErr = NewReportDocument(ReportDocumentTypeMarkdown, ReportDocumentRoleAnnex, []byte("# Annex\n"), 2024, CostBasisMethodFIFO, generatedAt)
 	if annexErr != nil {
 		t.Fatalf("new annex document: %v", annexErr)
 	}
-	var pdf, pdfErr = NewPDFReportDocument(ReportDocumentRoleCombined, []byte("%PDF-1.7"), 2024, CostBasisMethodFIFO, generatedAt)
+	var pdf, pdfErr = NewReportDocument(ReportDocumentTypePDF, ReportDocumentRoleCombined, []byte("%PDF-1.7"), 2024, CostBasisMethodFIFO, generatedAt)
 	if pdfErr != nil {
 		t.Fatalf("new PDF document: %v", pdfErr)
 	}
@@ -845,7 +854,7 @@ func TestReportDocumentRequiresExplicitMarkdownRole(t *testing.T) {
 
 	var document = ReportDocument{
 		DocumentType:    ReportDocumentTypeMarkdown,
-		Content:         "# Report\n",
+		Content:         []byte("# Report\n"),
 		Year:            2024,
 		CostBasisMethod: CostBasisMethodFIFO,
 		GeneratedAt:     time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC),
@@ -937,12 +946,12 @@ func TestReportDocumentValidationGuardrails(t *testing.T) {
 		t.Fatalf("expected invalid yearly net total error, got %v", err)
 	}
 
-	_, err = NewReportDocument(ReportDocumentTypeMarkdown, ReportDocumentRoleMain, "   ", 2024, CostBasisMethodFIFO, time.Now())
+	_, err = NewReportDocument(ReportDocumentTypeMarkdown, ReportDocumentRoleMain, []byte("   "), 2024, CostBasisMethodFIFO, time.Now())
 	if err == nil || !strings.Contains(err.Error(), "report document content is required") {
 		t.Fatalf("expected missing content error, got %v", err)
 	}
 
-	_, err = NewReportDocument(ReportDocumentTypeMarkdown, ReportDocumentRoleMain, "# Report\n", 2024, CostBasisMethod("bad"), time.Now())
+	_, err = NewReportDocument(ReportDocumentTypeMarkdown, ReportDocumentRoleMain, []byte("# Report\n"), 2024, CostBasisMethod("bad"), time.Now())
 	if err == nil || !strings.Contains(err.Error(), "report document cost basis method") {
 		t.Fatalf("expected invalid report document method error, got %v", err)
 	}
@@ -1115,10 +1124,10 @@ func TestReportConstructorsAndValidationHelpersCoverRemainingBranches(t *testing
 		t.Fatalf("expected invalid nested detail section to fail, got %v", err)
 	}
 
-	if err = (ReportDocument{DocumentType: ReportDocumentTypeMarkdown, Role: ReportDocumentRoleMain, Content: "# Report\n", Year: 0, CostBasisMethod: CostBasisMethodFIFO, GeneratedAt: time.Now()}).Validate(); err == nil || !strings.Contains(err.Error(), "report document year must be greater than zero") {
+	if err = (ReportDocument{DocumentType: ReportDocumentTypeMarkdown, Role: ReportDocumentRoleMain, Content: []byte("# Report\n"), Year: 0, CostBasisMethod: CostBasisMethodFIFO, GeneratedAt: time.Now()}).Validate(); err == nil || !strings.Contains(err.Error(), "report document year must be greater than zero") {
 		t.Fatalf("expected missing document year to fail, got %v", err)
 	}
-	if err = (ReportDocument{DocumentType: ReportDocumentTypeMarkdown, Role: ReportDocumentRoleMain, Content: "# Report\n", Year: 2024, CostBasisMethod: CostBasisMethodFIFO}).Validate(); err == nil || !strings.Contains(err.Error(), "generated-at timestamp is required") {
+	if err = (ReportDocument{DocumentType: ReportDocumentTypeMarkdown, Role: ReportDocumentRoleMain, Content: []byte("# Report\n"), Year: 2024, CostBasisMethod: CostBasisMethodFIFO}).Validate(); err == nil || !strings.Contains(err.Error(), "generated-at timestamp is required") {
 		t.Fatalf("expected missing document timestamp to fail, got %v", err)
 	}
 
@@ -1716,7 +1725,7 @@ func TestReportModelCoverageGapBranches(t *testing.T) {
 		t.Fatalf("new PDF output file: %v", pdfErr)
 	}
 
-	if err := (ReportDocument{DocumentType: ReportDocumentTypePDF, PDFContent: []byte("%PDF"), Year: 2024, CostBasisMethod: CostBasisMethodFIFO, GeneratedAt: savedAt}).Validate(); err == nil || !strings.Contains(err.Error(), "report document role") {
+	if err := (ReportDocument{DocumentType: ReportDocumentTypePDF, Content: []byte("%PDF"), Year: 2024, CostBasisMethod: CostBasisMethodFIFO, GeneratedAt: savedAt}).Validate(); err == nil || !strings.Contains(err.Error(), "report document role") {
 		t.Fatalf("expected missing PDF document role failure, got %v", err)
 	}
 

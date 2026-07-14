@@ -423,7 +423,7 @@ func TestRenderRendersReferenceEmptyState(t *testing.T) {
 		"### Historical Position",
 		"- **Quantity:** 0",
 	} {
-		if !strings.Contains(document.Content, expected) {
+		if !strings.Contains(string(document.Content), expected) {
 			t.Fatalf("expected rendered document to contain %q", expected)
 		}
 	}
@@ -449,12 +449,12 @@ func TestRenderAnnexRendersSeparateDetailedAuditDocument(t *testing.T) {
 		"| audit-zero-sell | BLOCKCHAIN OP | 1 | 0 | 0 | 0 | USD | USD | 0 | 0 | true | 10 |  |  | Same currency | move token=[REDACTED] |",
 		"Source currency per base currency",
 	} {
-		if !strings.Contains(document.Content, expected) {
+		if !strings.Contains(string(document.Content), expected) {
 			t.Fatalf("expected annex document to contain %q, got %q", expected, document.Content)
 		}
 	}
 	for _, excluded := range []string{"source_per_base", "secret-token"} {
-		if strings.Contains(document.Content, excluded) {
+		if strings.Contains(string(document.Content), excluded) {
 			t.Fatalf("expected annex document to exclude %q, got %q", excluded, document.Content)
 		}
 	}
@@ -538,7 +538,7 @@ func TestRenderCoversDetailAndLiquidationBranches(t *testing.T) {
 			"| sell-1 | SELL | 1 |  | 12 | 2 | 0 | 0 | USD | USD | Same currency |  |",
 			"| sell-1 | 1 | 10 | 10 | 0 | USD |",
 		} {
-			if !strings.Contains(document.Content, expected) {
+			if !strings.Contains(string(document.Content), expected) {
 				t.Fatalf("expected rendered report to contain %q", expected)
 			}
 		}
@@ -971,7 +971,7 @@ func TestRenderDocumentsAndAnnexFallbackBranches(t *testing.T) {
 		"No per-asset audit activity is available for this report.",
 		"No converted activity was present for this report.",
 	} {
-		if !strings.Contains(document.Content, expected) {
+		if !strings.Contains(string(document.Content), expected) {
 			t.Fatalf("expected default annex to contain %q, got %q", expected, document.Content)
 		}
 	}

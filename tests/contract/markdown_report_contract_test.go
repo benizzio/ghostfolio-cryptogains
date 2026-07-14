@@ -275,7 +275,7 @@ func TestMarkdownReportOutputFileContract(t *testing.T) {
 	}
 	testutil.AssertPathWithin(t, outputFile.Path, fixture.DocumentsDir)
 	testutil.AssertRegularFile(t, outputFile.Path)
-	testutil.AssertFileContent(t, outputFile.Path, document.Content)
+	testutil.AssertFileContent(t, outputFile.Path, string(document.Content))
 	assertNotContains(t, document.Content, "secret-token")
 	assertNotContains(t, outputFile.Path, "secret-token")
 }
@@ -453,12 +453,13 @@ func contractConversionAuditEntry(sourceID string, assetLabel string, sourceCurr
 // rateSourceSummarySection extracts the Rate Source Summary block from a
 // rendered Markdown document.
 // Authored by: OpenCode
-func rateSourceSummarySection(content string) string {
-	var start = strings.Index(content, "## Rate Source Summary")
+func rateSourceSummarySection(content any) string {
+	var rendered = string(reportDocumentContent(content))
+	var start = strings.Index(rendered, "## Rate Source Summary")
 	if start < 0 {
 		return ""
 	}
-	var rest = content[start:]
+	var rest = rendered[start:]
 	var next = strings.Index(rest[len("## Rate Source Summary"):], "\n## ")
 	if next < 0 {
 		return rest
