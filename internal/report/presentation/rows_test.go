@@ -75,9 +75,9 @@ func TestBuildRowsReturnContextualErrors(t *testing.T) {
 			return err
 		}, want: "liquidation \"liquidation\" disposed quantity"},
 		{name: "annex", build: func() error {
-			_, err := BuildAnnexActivityRow(reportmodel.AuditActivityEntry{Quantity: invalid})
+			_, err := BuildAnnexActivityRow(reportmodel.AuditActivityEntry{SourceID: "annex", Quantity: invalid})
 			return err
-		}, want: "quantity"},
+		}, want: "annex activity row \"annex\" quantity"},
 		{name: "conversion", build: func() error {
 			_, err := BuildConversionAuditRow(3, reportmodel.ConversionAuditEntry{RateValue: invalid})
 			return err
@@ -87,6 +87,54 @@ func TestBuildRowsReturnContextualErrors(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			if err := testCase.build(); err == nil || !strings.Contains(err.Error(), testCase.want) {
 				t.Fatalf("error = %v, want %q", err, testCase.want)
+			}
+		})
+	}
+}
+
+// TestBuildAnnexActivityRowReturnsContextualErrors verifies every
+// canonicalization and label failure identifies the affected audit activity.
+// Authored by: OpenCode
+func TestBuildAnnexActivityRowReturnsContextualErrors(t *testing.T) {
+	var invalid apd.Decimal
+	invalid.Form = apd.Infinite
+	var entry = reportmodel.AuditActivityEntry{
+		SourceID:              "annex-activity",
+		ActivityType:          reportmodel.ActivityTypeBuy,
+		Quantity:              *apd.New(1, 0),
+		QuantityAfterActivity: *apd.New(1, 0),
+		BasisAfterActivity:    *apd.New(1, 0),
+	}
+	for _, testCase := range []struct {
+		name      string
+		configure func(*reportmodel.AuditActivityEntry)
+		operation string
+	}{
+		{name: "quantity", configure: func(entry *reportmodel.AuditActivityEntry) { entry.Quantity = invalid }, operation: "quantity"},
+		{name: "unit price", configure: func(entry *reportmodel.AuditActivityEntry) { entry.UnitPrice = &invalid }, operation: "unit price"},
+		{name: "gross value", configure: func(entry *reportmodel.AuditActivityEntry) { entry.GrossValue = &invalid }, operation: "gross value"},
+		{name: "fee", configure: func(entry *reportmodel.AuditActivityEntry) { entry.FeeAmount = &invalid }, operation: "fee"},
+		{name: "quantity after activity", configure: func(entry *reportmodel.AuditActivityEntry) { entry.QuantityAfterActivity = invalid }, operation: "quantity after activity"},
+		{name: "basis after activity", configure: func(entry *reportmodel.AuditActivityEntry) { entry.BasisAfterActivity = invalid }, operation: "basis after activity"},
+		{name: "allocated basis", configure: func(entry *reportmodel.AuditActivityEntry) { entry.AllocatedBasis = &invalid }, operation: "allocated basis"},
+		{name: "net liquidation proceeds", configure: func(entry *reportmodel.AuditActivityEntry) { entry.NetLiquidationProceeds = &invalid }, operation: "net liquidation proceeds"},
+		{name: "gain or loss", configure: func(entry *reportmodel.AuditActivityEntry) { entry.GainOrLoss = &invalid }, operation: "gain or loss"},
+		{name: "activity type label", configure: func(entry *reportmodel.AuditActivityEntry) {
+			entry.ActivityType = reportmodel.ActivityType("unsupported")
+		}, operation: "activity type label"},
+		{name: "conversion status label", configure: func(entry *reportmodel.AuditActivityEntry) {
+			entry.ConversionStatus = reportmodel.ConversionStatus("unsupported")
+		}, operation: "conversion status label"},
+	} {
+		var testCase = testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			var configured = entry
+			testCase.configure(&configured)
+
+			_, err := BuildAnnexActivityRow(configured)
+			var want = "render annex activity row \"annex-activity\" " + testCase.operation
+			if err == nil || !strings.Contains(err.Error(), want) {
+				t.Fatalf("error = %v, want context %q", err, want)
 			}
 		})
 	}

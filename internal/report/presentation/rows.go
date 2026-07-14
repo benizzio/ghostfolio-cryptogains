@@ -171,49 +171,49 @@ func BuildLiquidationRow(liquidation reportmodel.LiquidationCalculation, fallbac
 func BuildAnnexActivityRow(entry reportmodel.AuditActivityEntry) (AnnexActivityRow, error) {
 	quantity, err := decimalsupport.CanonicalString(entry.Quantity)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("quantity: %w", err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q quantity: %w", entry.SourceID, err)
 	}
 	unitPrice, err := decimalsupport.CanonicalStringPointer(entry.UnitPrice)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("unit price: %w", err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q unit price: %w", entry.SourceID, err)
 	}
 	grossValue, err := decimalsupport.CanonicalStringPointer(entry.GrossValue)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("gross value: %w", err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q gross value: %w", entry.SourceID, err)
 	}
 	fee, err := decimalsupport.CanonicalStringPointer(entry.FeeAmount)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("fee: %w", err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q fee: %w", entry.SourceID, err)
 	}
 	quantityAfter, err := decimalsupport.CanonicalString(entry.QuantityAfterActivity)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("quantity after activity: %w", err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q quantity after activity: %w", entry.SourceID, err)
 	}
 	basisAfter, err := decimalsupport.CanonicalString(entry.BasisAfterActivity)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("basis after activity: %w", err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q basis after activity: %w", entry.SourceID, err)
 	}
 	allocatedBasis, err := decimalsupport.CanonicalStringPointer(entry.AllocatedBasis)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("allocated basis: %w", err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q allocated basis: %w", entry.SourceID, err)
 	}
 	netProceeds, err := decimalsupport.CanonicalStringPointer(entry.NetLiquidationProceeds)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("net liquidation proceeds: %w", err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q net liquidation proceeds: %w", entry.SourceID, err)
 	}
 	gainOrLoss, err := decimalsupport.CanonicalStringPointer(entry.GainOrLoss)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("gain or loss: %w", err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q gain or loss: %w", entry.SourceID, err)
 	}
 	activityType, err := reportmodel.RenderAuditActivityTypeLabel(entry)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("activity type label: %w", err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q activity type label: %w", entry.SourceID, err)
 	}
 	conversionStatus := ""
 	if strings.TrimSpace(string(entry.ConversionStatus)) != "" {
 		conversionStatus, err = reportmodel.RenderConversionStatusLabel(entry.ConversionStatus)
 		if err != nil {
-			return AnnexActivityRow{}, fmt.Errorf("conversion status label: %w", err)
+			return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q conversion status label: %w", entry.SourceID, err)
 		}
 	}
 
