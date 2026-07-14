@@ -9,6 +9,13 @@ import (
 	"time"
 )
 
+// Fixed positions for documents in a rendered Markdown output bundle.
+// Authored by: OpenCode
+const (
+	mainReportDocumentPosition = iota
+	annexReportDocumentPosition
+)
+
 // ReportOutputBundle stores the saved-file outcome for one successful report
 // generation run. A Markdown bundle must contain main and annex files. A PDF
 // bundle must contain the single combined file.
@@ -116,17 +123,17 @@ func validateRenderedDocumentShape(outputFormat ReportOutputFormat, documents []
 		if len(documents) != 2 {
 			return fmt.Errorf("markdown report output requires exactly two documents")
 		}
-		if documents[0].DocumentType != ReportDocumentTypeMarkdown || documents[0].Role != ReportDocumentRoleMain {
+		if documents[mainReportDocumentPosition].DocumentType != ReportDocumentTypeMarkdown || documents[mainReportDocumentPosition].Role != ReportDocumentRoleMain {
 			return fmt.Errorf("markdown report output document 0 must be the main Markdown document")
 		}
-		if documents[1].DocumentType != ReportDocumentTypeMarkdown || documents[1].Role != ReportDocumentRoleAnnex {
+		if documents[annexReportDocumentPosition].DocumentType != ReportDocumentTypeMarkdown || documents[annexReportDocumentPosition].Role != ReportDocumentRoleAnnex {
 			return fmt.Errorf("markdown report output document 1 must be the Annex 1 Markdown document")
 		}
 	case ReportOutputFormatPDF:
 		if len(documents) != 1 {
 			return fmt.Errorf("pdf report output requires exactly one document")
 		}
-		if documents[0].DocumentType != ReportDocumentTypePDF || documents[0].Role != ReportDocumentRoleCombined {
+		if documents[mainReportDocumentPosition].DocumentType != ReportDocumentTypePDF || documents[mainReportDocumentPosition].Role != ReportDocumentRoleCombined {
 			return fmt.Errorf("pdf report output document must be the combined PDF document")
 		}
 	}
@@ -137,8 +144,8 @@ func validateRenderedDocumentShape(outputFormat ReportOutputFormat, documents []
 // the same calculated report.
 // Authored by: OpenCode
 func validateRenderedDocumentMetadata(documents []ReportDocument) error {
-	var first = documents[0]
-	for index := 1; index < len(documents); index++ {
+	var first = documents[mainReportDocumentPosition]
+	for index := annexReportDocumentPosition; index < len(documents); index++ {
 		if documents[index].Year != first.Year {
 			return fmt.Errorf("report document %d year does not match the first document", index)
 		}
