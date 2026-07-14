@@ -295,7 +295,7 @@ func TestReportOutputFormatContract(t *testing.T) {
 	}
 }
 
-// TestReportDocumentConstructorsCoverValidation verifies document role/content combinations.
+// TestReportDocumentConstructorsCoverCompatibilityBranches verifies document role/content combinations.
 // Authored by: OpenCode
 func TestReportDocumentConstructorsCoverCompatibilityBranches(t *testing.T) {
 	var generatedAt = time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC)
@@ -330,7 +330,7 @@ func TestReportDocumentConstructorsCoverCompatibilityBranches(t *testing.T) {
 	}
 }
 
-// TestReportOutputFileConstructorsCoverValidation verifies output metadata guardrails.
+// TestReportOutputFileConstructorsCoverCompatibilityBranches verifies output metadata guardrails.
 // Authored by: OpenCode
 func TestReportOutputFileConstructorsCoverCompatibilityBranches(t *testing.T) {
 	var savedAt = time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC)
