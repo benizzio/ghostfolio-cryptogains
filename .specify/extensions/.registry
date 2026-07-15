@@ -48,29 +48,6 @@
       "registered_skills": [],
       "installed_at": "2026-05-26T18:29:23.776328+00:00"
     },
-    "test-coverage-drift-control": {
-      "version": "0.2.1",
-      "source": "local",
-      "manifest_hash": "sha256:86dfa5b9c795797dc7c783d5d12a49cfb1b601bd7e21137181c51a1e3befbf95",
-      "enabled": true,
-      "priority": 10,
-      "registered_commands": {
-        "agy": [
-          "speckit.test-coverage-drift-control.report",
-          "speckit.test-coverage-drift-control.remediation-plan"
-        ],
-        "codex": [
-          "speckit.test-coverage-drift-control.report",
-          "speckit.test-coverage-drift-control.remediation-plan"
-        ],
-        "opencode": [
-          "speckit.test-coverage-drift-control.report",
-          "speckit.test-coverage-drift-control.remediation-plan"
-        ]
-      },
-      "registered_skills": [],
-      "installed_at": "2026-05-31T18:56:17.604701+00:00"
-    },
     "data-model-diagram": {
       "version": "0.2.2",
       "source": "local",
@@ -198,6 +175,33 @@
       },
       "registered_skills": [],
       "installed_at": "2026-07-04T14:43:19.875387+00:00"
+    },
+    "test-coverage-drift-control": {
+      "version": "0.3.0",
+      "source": "local",
+      "manifest_hash": "sha256:03d7248bba26f0cec27aaa7406ab3e3f0279c0dde67cc16bca6b439ea9fe8332",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "agy": [
+          "speckit.test-coverage-drift-control.report",
+          "speckit.test-coverage-drift-control.remediation-plan"
+        ],
+        "codex": [
+          "speckit.test-coverage-drift-control.report",
+          "speckit.test-coverage-drift-control.remediation-plan"
+        ],
+        "opencode": [
+          "speckit.test-coverage-drift-control.report",
+          "speckit.test-coverage-drift-control.remediation-plan"
+        ],
+        "zed": [
+          "speckit.test-coverage-drift-control.report",
+          "speckit.test-coverage-drift-control.remediation-plan"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-07-15T14:11:16.211096+00:00"
     }
   }
 }
