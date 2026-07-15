@@ -62,16 +62,19 @@ func TestRendererHelperFallbacks(t *testing.T) {
 	}
 
 	var convertedRow = reportmodel.AssetActivityRow{GrossValue: apdDecimalPointer(1), ActivityCurrency: "EUR", CalculationCurrency: "USD"}
-	if got := conversionStatusColumn(convertedRow); got != string(reportmodel.ConversionStatusConverted) {
+	if got, err := conversionStatusColumn(convertedRow); err != nil || got != "Converted" {
 		t.Fatalf("expected converted status, got %q", got)
 	}
 	var explicitlyConvertedRow = reportmodel.AssetActivityRow{GrossValue: apdDecimalPointer(1), ActivityCurrency: "USD", CalculationCurrency: "USD", ConversionStatus: reportmodel.ConversionStatusConverted}
-	if got := conversionStatusColumn(explicitlyConvertedRow); got != string(reportmodel.ConversionStatusConverted) {
+	if got, err := conversionStatusColumn(explicitlyConvertedRow); err != nil || got != "Converted" {
 		t.Fatalf("expected explicit converted status to override currency inference, got %q", got)
 	}
 	var blankRow = reportmodel.AssetActivityRow{ActivityCurrency: "EUR", CalculationCurrency: "USD"}
-	if got := conversionStatusColumn(blankRow); got != "" {
+	if got, err := conversionStatusColumn(blankRow); err != nil || got != "" {
 		t.Fatalf("expected blank status without rendered activity currency, got %q", got)
+	}
+	if _, err := conversionStatusColumn(reportmodel.AssetActivityRow{GrossValue: apdDecimalPointer(1), ActivityCurrency: "USD", ConversionStatus: reportmodel.ConversionStatus("unknown")}); err == nil {
+		t.Fatalf("expected unsupported conversion status to fail")
 	}
 
 	if got := rateAuthorityLabel(reportmodel.RateAuthorityEuropeanCentralBank); got != "European Central Bank" {
@@ -151,6 +154,9 @@ func TestRendererInternalErrorBranches(t *testing.T) {
 			AssetIdentityKey: "asset-1",
 			DisplayLabel:     "Asset 1",
 			OpeningQuantity:  invalid,
+			ClosingQuantity:  *apd.New(0, 0),
+			ClosingCostBasis: *apd.New(0, 0),
+			ActivityRows:     []reportmodel.AssetActivityRow{validRendererActivityRow("row-opening")},
 		}
 
 		var err = writeDetailSection(&builder, section, "USD")
@@ -171,6 +177,7 @@ func TestRendererInternalErrorBranches(t *testing.T) {
 			OpeningCostBasis: *apd.New(0, 0),
 			ClosingQuantity:  *apd.New(0, 0),
 			ClosingCostBasis: invalid,
+			ActivityRows:     []reportmodel.AssetActivityRow{validRendererActivityRow("row-closing")},
 		}
 
 		var err = writeDetailSection(&builder, section, "USD")
@@ -256,6 +263,7 @@ func TestRendererInternalErrorBranches(t *testing.T) {
 			OpeningCostBasis: *apd.New(0, 0),
 			ClosingQuantity:  *apd.New(0, 0),
 			ClosingCostBasis: *apd.New(0, 0),
+			ActivityRows:     []reportmodel.AssetActivityRow{validRendererActivityRow("row-liquidation")},
 			LiquidationSummaries: []reportmodel.LiquidationCalculation{{
 				SourceID:               "sell-wrap",
 				OccurredAt:             time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
@@ -290,7 +298,7 @@ func TestRenderRejectsInvalidReport(t *testing.T) {
 func TestRenderWrapsInjectedHelperFailures(t *testing.T) {
 	t.Parallel()
 
-	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
+	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
@@ -372,39 +380,13 @@ func TestRenderWrapsInjectedHelperFailures(t *testing.T) {
 		}
 	})
 
-	t.Run("conversion audit failure propagates from Render", func(t *testing.T) {
-		var previousSummary = renderWriteSummarySection
-		var previousRateSource = renderWriteRateSourceSummary
-		var previousReference = renderWriteReferenceSection
-		var previousDetails = renderWriteDetailSections
-		var previousAudit = renderWriteConversionAuditSection
-		defer func() {
-			renderWriteSummarySection = previousSummary
-			renderWriteRateSourceSummary = previousRateSource
-			renderWriteReferenceSection = previousReference
-			renderWriteDetailSections = previousDetails
-			renderWriteConversionAuditSection = previousAudit
-		}()
-
-		renderWriteSummarySection = writeSummarySection
-		renderWriteRateSourceSummary = writeRateSourceSummary
-		renderWriteReferenceSection = writeReferenceSection
-		renderWriteDetailSections = writeDetailSections
-		renderWriteConversionAuditSection = func(*strings.Builder, reportmodel.CapitalGainsReport) error {
-			return errors.New("audit boom")
-		}
-
-		if _, renderErr := Render(report); renderErr == nil || !strings.Contains(renderErr.Error(), "audit boom") {
-			t.Fatalf("expected conversion audit helper failure to propagate, got %v", renderErr)
-		}
-	})
 }
 
 // TestRenderRendersReferenceEmptyState verifies the valid no-reference branch
 // in the final Markdown document.
 // Authored by: OpenCode
 func TestRenderRendersReferenceEmptyState(t *testing.T) {
-	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
+	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
@@ -436,10 +418,44 @@ func TestRenderRendersReferenceEmptyState(t *testing.T) {
 	for _, expected := range []string{
 		"## Reference Section",
 		"No assets reached full liquidation by year end.",
+		"No assets had a non-zero net gain or loss in the selected year.",
 		"| Overall Yearly Net Total | 0 | USD |",
+		"### Historical Position",
+		"- **Quantity:** 0",
 	} {
-		if !strings.Contains(document.Content, expected) {
+		if !strings.Contains(string(document.Content), expected) {
 			t.Fatalf("expected rendered document to contain %q", expected)
+		}
+	}
+}
+
+// TestRenderAnnexRendersSeparateDetailedAuditDocument verifies the separate
+// Annex 1 Markdown document contains detailed per-asset and conversion evidence.
+// Authored by: OpenCode
+func TestRenderAnnexRendersSeparateDetailedAuditDocument(t *testing.T) {
+	var report = markdownAnnexReportFixture(t)
+
+	var document, err = RenderAnnex(report)
+	if err != nil {
+		t.Fatalf("render annex: %v", err)
+	}
+
+	for _, expected := range []string{
+		"# Annex 1 - Audit",
+		"## Detailed Per-Asset Audit Report",
+		"## Currency Conversion Audit",
+		"### Asset: BTC",
+		"| Date/Time | Source ID | Activity Type | Quantity | Unit Price | Gross Value | Fee | Original Activity Currency | Calculation Currency | Quantity After Activity | Basis After Activity | Full Liquidation Event | Allocated Basis | Net Liquidation Proceeds | Gain/Loss | Conversion Status | Sanitized Note |",
+		"| audit-zero-sell | BLOCKCHAIN OP | 1 | 0 | 0 | 0 | USD | USD | 0 | 0 | true | 10 |  |  | Same currency | move token=[REDACTED] |",
+		"Source currency per base currency",
+	} {
+		if !strings.Contains(string(document.Content), expected) {
+			t.Fatalf("expected annex document to contain %q, got %q", expected, document.Content)
+		}
+	}
+	for _, excluded := range []string{"source_per_base", "secret-token"} {
+		if strings.Contains(string(document.Content), excluded) {
+			t.Fatalf("expected annex document to exclude %q, got %q", excluded, document.Content)
 		}
 	}
 }
@@ -449,7 +465,7 @@ func TestRenderRendersReferenceEmptyState(t *testing.T) {
 // Authored by: OpenCode
 func TestRenderCoversDetailAndLiquidationBranches(t *testing.T) {
 	t.Run("renders full detail and liquidation sections", func(t *testing.T) {
-		var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodHIFO, reportmodel.ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
+		var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodHIFO, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown, time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC))
 		if err != nil {
 			t.Fatalf("new report request: %v", err)
 		}
@@ -519,10 +535,10 @@ func TestRenderCoversDetailAndLiquidationBranches(t *testing.T) {
 			"### Closing Position",
 			"| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |",
 			"| Date | Source ID | Disposed Quantity | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |",
-			"| sell-1 | SELL | 1 |  | 12 | 2 | 0 | 0 | USD | USD | same_currency |  |",
+			"| sell-1 | SELL | 1 |  | 12 | 2 | 0 | 0 | USD | USD | Same currency |  |",
 			"| sell-1 | 1 | 10 | 10 | 0 | USD |",
 		} {
-			if !strings.Contains(document.Content, expected) {
+			if !strings.Contains(string(document.Content), expected) {
 				t.Fatalf("expected rendered report to contain %q", expected)
 			}
 		}
@@ -613,7 +629,7 @@ func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 				DatasetReference: "H10 fixture second rate",
 			},
 		},
-		ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{
+		AuditAnnex: reportmodel.AuditAnnex{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{
 			SourceID:           "eur-buy-1",
 			AssetLabel:         "BTC",
 			ActivityDate:       activityDate,
@@ -641,7 +657,7 @@ func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 					ConvertedAmount: *apd.New(0, 0),
 				},
 			},
-		}},
+		}}},
 	}
 
 	var builder strings.Builder
@@ -649,10 +665,10 @@ func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 		t.Fatalf("write rate source summary: %v", err)
 	}
 	var summary = builder.String()
-	if strings.Count(summary, "- Authority: Federal Reserve") != 1 {
+	if strings.Count(summary, "- **Authority:** Federal Reserve") != 1 {
 		t.Fatalf("expected provider-level rate source to render once, got %q", summary)
 	}
-	for _, expected := range []string{"Report Base Currency: USD", "Federal Reserve Board H.10", "most recent previous available H.10 observation"} {
+	for _, expected := range []string{"**Report Base Currency:** USD", "Federal Reserve Board H.10", "most recent previous available H.10 observation"} {
 		if !strings.Contains(summary, expected) {
 			t.Fatalf("expected rate source summary to contain %q, got %q", expected, summary)
 		}
@@ -668,18 +684,18 @@ func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 		t.Fatalf("write conversion audit section: %v", err)
 	}
 	var audit = builder.String()
-	for _, expected := range []string{"## Currency Conversion Audit", "eur-buy-1", "base_per_source", "Rate Value", "1.0946", "unit_price: 100 -> 109.46; gross_value: 200 -> 218.92"} {
+	for _, expected := range []string{"## Currency Conversion Audit", "eur-buy-1", "Base currency per source currency", "Rate Value", "1.0946", "unit_price: 100 -> 109.46; gross_value: 200 -> 218.92"} {
 		if !strings.Contains(audit, expected) {
 			t.Fatalf("expected conversion audit to contain %q, got %q", expected, audit)
 		}
 	}
-	for _, excluded := range []string{"Rate Authority", "Rate Kind", "Federal Reserve", "daily noon buying rate", "fee_amount", "0 -> 0"} {
+	for _, excluded := range []string{"Rate Authority", "Rate Kind", "Federal Reserve", "daily noon buying rate", "fee_amount", "0 -> 0", "base_per_source", "source_per_base"} {
 		if strings.Contains(audit, excluded) {
 			t.Fatalf("expected conversion audit to exclude provider-level field %q, got %q", excluded, audit)
 		}
 	}
 	var expectedHeader = "| Date | Source ID | Asset | Rate Date | Source Currency | Report Base Currency | Converted Amounts | Quote Direction | Rate Value |"
-	var expectedRow = "| 2024-01-05 | eur-buy-1 | BTC | 2024-01-05 | EUR | USD | unit_price: 100 -> 109.46; gross_value: 200 -> 218.92 | base_per_source | 1.0946 |"
+	var expectedRow = "| 2024-01-05 | eur-buy-1 | BTC | 2024-01-05 | EUR | USD | unit_price: 100 -> 109.46; gross_value: 200 -> 218.92 | Base currency per source currency | 1.0946 |"
 	if !strings.Contains(audit, expectedHeader) || !strings.Contains(audit, expectedRow) {
 		t.Fatalf("expected grouped conversion audit order, got %q", audit)
 	}
@@ -727,7 +743,7 @@ func TestRendererUsesPreservedConversionStatusForAssetDetails(t *testing.T) {
 	if strings.Contains(rendered, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency |") {
 		t.Fatalf("expected old activity currency header to be absent, got %q", rendered)
 	}
-	if !strings.Contains(rendered, "| audited-converted-row | SELL | 1 |  | 12 |  | 0 | 0 | USD | USD | converted |  |") {
+	if !strings.Contains(rendered, "| audited-converted-row | SELL | 1 |  | 12 |  | 0 | 0 | USD | USD | Converted |  |") {
 		t.Fatalf("expected preserved converted status in detail row, got %q", rendered)
 	}
 	if strings.Contains(rendered, "| audited-converted-row | SELL | 1 |  | 12 |  | 0 | 0 | USD | USD | same_currency |  |") {
@@ -782,7 +798,7 @@ func TestRendererAssetDetailCurrencyColumnContracts(t *testing.T) {
 	var rendered = builder.String()
 	for _, expected := range []string{
 		"| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |",
-		"| eth-sell | SELL | 2 | 100 | 200 | 1 | 3 | 50 | USD | EUR | converted |  |",
+		"| eth-sell | SELL | 2 | 100 | 200 | 1 | 3 | 50 | USD | EUR | Converted |  |",
 		"| Date | Source ID | Disposed Quantity | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |",
 		"| eth-sell | 2 | 50 | 199 | 149 | EUR |",
 	} {
@@ -808,24 +824,24 @@ func TestRendererRateSourceAndConversionAuditErrors(t *testing.T) {
 
 	var invalid apd.Decimal
 	invalid.Form = apd.Infinite
-	var report = reportmodel.CapitalGainsReport{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{RateValue: invalid}}}
+	var report = reportmodel.CapitalGainsReport{AuditAnnex: reportmodel.AuditAnnex{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{RateValue: invalid}}}}
 	var builder strings.Builder
 	builder.Reset()
 	if err := writeConversionAuditSection(&builder, report); err == nil || !strings.Contains(err.Error(), "render conversion audit entry 0 rate value") {
 		t.Fatalf("expected audit rate invalid-decimal error, got %v", err)
 	}
 
-	report = reportmodel.CapitalGainsReport{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{
+	report = reportmodel.CapitalGainsReport{AuditAnnex: reportmodel.AuditAnnex{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{
 		RateValue: *apd.New(1, 0),
 		Amounts:   []reportmodel.ConvertedActivityAmount{{OriginalAmount: invalid}},
-	}}}
+	}}}}
 	builder.Reset()
 	if err := writeConversionAuditSection(&builder, report); err == nil || !strings.Contains(err.Error(), "amount 0 original amount") {
 		t.Fatalf("expected audit original amount invalid-decimal error, got %v", err)
 	}
 
-	report.ConversionAuditEntries[0].Amounts[0].OriginalAmount = *apd.New(1, 0)
-	report.ConversionAuditEntries[0].Amounts[0].ConvertedAmount = invalid
+	report.AuditAnnex.ConversionAuditEntries[0].Amounts[0].OriginalAmount = *apd.New(1, 0)
+	report.AuditAnnex.ConversionAuditEntries[0].Amounts[0].ConvertedAmount = invalid
 	builder.Reset()
 	if err := writeConversionAuditSection(&builder, report); err == nil || !strings.Contains(err.Error(), "amount 0 converted amount") {
 		t.Fatalf("expected audit converted amount invalid-decimal error, got %v", err)
@@ -839,6 +855,12 @@ func TestRendererAdditionalHelperFailures(t *testing.T) {
 	t.Parallel()
 
 	var builder strings.Builder
+	var historicalSection = reportmodel.AssetDetailSection{AssetIdentityKey: "asset-historical", ClosingQuantity: reportInvalidDecimalForRenderer()}
+	if err := writeDetailSection(&builder, historicalSection, "USD"); err == nil || !strings.Contains(err.Error(), "historical position") {
+		t.Fatalf("expected invalid historical position to fail, got %v", err)
+	}
+
+	builder.Reset()
 	if err := writePositionBlock(&builder, "Opening Position", *apd.New(1, 0), reportInvalidDecimalForRenderer(), "USD", "USD"); err == nil || !strings.Contains(err.Error(), "render cost basis") {
 		t.Fatalf("expected invalid position cost basis to fail, got %v", err)
 	}
@@ -923,6 +945,231 @@ func TestRendererAdditionalHelperFailures(t *testing.T) {
 	}
 }
 
+// TestRenderDocumentsAndAnnexFallbackBranches verifies document-bundle failures
+// and the empty-annex fallback used by reports that carry no detailed evidence.
+// Authored by: OpenCode
+func TestRenderDocumentsAndAnnexFallbackBranches(t *testing.T) {
+	var _, err = RenderDocuments(reportmodel.CapitalGainsReport{})
+	if err == nil || !strings.Contains(err.Error(), "capital gains report year must be greater than zero") {
+		t.Fatalf("expected RenderDocuments to return main-render validation error, got %v", err)
+	}
+
+	_, err = RenderAnnex(reportmodel.CapitalGainsReport{})
+	if err == nil || !strings.Contains(err.Error(), "capital gains report year must be greater than zero") {
+		t.Fatalf("expected RenderAnnex to return report validation error, got %v", err)
+	}
+
+	var report = minimalMarkdownReportFixture(t)
+	report.AuditAnnex = reportmodel.DefaultAuditAnnex()
+	var document reportmodel.ReportDocument
+	document, err = RenderAnnex(report)
+	if err != nil {
+		t.Fatalf("render default annex: %v", err)
+	}
+	for _, expected := range []string{
+		"# Annex 1 - Audit",
+		"No per-asset audit activity is available for this report.",
+		"No converted activity was present for this report.",
+	} {
+		if !strings.Contains(string(document.Content), expected) {
+			t.Fatalf("expected default annex to contain %q, got %q", expected, document.Content)
+		}
+	}
+
+	var previousAnnexRenderer = renderAnnexForDocuments
+	defer func() { renderAnnexForDocuments = previousAnnexRenderer }()
+	renderAnnexForDocuments = func(reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
+		return reportmodel.ReportDocument{}, errors.New("annex render boom")
+	}
+	_, err = RenderDocuments(report)
+	if err == nil || !strings.Contains(err.Error(), "annex render boom") {
+		t.Fatalf("expected RenderDocuments to return annex-render validation error, got %v", err)
+	}
+
+	var previousPerAssetWriter = writeAnnexPerAssetAuditForRender
+	defer func() { writeAnnexPerAssetAuditForRender = previousPerAssetWriter }()
+	writeAnnexPerAssetAuditForRender = func(*strings.Builder, reportmodel.AuditAnnex) error {
+		return errors.New("per-asset annex render boom")
+	}
+	_, err = RenderAnnex(report)
+	if err == nil || !strings.Contains(err.Error(), "per-asset annex render boom") {
+		t.Fatalf("expected RenderAnnex per-asset render failure, got %v", err)
+	}
+
+	writeAnnexPerAssetAuditForRender = previousPerAssetWriter
+	var previousConversionWriter = writeAnnexConversionAuditForRender
+	defer func() { writeAnnexConversionAuditForRender = previousConversionWriter }()
+	writeAnnexConversionAuditForRender = func(*strings.Builder, reportmodel.AuditAnnex) error {
+		return errors.New("conversion annex render boom")
+	}
+	_, err = RenderAnnex(report)
+	if err == nil || !strings.Contains(err.Error(), "conversion annex render boom") {
+		t.Fatalf("expected RenderAnnex conversion render failure, got %v", err)
+	}
+}
+
+// TestRendererAnnexHelperFailures verifies direct Annex 1 helper error wrapping
+// for invalid decimals and unsupported closed-label values.
+// Authored by: OpenCode
+func TestRendererAnnexHelperFailures(t *testing.T) {
+	t.Parallel()
+
+	var builder strings.Builder
+	var invalid = reportInvalidDecimalForRenderer()
+	var validEntry = validMarkdownAuditEntry("annex-row")
+
+	var entry = validEntry
+	entry.Quantity = invalid
+	if err := writeAnnexActivityEntry(&builder, entry); err == nil || !strings.Contains(err.Error(), "quantity") {
+		t.Fatalf("expected invalid annex quantity to fail, got %v", err)
+	}
+
+	builder.Reset()
+	entry = validEntry
+	entry.UnitPrice = &invalid
+	if err := writeAnnexActivityEntry(&builder, entry); err == nil || !strings.Contains(err.Error(), "unit price") {
+		t.Fatalf("expected invalid annex unit price to fail, got %v", err)
+	}
+
+	builder.Reset()
+	entry = validEntry
+	entry.GrossValue = &invalid
+	if err := writeAnnexActivityEntry(&builder, entry); err == nil || !strings.Contains(err.Error(), "gross value") {
+		t.Fatalf("expected invalid annex gross value to fail, got %v", err)
+	}
+
+	builder.Reset()
+	entry = validEntry
+	entry.FeeAmount = &invalid
+	if err := writeAnnexActivityEntry(&builder, entry); err == nil || !strings.Contains(err.Error(), "fee") {
+		t.Fatalf("expected invalid annex fee to fail, got %v", err)
+	}
+
+	builder.Reset()
+	entry = validEntry
+	entry.QuantityAfterActivity = invalid
+	if err := writeAnnexActivityEntry(&builder, entry); err == nil || !strings.Contains(err.Error(), "quantity after activity") {
+		t.Fatalf("expected invalid annex quantity-after to fail, got %v", err)
+	}
+
+	builder.Reset()
+	entry = validEntry
+	entry.BasisAfterActivity = invalid
+	if err := writeAnnexActivityEntry(&builder, entry); err == nil || !strings.Contains(err.Error(), "basis after activity") {
+		t.Fatalf("expected invalid annex basis-after to fail, got %v", err)
+	}
+
+	builder.Reset()
+	entry = validEntry
+	entry.AllocatedBasis = &invalid
+	if err := writeAnnexActivityEntry(&builder, entry); err == nil || !strings.Contains(err.Error(), "allocated basis") {
+		t.Fatalf("expected invalid annex allocated basis to fail, got %v", err)
+	}
+
+	builder.Reset()
+	entry = validEntry
+	entry.NetLiquidationProceeds = &invalid
+	if err := writeAnnexActivityEntry(&builder, entry); err == nil || !strings.Contains(err.Error(), "net liquidation proceeds") {
+		t.Fatalf("expected invalid annex proceeds to fail, got %v", err)
+	}
+
+	builder.Reset()
+	entry = validEntry
+	entry.GainOrLoss = &invalid
+	if err := writeAnnexActivityEntry(&builder, entry); err == nil || !strings.Contains(err.Error(), "gain or loss") {
+		t.Fatalf("expected invalid annex gain/loss to fail, got %v", err)
+	}
+
+	builder.Reset()
+	entry = validEntry
+	entry.ActivityType = reportmodel.ActivityType("UNKNOWN")
+	if err := writeAnnexActivityEntry(&builder, entry); err == nil || !strings.Contains(err.Error(), "activity type label") {
+		t.Fatalf("expected unsupported annex activity label to fail, got %v", err)
+	}
+
+	builder.Reset()
+	entry = validEntry
+	entry.ConversionStatus = reportmodel.ConversionStatus("unsupported")
+	if err := writeAnnexActivityEntry(&builder, entry); err == nil || !strings.Contains(err.Error(), "conversion status label") {
+		t.Fatalf("expected unsupported annex conversion label to fail, got %v", err)
+	}
+
+	builder.Reset()
+	if err := writeAnnexPerAssetAudit(&builder, reportmodel.AuditAnnex{PerAssetAuditSections: []reportmodel.PerAssetAuditSection{{
+		AssetIdentityKey: "asset-btc",
+		DisplayLabel:     "BTC",
+		Entries:          []reportmodel.AuditActivityEntry{{SourceID: "bad-annex-row", Quantity: invalid}},
+	}}}); err == nil || !strings.Contains(err.Error(), `render annex audit entry "bad-annex-row"`) {
+		t.Fatalf("expected per-asset annex wrapper error, got %v", err)
+	}
+
+	builder.Reset()
+	if err := writeConversionAuditRow(&builder, 3, reportmodel.ConversionAuditEntry{RateValue: invalid}); err == nil || !strings.Contains(err.Error(), "entry 3 rate value") {
+		t.Fatalf("expected annex conversion rate error, got %v", err)
+	}
+
+	builder.Reset()
+	if err := writeConversionAuditRow(&builder, 4, reportmodel.ConversionAuditEntry{RateValue: *apd.New(1, 0), QuoteDirection: reportmodel.QuoteDirection("unsupported")}); err == nil || !strings.Contains(err.Error(), "entry 4 quote direction") {
+		t.Fatalf("expected annex quote-direction label error, got %v", err)
+	}
+
+	builder.Reset()
+	if err := writeAnnexConversionAudit(&builder, reportmodel.AuditAnnex{ConversionAuditEntries: []reportmodel.ConversionAuditEntry{{RateValue: invalid}}}); err == nil || !strings.Contains(err.Error(), "entry 0 rate value") {
+		t.Fatalf("expected annex conversion section error, got %v", err)
+	}
+}
+
+// TestRendererEmptyAndUnsupportedLabelBranches verifies focused empty-state and
+// unsupported-label branches not reached by validated report construction.
+// Authored by: OpenCode
+func TestRendererEmptyAndUnsupportedLabelBranches(t *testing.T) {
+	var builder strings.Builder
+	if err := writeActivityBlock(&builder, reportmodel.AssetDetailSection{}); err != nil {
+		t.Fatalf("write empty activity block: %v", err)
+	}
+	if !strings.Contains(builder.String(), "No in-year activity for the selected year.") {
+		t.Fatalf("expected empty activity message, got %q", builder.String())
+	}
+
+	builder.Reset()
+	if err := writeConversionAuditSection(&builder, reportmodel.CapitalGainsReport{}); err != nil {
+		t.Fatalf("write empty conversion audit section: %v", err)
+	}
+	if builder.String() != "" {
+		t.Fatalf("expected empty conversion audit section to emit no text, got %q", builder.String())
+	}
+
+	builder.Reset()
+	var badActivityRow = validRendererActivityRow("row-bad-type")
+	badActivityRow.ActivityType = reportmodel.ActivityType("UNKNOWN")
+	if err := writeActivityRow(&builder, badActivityRow); err == nil || !strings.Contains(err.Error(), "type label") {
+		t.Fatalf("expected unsupported activity type error, got %v", err)
+	}
+
+	builder.Reset()
+	var badStatusRow = validRendererActivityRow("row-bad-status")
+	badStatusRow.GrossValue = apdDecimalPointer(1)
+	badStatusRow.ActivityCurrency = "USD"
+	badStatusRow.ConversionStatus = reportmodel.ConversionStatus("unsupported")
+	if err := writeActivityRow(&builder, badStatusRow); err == nil || !strings.Contains(err.Error(), "conversion status label") {
+		t.Fatalf("expected unsupported conversion status error, got %v", err)
+	}
+
+	builder.Reset()
+	var badQuote = markdownAnnexConversionEntry()
+	badQuote.QuoteDirection = reportmodel.QuoteDirection("unsupported")
+	if err := writeConversionAuditRow(&builder, 9, badQuote); err == nil || !strings.Contains(err.Error(), "entry 9 quote direction") {
+		t.Fatalf("expected unsupported conversion quote-direction error, got %v", err)
+	}
+
+	builder.Reset()
+	badQuote = markdownAnnexConversionEntry()
+	badQuote.Amounts[0].ConvertedAmount = reportInvalidDecimalForRenderer()
+	if err := writeConversionAuditRow(&builder, 10, badQuote); err == nil || !strings.Contains(err.Error(), "entry 10 amount 0 converted amount") {
+		t.Fatalf("expected annex grouped amount error, got %v", err)
+	}
+}
+
 // apdDecimalPointer returns one finite decimal pointer for renderer tests.
 // Authored by: OpenCode
 func apdDecimalPointer(value int64) *apd.Decimal {
@@ -946,4 +1193,144 @@ func reportInvalidDecimalForRenderer() apd.Decimal {
 	var invalid apd.Decimal
 	invalid.Form = apd.Infinite
 	return invalid
+}
+
+// validRendererActivityRow returns one minimal valid row for detail wrapper
+// tests that must bypass historical-position rendering.
+// Authored by: OpenCode
+func validRendererActivityRow(sourceID string) reportmodel.AssetActivityRow {
+	return reportmodel.AssetActivityRow{
+		SourceID:            sourceID,
+		OccurredAt:          time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
+		ActivityType:        reportmodel.ActivityTypeBuy,
+		Quantity:            *apd.New(1, 0),
+		BasisAfterRow:       *apd.New(1, 0),
+		CalculationCurrency: "USD",
+		QuantityAfterRow:    *apd.New(1, 0),
+	}
+}
+
+// minimalMarkdownReportFixture creates a validated report containing no detail
+// evidence for wrapper and annex fallback tests.
+// Authored by: OpenCode
+func minimalMarkdownReportFixture(t *testing.T) reportmodel.CapitalGainsReport {
+	t.Helper()
+
+	var requestedAt = time.Date(2026, time.July, 5, 9, 0, 0, 0, time.UTC)
+	var request, requestErr = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown, requestedAt)
+	if requestErr != nil {
+		t.Fatalf("new report request: %v", requestErr)
+	}
+	var report, reportErr = reportmodel.NewCapitalGainsReport(request, requestedAt, "USD", nil, *apd.New(0, 0), nil, nil)
+	if reportErr != nil {
+		t.Fatalf("new capital gains report: %v", reportErr)
+	}
+
+	return report
+}
+
+// validMarkdownAuditEntry creates one valid Annex 1 audit activity row.
+// Authored by: OpenCode
+func validMarkdownAuditEntry(sourceID string) reportmodel.AuditActivityEntry {
+	return reportmodel.AuditActivityEntry{
+		SourceID:              sourceID,
+		OccurredAt:            time.Date(2024, time.January, 2, 10, 0, 0, 0, time.UTC),
+		ActivityType:          reportmodel.ActivityTypeBuy,
+		Quantity:              *apd.New(1, 0),
+		UnitPrice:             apd.New(10, 0),
+		GrossValue:            apd.New(10, 0),
+		FeeAmount:             apd.New(0, 0),
+		ActivityCurrency:      "USD",
+		CalculationCurrency:   "USD",
+		QuantityAfterActivity: *apd.New(1, 0),
+		BasisAfterActivity:    *apd.New(10, 0),
+		AllocatedBasis:        apd.New(0, 0),
+		ConversionStatus:      reportmodel.ConversionStatusSameCurrency,
+	}
+}
+
+// markdownAnnexReportFixture creates one report with detailed Annex 1 evidence.
+// Authored by: OpenCode
+func markdownAnnexReportFixture(t *testing.T) reportmodel.CapitalGainsReport {
+	t.Helper()
+
+	var requestedAt = time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC)
+	var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown, requestedAt)
+	if err != nil {
+		t.Fatalf("new report request: %v", err)
+	}
+	var report reportmodel.CapitalGainsReport
+	report, err = reportmodel.NewCapitalGainsReport(request, requestedAt, "USD", nil, *apd.New(0, 0), nil, nil)
+	if err != nil {
+		t.Fatalf("new capital gains report: %v", err)
+	}
+	var conversion = markdownAnnexConversionEntry()
+	report.AuditAnnex, err = reportmodel.NewDetailedAuditAnnex([]reportmodel.PerAssetAuditSection{{
+		AssetIdentityKey: "asset-btc",
+		DisplayLabel:     "BTC",
+		Entries: []reportmodel.AuditActivityEntry{{
+			SourceID:              "audit-zero-sell",
+			OccurredAt:            time.Date(2024, time.January, 2, 10, 0, 0, 0, time.UTC),
+			ActivityType:          reportmodel.ActivityTypeSell,
+			Quantity:              *apd.New(1, 0),
+			UnitPrice:             apd.New(0, 0),
+			GrossValue:            apd.New(0, 0),
+			FeeAmount:             apd.New(0, 0),
+			ActivityCurrency:      "USD",
+			CalculationCurrency:   "USD",
+			QuantityAfterActivity: *apd.New(0, 0),
+			BasisAfterActivity:    *apd.New(0, 0),
+			FullLiquidationEvent:  true,
+			AllocatedBasis:        apd.New(10, 0),
+			ConversionStatus:      reportmodel.ConversionStatusSameCurrency,
+			Note:                  "move token=secret-token",
+		}},
+	}}, []reportmodel.ConversionAuditEntry{conversion})
+	if err != nil {
+		t.Fatalf("new detailed annex: %v", err)
+	}
+	report.AuditAnnex.ConversionAuditEntries = []reportmodel.ConversionAuditEntry{conversion}
+	report.RateSources = []reportmodel.ExchangeRateEvidence{*conversion.Amounts[0].ExchangeRateEvidence}
+	return report
+}
+
+// markdownAnnexConversionEntry creates one valid conversion audit entry.
+// Authored by: OpenCode
+func markdownAnnexConversionEntry() reportmodel.ConversionAuditEntry {
+	var activityDate = time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC)
+	var evidence = reportmodel.ExchangeRateEvidence{
+		SourceCurrency:   "EUR",
+		BaseCurrency:     reportmodel.ReportBaseCurrencyUSD,
+		ActivityDate:     activityDate,
+		RateDate:         activityDate,
+		Authority:        reportmodel.RateAuthorityFederalReserve,
+		ProviderID:       reportmodel.RateProviderIDFederalReserveH10,
+		RateKind:         "daily noon buying rate",
+		QuoteDirection:   reportmodel.QuoteDirectionSourcePerBase,
+		RateValue:        *apd.New(2, 0),
+		DatasetReference: "H10 fixture",
+	}
+	var amount = reportmodel.ConvertedActivityAmount{
+		SourceID:             "eur-annex-buy",
+		AmountKind:           reportmodel.ConvertedAmountKindGrossValue,
+		OriginalCurrency:     "EUR",
+		OriginalAmount:       *apd.New(10, 0),
+		ReportBaseCurrency:   reportmodel.ReportBaseCurrencyUSD,
+		ConvertedAmount:      *apd.New(5, 0),
+		ExchangeRateEvidence: &evidence,
+		ConversionStatus:     reportmodel.ConversionStatusConverted,
+	}
+	return reportmodel.ConversionAuditEntry{
+		SourceID:           "eur-annex-buy",
+		AssetLabel:         "BTC",
+		ActivityDate:       activityDate,
+		SourceCurrency:     "EUR",
+		ReportBaseCurrency: reportmodel.ReportBaseCurrencyUSD,
+		RateDate:           activityDate,
+		RateAuthority:      reportmodel.RateAuthorityFederalReserve,
+		RateKind:           "daily noon buying rate",
+		RateValue:          *apd.New(2, 0),
+		QuoteDirection:     reportmodel.QuoteDirectionSourcePerBase,
+		Amounts:            []reportmodel.ConvertedActivityAmount{amount},
+	}
 }

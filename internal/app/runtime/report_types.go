@@ -88,6 +88,8 @@ type ReportOutcome struct {
 	FailureReason ReportFailureReason
 	Attempt       SyncAttempt
 	Request       reportmodel.ReportRequest
+	OutputFormat  reportmodel.ReportOutputFormat
+	OutputBundle  reportmodel.ReportOutputBundle
 	OutputFile    reportmodel.ReportOutputFile
 	Diagnostic    DiagnosticReportState
 }

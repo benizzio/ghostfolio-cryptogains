@@ -115,6 +115,52 @@ func buildConversionAuditEntry(
 	return entry, nil
 }
 
+// buildAuditActivityEntry creates one Annex 1 audit row after an activity has
+// been replayed into the basis state.
+// Authored by: OpenCode
+func buildAuditActivityEntry(
+	input reportmodel.ActivityCalculationInput,
+	basisAfter apd.Decimal,
+	quantityAfter apd.Decimal,
+	application basisApplicationResult,
+) (*reportmodel.AuditActivityEntry, error) {
+	var entry = &reportmodel.AuditActivityEntry{
+		SourceID:              input.SourceID,
+		OccurredAt:            input.OccurredAt,
+		ActivityType:          input.ActivityType,
+		Quantity:              input.Quantity,
+		UnitPrice:             decimalsupport.ClonePointer(input.UnitPrice),
+		GrossValue:            decimalsupport.ClonePointer(input.GrossValue),
+		FeeAmount:             decimalsupport.ClonePointer(input.FeeAmount),
+		ActivityCurrency:      inputActivityCurrency(input),
+		CalculationCurrency:   inputCalculationCurrency(input),
+		QuantityAfterActivity: quantityAfter,
+		BasisAfterActivity:    basisAfter,
+		FullLiquidationEvent:  application.reachedZero,
+		ConversionStatus:      input.ConversionStatus,
+		Note:                  strings.TrimSpace(input.Comment),
+	}
+	if application.allocatedBasis != nil {
+		entry.AllocatedBasis = decimalsupport.ClonePointer(application.allocatedBasis)
+	}
+	if application.netProceeds != nil {
+		entry.NetLiquidationProceeds = decimalsupport.ClonePointer(application.netProceeds)
+	}
+	if application.gainOrLoss != nil {
+		entry.GainOrLoss = decimalsupport.ClonePointer(application.gainOrLoss)
+	}
+	if err := entry.Validate(); err != nil {
+		return nil, newInputCalculationError(
+			reportmodel.CalculationErrorKindBasisAllocation,
+			input,
+			"could not build the audit activity entry",
+			err,
+		)
+	}
+
+	return entry, nil
+}
+
 // conversionAuditAssetLabel returns the stable report label used in conversion
 // audit entries.
 // Authored by: OpenCode
@@ -147,8 +193,27 @@ func buildAssetCalculationResult(group assetInputGroup, replayState assetReplayS
 		)
 	}
 	var result = assetCalculationResult{
-		IncludeInMain: replayState.closingQuantity.Sign() > 0 || replayState.hadInYearFullLiquidation,
-		YearlyNet:     replayState.yearlyNet,
+		IncludeInMain:  replayState.closingQuantity.Sign() > 0 || replayState.hadInYearFullLiquidation,
+		IncludeInAudit: len(replayState.auditEntries) > 0,
+		YearlyNet:      replayState.yearlyNet,
+	}
+
+	if result.IncludeInAudit {
+		var auditSection, auditErr = reportmodel.NewPerAssetAuditSection(
+			group.AssetIdentityKey,
+			conversionAuditAssetLabel(group, reportmodel.ActivityCalculationInput{}),
+			replayState.auditEntries,
+		)
+		if auditErr != nil {
+			return assetCalculationResult{}, reportmodel.NewCalculationError(
+				reportmodel.CalculationErrorKindBasisAllocation,
+				"could not build the per-asset audit section",
+				"",
+				group.DisplayLabel,
+				auditErr,
+			)
+		}
+		result.AuditSection = auditSection
 	}
 
 	if replayState.fullLiquidationCount > 0 {

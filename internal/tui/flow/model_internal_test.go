@@ -890,12 +890,14 @@ func TestUpdateReportCoversSelectionBusyAndResultBranches(t *testing.T) {
 	var reportService = &testReportService{outcome: runtime.ReportOutcome{
 		Success: true,
 		Message: "Saved the report to \"/tmp/report.md\" and requested automatic opening.",
+		OutputBundle: reportmodel.ReportOutputBundle{
+			OpenRequested: true,
+		},
 		OutputFile: reportmodel.ReportOutputFile{
 			DocumentsDirectory: "/tmp",
 			Filename:           "report.md",
 			Path:               "/tmp/report.md",
 			SavedAt:            time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC),
-			OpenRequested:      true,
 		},
 	}}
 	var model = newTestModel(t, &config)
@@ -934,8 +936,13 @@ func TestUpdateReportCoversSelectionBusyAndResultBranches(t *testing.T) {
 	model = updated.(*Model)
 	updated, cmd := model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*Model)
+	if cmd != nil || model.report.FocusArea != reportSelectionFocusOutputFormat {
+		t.Fatalf("expected base-currency activation to advance to output format, got cmd=%v report=%#v", cmd, model.report)
+	}
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = updated.(*Model)
 	if cmd != nil || model.report.FocusArea != reportSelectionFocusAction {
-		t.Fatalf("expected base-currency activation to advance to actions, got cmd=%v report=%#v", cmd, model.report)
+		t.Fatalf("expected output-format activation to advance to actions, got cmd=%v report=%#v", cmd, model.report)
 	}
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = updated.(*Model)
@@ -991,8 +998,8 @@ func TestUpdateReportCoversSelectionBusyAndResultBranches(t *testing.T) {
 	}
 }
 
-// TestReportSelectionFocusIncludesBaseCurrencyPane verifies keyboard focus
-// moves through year, method, base currency, and action panes before wrapping.
+// TestReportSelectionFocusIncludesBaseCurrencyPane verifies keyboard focus moves
+// through year, method, base currency, output format, and action panes before wrapping.
 // Authored by: OpenCode
 func TestReportSelectionFocusIncludesBaseCurrencyPane(t *testing.T) {
 	t.Parallel()
@@ -1013,7 +1020,11 @@ func TestReportSelectionFocusIncludesBaseCurrencyPane(t *testing.T) {
 	}
 	model.advanceReportSelectionFocus()
 	if model.report.FocusArea != 3 {
-		t.Fatalf("expected third focus move to reach action pane after base-currency pane, got %d", model.report.FocusArea)
+		t.Fatalf("expected third focus move to reach output-format pane after base-currency pane, got %d", model.report.FocusArea)
+	}
+	model.advanceReportSelectionFocus()
+	if model.report.FocusArea != 4 {
+		t.Fatalf("expected fourth focus move to reach action pane after output-format pane, got %d", model.report.FocusArea)
 	}
 	model.advanceReportSelectionFocus()
 	if model.report.FocusArea != 0 {
@@ -1106,8 +1117,55 @@ func TestReportSelectionActivationFallsBackFromInvalidBaseCurrencyIndex(t *testi
 		t.Fatalf("expected base-currency fallback activation to stay synchronous")
 	}
 	model = assertUpdatedModel(t, updated)
-	if model.report.BaseCurrencyIndex != 0 || model.report.SelectedBaseCurrency != reportmodel.ReportBaseCurrencyUSD || model.report.FocusArea != reportSelectionFocusAction {
-		t.Fatalf("expected invalid base-currency index to fall back to USD and actions, got %#v", model.report)
+	if model.report.BaseCurrencyIndex != 0 || model.report.SelectedBaseCurrency != reportmodel.ReportBaseCurrencyUSD || model.report.FocusArea != reportSelectionFocusOutputFormat {
+		t.Fatalf("expected invalid base-currency index to fall back to USD and output format, got %#v", model.report)
+	}
+}
+
+// TestReportOutputFormatSelectionBranches verifies output-format navigation,
+// stale-index fallback, and invalid helper indexes.
+// Authored by: OpenCode
+func TestReportOutputFormatSelectionBranches(t *testing.T) {
+	t.Parallel()
+
+	var config = mustSetupConfig(t)
+	var model = newTestModel(t, &config)
+	model.active = reportSelectionScreenKey
+	model.syncReports.ProtectedData = runtime.ProtectedDataState{HasReadableSnapshot: true, AvailableReportYears: []int{2024}}
+	model.report = newReportState(model.syncReports.ProtectedData.AvailableReportYears)
+
+	model.report.FocusArea = reportSelectionFocusOutputFormat
+	model.moveReportSelection(1, 1, len(model.reportMethodItems()), len(model.reportBaseCurrencyItems()), len(model.reportOutputFormatItems()), len(model.reportSelectionActions()))
+	if model.report.OutputFormatIndex != 1 || model.report.SelectedOutputFormat != reportmodel.ReportOutputFormatPDF {
+		t.Fatalf("expected output-format movement to select PDF, got %#v", model.report)
+	}
+
+	model.report.OutputFormatIndex = 99
+	model.report.SelectedOutputFormat = ""
+	var updated, cmd = model.activateReportSelection()
+	if cmd != nil {
+		t.Fatalf("expected stale output-format activation to stay synchronous")
+	}
+	model = assertUpdatedModel(t, updated)
+	if model.report.OutputFormatIndex != 0 || model.report.SelectedOutputFormat != reportmodel.ReportOutputFormatMarkdown || model.report.FocusArea != reportSelectionFocusAction {
+		t.Fatalf("expected invalid output-format index to fall back to Markdown and actions, got %#v", model.report)
+	}
+
+	if got := model.selectReportOutputFormatAtCurrentIndex(); !got {
+		t.Fatalf("expected current output-format selection to be valid")
+	}
+	model.report.OutputFormatIndex = -1
+	if got := model.selectReportOutputFormatAtCurrentIndex(); got {
+		t.Fatalf("expected negative output-format selection to fail")
+	}
+	if got := reportOutputFormatForIndex(99); got != "" {
+		t.Fatalf("expected invalid output-format helper index to return empty, got %q", got)
+	}
+
+	model.report.SelectedOutputFormat = ""
+	updated, cmd = model.startReportGeneration()
+	if cmd != nil || assertUpdatedModel(t, updated).active != reportSelectionScreenKey {
+		t.Fatalf("expected direct start with empty output format to remain on selection")
 	}
 }
 

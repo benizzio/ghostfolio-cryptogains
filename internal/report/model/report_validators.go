@@ -37,10 +37,21 @@ func validateReferenceSectionStatus(status ReferenceSectionStatus) error {
 // Authored by: OpenCode
 func validateReportDocumentType(documentType ReportDocumentType) error {
 	switch documentType {
-	case ReportDocumentTypeMarkdown:
+	case ReportDocumentTypeMarkdown, ReportDocumentTypePDF:
 		return nil
 	default:
 		return fmt.Errorf("unsupported report document type %q", documentType)
+	}
+}
+
+// validateReportDocumentRole rejects unsupported rendered-document roles.
+// Authored by: OpenCode
+func validateReportDocumentRole(role ReportDocumentRole) error {
+	switch role {
+	case ReportDocumentRoleMain, ReportDocumentRoleAnnex, ReportDocumentRoleCombined:
+		return nil
+	default:
+		return fmt.Errorf("unsupported report document role %q", role)
 	}
 }
 

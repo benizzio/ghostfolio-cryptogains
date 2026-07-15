@@ -57,10 +57,20 @@ Collision suffix rules:
 
 Rules:
 
-- The PDF must be A4-sized.
+- The PDF must use landscape A4 pages.
 - The PDF must contain the main report first.
 - Annex 1 must appear after a page break in the same PDF file.
 - The PDF must be text-based and must not rasterize required report text into page images.
+- The PDF must be formatted from report-domain data through the PDF renderer, not by embedding Markdown-rendered source text as the report body.
+- A PDF that exposes Markdown structural syntax such as heading markers, table pipes or separators, or bold markers as visible report presentation is not a valid successful PDF output.
+- A PDF that presents report-domain data as a plain sequential line dump without visible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context is not a valid successful PDF output.
+- A PDF that clips table columns at the right edge, omits visible right padding, or fails to wrap cell content that exceeds its column width is not a valid successful PDF output.
+- A PDF that overlaps adjacent section text, headings, subheadings, or tables is not a valid successful PDF output.
+- A PDF with insufficient top margin before main-report asset headings, `In-Year Activity` subheadings, or Annex 1 asset subheadings is not a valid successful PDF output.
+- A PDF that renders `Overall Yearly Net Total` outside the `Gains-And-Losses Summary` table is not a valid successful PDF output.
+- A PDF that renders Rate Source Summary as a `Rate Source Summary Table` instead of bold classifier label lines followed by non-bold values is not a valid successful PDF output.
+- A PDF that introduces generated helper subheadings outside the report presentation contract, including `Reference Table`, is not a valid successful PDF output.
+- The PDF renderer must use `github.com/signintech/gopdf` layout primitives for landscape A4 pages, application-supplied fonts, headings, styled text, table rows, table columns, wrapping, and continuation context.
 - A PDF success outcome is valid only when the file is written, synced, closed, and recorded.
 
 ## Result Screen Path Reporting

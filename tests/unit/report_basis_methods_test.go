@@ -19,12 +19,7 @@ func TestHIFOTieBreakingUsesOlderLotThenDeterministicOrder(t *testing.T) {
 	t.Parallel()
 
 	t.Run("older lot wins equal unit cost", func(t *testing.T) {
-		var state, err = reportbasis.NewLotMethodState(reportbasis.LotMethodHIFO)
-		if err != nil {
-			t.Fatalf("new HIFO lot state: %v", err)
-		}
-
-		for _, acquisition := range []reportbasis.LotAcquisition{
+		assertHIFOTieWinner(t, []reportbasis.LotAcquisition{
 			{
 				SourceID:           "older-cost-match",
 				AcquiredAt:         time.Date(2024, time.January, 10, 0, 0, 0, 0, time.UTC),
@@ -39,28 +34,11 @@ func TestHIFOTieBreakingUsesOlderLotThenDeterministicOrder(t *testing.T) {
 				RemainingQuantity:  mustCalculationDecimal(t, "1"),
 				RemainingBasis:     mustCalculationDecimal(t, "10"),
 			},
-		} {
-			if err = state.AddAcquisition(acquisition); err != nil {
-				t.Fatalf("add acquisition %q: %v", acquisition.SourceID, err)
-			}
-		}
-
-		var result, disposeErr = state.Dispose(mustCalculationDecimal(t, "1"))
-		if disposeErr != nil {
-			t.Fatalf("dispose tied older/newer lots: %v", disposeErr)
-		}
-		if len(result.Matches) != 1 || result.Matches[0].AcquisitionSourceID != "older-cost-match" {
-			t.Fatalf("expected HIFO tie to prefer older lot, got %#v", result.Matches)
-		}
+		}, "older-cost-match")
 	})
 
 	t.Run("lower deterministic order wins same day tie", func(t *testing.T) {
-		var state, err = reportbasis.NewLotMethodState(reportbasis.LotMethodHIFO)
-		if err != nil {
-			t.Fatalf("new HIFO lot state: %v", err)
-		}
-
-		for _, acquisition := range []reportbasis.LotAcquisition{
+		assertHIFOTieWinner(t, []reportbasis.LotAcquisition{
 			{
 				SourceID:           "same-day-late-order",
 				AcquiredAt:         time.Date(2024, time.March, 10, 0, 0, 0, 0, time.UTC),
@@ -75,20 +53,33 @@ func TestHIFOTieBreakingUsesOlderLotThenDeterministicOrder(t *testing.T) {
 				RemainingQuantity:  mustCalculationDecimal(t, "1"),
 				RemainingBasis:     mustCalculationDecimal(t, "10"),
 			},
-		} {
-			if err = state.AddAcquisition(acquisition); err != nil {
-				t.Fatalf("add acquisition %q: %v", acquisition.SourceID, err)
-			}
-		}
-
-		var result, disposeErr = state.Dispose(mustCalculationDecimal(t, "1"))
-		if disposeErr != nil {
-			t.Fatalf("dispose same-day tied lots: %v", disposeErr)
-		}
-		if len(result.Matches) != 1 || result.Matches[0].AcquisitionSourceID != "same-day-early-order" {
-			t.Fatalf("expected same-day HIFO tie to prefer lower deterministic order, got %#v", result.Matches)
-		}
+		}, "same-day-early-order")
 	})
+}
+
+// assertHIFOTieWinner adds tied HIFO acquisitions and verifies the selected
+// acquisition source ID.
+// Authored by: OpenCode
+func assertHIFOTieWinner(t *testing.T, acquisitions []reportbasis.LotAcquisition, expectedSourceID string) {
+	t.Helper()
+
+	var state, err = reportbasis.NewLotMethodState(reportbasis.LotMethodHIFO)
+	if err != nil {
+		t.Fatalf("new HIFO lot state: %v", err)
+	}
+	for _, acquisition := range acquisitions {
+		if err = state.AddAcquisition(acquisition); err != nil {
+			t.Fatalf("add acquisition %q: %v", acquisition.SourceID, err)
+		}
+	}
+
+	var result, disposeErr = state.Dispose(mustCalculationDecimal(t, "1"))
+	if disposeErr != nil {
+		t.Fatalf("dispose tied lots: %v", disposeErr)
+	}
+	if len(result.Matches) != 1 || result.Matches[0].AcquisitionSourceID != expectedSourceID {
+		t.Fatalf("expected HIFO tie to prefer %q, got %#v", expectedSourceID, result.Matches)
+	}
 }
 
 // TestCalculateRoundsAverageCostWhenDivisionRepeats verifies the shared
@@ -97,9 +88,8 @@ func TestHIFOTieBreakingUsesOlderLotThenDeterministicOrder(t *testing.T) {
 func TestCalculateRoundsAverageCostWhenDivisionRepeats(t *testing.T) {
 	t.Parallel()
 
-	var request = mustReportRequest(t, 2024, reportmodel.CostBasisMethodAverageCost)
+	var request = mustReportRequest(t, reportmodel.CostBasisMethodAverageCost)
 	var report, err = reportcalculate.Calculate(request, calculationCache(
-		2024,
 		calculationActivity(t, calculationActivityInput{
 			SourceID:         "avg-buy-2023-001",
 			OccurredAt:       "2023-01-01T10:00:00Z",
@@ -230,15 +220,15 @@ func TestLotMethodStateUsesRoundedProportionalFragmentAllocation(t *testing.T) {
 func TestCalculateScopeLocalHybridNarrowsReliableScopeTimeline(t *testing.T) {
 	t.Parallel()
 
-	var request = mustReportRequest(t, 2024, reportmodel.CostBasisMethodScopeLocalHybrid)
+	var request = mustReportRequest(t, reportmodel.CostBasisMethodScopeLocalHybrid)
 	var report, err = reportcalculate.Calculate(request, syncmodel.ProtectedActivityCache{
 		ActivityCount:        3,
 		AvailableReportYears: []int{2024},
 		ScopeReliability:     syncmodel.ScopeReliabilityPartial,
 		Activities: []syncmodel.ActivityRecord{
-			scopeLocalActivityRecord(t, "avax-buy-beta-2023-001", "2023-01-10T10:00:00Z", syncmodel.ActivityTypeBuy, "asset-avax-001", "AVAX", "Avalanche", "1", "500", "0", scopeLocalReliableWallet("wallet-avax-beta")),
-			scopeLocalActivityRecord(t, "avax-buy-alpha-2023-001", "2023-06-10T10:00:00Z", syncmodel.ActivityTypeBuy, "asset-avax-001", "AVAX", "Avalanche", "1", "100", "0", scopeLocalReliableWallet("wallet-avax-alpha")),
-			scopeLocalActivityRecord(t, "avax-sell-alpha-2024-001", "2024-08-15T10:00:00Z", syncmodel.ActivityTypeSell, "asset-avax-001", "AVAX", "Avalanche", "1", "250", "0", scopeLocalReliableWallet("wallet-avax-alpha")),
+			scopeLocalActivityRecord(t, "avax-buy-beta-2023-001", "2023-01-10T10:00:00Z", syncmodel.ActivityTypeBuy, "asset-avax-001", "AVAX", "Avalanche", "500", scopeLocalReliableWallet("wallet-avax-beta")),
+			scopeLocalActivityRecord(t, "avax-buy-alpha-2023-001", "2023-06-10T10:00:00Z", syncmodel.ActivityTypeBuy, "asset-avax-001", "AVAX", "Avalanche", "100", scopeLocalReliableWallet("wallet-avax-alpha")),
+			scopeLocalActivityRecord(t, "avax-sell-alpha-2024-001", "2024-08-15T10:00:00Z", syncmodel.ActivityTypeSell, "asset-avax-001", "AVAX", "Avalanche", "250", scopeLocalReliableWallet("wallet-avax-alpha")),
 		},
 	})
 	if err != nil {
@@ -274,8 +264,8 @@ func TestScopeLocalHybridFallbackCarriesForwardUntilZero(t *testing.T) {
 
 	var state = reportbasis.NewScopeLocalHybridState()
 	for _, acquisition := range []reportbasis.ScopeLocalHybridAcquisition{
-		scopeLocalAcquisition(t, "scope-a-buy-001", "scope-a", "2023-01-10T00:00:00Z", 1, "1", "100"),
-		scopeLocalAcquisition(t, "scope-a-buy-002", "scope-a", "2023-02-10T00:00:00Z", 2, "1", "300"),
+		scopeLocalAcquisition(t, "scope-a-buy-001", "scope-a", "2023-01-10T00:00:00Z", 1, "100"),
+		scopeLocalAcquisition(t, "scope-a-buy-002", "scope-a", "2023-02-10T00:00:00Z", 2, "300"),
 	} {
 		if err := state.AddAcquisition(acquisition); err != nil {
 			t.Fatalf("add scope-local acquisition %q: %v", acquisition.SourceID, err)
@@ -291,7 +281,7 @@ func TestScopeLocalHybridFallbackCarriesForwardUntilZero(t *testing.T) {
 		t.Fatalf("expected scope to remain open after first fallback disposal")
 	}
 
-	if err = state.AddAcquisition(scopeLocalAcquisition(t, "scope-a-buy-003", "scope-a", "2023-03-10T00:00:00Z", 3, "1", "500")); err != nil {
+	if err = state.AddAcquisition(scopeLocalAcquisition(t, "scope-a-buy-003", "scope-a", "2023-03-10T00:00:00Z", 3, "500")); err != nil {
 		t.Fatalf("add acquisition while fallback is active: %v", err)
 	}
 
@@ -323,9 +313,9 @@ func TestScopeLocalHybridResetsAfterZeroAndKeepsScopesIndependent(t *testing.T) 
 
 	var state = reportbasis.NewScopeLocalHybridState()
 	for _, acquisition := range []reportbasis.ScopeLocalHybridAcquisition{
-		scopeLocalAcquisition(t, "scope-a-buy-001", "scope-a", "2023-01-10T00:00:00Z", 1, "1", "100"),
-		scopeLocalAcquisition(t, "scope-a-buy-002", "scope-a", "2023-02-10T00:00:00Z", 2, "1", "300"),
-		scopeLocalAcquisition(t, "scope-b-buy-001", "scope-b", "2023-01-15T00:00:00Z", 1, "1", "900"),
+		scopeLocalAcquisition(t, "scope-a-buy-001", "scope-a", "2023-01-10T00:00:00Z", 1, "100"),
+		scopeLocalAcquisition(t, "scope-a-buy-002", "scope-a", "2023-02-10T00:00:00Z", 2, "300"),
+		scopeLocalAcquisition(t, "scope-b-buy-001", "scope-b", "2023-01-15T00:00:00Z", 1, "900"),
 	} {
 		if err := state.AddAcquisition(acquisition); err != nil {
 			t.Fatalf("add scope-local acquisition %q: %v", acquisition.SourceID, err)
@@ -359,7 +349,7 @@ func TestScopeLocalHybridResetsAfterZeroAndKeepsScopesIndependent(t *testing.T) 
 		t.Fatalf("expected scope-a to reach zero on second disposal")
 	}
 
-	if err = state.AddAcquisition(scopeLocalAcquisition(t, "scope-a-buy-003", "scope-a", "2024-01-10T00:00:00Z", 1, "1", "50")); err != nil {
+	if err = state.AddAcquisition(scopeLocalAcquisition(t, "scope-a-buy-003", "scope-a", "2024-01-10T00:00:00Z", 1, "50")); err != nil {
 		t.Fatalf("reacquire in scope-a after zero: %v", err)
 	}
 
@@ -380,15 +370,15 @@ func TestScopeLocalHybridResetsAfterZeroAndKeepsScopesIndependent(t *testing.T) 
 func TestCalculateScopeLocalHybridUsesScopeLocalReliableResolution(t *testing.T) {
 	t.Parallel()
 
-	var request = mustReportRequest(t, 2024, reportmodel.CostBasisMethodScopeLocalHybrid)
+	var request = mustReportRequest(t, reportmodel.CostBasisMethodScopeLocalHybrid)
 	var report, err = reportcalculate.Calculate(request, syncmodel.ProtectedActivityCache{
 		ActivityCount:        3,
 		AvailableReportYears: []int{2024},
 		ScopeReliability:     syncmodel.ScopeReliabilityReliable,
 		Activities: []syncmodel.ActivityRecord{
-			scopeLocalActivityRecord(t, "atom-buy-alpha-2023-001", "2023-01-10T10:00:00Z", syncmodel.ActivityTypeBuy, "asset-atom-001", "ATOM", "Cosmos", "1", "100", "0", scopeLocalReliableWallet("wallet-atom-alpha")),
-			scopeLocalActivityRecord(t, "atom-buy-beta-2023-001", "2023-06-10T10:00:00Z", syncmodel.ActivityTypeBuy, "asset-atom-001", "ATOM", "Cosmos", "1", "20", "0", scopeLocalReliableWallet("wallet-atom-beta")),
-			scopeLocalActivityRecord(t, "atom-sell-alpha-2024-001", "2024-08-15T10:00:00Z", syncmodel.ActivityTypeSell, "asset-atom-001", "ATOM", "Cosmos", "1", "250", "0", scopeLocalReliableWallet("wallet-atom-alpha")),
+			scopeLocalActivityRecord(t, "atom-buy-alpha-2023-001", "2023-01-10T10:00:00Z", syncmodel.ActivityTypeBuy, "asset-atom-001", "ATOM", "Cosmos", "100", scopeLocalReliableWallet("wallet-atom-alpha")),
+			scopeLocalActivityRecord(t, "atom-buy-beta-2023-001", "2023-06-10T10:00:00Z", syncmodel.ActivityTypeBuy, "asset-atom-001", "ATOM", "Cosmos", "20", scopeLocalReliableWallet("wallet-atom-beta")),
+			scopeLocalActivityRecord(t, "atom-sell-alpha-2024-001", "2024-08-15T10:00:00Z", syncmodel.ActivityTypeSell, "asset-atom-001", "ATOM", "Cosmos", "250", scopeLocalReliableWallet("wallet-atom-alpha")),
 		},
 	})
 	if err != nil {
@@ -413,9 +403,9 @@ func TestScopeLocalHybridFallbackAllocationUsesCurrentProportionalRule(t *testin
 
 	var state = reportbasis.NewScopeLocalHybridState()
 	for _, acquisition := range []reportbasis.ScopeLocalHybridAcquisition{
-		scopeLocalAcquisition(t, "scope-rounding-001", "scope-a", "2023-01-10T00:00:00Z", 1, "1", "0.2"),
-		scopeLocalAcquisition(t, "scope-rounding-002", "scope-a", "2023-02-10T00:00:00Z", 2, "1", "0.3"),
-		scopeLocalAcquisition(t, "scope-rounding-003", "scope-a", "2023-03-10T00:00:00Z", 3, "1", "0.5"),
+		scopeLocalAcquisition(t, "scope-rounding-001", "scope-a", "2023-01-10T00:00:00Z", 1, "0.2"),
+		scopeLocalAcquisition(t, "scope-rounding-002", "scope-a", "2023-02-10T00:00:00Z", 2, "0.3"),
+		scopeLocalAcquisition(t, "scope-rounding-003", "scope-a", "2023-03-10T00:00:00Z", 3, "0.5"),
 	} {
 		if err := state.AddAcquisition(acquisition); err != nil {
 			t.Fatalf("add rounding acquisition %q: %v", acquisition.SourceID, err)
@@ -446,7 +436,7 @@ func TestScopeLocalHybridFallbackAllocationUsesCurrentProportionalRule(t *testin
 // scopeLocalActivityRecord builds one scoped activity fixture for hybrid-method
 // calculator tests.
 // Authored by: OpenCode
-func scopeLocalActivityRecord(t *testing.T, sourceID string, occurredAt string, activityType syncmodel.ActivityType, assetIdentityKey string, assetSymbol string, assetName string, quantity string, grossValue string, feeAmount string, scope *syncmodel.SourceScope) syncmodel.ActivityRecord {
+func scopeLocalActivityRecord(t *testing.T, sourceID string, occurredAt string, activityType syncmodel.ActivityType, assetIdentityKey string, assetSymbol string, assetName string, grossValue string, scope *syncmodel.SourceScope) syncmodel.ActivityRecord {
 	t.Helper()
 
 	return syncmodel.ActivityRecord{
@@ -456,10 +446,10 @@ func scopeLocalActivityRecord(t *testing.T, sourceID string, occurredAt string, 
 		AssetIdentityKey: assetIdentityKey,
 		AssetSymbol:      assetSymbol,
 		AssetName:        assetName,
-		Quantity:         mustCalculationDecimal(t, quantity),
+		Quantity:         mustCalculationDecimal(t, "1"),
 		OrderCurrency:    "USD",
 		OrderGrossValue:  calculationDecimalPointer(t, grossValue),
-		OrderFeeAmount:   calculationDecimalPointer(t, feeAmount),
+		OrderFeeAmount:   calculationDecimalPointer(t, "0"),
 		SourceScope:      scope,
 	}
 }
@@ -478,7 +468,7 @@ func scopeLocalReliableWallet(id string) *syncmodel.SourceScope {
 // scopeLocalAcquisition builds one direct scope-local hybrid acquisition test
 // input.
 // Authored by: OpenCode
-func scopeLocalAcquisition(t *testing.T, sourceID string, scopeKey string, acquiredAt string, deterministicOrder int, quantity string, basis string) reportbasis.ScopeLocalHybridAcquisition {
+func scopeLocalAcquisition(t *testing.T, sourceID string, scopeKey string, acquiredAt string, deterministicOrder int, basis string) reportbasis.ScopeLocalHybridAcquisition {
 	t.Helper()
 
 	var parsedTime, err = time.Parse(time.RFC3339, acquiredAt)
@@ -491,7 +481,7 @@ func scopeLocalAcquisition(t *testing.T, sourceID string, scopeKey string, acqui
 		ScopeKey:           scopeKey,
 		AcquiredAt:         parsedTime,
 		DeterministicOrder: deterministicOrder,
-		Quantity:           mustCalculationDecimal(t, quantity),
+		Quantity:           mustCalculationDecimal(t, "1"),
 		Basis:              mustCalculationDecimal(t, basis),
 	}
 }

@@ -99,6 +99,7 @@ func TestProductionConversionFailureDiagnosticsRedactFinancialValues(t *testing.
 		2024,
 		reportmodel.CostBasisMethodFIFO,
 		reportmodel.ReportBaseCurrencyUSD,
+		reportmodel.ReportOutputFormatMarkdown,
 		time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
 	)
 	if requestErr != nil {

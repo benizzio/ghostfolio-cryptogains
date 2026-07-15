@@ -12,9 +12,24 @@ import (
 	reportmarkdown "github.com/benizzio/ghostfolio-cryptogains/internal/report/markdown"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	reportoutput "github.com/benizzio/ghostfolio-cryptogains/internal/report/output"
+	reportpdf "github.com/benizzio/ghostfolio-cryptogains/internal/report/pdf"
 	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
+	"golang.org/x/image/font/gofont/gobold"
+	"golang.org/x/image/font/gofont/goregular"
 )
+
+// reportPDFRenderOptions supplies application-owned embedded font bytes for the
+// local PDF renderer.
+// Authored by: OpenCode
+var reportPDFRenderOptions = func() reportpdf.RenderOptions {
+	return reportpdf.RenderOptions{Fonts: reportpdf.FontData{Regular: goregular.TTF, Bold: gobold.TTF}}
+}
+
+// newReportDocumentForRuntime keeps the defensive runtime finalization branch
+// testable after renderer validation has guaranteed normal document inputs.
+// Authored by: OpenCode
+var newReportDocumentForRuntime = reportmodel.NewReportDocument
 
 // reportCalculator defines the calculation seam used by the runtime report
 // service.
@@ -24,15 +39,15 @@ type reportCalculator func(context.Context, reportmodel.ReportRequest, syncmodel
 	error,
 )
 
-// reportRenderer defines the Markdown rendering seam used by the runtime report
-// service.
+// reportBundleRenderer defines the selected-format rendering seam used by the
+// runtime report service.
 // Authored by: OpenCode
-type reportRenderer func(reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error)
+type reportBundleRenderer func(reportmodel.ReportOutputFormat, reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error)
 
-// reportDocumentWriter defines the final file-save seam used by the runtime
+// reportBundleWriter defines the output-bundle save seam used by the runtime
 // report service.
 // Authored by: OpenCode
-type reportDocumentWriter func(reportmodel.ReportDocument) (reportmodel.ReportOutputFile, error)
+type reportBundleWriter func(reportmodel.ReportOutputFormat, []reportmodel.ReportDocument) (reportmodel.ReportOutputBundle, error)
 
 // reportPathOpener defines the post-save opener seam used by the runtime report
 // service.
@@ -48,8 +63,8 @@ type reportService struct {
 	diagnosticReports diagnosticReportService
 	currencyRates     reportcalculate.CurrencyRateService
 	calculate         reportCalculator
-	render            reportRenderer
-	write             reportDocumentWriter
+	renderBundle      reportBundleRenderer
+	writeBundle       reportBundleWriter
 	open              reportPathOpener
 }
 
@@ -70,8 +85,8 @@ func newReportService(
 		diagnosticReports: newDiagnosticReportService(baseConfigDir),
 		currencyRates:     currencyRates,
 		calculate:         calculator.Calculate,
-		render:            reportmarkdown.Render,
-		write:             reportoutput.WriteReportDocument,
+		renderBundle:      renderReportOutputBundle,
+		writeBundle:       reportoutput.WriteReportOutputBundle,
 		open:              reportoutput.OpenPath,
 	}
 }
@@ -100,8 +115,8 @@ func (s *reportService) Generate(ctx context.Context, request ReportGenerationRe
 		)
 	}
 
-	var document reportmodel.ReportDocument
-	document, err = s.render(report)
+	var documents []reportmodel.ReportDocument
+	documents, err = s.renderReportDocuments(request.Request.OutputFormat, report)
 	if err != nil {
 		var wrappedErr = reportRenderDiagnosticError(request.Request, err)
 		return s.reportFailureOutcome(
@@ -118,9 +133,8 @@ func (s *reportService) Generate(ctx context.Context, request ReportGenerationRe
 			reportDiagnosticContextFromError(wrappedErr),
 		)
 	}
-
-	var outputFile reportmodel.ReportOutputFile
-	outputFile, err = s.write(document)
+	var outputBundle reportmodel.ReportOutputBundle
+	outputBundle, err = s.writeReportDocuments(request.Request.OutputFormat, documents)
 	if err != nil {
 		var reason = reportWriteFailureReason(err)
 		var wrappedErr = reportWriteDiagnosticError(reason, err)
@@ -134,19 +148,68 @@ func (s *reportService) Generate(ctx context.Context, request ReportGenerationRe
 		)
 	}
 
-	var openedOutputFile, openedOutcome = requestAutomaticOpen(request.Request, outputFile, s.open)
+	var openedOutputBundle, openedOutcome = requestAutomaticOpenBundle(request.Request, outputBundle, s.open)
 	if openedOutcome != nil {
 		openedOutcome.Attempt = outcomeAttempt
 		return *openedOutcome
 	}
+	var primaryOutputFile = openedOutputBundle.Files[0]
 
 	return ReportOutcome{
 		Success:       true,
-		Message:       reportSuccessMessage(openedOutputFile.Path),
+		Message:       reportBundleSuccessMessage(openedOutputBundle.Files),
 		FailureReason: ReportFailureNone,
 		Attempt:       outcomeAttempt,
 		Request:       request.Request,
-		OutputFile:    openedOutputFile,
+		OutputFormat:  request.Request.OutputFormat,
+		OutputBundle:  openedOutputBundle,
+		OutputFile:    primaryOutputFile,
+	}
+}
+
+// renderReportDocuments renders one report through the selected-format bundle seam.
+// Authored by: OpenCode
+func (s *reportService) renderReportDocuments(outputFormat reportmodel.ReportOutputFormat, report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+	if s.renderBundle == nil {
+		return nil, fmt.Errorf("report renderer is unavailable")
+	}
+	return s.renderBundle(outputFormat, report)
+}
+
+// writeReportDocuments writes rendered documents through the bundle seam.
+// Authored by: OpenCode
+func (s *reportService) writeReportDocuments(outputFormat reportmodel.ReportOutputFormat, documents []reportmodel.ReportDocument) (reportmodel.ReportOutputBundle, error) {
+	if s.writeBundle == nil {
+		return reportmodel.ReportOutputBundle{}, fmt.Errorf("report writer is unavailable")
+	}
+	return s.writeBundle(outputFormat, documents)
+}
+
+// renderReportOutputBundle selects the local renderer for the requested output
+// format and returns the rendered documents to save.
+// Authored by: OpenCode
+func renderReportOutputBundle(outputFormat reportmodel.ReportOutputFormat, report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+	switch outputFormat {
+	case reportmodel.ReportOutputFormatMarkdown:
+		return reportmarkdown.RenderDocuments(report)
+	case reportmodel.ReportOutputFormatPDF:
+		var renderer, err = reportpdf.NewRenderer(reportPDFRenderOptions())
+		if err != nil {
+			return nil, err
+		}
+		var payload []byte
+		payload, err = renderer.Render(report)
+		if err != nil {
+			return nil, err
+		}
+		var document reportmodel.ReportDocument
+		document, err = newReportDocumentForRuntime(reportmodel.ReportDocumentTypePDF, reportmodel.ReportDocumentRoleCombined, payload, report.Year, report.CostBasisMethod, report.GeneratedAt)
+		if err != nil {
+			return nil, err
+		}
+		return []reportmodel.ReportDocument{document}, nil
+	default:
+		return nil, fmt.Errorf("unsupported report output format %q", outputFormat)
 	}
 }
 

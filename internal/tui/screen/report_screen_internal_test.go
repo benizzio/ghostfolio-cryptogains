@@ -45,6 +45,24 @@ func TestReportSelectionScreenViewRendersBaseCurrencyMenu(t *testing.T) {
 	}
 }
 
+// TestReportOutputFormatExplanationRejectsUnsupportedFormats verifies the
+// selection screen provides corrective copy before report generation starts.
+// Authored by: OpenCode
+func TestReportOutputFormatExplanationRejectsUnsupportedFormats(t *testing.T) {
+	t.Parallel()
+
+	if explanation := reportOutputFormatExplanation(reportmodel.ReportOutputFormatPDF); !strings.Contains(explanation, "one local A4 text PDF") {
+		t.Fatalf("unexpected PDF explanation: %q", explanation)
+	}
+	if explanation := reportOutputFormatExplanation(reportmodel.ReportOutputFormatMarkdown); !strings.Contains(explanation, "separate Annex 1 Markdown") {
+		t.Fatalf("unexpected Markdown explanation: %q", explanation)
+	}
+	var explanation = reportOutputFormatExplanation(reportmodel.ReportOutputFormat("html"))
+	if !strings.Contains(explanation, "Choose Markdown or PDF") {
+		t.Fatalf("unexpected unsupported-format explanation: %q", explanation)
+	}
+}
+
 // TestReportBusyScreenViewRendersSelectedBaseCurrency verifies the busy screen
 // keeps the selected report base currency visible during asynchronous work.
 // Authored by: OpenCode
@@ -77,6 +95,7 @@ func TestReportResultScreenViewRendersSelectedBaseCurrency(t *testing.T) {
 		2024,
 		reportmodel.CostBasisMethodFIFO,
 		reportmodel.ReportBaseCurrencyEUR,
+		reportmodel.ReportOutputFormatMarkdown,
 		time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC),
 	)
 	if err != nil {
@@ -85,10 +104,10 @@ func TestReportResultScreenViewRendersSelectedBaseCurrency(t *testing.T) {
 	var outputFile, outputErr = reportmodel.NewReportOutputFile(
 		"/tmp/Documents",
 		"ghostfolio-capital-gains-2024-fifo.md",
-		"/tmp/report.md",
+		"/tmp/Documents/ghostfolio-capital-gains-2024-fifo.md",
+		reportmodel.ReportDocumentRoleMain,
+		reportmodel.ReportMediaTypeMarkdown,
 		time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC),
-		true,
-		"",
 	)
 	if outputErr != nil {
 		t.Fatalf("new report output file: %v", outputErr)
@@ -123,6 +142,7 @@ func TestReportResultScreenViewRendersFailureBaseCurrency(t *testing.T) {
 		2024,
 		reportmodel.CostBasisMethodFIFO,
 		reportmodel.ReportBaseCurrencyUSD,
+		reportmodel.ReportOutputFormatMarkdown,
 		time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC),
 	)
 	if err != nil {
@@ -146,6 +166,82 @@ func TestReportResultScreenViewRendersFailureBaseCurrency(t *testing.T) {
 	})
 
 	assertReportScreenContainsAll(t, content, []string{"Failure Category: unsupported report calculation", "Report Base Currency: USD"})
+}
+
+// TestReportSelectionScreenViewRendersUnselectedOutputFormatGuidance verifies
+// stale output-format selections render actionable fallback copy.
+// Authored by: OpenCode
+func TestReportSelectionScreenViewRendersUnselectedOutputFormatGuidance(t *testing.T) {
+	t.Parallel()
+
+	var content = ReportSelectionScreenView(ReportSelectionScreenParams{
+		Theme:                     component.DefaultTheme(),
+		Width:                     80,
+		Height:                    24,
+		AvailableYears:            []int{2024},
+		SelectedYearIndex:         0,
+		MethodItems:               []component.MenuItem{{Label: "FIFO", Enabled: true}},
+		SelectedMethod:            0,
+		SelectedOutputFormatIndex: 99,
+		MethodExplanation:         reportmodel.CostBasisMethodFIFO.Explanation(),
+		MenuItems:                 []component.MenuItem{{Label: component.GenerateReportActionLabel, Enabled: false}},
+		HelpText:                  "help",
+	})
+
+	assertReportScreenContainsAll(t, content, []string{"Output Format Explanation", "Choose Markdown or PDF before generation starts."})
+}
+
+// TestReportResultScreenViewRendersPDFBundlePath verifies combined PDF bundle
+// output uses the PDF saved-path label.
+// Authored by: OpenCode
+func TestReportResultScreenViewRendersPDFBundlePath(t *testing.T) {
+	t.Parallel()
+
+	var request, err = reportmodel.NewReportRequest(
+		2024,
+		reportmodel.CostBasisMethodFIFO,
+		reportmodel.ReportBaseCurrencyUSD,
+		reportmodel.ReportOutputFormatPDF,
+		time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC),
+	)
+	if err != nil {
+		t.Fatalf("new report request: %v", err)
+	}
+	var savedAt = time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC)
+	var pdfFile, outputErr = reportmodel.NewReportOutputFile(
+		"/tmp/Documents",
+		"ghostfolio-capital-gains-2024-fifo.pdf",
+		"/tmp/Documents/ghostfolio-capital-gains-2024-fifo.pdf",
+		reportmodel.ReportDocumentRoleCombined,
+		reportmodel.ReportMediaTypePDF,
+		savedAt,
+	)
+	if outputErr != nil {
+		t.Fatalf("new PDF output file: %v", outputErr)
+	}
+	var bundle, bundleErr = reportmodel.NewReportOutputBundle(reportmodel.ReportOutputFormatPDF, []reportmodel.ReportOutputFile{pdfFile}, savedAt, true, "")
+	if bundleErr != nil {
+		t.Fatalf("new PDF output bundle: %v", bundleErr)
+	}
+
+	var content = ReportResultScreenView(ReportResultScreenParams{
+		Theme:         component.DefaultTheme(),
+		Width:         80,
+		Height:        24,
+		MethodLabel:   reportmodel.CostBasisMethodFIFO.Label(),
+		MenuItems:     []component.MenuItem{{Label: component.BackToSyncReportsActionLabel, Enabled: true}},
+		SelectedIndex: 0,
+		HelpText:      "help",
+		Outcome: runtime.ReportOutcome{
+			Success:      true,
+			Message:      "Saved the report.",
+			Request:      request,
+			OutputBundle: bundle,
+			OutputFile:   pdfFile,
+		},
+	})
+
+	assertReportScreenContainsAll(t, content, []string{"Output Format: PDF", "Saved PDF Path: /tmp/Documents/ghostfolio-capital-gains-2024-fifo.pdf"})
 }
 
 // assertReportScreenContainsAll verifies that rendered report content includes

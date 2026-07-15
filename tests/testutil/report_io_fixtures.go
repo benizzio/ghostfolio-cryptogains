@@ -10,6 +10,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
+
+	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 )
 
 // ReportIOFixture provides one controlled home-directory layout for report
@@ -21,6 +24,45 @@ type ReportIOFixture struct {
 	HomeDir      string
 	DocumentsDir string
 	XDGConfigDir string
+}
+
+// ReportOutputFilenameFixture stores deterministic names from the report-output
+// filename contract.
+// Authored by: OpenCode
+type ReportOutputFilenameFixture struct {
+	Year                  int
+	CostBasisMethod       reportmodel.CostBasisMethod
+	GeneratedAt           time.Time
+	MarkdownMainFilename  string
+	MarkdownAnnexFilename string
+	PDFCombinedFilename   string
+	CollidedMarkdownMain  string
+	CollidedMarkdownAnnex string
+	CollidedPDFCombined   string
+}
+
+// ReportOutputPathFixture stores deterministic paths inside one fixture
+// Documents directory.
+// Authored by: OpenCode
+type ReportOutputPathFixture struct {
+	DocumentsDirectory    string
+	MarkdownMainPath      string
+	MarkdownAnnexPath     string
+	PDFCombinedPath       string
+	CollidedMarkdownMain  string
+	CollidedMarkdownAnnex string
+	CollidedPDFCombined   string
+}
+
+// ReportOutputBundleFixture stores validated Markdown and PDF output bundle
+// defaults backed by deterministic fixture paths.
+// Authored by: OpenCode
+type ReportOutputBundleFixture struct {
+	SavedAt        time.Time
+	MarkdownFiles  []reportmodel.ReportOutputFile
+	PDFFiles       []reportmodel.ReportOutputFile
+	MarkdownBundle reportmodel.ReportOutputBundle
+	PDFBundle      reportmodel.ReportOutputBundle
 }
 
 // NewReportIOFixture creates one temporary home-directory fixture with a
@@ -67,6 +109,131 @@ func NewReportIOFixture(t *testing.T) ReportIOFixture {
 // Authored by: OpenCode
 func (fixture ReportIOFixture) ReportPath(name string) string {
 	return filepath.Join(fixture.DocumentsDir, name)
+}
+
+// DeterministicReportOutputFilenameFixture returns canonical output filenames
+// for the planned Markdown pair and combined PDF output contracts.
+//
+// Example usage:
+//
+//	filenames := testutil.DeterministicReportOutputFilenameFixture()
+//	_ = filenames.MarkdownAnnexFilename
+//
+// Authored by: OpenCode
+func DeterministicReportOutputFilenameFixture() ReportOutputFilenameFixture {
+	var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
+	var year = 2024
+	var method = reportmodel.CostBasisMethodFIFO
+	return ReportOutputFilenameFixture{
+		Year:                  year,
+		CostBasisMethod:       method,
+		GeneratedAt:           generatedAt,
+		MarkdownMainFilename:  "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56.md",
+		MarkdownAnnexFilename: "ghostfolio-capital-gains-2024-fifo-annex-1-2026-05-21_12-34-56.md",
+		PDFCombinedFilename:   "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56.pdf",
+		CollidedMarkdownMain:  "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56-2.md",
+		CollidedMarkdownAnnex: "ghostfolio-capital-gains-2024-fifo-annex-1-2026-05-21_12-34-56-2.md",
+		CollidedPDFCombined:   "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56-2.pdf",
+	}
+}
+
+// DeterministicReportOutputPathFixture returns canonical output paths under the
+// fixture Documents directory.
+//
+// Example usage:
+//
+//	ioFixture := testutil.NewReportIOFixture(t)
+//	paths := ioFixture.DeterministicReportOutputPathFixture()
+//	_ = paths.PDFCombinedPath
+//
+// Authored by: OpenCode
+func (fixture ReportIOFixture) DeterministicReportOutputPathFixture() ReportOutputPathFixture {
+	var filenames = DeterministicReportOutputFilenameFixture()
+
+	return ReportOutputPathFixture{
+		DocumentsDirectory:    fixture.DocumentsDir,
+		MarkdownMainPath:      fixture.ReportPath(filenames.MarkdownMainFilename),
+		MarkdownAnnexPath:     fixture.ReportPath(filenames.MarkdownAnnexFilename),
+		PDFCombinedPath:       fixture.ReportPath(filenames.PDFCombinedFilename),
+		CollidedMarkdownMain:  fixture.ReportPath(filenames.CollidedMarkdownMain),
+		CollidedMarkdownAnnex: fixture.ReportPath(filenames.CollidedMarkdownAnnex),
+		CollidedPDFCombined:   fixture.ReportPath(filenames.CollidedPDFCombined),
+	}
+}
+
+// DeterministicReportOutputBundleFixture returns validated output-file and
+// bundle metadata for the canonical Markdown pair and combined PDF outputs.
+//
+// Example usage:
+//
+//	ioFixture := testutil.NewReportIOFixture(t)
+//	bundles := ioFixture.DeterministicReportOutputBundleFixture(t)
+//	_ = bundles.MarkdownBundle.OutputFormat
+//
+// Authored by: OpenCode
+func (fixture ReportIOFixture) DeterministicReportOutputBundleFixture(t *testing.T) ReportOutputBundleFixture {
+	t.Helper()
+
+	var filenames = DeterministicReportOutputFilenameFixture()
+	var paths = fixture.DeterministicReportOutputPathFixture()
+	var savedAt = filenames.GeneratedAt
+
+	var markdownMainFile, err = reportmodel.NewReportOutputFile(
+		paths.DocumentsDirectory,
+		filenames.MarkdownMainFilename,
+		paths.MarkdownMainPath,
+		reportmodel.ReportDocumentRoleMain,
+		reportmodel.ReportMediaTypeMarkdown,
+		savedAt,
+	)
+	if err != nil {
+		t.Fatalf("build markdown main output fixture: %v", err)
+	}
+	var markdownAnnexFile reportmodel.ReportOutputFile
+	markdownAnnexFile, err = reportmodel.NewReportOutputFile(
+		paths.DocumentsDirectory,
+		filenames.MarkdownAnnexFilename,
+		paths.MarkdownAnnexPath,
+		reportmodel.ReportDocumentRoleAnnex,
+		reportmodel.ReportMediaTypeMarkdown,
+		savedAt,
+	)
+	if err != nil {
+		t.Fatalf("build markdown annex output fixture: %v", err)
+	}
+	var pdfCombinedFile reportmodel.ReportOutputFile
+	pdfCombinedFile, err = reportmodel.NewReportOutputFile(
+		paths.DocumentsDirectory,
+		filenames.PDFCombinedFilename,
+		paths.PDFCombinedPath,
+		reportmodel.ReportDocumentRoleCombined,
+		reportmodel.ReportMediaTypePDF,
+		savedAt,
+	)
+	if err != nil {
+		t.Fatalf("build pdf output fixture: %v", err)
+	}
+
+	var markdownFiles = []reportmodel.ReportOutputFile{markdownMainFile, markdownAnnexFile}
+	var pdfFiles = []reportmodel.ReportOutputFile{pdfCombinedFile}
+	var markdownBundle reportmodel.ReportOutputBundle
+	markdownBundle, err = reportmodel.NewReportOutputBundle(reportmodel.ReportOutputFormatMarkdown, markdownFiles, savedAt, false, "")
+	if err != nil {
+		t.Fatalf("build markdown output bundle fixture: %v", err)
+	}
+	var pdfBundle reportmodel.ReportOutputBundle
+	pdfBundle, err = reportmodel.NewReportOutputBundle(reportmodel.ReportOutputFormatPDF, pdfFiles, savedAt, false, "")
+	if err != nil {
+		t.Fatalf("build pdf output bundle fixture: %v", err)
+	}
+
+	return ReportOutputBundleFixture{
+		SavedAt:        savedAt,
+		MarkdownFiles:  markdownFiles,
+		PDFFiles:       pdfFiles,
+		MarkdownBundle: markdownBundle,
+		PDFBundle:      pdfBundle,
+	}
 }
 
 // SetXDGDocumentsDir writes one Linux user-dirs configuration that points the
@@ -224,6 +391,24 @@ func WriteFixtureFile(t *testing.T, path string, content string) {
 	}
 }
 
+// WriteDeterministicReportOutputCollisions creates canonical existing output
+// files so writer tests can exercise collision suffix behavior.
+//
+// Example usage:
+//
+//	fixture := testutil.NewReportIOFixture(t)
+//	fixture.WriteDeterministicReportOutputCollisions(t)
+//
+// Authored by: OpenCode
+func (fixture ReportIOFixture) WriteDeterministicReportOutputCollisions(t *testing.T) {
+	t.Helper()
+
+	var paths = fixture.DeterministicReportOutputPathFixture()
+	WriteFixtureFile(t, paths.MarkdownMainPath, "existing main markdown report\n")
+	WriteFixtureFile(t, paths.MarkdownAnnexPath, "existing annex markdown report\n")
+	WriteFixtureFile(t, paths.PDFCombinedPath, "%PDF-existing-report\n")
+}
+
 // AssertFileContent verifies one file's full text content.
 //
 // Example usage:
@@ -234,6 +419,7 @@ func WriteFixtureFile(t *testing.T, path string, content string) {
 func AssertFileContent(t *testing.T, path string, expected string) {
 	t.Helper()
 
+	//nolint:gosec // Test assertion reads the caller-provided report fixture path.
 	var content, err = os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read file %q: %v", path, err)
@@ -248,7 +434,7 @@ func AssertFileContent(t *testing.T, path string, expected string) {
 func mustMkdirAll(t *testing.T, path string) {
 	t.Helper()
 
-	var err = os.MkdirAll(path, 0o755)
+	var err = os.MkdirAll(path, 0o750)
 	if err != nil {
 		t.Fatalf("mkdir %q: %v", path, err)
 	}

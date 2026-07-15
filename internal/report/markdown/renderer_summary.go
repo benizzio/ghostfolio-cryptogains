@@ -16,23 +16,37 @@ import (
 // Authored by: OpenCode
 func writeSummarySection(builder *strings.Builder, report reportmodel.CapitalGainsReport, calculationCurrency string) error {
 	builder.WriteString("## Gains-And-Losses Summary\n\n")
-	if len(report.SummaryEntries) == 0 {
-		builder.WriteString("No assets qualified for the main report sections in the selected year.\n\n")
+	var renderedEntries []struct {
+		entry         reportmodel.AssetSummaryEntry
+		netGainOrLoss string
 	}
-
-	builder.WriteString("| Asset | Net Gain Or Loss | Report Calculation Currency |\n")
-	builder.WriteString("|-------|------------------|-----------------------------|\n")
 	for _, entry := range report.SummaryEntries {
 		var netGainOrLoss, err = decimalsupport.CanonicalString(entry.NetGainOrLoss)
 		if err != nil {
 			return fmt.Errorf("render summary entry %q net gain or loss: %w", entry.AssetIdentityKey, err)
 		}
-		builder.WriteString(fmt.Sprintf(
+		if netGainOrLoss == "0" {
+			continue
+		}
+		renderedEntries = append(renderedEntries, struct {
+			entry         reportmodel.AssetSummaryEntry
+			netGainOrLoss string
+		}{entry: entry, netGainOrLoss: netGainOrLoss})
+	}
+	if len(renderedEntries) == 0 {
+		builder.WriteString("No assets had a non-zero net gain or loss in the selected year.\n\n")
+	}
+
+	builder.WriteString("| Asset | Net Gain Or Loss | Report Calculation Currency |\n")
+	builder.WriteString("|-------|------------------|-----------------------------|\n")
+	for _, renderedEntry := range renderedEntries {
+		var entry = renderedEntry.entry
+		fmt.Fprintf(builder,
 			"| %s | %s | %s |\n",
 			renderDisplayLabel(entry.DisplayLabel, entry.AssetIdentityKey),
-			netGainOrLoss,
+			renderedEntry.netGainOrLoss,
 			calculationCurrencyLabelWithFallback(entry.ReportCalculationCurrency, calculationCurrency),
-		))
+		)
 	}
 
 	var yearlyNetTotal, err = decimalsupport.CanonicalString(report.YearlyNetTotal)
@@ -40,7 +54,7 @@ func writeSummarySection(builder *strings.Builder, report reportmodel.CapitalGai
 		return fmt.Errorf("render yearly net total: %w", err)
 	}
 
-	builder.WriteString(fmt.Sprintf("| Overall Yearly Net Total | %s | %s |\n\n", yearlyNetTotal, calculationCurrency))
+	fmt.Fprintf(builder, "| Overall Yearly Net Total | %s | %s |\n\n", yearlyNetTotal, calculationCurrency)
 	return nil
 }
 
@@ -54,15 +68,15 @@ func writeReferenceSection(builder *strings.Builder, report reportmodel.CapitalG
 		return nil
 	}
 
-	builder.WriteString("| Asset | Full Liquidation Count Through Year End | Main Section Status |\n")
-	builder.WriteString("|-------|-----------------------------------------|---------------------|\n")
+	builder.WriteString("| Asset | Historical Full Liquidation Count | Main Section Status |\n")
+	builder.WriteString("|-------|-----------------------------------|---------------------|\n")
 	for _, entry := range report.ReferenceEntries {
-		builder.WriteString(fmt.Sprintf(
+		fmt.Fprintf(builder,
 			"| %s | %d | %s |\n",
 			renderDisplayLabel(entry.DisplayLabel, entry.AssetIdentityKey),
 			entry.FullLiquidationCountThroughYearEnd,
 			sanitizeInlineText(string(entry.MainSectionStatus)),
-		))
+		)
 	}
 
 	builder.WriteString("\n")

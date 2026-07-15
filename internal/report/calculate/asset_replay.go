@@ -26,6 +26,7 @@ type assetReplayState struct {
 	hadInYearFullLiquidation bool
 	activityRows             []reportmodel.AssetActivityRow
 	liquidationSummaries     []reportmodel.LiquidationCalculation
+	auditEntries             []reportmodel.AuditActivityEntry
 }
 
 // assetInputReplayResult stores one replayed activity's contribution to the
@@ -35,6 +36,7 @@ type assetInputReplayResult struct {
 	reachedZero        bool
 	liquidationSummary *reportmodel.LiquidationCalculation
 	activityRow        *reportmodel.AssetActivityRow
+	auditEntry         *reportmodel.AuditActivityEntry
 	yearlyNetDelta     apd.Decimal
 }
 
@@ -84,6 +86,9 @@ func applyReplayResult(state *assetReplayState, input reportmodel.ActivityCalcul
 	}
 	if replayResult.liquidationSummary != nil {
 		state.liquidationSummaries = append(state.liquidationSummaries, *replayResult.liquidationSummary)
+	}
+	if replayResult.auditEntry != nil {
+		state.auditEntries = append(state.auditEntries, *replayResult.auditEntry)
 	}
 
 	var nextYearlyNet, err = supportmath.Add(state.yearlyNet, replayResult.yearlyNetDelta)

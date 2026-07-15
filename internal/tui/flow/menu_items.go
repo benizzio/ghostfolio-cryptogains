@@ -106,6 +106,17 @@ func (m *Model) reportBaseCurrencyItems() []component.MenuItem {
 	return items
 }
 
+// reportOutputFormatItems builds the supported report output-format menu.
+// Authored by: OpenCode
+func (m *Model) reportOutputFormatItems() []component.MenuItem {
+	var formats = reportmodel.SupportedReportOutputFormats()
+	var items = make([]component.MenuItem, 0, len(formats))
+	for _, format := range formats {
+		items = append(items, component.MenuItem{Label: format.Label(), Enabled: true})
+	}
+	return items
+}
+
 // reportSelectionMenuItems builds the report-selection action menu.
 // Authored by: OpenCode
 func (m *Model) reportSelectionMenuItems() []component.MenuItem {
@@ -116,7 +127,7 @@ func (m *Model) reportSelectionMenuItems() []component.MenuItem {
 // choices for starting report generation.
 // Authored by: OpenCode
 func (m *Model) reportCanGenerate() bool {
-	return m.report.SelectedYear > 0 && m.report.MethodIndex >= 0 && m.report.SelectedBaseCurrency != ""
+	return m.report.SelectedYear > 0 && m.report.MethodIndex >= 0 && m.report.SelectedBaseCurrency != "" && m.report.SelectedOutputFormat != ""
 }
 
 // reportResultMenuItems builds the completed report-result action menu.

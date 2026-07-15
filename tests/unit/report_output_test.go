@@ -93,23 +93,19 @@ func TestResolveDocumentsDirectoryForOSRejectsUnsupportedPlatform(t *testing.T) 
 func TestWriteReportDocumentUsesTimestampedFilenameAndSuffix(t *testing.T) {
 	var fixture = testutil.NewReportIOFixture(t)
 	var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.Local)
-	var document = reportmodel.ReportDocument{
-		DocumentType:    reportmodel.ReportDocumentTypeMarkdown,
-		Content:         "# Report\n",
-		Year:            2024,
-		CostBasisMethod: reportmodel.CostBasisMethodAverageCost,
-		GeneratedAt:     generatedAt,
-	}
+	var documents = outputMarkdownDocuments(reportmodel.CostBasisMethodAverageCost, "# Report\n", generatedAt)
 
-	var firstOutput, err = reportoutput.WriteReportDocument(document)
+	var firstBundle, err = reportoutput.WriteReportOutputBundle(reportmodel.ReportOutputFormatMarkdown, documents)
 	if err != nil {
 		t.Fatalf("write first report document: %v", err)
 	}
-	var secondOutput reportmodel.ReportOutputFile
-	secondOutput, err = reportoutput.WriteReportDocument(document)
+	var secondBundle reportmodel.ReportOutputBundle
+	secondBundle, err = reportoutput.WriteReportOutputBundle(reportmodel.ReportOutputFormatMarkdown, documents)
 	if err != nil {
 		t.Fatalf("write second report document: %v", err)
 	}
+	var firstOutput = firstBundle.Files[0]
+	var secondOutput = secondBundle.Files[0]
 
 	var expectedFirst = "ghostfolio-capital-gains-2024-average-cost-2026-05-21_12-34-56.md"
 	var expectedSecond = "ghostfolio-capital-gains-2024-average-cost-2026-05-21_12-34-56-2.md"
@@ -135,16 +131,11 @@ func TestWriteReportDocumentUsesExclusiveCreate(t *testing.T) {
 	var existingPath = fixture.ReportPath("ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56.md")
 	testutil.WriteFixtureFile(t, existingPath, "existing")
 
-	var outputFile, err = reportoutput.WriteReportDocument(reportmodel.ReportDocument{
-		DocumentType:    reportmodel.ReportDocumentTypeMarkdown,
-		Content:         "new",
-		Year:            2024,
-		CostBasisMethod: reportmodel.CostBasisMethodFIFO,
-		GeneratedAt:     generatedAt,
-	})
+	var bundle, err = reportoutput.WriteReportOutputBundle(reportmodel.ReportOutputFormatMarkdown, outputMarkdownDocuments(reportmodel.CostBasisMethodFIFO, "new", generatedAt))
 	if err != nil {
 		t.Fatalf("write report document with existing base path: %v", err)
 	}
+	var outputFile = bundle.Files[0]
 
 	if outputFile.Filename != "ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56-2.md" {
 		t.Fatalf("unexpected suffixed filename: %q", outputFile.Filename)
@@ -153,6 +144,16 @@ func TestWriteReportDocumentUsesExclusiveCreate(t *testing.T) {
 	testutil.AssertRegularFile(t, outputFile.Path)
 	testutil.AssertFileContent(t, existingPath, "existing")
 	testutil.AssertFileContent(t, outputFile.Path, "new")
+}
+
+// outputMarkdownDocuments builds the valid main-plus-annex document bundle used
+// by report-output tests.
+// Authored by: OpenCode
+func outputMarkdownDocuments(method reportmodel.CostBasisMethod, content string, generatedAt time.Time) []reportmodel.ReportDocument {
+	return []reportmodel.ReportDocument{
+		{DocumentType: reportmodel.ReportDocumentTypeMarkdown, Role: reportmodel.ReportDocumentRoleMain, Content: []byte(content), Year: 2024, CostBasisMethod: method, GeneratedAt: generatedAt},
+		{DocumentType: reportmodel.ReportDocumentTypeMarkdown, Role: reportmodel.ReportDocumentRoleAnnex, Content: []byte("# Annex 1 - Audit\n"), Year: 2024, CostBasisMethod: method, GeneratedAt: generatedAt},
+	}
 }
 
 // TestResolveOpenCommandForOSReturnsExpectedCommands verifies the adapter

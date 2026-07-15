@@ -239,6 +239,26 @@ func IsZero(value apd.Decimal) (bool, error) {
 	return value.Cmp(&apd.Decimal{}) == 0, nil
 }
 
+// IsZeroPointer reports whether an optional finite decimal is present and
+// numerically zero. A nil value is not zero.
+//
+// Example:
+//
+//	zero, err := math.IsZeroPointer(amount)
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = zero
+//
+// Authored by: OpenCode
+func IsZeroPointer(value *apd.Decimal) (bool, error) {
+	if value == nil {
+		return false, nil
+	}
+
+	return IsZero(*value)
+}
+
 // RequirePositive rejects non-finite or non-positive decimal values.
 //
 // Example:

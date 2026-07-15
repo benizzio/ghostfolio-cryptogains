@@ -8,8 +8,7 @@ import (
 	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
-	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
-	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
 )
 
 // writeRateSourceSummary renders the official rate-provider summary disclosed
@@ -17,9 +16,9 @@ import (
 // Authored by: OpenCode
 func writeRateSourceSummary(builder *strings.Builder, report reportmodel.CapitalGainsReport) error {
 	builder.WriteString("## Rate Source Summary\n\n")
-	builder.WriteString(fmt.Sprintf("- Report Base Currency: %s\n", calculationCurrencyLabel(report.ReportCalculationCurrency)))
+	fmt.Fprintf(builder, "- **Report Base Currency:** %s\n", calculationCurrencyLabel(report.ReportCalculationCurrency))
 	if len(report.RateSources) == 0 {
-		builder.WriteString("- Exchange Rate Use: No activity required exchange-rate conversion.\n\n")
+		builder.WriteString("- **Exchange Rate Use:** No activity required exchange-rate conversion.\n\n")
 		return nil
 	}
 
@@ -30,10 +29,10 @@ func writeRateSourceSummary(builder *strings.Builder, report reportmodel.Capital
 			continue
 		}
 		rendered[key] = true
-		builder.WriteString(fmt.Sprintf("- Authority: %s\n", rateAuthorityLabel(source.Authority)))
-		builder.WriteString(fmt.Sprintf("- Provider: %s\n", rateProviderLabel(source.ProviderID)))
-		builder.WriteString(fmt.Sprintf("- Rate Kind: %s\n", sanitizeInlineText(source.RateKind)))
-		builder.WriteString(fmt.Sprintf("- Unavailable-Date Rule: %s\n", unavailableDateRule(source.ProviderID)))
+		fmt.Fprintf(builder, "- **Authority:** %s\n", rateAuthorityLabel(source.Authority))
+		fmt.Fprintf(builder, "- **Provider:** %s\n", rateProviderLabel(source.ProviderID))
+		fmt.Fprintf(builder, "- **Rate Kind:** %s\n", sanitizeInlineText(source.RateKind))
+		fmt.Fprintf(builder, "- **Unavailable-Date Rule:** %s\n", unavailableDateRule(source.ProviderID))
 	}
 
 	builder.WriteString("\n")
@@ -44,14 +43,14 @@ func writeRateSourceSummary(builder *strings.Builder, report reportmodel.Capital
 // activity disclosed by the report model.
 // Authored by: OpenCode
 func writeConversionAuditSection(builder *strings.Builder, report reportmodel.CapitalGainsReport) error {
-	if len(report.ConversionAuditEntries) == 0 {
+	if len(report.AuditAnnex.ConversionAuditEntries) == 0 {
 		return nil
 	}
 
 	builder.WriteString("## Currency Conversion Audit\n\n")
 	builder.WriteString("| Date | Source ID | Asset | Rate Date | Source Currency | Report Base Currency | Converted Amounts | Quote Direction | Rate Value |\n")
 	builder.WriteString("|------|-----------|-------|-----------|-----------------|----------------------|-------------------|-----------------|------------|\n")
-	for entryIndex, entry := range report.ConversionAuditEntries {
+	for entryIndex, entry := range report.AuditAnnex.ConversionAuditEntries {
 		if err := writeConversionAuditRow(builder, entryIndex, entry); err != nil {
 			return err
 		}
@@ -64,53 +63,16 @@ func writeConversionAuditSection(builder *strings.Builder, report reportmodel.Ca
 // writeConversionAuditRow renders one grouped activity-level conversion audit row.
 // Authored by: OpenCode
 func writeConversionAuditRow(builder *strings.Builder, entryIndex int, entry reportmodel.ConversionAuditEntry) error {
-	var rateValue, err = decimalsupport.CanonicalString(entry.RateValue)
-	if err != nil {
-		return fmt.Errorf("render conversion audit entry %d rate value: %w", entryIndex, err)
-	}
-	var convertedAmounts string
-	convertedAmounts, err = renderGroupedConvertedAmounts(entryIndex, entry.Amounts)
+	var row, err = presentation.BuildConversionAuditRow(entryIndex, entry)
 	if err != nil {
 		return err
 	}
 
-	builder.WriteString(fmt.Sprintf(
+	fmt.Fprintf(builder,
 		"| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
-		datesupport.FormatCalendarDate(entry.ActivityDate),
-		sanitizeInlineText(entry.SourceID),
-		sanitizeInlineText(entry.AssetLabel),
-		datesupport.FormatCalendarDate(entry.RateDate),
-		sanitizeInlineText(entry.SourceCurrency),
-		sanitizeInlineText(entry.ReportBaseCurrency.Label()),
-		convertedAmounts,
-		sanitizeInlineText(string(entry.QuoteDirection)),
-		rateValue,
-	))
+		sanitizeInlineText(row.Date), sanitizeInlineText(row.SourceID), sanitizeInlineText(row.Asset), sanitizeInlineText(row.RateDate), sanitizeInlineText(row.SourceCurrency), sanitizeInlineText(row.ReportBaseCurrency), sanitizeInlineText(row.ConvertedAmounts), sanitizeInlineText(row.QuoteDirection), sanitizeInlineText(row.RateValue),
+	)
 	return nil
-}
-
-// renderGroupedConvertedAmounts formats non-zero conversion amount slots for one
-// source activity and omits zero-to-zero slots from report-visible audit output.
-// Authored by: OpenCode
-func renderGroupedConvertedAmounts(entryIndex int, amounts []reportmodel.ConvertedActivityAmount) (string, error) {
-	var rendered []string
-	for amountIndex, amount := range amounts {
-		if amount.OriginalAmount.Sign() == 0 && amount.ConvertedAmount.Sign() == 0 {
-			continue
-		}
-		var originalAmount, err = decimalsupport.CanonicalString(amount.OriginalAmount)
-		if err != nil {
-			return "", fmt.Errorf("render conversion audit entry %d amount %d original amount: %w", entryIndex, amountIndex, err)
-		}
-		var convertedAmount string
-		convertedAmount, err = decimalsupport.CanonicalString(amount.ConvertedAmount)
-		if err != nil {
-			return "", fmt.Errorf("render conversion audit entry %d amount %d converted amount: %w", entryIndex, amountIndex, err)
-		}
-		rendered = append(rendered, fmt.Sprintf("%s: %s -> %s", sanitizeInlineText(string(amount.AmountKind)), originalAmount, convertedAmount))
-	}
-
-	return strings.Join(rendered, "; "), nil
 }
 
 // rateAuthorityLabel returns report-facing authority labels for canonical rate

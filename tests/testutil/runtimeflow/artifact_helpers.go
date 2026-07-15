@@ -21,9 +21,25 @@ func NormalizeRenderedText(content string) string {
 	return strings.Join(strings.Fields(frameCharacterPattern.ReplaceAllString(ansiEscapePattern.ReplaceAllString(content, ""), " ")), " ")
 }
 
-// MarkdownFiles returns generated Markdown files in dir.
+// MarkdownFiles returns generated main Markdown report files in dir. For
+// example, use AllMarkdownFiles when Annex 1 files must also be inspected.
 // Authored by: OpenCode
 func MarkdownFiles(t *testing.T, dir string) []string {
+	t.Helper()
+	var files = AllMarkdownFiles(t, dir)
+	var mainFiles []string
+	for _, file := range files {
+		if !strings.Contains(filepath.Base(file), "-annex-1-") {
+			mainFiles = append(mainFiles, file)
+		}
+	}
+	return mainFiles
+}
+
+// AllMarkdownFiles returns every generated Markdown file in dir, including
+// Annex 1 files. For example, use it to verify a complete Markdown output bundle.
+// Authored by: OpenCode
+func AllMarkdownFiles(t *testing.T, dir string) []string {
 	t.Helper()
 	var entries, err = os.ReadDir(dir)
 	if err != nil {

@@ -151,27 +151,32 @@ func TestCalculationErrorHelpersCoverRemainingBranches(t *testing.T) {
 func TestNewReportRequestValidatesRequiredFields(t *testing.T) {
 	t.Parallel()
 
-	_, err := NewReportRequest(0, CostBasisMethodFIFO, ReportBaseCurrencyUSD, time.Now())
+	_, err := NewReportRequest(0, CostBasisMethodFIFO, ReportBaseCurrencyUSD, ReportOutputFormatMarkdown, time.Now())
 	if err == nil || !strings.Contains(err.Error(), "year must be greater than zero") {
 		t.Fatalf("expected invalid year error, got %v", err)
 	}
 
-	_, err = NewReportRequest(2024, CostBasisMethod("bad"), ReportBaseCurrencyUSD, time.Now())
+	_, err = NewReportRequest(2024, CostBasisMethod("bad"), ReportBaseCurrencyUSD, ReportOutputFormatMarkdown, time.Now())
 	if err == nil || !strings.Contains(err.Error(), "unsupported cost basis method") {
 		t.Fatalf("expected invalid method error, got %v", err)
 	}
 
-	_, err = NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, time.Time{})
+	_, err = NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, ReportOutputFormatMarkdown, time.Time{})
 	if err == nil || !strings.Contains(err.Error(), "requested-at timestamp is required") {
 		t.Fatalf("expected missing timestamp error, got %v", err)
 	}
 
-	_, err = NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrency("GBP"), time.Now())
+	_, err = NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrency("GBP"), ReportOutputFormatMarkdown, time.Now())
 	if err == nil || !strings.Contains(err.Error(), "unsupported report base currency") {
 		t.Fatalf("expected invalid report base currency error, got %v", err)
 	}
 
-	request, err := NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
+	_, err = NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, ReportOutputFormat("html"), time.Now())
+	if err == nil || !strings.Contains(err.Error(), "unsupported report output format") {
+		t.Fatalf("expected invalid output format error, got %v", err)
+	}
+
+	request, err := NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, ReportOutputFormatMarkdown, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
@@ -200,7 +205,7 @@ func TestReportRequestValidatesBaseCurrency(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := NewReportRequest(2024, CostBasisMethodFIFO, testCase.currency, requestedAt)
+			_, err := NewReportRequest(2024, CostBasisMethodFIFO, testCase.currency, ReportOutputFormatMarkdown, requestedAt)
 			if err == nil || !strings.Contains(err.Error(), testCase.want) {
 				t.Fatalf("expected constructor error containing %q, got %v", testCase.want, err)
 			}
@@ -209,6 +214,7 @@ func TestReportRequestValidatesBaseCurrency(t *testing.T) {
 				Year:               2024,
 				CostBasisMethod:    CostBasisMethodFIFO,
 				ReportBaseCurrency: testCase.currency,
+				OutputFormat:       ReportOutputFormatMarkdown,
 				RequestedAt:        requestedAt,
 			}
 			err = request.Validate()
@@ -219,13 +225,145 @@ func TestReportRequestValidatesBaseCurrency(t *testing.T) {
 	}
 }
 
+// TestRenderLabels verifies closed user-facing labels for report presentation.
+// Authored by: OpenCode
+func TestRenderLabels(t *testing.T) {
+	var conversionLabel, err = RenderConversionStatusLabel(ConversionStatusSameCurrency)
+	if err != nil || conversionLabel != "Same currency" {
+		t.Fatalf("same-currency label = %q, err = %v", conversionLabel, err)
+	}
+	conversionLabel, err = RenderConversionStatusLabel(ConversionStatusConverted)
+	if err != nil || conversionLabel != "Converted" {
+		t.Fatalf("converted label = %q, err = %v", conversionLabel, err)
+	}
+	if _, err = RenderConversionStatusLabel(ConversionStatus("same_currency_new")); err == nil {
+		t.Fatalf("expected unsupported conversion status label to fail")
+	}
+
+	var quoteLabel string
+	quoteLabel, err = RenderQuoteDirectionLabel(QuoteDirectionSourcePerBase)
+	if err != nil || quoteLabel != "Source currency per base currency" {
+		t.Fatalf("source-per-base quote label = %q, err = %v", quoteLabel, err)
+	}
+	quoteLabel, err = RenderQuoteDirectionLabel(QuoteDirectionBasePerSource)
+	if err != nil || quoteLabel != "Base currency per source currency" {
+		t.Fatalf("base-per-source quote label = %q, err = %v", quoteLabel, err)
+	}
+	if _, err = RenderQuoteDirectionLabel(QuoteDirection("base_per_source_new")); err == nil {
+		t.Fatalf("expected unsupported quote direction label to fail")
+	}
+
+	var activityLabel string
+	activityLabel, err = RenderActivityTypeLabel(AssetActivityRow{
+		ActivityType: ActivityTypeSell,
+		UnitPrice:    decimalPointer(t, "0"),
+		GrossValue:   decimalPointer(t, "0"),
+		FeeAmount:    decimalPointer(t, "0"),
+	})
+	if err != nil || activityLabel != "BLOCKCHAIN OP" {
+		t.Fatalf("zero-priced sell label = %q, err = %v", activityLabel, err)
+	}
+	activityLabel, err = RenderActivityTypeLabel(AssetActivityRow{ActivityType: ActivityTypeBuy})
+	if err != nil || activityLabel != "BUY" {
+		t.Fatalf("buy label = %q, err = %v", activityLabel, err)
+	}
+	var invalidDecimal apd.Decimal
+	invalidDecimal.Form = apd.NaNSignaling
+	if _, err = RenderActivityTypeLabel(AssetActivityRow{ActivityType: ActivityTypeSell, UnitPrice: &invalidDecimal}); err == nil || !strings.Contains(err.Error(), "zero-priced fields") {
+		t.Fatalf("expected invalid zero-priced monetary field to fail, got %v", err)
+	}
+	if _, err = RenderAuditActivityTypeLabel(AuditActivityEntry{ActivityType: ActivityTypeSell, GrossValue: &invalidDecimal}); err == nil || !strings.Contains(err.Error(), "render audit activity type label zero-priced fields") {
+		t.Fatalf("expected invalid audit gross value to fail, got %v", err)
+	}
+	if _, err = RenderAuditActivityTypeLabel(AuditActivityEntry{ActivityType: ActivityTypeSell, FeeAmount: &invalidDecimal}); err == nil || !strings.Contains(err.Error(), "render audit activity type label zero-priced fields") {
+		t.Fatalf("expected invalid audit fee amount to fail, got %v", err)
+	}
+}
+
+// TestReportOutputFormatContract verifies supported output formats, labels, and
+// missing-format validation.
+// Authored by: OpenCode
+func TestReportOutputFormatContract(t *testing.T) {
+	t.Parallel()
+
+	var formats = SupportedReportOutputFormats()
+	if len(formats) != 2 || formats[0] != ReportOutputFormatMarkdown || formats[1] != ReportOutputFormatPDF {
+		t.Fatalf("unexpected supported output formats: %#v", formats)
+	}
+	if ReportOutputFormatMarkdown.Label() != "Markdown" || ReportOutputFormatPDF.Label() != "PDF" {
+		t.Fatalf("unexpected output format labels")
+	}
+	if got := ReportOutputFormat("html").Label(); got != "" {
+		t.Fatalf("expected unsupported format to have no label, got %q", got)
+	}
+	if err := (ReportRequest{Year: 2024, CostBasisMethod: CostBasisMethodFIFO, ReportBaseCurrency: ReportBaseCurrencyUSD, RequestedAt: time.Now()}).Validate(); err == nil || !strings.Contains(err.Error(), "output format") {
+		t.Fatalf("expected missing output format validation error, got %v", err)
+	}
+}
+
+// TestReportDocumentConstructorsCoverCompatibilityBranches verifies document role/content combinations.
+// Authored by: OpenCode
+func TestReportDocumentConstructorsCoverCompatibilityBranches(t *testing.T) {
+	var generatedAt = time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC)
+
+	var pdfAsMarkdownRole = ReportDocument{
+		DocumentType:    ReportDocumentTypePDF,
+		Role:            ReportDocumentRoleMain,
+		Content:         []byte("%PDF-1.7"),
+		Year:            2024,
+		CostBasisMethod: CostBasisMethodFIFO,
+		GeneratedAt:     generatedAt,
+	}
+	if err := pdfAsMarkdownRole.Validate(); err == nil || !strings.Contains(err.Error(), "pdf report document role") {
+		t.Fatalf("expected PDF role compatibility failure, got %v", err)
+	}
+
+	var markdownAsCombined = ReportDocument{
+		DocumentType:    ReportDocumentTypeMarkdown,
+		Role:            ReportDocumentRoleCombined,
+		Content:         []byte("# Report"),
+		Year:            2024,
+		CostBasisMethod: CostBasisMethodFIFO,
+		GeneratedAt:     generatedAt,
+	}
+	if err := markdownAsCombined.Validate(); err == nil || !strings.Contains(err.Error(), "markdown report document role") {
+		t.Fatalf("expected Markdown role compatibility failure, got %v", err)
+	}
+
+	var emptyPDF = ReportDocument{DocumentType: ReportDocumentTypePDF, Role: ReportDocumentRoleCombined, Year: 2024, CostBasisMethod: CostBasisMethodFIFO, GeneratedAt: generatedAt}
+	if err := emptyPDF.Validate(); err == nil || !strings.Contains(err.Error(), "PDF content") {
+		t.Fatalf("expected empty PDF content failure, got %v", err)
+	}
+}
+
+// TestReportOutputFileConstructorsCoverCompatibilityBranches verifies output metadata guardrails.
+// Authored by: OpenCode
+func TestReportOutputFileConstructorsCoverCompatibilityBranches(t *testing.T) {
+	var savedAt = time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC)
+	var dir = t.TempDir()
+	var path = dir + "/report.md"
+
+	var invalidRole = ReportOutputFile{DocumentsDirectory: dir, Filename: "report.md", Path: path, Role: ReportDocumentRole("bad"), MediaType: ReportMediaTypeMarkdown, SavedAt: savedAt}
+	if err := invalidRole.Validate(); err == nil || !strings.Contains(err.Error(), "report output role") {
+		t.Fatalf("expected invalid role failure, got %v", err)
+	}
+	var invalidMedia = ReportOutputFile{DocumentsDirectory: dir, Filename: "report.md", Path: path, Role: ReportDocumentRoleMain, MediaType: "text/plain", SavedAt: savedAt}
+	if err := invalidMedia.Validate(); err == nil || !strings.Contains(err.Error(), "unsupported report output media type") {
+		t.Fatalf("expected invalid media failure, got %v", err)
+	}
+	var relErrorPath = ReportOutputFile{DocumentsDirectory: string([]byte{0}), Filename: "report.md", Path: path, Role: ReportDocumentRoleMain, MediaType: ReportMediaTypeMarkdown, SavedAt: savedAt}
+	if err := relErrorPath.Validate(); err == nil || !strings.Contains(err.Error(), "inside documents directory") {
+		t.Fatalf("expected path relation failure, got %v", err)
+	}
+}
+
 // TestNewCapitalGainsReportValidatesNestedContent verifies that the top-level
 // report helper rejects invalid nested rows.
 // Authored by: OpenCode
 func TestNewCapitalGainsReportValidatesNestedContent(t *testing.T) {
 	t.Parallel()
 
-	request, err := NewReportRequest(2024, CostBasisMethodHIFO, ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
+	request, err := NewReportRequest(2024, CostBasisMethodHIFO, ReportBaseCurrencyUSD, ReportOutputFormatMarkdown, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
@@ -333,7 +471,7 @@ func TestNewCapitalGainsReportValidatesNestedContent(t *testing.T) {
 func TestNewCapitalGainsReportRequiresSupportedCalculationCurrency(t *testing.T) {
 	t.Parallel()
 
-	var request, requestErr = NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
+	var request, requestErr = NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, ReportOutputFormatMarkdown, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
 	if requestErr != nil {
 		t.Fatalf("new report request: %v", requestErr)
 	}
@@ -472,7 +610,7 @@ func TestReportConstructorsCloneOptionalDetailDecimals(t *testing.T) {
 			}},
 		}},
 	}}
-	var request, requestErr = NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
+	var request, requestErr = NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, ReportOutputFormatMarkdown, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
 	if requestErr != nil {
 		t.Fatalf("new report request: %v", requestErr)
 	}
@@ -603,12 +741,12 @@ func TestReferenceAndDetailValidationGuardrails(t *testing.T) {
 func TestReportDocumentAndOutputValidation(t *testing.T) {
 	t.Parallel()
 
-	_, err := NewReportDocument(ReportDocumentType("html"), "# Report\n", 2024, CostBasisMethodFIFO, time.Now())
+	_, err := NewReportDocument(ReportDocumentType("html"), ReportDocumentRoleMain, []byte("# Report\n"), 2024, CostBasisMethodFIFO, time.Now())
 	if err == nil || !strings.Contains(err.Error(), "unsupported report document type") {
 		t.Fatalf("expected invalid document type error, got %v", err)
 	}
 
-	document, err := NewReportDocument(ReportDocumentTypeMarkdown, "# Report\n", 2024, CostBasisMethodFIFO, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
+	document, err := NewReportDocument(ReportDocumentTypeMarkdown, ReportDocumentRoleMain, []byte("# Report\n"), 2024, CostBasisMethodFIFO, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report document: %v", err)
 	}
@@ -616,17 +754,177 @@ func TestReportDocumentAndOutputValidation(t *testing.T) {
 		t.Fatalf("validate report document: %v", err)
 	}
 
-	_, err = NewReportOutputFile("/tmp/Documents", "report.md", "/tmp/Documents/report.md", time.Now(), false, "open failed")
-	if err == nil || !strings.Contains(err.Error(), "open error requires an open request") {
-		t.Fatalf("expected open error validation failure, got %v", err)
+	_, err = NewReportOutputFile("/tmp/Documents", "report.md", "/tmp/report.md", ReportDocumentRoleMain, ReportMediaTypeMarkdown, time.Now())
+	if err == nil || !strings.Contains(err.Error(), "inside documents directory") {
+		t.Fatalf("expected path scope validation failure, got %v", err)
 	}
 
-	outputFile, err := NewReportOutputFile("/tmp/Documents", "report.md", "/tmp/Documents/report.md", time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC), true, "open failed")
+	outputFile, err := NewReportOutputFile("/tmp/Documents", "report.md", "/tmp/Documents/report.md", ReportDocumentRoleMain, ReportMediaTypeMarkdown, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report output file: %v", err)
 	}
 	if err = outputFile.Validate(); err != nil {
 		t.Fatalf("validate report output file: %v", err)
+	}
+
+	pdfDocument, err := NewReportDocument(ReportDocumentTypePDF, ReportDocumentRoleCombined, []byte("%PDF-1.7"), 2024, CostBasisMethodFIFO, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("new PDF report document: %v", err)
+	}
+	if err = pdfDocument.Validate(); err != nil {
+		t.Fatalf("validate PDF report document: %v", err)
+	}
+	var payload = []byte("%PDF-1.7")
+	var copiedDocument, copyErr = NewReportDocument(ReportDocumentTypePDF, ReportDocumentRoleCombined, payload, 2024, CostBasisMethodFIFO, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
+	if copyErr != nil {
+		t.Fatalf("new copied PDF report document: %v", copyErr)
+	}
+	payload[0] = '!'
+	if string(copiedDocument.Content) != "%PDF-1.7" {
+		t.Fatalf("expected report document content to be independent of input mutation, got %q", copiedDocument.Content)
+	}
+
+	_, err = NewReportDocument(ReportDocumentTypePDF, ReportDocumentRoleMain, []byte("%PDF-1.7"), 2024, CostBasisMethodFIFO, time.Now())
+	if err == nil || !strings.Contains(err.Error(), "pdf report document role must be combined") {
+		t.Fatalf("expected PDF role validation failure, got %v", err)
+	}
+}
+
+// TestValidateRenderedDocumentsValidatesBundleShapeAndMetadata verifies that
+// output formats reject incomplete document roles and inconsistent report
+// metadata before output files are reserved.
+// Authored by: OpenCode
+func TestValidateRenderedDocumentsValidatesBundleShapeAndMetadata(t *testing.T) {
+	t.Parallel()
+
+	var generatedAt = time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC)
+	var main, mainErr = NewReportDocument(ReportDocumentTypeMarkdown, ReportDocumentRoleMain, []byte("# Report\n"), 2024, CostBasisMethodFIFO, generatedAt)
+	if mainErr != nil {
+		t.Fatalf("new main document: %v", mainErr)
+	}
+	var annex, annexErr = NewReportDocument(ReportDocumentTypeMarkdown, ReportDocumentRoleAnnex, []byte("# Annex\n"), 2024, CostBasisMethodFIFO, generatedAt)
+	if annexErr != nil {
+		t.Fatalf("new annex document: %v", annexErr)
+	}
+	var pdf, pdfErr = NewReportDocument(ReportDocumentTypePDF, ReportDocumentRoleCombined, []byte("%PDF-1.7"), 2024, CostBasisMethodFIFO, generatedAt)
+	if pdfErr != nil {
+		t.Fatalf("new PDF document: %v", pdfErr)
+	}
+
+	var testCases = []struct {
+		name         string
+		outputFormat ReportOutputFormat
+		documents    []ReportDocument
+		want         string
+	}{
+		{name: "invalid format", outputFormat: ReportOutputFormat("html"), documents: []ReportDocument{main}, want: "unsupported report output format"},
+		{name: "markdown count", outputFormat: ReportOutputFormatMarkdown, documents: []ReportDocument{main}, want: "exactly two documents"},
+		{name: "markdown main", outputFormat: ReportOutputFormatMarkdown, documents: []ReportDocument{annex, annex}, want: "document 0 must be the main"},
+		{name: "markdown annex", outputFormat: ReportOutputFormatMarkdown, documents: []ReportDocument{main, main}, want: "document 1 must be the Annex"},
+		{name: "pdf count", outputFormat: ReportOutputFormatPDF, documents: []ReportDocument{pdf, pdf}, want: "exactly one document"},
+		{name: "pdf combined", outputFormat: ReportOutputFormatPDF, documents: []ReportDocument{main}, want: "must be the combined PDF document"},
+		{name: "year mismatch", outputFormat: ReportOutputFormatMarkdown, documents: []ReportDocument{main, func() ReportDocument { var document = annex; document.Year = 2025; return document }()}, want: "year does not match"},
+		{name: "method mismatch", outputFormat: ReportOutputFormatMarkdown, documents: []ReportDocument{main, func() ReportDocument {
+			var document = annex
+			document.CostBasisMethod = CostBasisMethodLIFO
+			return document
+		}()}, want: "cost basis method does not match"},
+		{name: "timestamp mismatch", outputFormat: ReportOutputFormatMarkdown, documents: []ReportDocument{main, func() ReportDocument {
+			var document = annex
+			document.GeneratedAt = generatedAt.Add(time.Second)
+			return document
+		}()}, want: "generated-at timestamp does not match"},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var err = ValidateRenderedDocuments(testCase.outputFormat, testCase.documents)
+			if err == nil || !strings.Contains(err.Error(), testCase.want) {
+				t.Fatalf("expected error containing %q, got %v", testCase.want, err)
+			}
+		})
+	}
+
+	if err := ValidateRenderedDocuments(ReportOutputFormatMarkdown, []ReportDocument{main, annex}); err != nil {
+		t.Fatalf("validate Markdown documents: %v", err)
+	}
+	if err := ValidateRenderedDocuments(ReportOutputFormatPDF, []ReportDocument{pdf}); err != nil {
+		t.Fatalf("validate PDF document: %v", err)
+	}
+}
+
+// TestReportDocumentRequiresExplicitMarkdownRole verifies bundle documents do
+// not infer a compatibility role from their type.
+// Authored by: OpenCode
+func TestReportDocumentRequiresExplicitMarkdownRole(t *testing.T) {
+	t.Parallel()
+
+	var document = ReportDocument{
+		DocumentType:    ReportDocumentTypeMarkdown,
+		Content:         []byte("# Report\n"),
+		Year:            2024,
+		CostBasisMethod: CostBasisMethodFIFO,
+		GeneratedAt:     time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC),
+	}
+	if err := document.Validate(); err == nil {
+		t.Fatal("expected blank Markdown role to fail validation")
+	}
+}
+
+// TestAuditAnnexAndOutputBundleValidation verifies the foundational Annex 1
+// shell and saved-output bundle contracts.
+// Authored by: OpenCode
+func TestAuditAnnexAndOutputBundleValidation(t *testing.T) {
+	t.Parallel()
+
+	var annex = DefaultAuditAnnex()
+	if err := annex.Validate(); err != nil {
+		t.Fatalf("validate default audit annex: %v", err)
+	}
+	if annex.Title != AuditAnnexTitle() {
+		t.Fatalf("unexpected audit annex title: %q", annex.Title)
+	}
+	annex.SectionOrder[0] = AuditAnnexSectionCurrencyConversionAudit
+	if err := DefaultAuditAnnex().Validate(); err != nil {
+		t.Fatalf("default audit annex must not share section-order backing array: %v", err)
+	}
+
+	_, err := NewAuditAnnex("Audit", RequiredAuditAnnexSectionOrder())
+	if err == nil || !strings.Contains(err.Error(), "audit annex title") {
+		t.Fatalf("expected title validation failure, got %v", err)
+	}
+	_, err = NewAuditAnnex(AuditAnnexTitle(), []AuditAnnexSection{AuditAnnexSectionCurrencyConversionAudit, AuditAnnexSectionPerAssetReport})
+	if err == nil || !strings.Contains(err.Error(), "section order") {
+		t.Fatalf("expected section order validation failure, got %v", err)
+	}
+
+	var savedAt = time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC)
+	var mainFile, mainErr = NewReportOutputFile("/tmp/Documents", "report.md", "/tmp/Documents/report.md", ReportDocumentRoleMain, ReportMediaTypeMarkdown, savedAt)
+	if mainErr != nil {
+		t.Fatalf("new main output file: %v", mainErr)
+	}
+	var annexFile, annexErr = NewReportOutputFile("/tmp/Documents", "report-annex-1.md", "/tmp/Documents/report-annex-1.md", ReportDocumentRoleAnnex, ReportMediaTypeMarkdown, savedAt)
+	if annexErr != nil {
+		t.Fatalf("new annex output file: %v", annexErr)
+	}
+	var pdfFile, pdfErr = NewReportOutputFile("/tmp/Documents", "report.pdf", "/tmp/Documents/report.pdf", ReportDocumentRoleCombined, ReportMediaTypePDF, savedAt)
+	if pdfErr != nil {
+		t.Fatalf("new PDF output file: %v", pdfErr)
+	}
+
+	if _, err = NewReportOutputBundle(ReportOutputFormatMarkdown, []ReportOutputFile{mainFile, annexFile}, savedAt, false, ""); err != nil {
+		t.Fatalf("new Markdown output bundle: %v", err)
+	}
+	if _, err = NewReportOutputBundle(ReportOutputFormatPDF, []ReportOutputFile{pdfFile}, savedAt, true, "open failed"); err != nil {
+		t.Fatalf("new PDF output bundle with open warning: %v", err)
+	}
+	if _, err = NewReportOutputBundle(ReportOutputFormatMarkdown, []ReportOutputFile{mainFile}, savedAt, false, ""); err == nil || !strings.Contains(err.Error(), "exactly two files") {
+		t.Fatalf("expected Markdown bundle file-count failure, got %v", err)
+	}
+	if _, err = NewReportOutputBundle(ReportOutputFormatPDF, []ReportOutputFile{mainFile}, savedAt, false, ""); err == nil || !strings.Contains(err.Error(), "combined") {
+		t.Fatalf("expected PDF bundle role failure, got %v", err)
+	}
+	if _, err = NewReportOutputBundle(ReportOutputFormatPDF, []ReportOutputFile{pdfFile}, savedAt, false, "open failed"); err == nil || !strings.Contains(err.Error(), "open error requires an open request") {
+		t.Fatalf("expected bundle open error validation failure, got %v", err)
 	}
 }
 
@@ -636,7 +934,7 @@ func TestReportDocumentAndOutputValidation(t *testing.T) {
 func TestReportDocumentValidationGuardrails(t *testing.T) {
 	t.Parallel()
 
-	request, err := NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
+	request, err := NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, ReportOutputFormatMarkdown, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
 	if err != nil {
 		t.Fatalf("new report request: %v", err)
 	}
@@ -654,12 +952,12 @@ func TestReportDocumentValidationGuardrails(t *testing.T) {
 		t.Fatalf("expected invalid yearly net total error, got %v", err)
 	}
 
-	_, err = NewReportDocument(ReportDocumentTypeMarkdown, "   ", 2024, CostBasisMethodFIFO, time.Now())
+	_, err = NewReportDocument(ReportDocumentTypeMarkdown, ReportDocumentRoleMain, []byte("   "), 2024, CostBasisMethodFIFO, time.Now())
 	if err == nil || !strings.Contains(err.Error(), "report document content is required") {
 		t.Fatalf("expected missing content error, got %v", err)
 	}
 
-	_, err = NewReportDocument(ReportDocumentTypeMarkdown, "# Report\n", 2024, CostBasisMethod("bad"), time.Now())
+	_, err = NewReportDocument(ReportDocumentTypeMarkdown, ReportDocumentRoleMain, []byte("# Report\n"), 2024, CostBasisMethod("bad"), time.Now())
 	if err == nil || !strings.Contains(err.Error(), "report document cost basis method") {
 		t.Fatalf("expected invalid report document method error, got %v", err)
 	}
@@ -732,7 +1030,7 @@ func TestReportConstructorsAndValidationHelpersCoverRemainingBranches(t *testing
 		t.Fatalf("expected invalid basis match to fail, got %v", err)
 	}
 
-	var request, requestErr = NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
+	var request, requestErr = NewReportRequest(2024, CostBasisMethodFIFO, ReportBaseCurrencyUSD, ReportOutputFormatMarkdown, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
 	if requestErr != nil {
 		t.Fatalf("new report request: %v", requestErr)
 	}
@@ -832,20 +1130,20 @@ func TestReportConstructorsAndValidationHelpersCoverRemainingBranches(t *testing
 		t.Fatalf("expected invalid nested detail section to fail, got %v", err)
 	}
 
-	if err = (ReportDocument{DocumentType: ReportDocumentTypeMarkdown, Content: "# Report\n", Year: 0, CostBasisMethod: CostBasisMethodFIFO, GeneratedAt: time.Now()}).Validate(); err == nil || !strings.Contains(err.Error(), "report document year must be greater than zero") {
+	if err = (ReportDocument{DocumentType: ReportDocumentTypeMarkdown, Role: ReportDocumentRoleMain, Content: []byte("# Report\n"), Year: 0, CostBasisMethod: CostBasisMethodFIFO, GeneratedAt: time.Now()}).Validate(); err == nil || !strings.Contains(err.Error(), "report document year must be greater than zero") {
 		t.Fatalf("expected missing document year to fail, got %v", err)
 	}
-	if err = (ReportDocument{DocumentType: ReportDocumentTypeMarkdown, Content: "# Report\n", Year: 2024, CostBasisMethod: CostBasisMethodFIFO}).Validate(); err == nil || !strings.Contains(err.Error(), "generated-at timestamp is required") {
+	if err = (ReportDocument{DocumentType: ReportDocumentTypeMarkdown, Role: ReportDocumentRoleMain, Content: []byte("# Report\n"), Year: 2024, CostBasisMethod: CostBasisMethodFIFO}).Validate(); err == nil || !strings.Contains(err.Error(), "generated-at timestamp is required") {
 		t.Fatalf("expected missing document timestamp to fail, got %v", err)
 	}
 
-	if err = (ReportOutputFile{DocumentsDirectory: "/tmp/docs", Filename: "report.md", Path: "/tmp/docs/report.md", OpenRequested: true}).Validate(); err == nil || !strings.Contains(err.Error(), "saved-at timestamp is required") {
+	if err = (ReportOutputFile{DocumentsDirectory: "/tmp/docs", Filename: "report.md", Path: "/tmp/docs/report.md", Role: ReportDocumentRoleMain, MediaType: ReportMediaTypeMarkdown}).Validate(); err == nil || !strings.Contains(err.Error(), "saved-at timestamp is required") {
 		t.Fatalf("expected missing output timestamp to fail, got %v", err)
 	}
-	if err = (ReportOutputFile{Filename: "report.md", Path: "/tmp/docs/report.md", SavedAt: time.Now()}).Validate(); err == nil || !strings.Contains(err.Error(), "documents directory") {
+	if err = (ReportOutputFile{Filename: "report.md", Path: "/tmp/docs/report.md", Role: ReportDocumentRoleMain, MediaType: ReportMediaTypeMarkdown, SavedAt: time.Now()}).Validate(); err == nil || !strings.Contains(err.Error(), "documents directory") {
 		t.Fatalf("expected missing output documents directory to fail, got %v", err)
 	}
-	if err = (ReportOutputFile{DocumentsDirectory: "/tmp/docs", Filename: "report.md", SavedAt: time.Now()}).Validate(); err == nil || !strings.Contains(err.Error(), "output path") {
+	if err = (ReportOutputFile{DocumentsDirectory: "/tmp/docs", Filename: "report.md", Role: ReportDocumentRoleMain, MediaType: ReportMediaTypeMarkdown, SavedAt: time.Now()}).Validate(); err == nil || !strings.Contains(err.Error(), "output path") {
 		t.Fatalf("expected missing output path to fail, got %v", err)
 	}
 
@@ -925,11 +1223,10 @@ func TestCloneExchangeRateEvidenceCopiesRateValues(t *testing.T) {
 	}
 }
 
-// TestBasisMatchValidationAndCloneOptionalDecimalCoverRemainingBranches
-// verifies the remaining basis-match guardrails and optional-decimal clone
-// branches.
+// TestBasisMatchValidationGuardrails verifies the remaining basis-match
+// guardrails.
 // Authored by: OpenCode
-func TestBasisMatchValidationAndCloneOptionalDecimalCoverRemainingBranches(t *testing.T) {
+func TestBasisMatchValidationGuardrails(t *testing.T) {
 	t.Parallel()
 
 	if err := (BasisMatch{AcquisitionSourceID: "buy-1"}).Validate(); err == nil || !strings.Contains(err.Error(), "matched quantity") {
@@ -945,19 +1242,6 @@ func TestBasisMatchValidationAndCloneOptionalDecimalCoverRemainingBranches(t *te
 		t.Fatalf("expected invalid matched gain or loss to fail, got %v", err)
 	}
 
-	if cloned := cloneOptionalDecimal(nil); cloned != nil {
-		t.Fatalf("expected nil optional decimal clone to stay nil, got %#v", cloned)
-	}
-
-	var original = mustReportDecimal(t, "1.5")
-	var cloned = cloneOptionalDecimal(&original)
-	if cloned == nil || cloned == &original || cloned.Cmp(&original) != 0 {
-		t.Fatalf("expected optional decimal clone to copy the original value, got original=%#v cloned=%#v", original, cloned)
-	}
-	original = mustReportDecimal(t, "2")
-	if got, err := decimalsupport.CanonicalStringPointer(cloned); err != nil || got != "1.5" {
-		t.Fatalf("expected cloned optional decimal to remain independent, got %q err=%v", got, err)
-	}
 }
 
 // TestConversionAuditValidationGuardrails verifies conversion audit model
@@ -1327,7 +1611,7 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 		t.Fatalf("expected audit invalid nested amount rejection, got %v", err)
 	}
 
-	var report = CapitalGainsReport{Year: 2024, CostBasisMethod: CostBasisMethodFIFO, GeneratedAt: activityDate, ReportCalculationCurrency: "USD", YearlyNetTotal: mustReportDecimal(t, "0")}
+	var report = CapitalGainsReport{Year: 2024, CostBasisMethod: CostBasisMethodFIFO, GeneratedAt: activityDate, ReportCalculationCurrency: "USD", YearlyNetTotal: mustReportDecimal(t, "0"), AuditAnnex: DefaultAuditAnnex()}
 	invalidEvidence = evidence
 	invalidEvidence.RateValue = mustReportDecimal(t, "0")
 	report.RateSources = []ExchangeRateEvidence{invalidEvidence}
@@ -1344,19 +1628,19 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 	report.ReportCalculationCurrency = "USD"
 	invalidEntry = entry
 	invalidEntry.SourceID = " "
-	report.ConversionAuditEntries = []ConversionAuditEntry{invalidEntry}
+	report.AuditAnnex.ConversionAuditEntries = []ConversionAuditEntry{invalidEntry}
 	if err := report.Validate(); err == nil || !strings.Contains(err.Error(), "conversion audit entry 0") {
 		t.Fatalf("expected invalid report audit entry rejection, got %v", err)
 	}
 
-	report.ConversionAuditEntries = []ConversionAuditEntry{entry}
+	report.AuditAnnex.ConversionAuditEntries = []ConversionAuditEntry{entry}
 	report.RateSources = nil
 	if err := report.Validate(); err == nil || !strings.Contains(err.Error(), "matching rate source") {
 		t.Fatalf("expected missing report rate source rejection, got %v", err)
 	}
 
 	report.RateSources = []ExchangeRateEvidence{evidence}
-	report.ConversionAuditEntries = []ConversionAuditEntry{entry}
+	report.AuditAnnex.ConversionAuditEntries = []ConversionAuditEntry{entry}
 	report.DetailSections = []AssetDetailSection{{
 		AssetIdentityKey:    "asset-btc",
 		DisplayLabel:        "BTC",
@@ -1388,7 +1672,7 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 
 	report.ReportCalculationCurrency = ""
 	report.RateSources = []ExchangeRateEvidence{evidence}
-	report.ConversionAuditEntries = nil
+	report.AuditAnnex.ConversionAuditEntries = nil
 	report.DetailSections = nil
 	if err := report.Validate(); err == nil || !strings.Contains(err.Error(), "calculation currency") {
 		t.Fatalf("expected empty report currency rejection, got %v", err)
@@ -1402,7 +1686,7 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 	sameCalendarEntry.ActivityDate = time.Date(2024, time.January, 5, 9, 0, 0, 0, time.UTC)
 	sameCalendarEntry.RateDate = time.Date(2024, time.January, 5, 7, 0, 0, 0, time.UTC)
 	report.RateSources = []ExchangeRateEvidence{sameCalendarSource}
-	report.ConversionAuditEntries = []ConversionAuditEntry{sameCalendarEntry}
+	report.AuditAnnex.ConversionAuditEntries = []ConversionAuditEntry{sameCalendarEntry}
 	if !report.hasMatchingRateSource(sameCalendarEntry) {
 		t.Fatalf("expected same calendar dates in different zones to match rate source")
 	}
@@ -1411,6 +1695,237 @@ func TestConversionAuditValidationGuardrails(t *testing.T) {
 	if report.hasMatchingRateSource(invalidEntry) {
 		t.Fatalf("expected report without audit source fields to report no direct match")
 	}
+}
+
+// TestReportModelCoverageGapBranches verifies narrow constructor and validation
+// branches that are otherwise only reached by malformed renderer/output wiring.
+// Authored by: OpenCode
+func TestReportModelCoverageGapBranches(t *testing.T) {
+	t.Parallel()
+
+	var savedAt = time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC)
+	var mainFile, mainErr = NewReportOutputFile("/tmp/Documents", "report.md", "/tmp/Documents/report.md", ReportDocumentRoleMain, ReportMediaTypeMarkdown, savedAt)
+	if mainErr != nil {
+		t.Fatalf("new main output file: %v", mainErr)
+	}
+	var annexFile, annexErr = NewReportOutputFile("/tmp/Documents", "report-annex.md", "/tmp/Documents/report-annex.md", ReportDocumentRoleAnnex, ReportMediaTypeMarkdown, savedAt)
+	if annexErr != nil {
+		t.Fatalf("new annex output file: %v", annexErr)
+	}
+	var pdfFile, pdfErr = NewReportOutputFile("/tmp/Documents", "report.pdf", "/tmp/Documents/report.pdf", ReportDocumentRoleCombined, ReportMediaTypePDF, savedAt)
+	if pdfErr != nil {
+		t.Fatalf("new PDF output file: %v", pdfErr)
+	}
+
+	if err := (ReportDocument{DocumentType: ReportDocumentTypePDF, Content: []byte("%PDF"), Year: 2024, CostBasisMethod: CostBasisMethodFIFO, GeneratedAt: savedAt}).Validate(); err == nil || !strings.Contains(err.Error(), "report document role") {
+		t.Fatalf("expected missing PDF document role failure, got %v", err)
+	}
+
+	if err := (ReportOutputBundle{OutputFormat: ReportOutputFormat("html"), SavedAt: savedAt}).Validate(); err == nil || !strings.Contains(err.Error(), "report output bundle format") {
+		t.Fatalf("expected invalid bundle format failure, got %v", err)
+	}
+	if err := (ReportOutputBundle{OutputFormat: ReportOutputFormatMarkdown, Files: []ReportOutputFile{mainFile, annexFile}}).Validate(); err == nil || !strings.Contains(err.Error(), "saved-at timestamp") {
+		t.Fatalf("expected missing bundle saved-at failure, got %v", err)
+	}
+	var invalidFile = mainFile
+	invalidFile.Path = ""
+	if err := (ReportOutputBundle{OutputFormat: ReportOutputFormatMarkdown, Files: []ReportOutputFile{invalidFile, annexFile}, SavedAt: savedAt}).Validate(); err == nil || !strings.Contains(err.Error(), "file 0") {
+		t.Fatalf("expected nested bundle file failure, got %v", err)
+	}
+	if err := (ReportOutputBundle{OutputFormat: ReportOutputFormat("html")}).validateFileShape(); err == nil || !strings.Contains(err.Error(), "unsupported report output format") {
+		t.Fatalf("expected direct bundle shape format failure, got %v", err)
+	}
+	var wrongAnnexRole = annexFile
+	wrongAnnexRole.Role = ReportDocumentRoleMain
+	if err := (ReportOutputBundle{OutputFormat: ReportOutputFormatMarkdown, Files: []ReportOutputFile{mainFile, wrongAnnexRole}, SavedAt: savedAt}).Validate(); err == nil || !strings.Contains(err.Error(), "file 1 must be annex") {
+		t.Fatalf("expected Markdown annex-role failure, got %v", err)
+	}
+	var wrongMainMedia = mainFile
+	wrongMainMedia.MediaType = ReportMediaTypePDF
+	if err := (ReportOutputBundle{OutputFormat: ReportOutputFormatMarkdown, Files: []ReportOutputFile{wrongMainMedia, annexFile}, SavedAt: savedAt}).Validate(); err == nil || !strings.Contains(err.Error(), "media type") {
+		t.Fatalf("expected Markdown media type failure, got %v", err)
+	}
+	if err := (ReportOutputBundle{OutputFormat: ReportOutputFormatPDF, Files: []ReportOutputFile{pdfFile, pdfFile}, SavedAt: savedAt}).Validate(); err == nil || !strings.Contains(err.Error(), "exactly one file") {
+		t.Fatalf("expected PDF file-count failure, got %v", err)
+	}
+	var wrongPDFMedia = pdfFile
+	wrongPDFMedia.MediaType = ReportMediaTypeMarkdown
+	if err := (ReportOutputBundle{OutputFormat: ReportOutputFormatPDF, Files: []ReportOutputFile{wrongPDFMedia}, SavedAt: savedAt}).Validate(); err == nil || !strings.Contains(err.Error(), "media type") {
+		t.Fatalf("expected PDF media type failure, got %v", err)
+	}
+}
+
+// TestCloneAuditAnnexCopiesNestedSlices verifies the audit-annex clone does not
+// share mutable nested slices or optional decimal pointers with the source.
+// Authored by: OpenCode
+func TestCloneAuditAnnexCopiesNestedSlices(t *testing.T) {
+	t.Parallel()
+
+	var activityDate = time.Date(2024, time.January, 5, 0, 0, 0, 0, time.UTC)
+	var unitPrice = decimalPointer(t, "10")
+	var grossValue = decimalPointer(t, "10")
+	var amount = ConvertedActivityAmount{
+		SourceID:           "eur-buy-1",
+		AmountKind:         ConvertedAmountKindGrossValue,
+		OriginalCurrency:   "EUR",
+		OriginalAmount:     mustReportDecimal(t, "100"),
+		ReportBaseCurrency: ReportBaseCurrencyUSD,
+		ConvertedAmount:    mustReportDecimal(t, "110"),
+		ConversionStatus:   ConversionStatusConverted,
+	}
+	var annex = AuditAnnex{
+		Title:        AuditAnnexTitle(),
+		SectionOrder: RequiredAuditAnnexSectionOrder(),
+		PerAssetAuditSections: []PerAssetAuditSection{{
+			AssetIdentityKey: "asset-btc",
+			DisplayLabel:     "BTC",
+			Entries: []AuditActivityEntry{{
+				SourceID:              "eur-buy-1",
+				OccurredAt:            activityDate,
+				ActivityType:          ActivityTypeBuy,
+				Quantity:              mustReportDecimal(t, "1"),
+				UnitPrice:             unitPrice,
+				GrossValue:            grossValue,
+				CalculationCurrency:   "USD",
+				QuantityAfterActivity: mustReportDecimal(t, "1"),
+				BasisAfterActivity:    mustReportDecimal(t, "110"),
+			}},
+		}},
+		ConversionAuditEntries: []ConversionAuditEntry{{
+			SourceID:           "eur-buy-1",
+			AssetLabel:         "BTC",
+			ActivityDate:       activityDate,
+			SourceCurrency:     "EUR",
+			ReportBaseCurrency: ReportBaseCurrencyUSD,
+			RateDate:           activityDate,
+			RateAuthority:      RateAuthorityFederalReserve,
+			RateKind:           "noon buying rate",
+			RateValue:          mustReportDecimal(t, "1.1"),
+			QuoteDirection:     QuoteDirectionBasePerSource,
+			Amounts:            []ConvertedActivityAmount{amount},
+		}},
+	}
+
+	var cloned = cloneAuditAnnex(annex)
+	annex.SectionOrder[0] = AuditAnnexSectionCurrencyConversionAudit
+	annex.PerAssetAuditSections[0].Entries[0].SourceID = "mutated"
+	annex.ConversionAuditEntries[0].Amounts[0].SourceID = "mutated"
+	*unitPrice = mustReportDecimal(t, "20")
+	*grossValue = mustReportDecimal(t, "30")
+
+	if cloned.SectionOrder[0] != AuditAnnexSectionPerAssetReport {
+		t.Fatalf("expected cloned section order to be independent, got %#v", cloned.SectionOrder)
+	}
+	if cloned.PerAssetAuditSections[0].Entries[0].SourceID != "eur-buy-1" {
+		t.Fatalf("expected cloned audit activity entries to be independent, got %#v", cloned.PerAssetAuditSections[0].Entries[0])
+	}
+	if cloned.ConversionAuditEntries[0].Amounts[0].SourceID != "eur-buy-1" {
+		t.Fatalf("expected cloned conversion audit amounts to be independent, got %#v", cloned.ConversionAuditEntries[0].Amounts[0])
+	}
+	assertOptionalDecimalString(t, cloned.PerAssetAuditSections[0].Entries[0].UnitPrice, "10")
+	assertOptionalDecimalString(t, cloned.PerAssetAuditSections[0].Entries[0].GrossValue, "10")
+}
+
+// TestAuditModelRemainingValidationBranches verifies focused guardrails that are
+// otherwise only reached by malformed Annex 1 or renderer/output wiring.
+// Authored by: OpenCode
+func TestAuditModelRemainingValidationBranches(t *testing.T) {
+	t.Parallel()
+
+	var activityDate = time.Date(2024, time.January, 5, 0, 0, 0, 0, time.UTC)
+	var validEntry = AuditActivityEntry{
+		SourceID:               "buy-1",
+		OccurredAt:             activityDate,
+		ActivityType:           ActivityTypeBuy,
+		Quantity:               mustReportDecimal(t, "1"),
+		UnitPrice:              decimalPointer(t, "10"),
+		GrossValue:             decimalPointer(t, "10"),
+		FeeAmount:              decimalPointer(t, "0"),
+		CalculationCurrency:    "USD",
+		QuantityAfterActivity:  mustReportDecimal(t, "1"),
+		BasisAfterActivity:     mustReportDecimal(t, "10"),
+		AllocatedBasis:         decimalPointer(t, "0"),
+		NetLiquidationProceeds: decimalPointer(t, "0"),
+		GainOrLoss:             decimalPointer(t, "0"),
+		ConversionStatus:       ConversionStatusConverted,
+	}
+
+	var testCases = []struct {
+		name   string
+		entry  AuditActivityEntry
+		wanted string
+	}{
+		{name: "missing timestamp", entry: auditEntryWith(validEntry, func(entry *AuditActivityEntry) { entry.OccurredAt = time.Time{} }), wanted: "occurred-at timestamp"},
+		{name: "activity type", entry: auditEntryWith(validEntry, func(entry *AuditActivityEntry) { entry.ActivityType = ActivityType("swap") }), wanted: "activity type"},
+		{name: "unit price", entry: auditEntryWith(validEntry, func(entry *AuditActivityEntry) { entry.UnitPrice = &reportInvalidDecimal }), wanted: "unit price"},
+		{name: "gross value", entry: auditEntryWith(validEntry, func(entry *AuditActivityEntry) { entry.GrossValue = &reportInvalidDecimal }), wanted: "gross value"},
+		{name: "fee amount", entry: auditEntryWith(validEntry, func(entry *AuditActivityEntry) { entry.FeeAmount = &reportInvalidDecimal }), wanted: "fee amount"},
+		{name: "calculation currency", entry: auditEntryWith(validEntry, func(entry *AuditActivityEntry) { entry.CalculationCurrency = " " }), wanted: "calculation currency"},
+		{name: "quantity after", entry: auditEntryWith(validEntry, func(entry *AuditActivityEntry) { entry.QuantityAfterActivity = mustReportDecimal(t, "-1") }), wanted: "quantity after activity"},
+		{name: "basis after", entry: auditEntryWith(validEntry, func(entry *AuditActivityEntry) { entry.BasisAfterActivity = mustReportDecimal(t, "-1") }), wanted: "basis after activity"},
+		{name: "allocated basis", entry: auditEntryWith(validEntry, func(entry *AuditActivityEntry) { entry.AllocatedBasis = &reportInvalidDecimal }), wanted: "allocated basis"},
+		{name: "net proceeds", entry: auditEntryWith(validEntry, func(entry *AuditActivityEntry) { entry.NetLiquidationProceeds = &reportInvalidDecimal }), wanted: "net liquidation proceeds"},
+		{name: "gain or loss", entry: auditEntryWith(validEntry, func(entry *AuditActivityEntry) { entry.GainOrLoss = &reportInvalidDecimal }), wanted: "gain or loss"},
+		{name: "conversion status", entry: auditEntryWith(validEntry, func(entry *AuditActivityEntry) { entry.ConversionStatus = ConversionStatus("unknown") }), wanted: "conversion status"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			var err = testCase.entry.Validate()
+			if err == nil || !strings.Contains(err.Error(), testCase.wanted) {
+				t.Fatalf("expected audit entry error containing %q, got %v", testCase.wanted, err)
+			}
+		})
+	}
+
+	if _, err := NewPerAssetAuditSection("asset-btc", " ", nil); err == nil || !strings.Contains(err.Error(), "display label") {
+		t.Fatalf("expected per-asset display label rejection, got %v", err)
+	}
+	if _, err := NewAuditAnnex(AuditAnnexTitle(), RequiredAuditAnnexSectionOrder()); err != nil {
+		t.Fatalf("expected valid audit annex constructor to succeed: %v", err)
+	}
+	if err := (AuditAnnex{Title: AuditAnnexTitle(), SectionOrder: []AuditAnnexSection{AuditAnnexSectionPerAssetReport}}).Validate(); err == nil || !strings.Contains(err.Error(), "must contain 2 sections") {
+		t.Fatalf("expected audit annex section-count rejection, got %v", err)
+	}
+	if err := (AuditAnnex{Title: AuditAnnexTitle(), SectionOrder: RequiredAuditAnnexSectionOrder(), ConversionAuditEntries: []ConversionAuditEntry{{}}}).Validate(); err == nil || !strings.Contains(err.Error(), "conversion audit entry 0") {
+		t.Fatalf("expected audit annex conversion entry rejection, got %v", err)
+	}
+
+	var report = CapitalGainsReport{Year: 2024, CostBasisMethod: CostBasisMethodFIFO, GeneratedAt: activityDate, ReportCalculationCurrency: "USD", YearlyNetTotal: mustReportDecimal(t, "0"), AuditAnnex: AuditAnnex{Title: "bad", SectionOrder: RequiredAuditAnnexSectionOrder()}}
+	if err := report.Validate(); err == nil || !strings.Contains(err.Error(), "capital gains report audit annex") {
+		t.Fatalf("expected report audit annex rejection, got %v", err)
+	}
+	if _, err := RenderActivityTypeLabel(AssetActivityRow{ActivityType: ActivityType("swap")}); err == nil || !strings.Contains(err.Error(), "unsupported activity type") {
+		t.Fatalf("expected unsupported activity label rejection, got %v", err)
+	}
+}
+
+// TestReportOutputBundleRemainingMarkdownRoleBranch verifies the first Markdown
+// bundle file must be the main report file.
+// Authored by: OpenCode
+func TestReportOutputBundleRemainingMarkdownRoleBranch(t *testing.T) {
+	t.Parallel()
+
+	var savedAt = time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC)
+	var annexFile, annexErr = NewReportOutputFile("/tmp/Documents", "report-annex.md", "/tmp/Documents/report-annex.md", ReportDocumentRoleAnnex, ReportMediaTypeMarkdown, savedAt)
+	if annexErr != nil {
+		t.Fatalf("new annex output file: %v", annexErr)
+	}
+
+	var err = (ReportOutputBundle{OutputFormat: ReportOutputFormatMarkdown, Files: []ReportOutputFile{annexFile, annexFile}, SavedAt: savedAt}).Validate()
+	if err == nil || !strings.Contains(err.Error(), "file 0 must be main") {
+		t.Fatalf("expected Markdown main-role failure, got %v", err)
+	}
+}
+
+// auditEntryWith returns a modified copy of an audit entry for validation
+// branch tests.
+// Authored by: OpenCode
+func auditEntryWith(entry AuditActivityEntry, mutate func(*AuditActivityEntry)) AuditActivityEntry {
+	mutate(&entry)
+	return entry
 }
 
 // mustReportDecimal parses one decimal literal for report-model tests.

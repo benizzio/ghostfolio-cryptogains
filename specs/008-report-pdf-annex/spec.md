@@ -29,6 +29,30 @@
 
 - Q: Are generated report files application-managed persistence requiring token-derived encryption at rest? → A: No. Generated report files are explicit user-requested exports outside the application-managed persistence boundary. The application writes them locally only when the user requests generation, does not manage them as a cache or durable application state, does not re-ingest them automatically, and must still use safe filenames, owner-local file handling, failure cleanup, and secret redaction.
 
+### Session 2026-07-05
+
+**Bugfix**: 2026-07-05 — [BUG-001] Clarified Markdown initial report detail label formatting.
+
+**Bugfix**: 2026-07-05 — [BUG-002] Clarified that PDF output must be formatted through the PDF renderer and must not render Markdown source syntax as the PDF body.
+
+### Session 2026-07-07
+
+**Bugfix**: 2026-07-07 — [BUG-003] Clarified that PDF output must use `github.com/signintech/gopdf` layout primitives for human-legible headings, styled labels, and tables instead of plain line dumping.
+
+### Session 2026-07-09
+
+**Bugfix**: 2026-07-09 — [BUG-004] Clarified landscape A4 PDF layout, table fit, non-overlapping section spacing, and section-specific PDF presentation rules.
+
+**Bugfix**: 2026-07-09 — [BUG-005] Clarified full-width balanced PDF tables, readable section spacing, and bottom-margin-safe table continuation.
+
+### Session 2026-07-10
+
+**Bugfix**: 2026-07-10 — [BUG-006] Clarified 24-point PDF subheading spacing and concise continuation labels emitted only for actual table continuations.
+
+### Session 2026-07-13
+
+**Bugfix**: 2026-07-13 — [BUG-007] Clarified independent two-minute performance measurement for each selected output format.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Choose Report Output Format (Priority: P1)
@@ -44,6 +68,11 @@ As a user generating a capital gains and losses report, I want to choose whether
 1. **Given** the user has completed report setup and selected valid report inputs, **When** the user selects PDF before generation, **Then** the report is generated as an A4 PDF file.
 2. **Given** the user has completed report setup and selected valid report inputs, **When** the user selects Markdown before generation, **Then** the report is generated in the existing Markdown format.
 3. **Given** the same report inputs are used for PDF and Markdown, **When** both reports are reviewed, **Then** shared report sections contain the same output data, explanatory text, and table content, with only format-specific page breaks, page titles, and annex placement differing.
+4. **Given** PDF output is selected, **When** the generated report is reviewed, **Then** headings, tables, emphasis, and Annex 1 content are presented as formatted PDF text and do not expose Markdown source syntax as report content.
+5. **Given** PDF output is selected, **When** the generated report is reviewed, **Then** the visible report uses a human-legible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context rather than a sequential dump of report lines.
+6. **Given** PDF output is selected, **When** the generated report is reviewed, **Then** every page uses landscape A4 layout and wide report tables remain inside the printable area with visible right padding, wrapped cell content, and no clipped columns.
+7. **Given** PDF output is selected, **When** a wide report table is rendered, **Then** it uses the available landscape printable width with equal left and right margins while retaining the required padding, wrapping, and no-clipping behavior.
+8. **Given** the deterministic 10,000-activity performance fixture, **When** Markdown and PDF reports are generated as separate selected-format requests, **Then** each request is timed and evaluated independently against the two-minute completion limit rather than combining both durations.
 
 ---
 
@@ -64,6 +93,12 @@ As a user reviewing the main capital gains and losses report, I want labels and 
 5. **Given** an asset has no activity registered during the report year, **When** the Asset Detail section is rendered, **Then** the report shows the closing-position information under the title `Historical Position` and omits the separate `Opening Position`, `In-Year Activity`, and `Closing Position` subsections for that asset.
 6. **Given** an In-Year Activity row includes a conversion status, **When** the row is rendered, **Then** the status is shown as a user-friendly label and does not expose code-style or snake_case values.
 7. **Given** an In-Year Activity row represents a zero-priced SELL activity, **When** the row is rendered, **Then** the Type value is `BLOCKCHAIN OP` instead of `SELL`.
+8. **Given** PDF output is selected, **When** the Gains-And-Losses Summary is rendered, **Then** `Overall Yearly Net Total` is the final row or footer inside the Gains-And-Losses Summary table.
+9. **Given** PDF output is selected, **When** the Rate Source Summary is rendered, **Then** it uses bold classifier label lines followed by non-bold values and does not render as a `Rate Source Summary Table`.
+10. **Given** PDF output is selected, **When** the Reference Section is rendered, **Then** it does not introduce a generated `Reference Table` subheading.
+11. **Given** PDF output is selected, **When** adjacent main-report text sections, headings, or subheadings are rendered on the same page, **Then** the `Report Calculation Currency` line, `Gains-And-Losses Summary` subtitle, `Asset Detail` headings, and `In-Year Activity` subheadings have non-overlapping vertical spacing from preceding content.
+12. ~~**Given** PDF output is selected, **When** the affected main-report section transitions are rendered on the same page, **Then** they have at least 12 points of vertical separation from preceding content.~~ **Superseded by BUG-006**: the replacement 24-point definition is specified in scenario 13.
+13. **Given** PDF output is selected, **When** the `Gains-And-Losses Summary`, `Rate Source Summary`, `Reference Section`, `Asset Detail: <asset symbol>`, or `In-Year Activity` subheading is rendered on the same page as preceding content, **Then** it has at least 24 points of vertical separation from that content.
 
 ---
 
@@ -83,6 +118,9 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 4. **Given** the Markdown format is selected, **When** the report is generated, **Then** Annex 1 is written as a separate Markdown file whose name preserves the main report filename pattern and inserts `-annex-1-` immediately before the date segment.
 5. **Given** the PDF format is selected, **When** the report is generated, **Then** Annex 1 appears in the same PDF file after a page break.
 6. **Given** a Currency Conversion Audit row includes quote direction, **When** Annex 1 is rendered, **Then** quote direction is shown as a user-friendly label and does not expose code-style or snake_case values.
+7. **Given** PDF output is selected, **When** Annex 1 renders multiple per-asset audit sections on the same page, **Then** each `Asset: <asset symbol>` subheading has sufficient top margin and does not touch or overlap the previous section's table.
+8. **Given** a PDF table continues onto another page, **When** the next row or its borders would cross the bottom printable margin, **Then** the renderer advances before drawing that row and preserves complete row content, borders, and blank bottom margin.
+9. **Given** a PDF table continues onto another page, **When** its continuation context is rendered, **Then** it uses the exact format `<section or table context> (continued)` and no continuation label is rendered when no table has continued.
 
 ### Edge Cases
 
@@ -93,6 +131,9 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - If a report has no currency conversions, Annex 1 must still include the Currency Conversion Audit section with a clear statement that no converted activity was present.
 - If a label mapping is unavailable for conversion status or quote direction, the report must fail before final output rather than exposing internal code labels to the user.
 - If PDF generation cannot complete, no incomplete or misleading final PDF report should be presented as successfully generated.
+- If a PDF renderer can emit selectable text but only as sequential dumped lines without visible heading hierarchy, styled labels, tables, rows, columns, wrapping, and continuation context, the PDF output is not a valid successful report.
+- If PDF tables, headings, or subheadings would otherwise exceed the printable area or collide with preceding content, the PDF renderer must wrap, reflow, add vertical space, or advance the page instead of clipping columns or overlapping text.
+- If a PDF table row or its borders would cross the bottom printable margin, the renderer must advance before drawing the row and preserve the required continuation context rather than clipping row content or margins.
 
 ## Requirements *(mandatory)*
 
@@ -103,7 +144,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **FR-003**: The system MUST generate PDF reports on A4-sized pages.
 - **FR-004**: The system MUST keep PDF and Markdown main report shared content aligned by preserving the same required output data, explanatory text blocks, table content, and section meanings, with differences limited to PDF pagination, PDF page titles, and Markdown annex file separation.
 - **FR-005**: The system MUST start Annex 1 on a new PDF page, MUST allow additional PDF page breaks only before a top-level section, per-asset annex section, table row, or content block that would not fit in the remaining printable page area, and MUST repeat visible section or table context on continuation pages.
-- **FR-006**: The system MUST render information classifier labels in the initial report details block in bold.
+- **FR-006**: The system MUST render information classifier labels in the initial report details block in bold. For Markdown output, the initial details list items MUST use the exact classifier label shape `- **Year:**`, `- **Cost Basis Method:**`, `- **Generated At:**`, and `- **Report Calculation Currency:**` before their values.
 - **FR-007**: The system MUST omit Gains-And-Losses Summary rows whose Net Gain Or Loss is zero.
 - **FR-008**: The system MUST render a clear empty-state message when all Gains-And-Losses Summary rows are omitted because their Net Gain Or Loss is zero.
 - **FR-009**: The system MUST render information classifier labels in the Rate Source Summary in bold.
@@ -127,6 +168,20 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **FR-027**: Generated reports and report-generation failure messages MUST NOT include Ghostfolio tokens, security tokens, bearer tokens, reusable authentication material, or other secrets.
 - **FR-028**: PDF generation and report rendering MUST run locally and MUST NOT send report data, financial data, tokens, or generated report files to any remote storage, telemetry destination, or external document-generation service as part of this feature.
 - **FR-029**: PDF generation MUST work on supported Linux, macOS, and Windows installations without requiring platform-specific font paths, user-installed fonts, a browser, or operating-system print-to-PDF support; required report text MUST use application-supplied local font data.
+- **FR-030**: When PDF output is selected, the system MUST render report-domain content through PDF-specific layout and MUST NOT use Markdown-rendered content or Markdown structural syntax, including heading markers, table pipes or separators, or bold markers, as the PDF body.
+- **FR-031**: When PDF output is selected, the system MUST use `github.com/signintech/gopdf` layout primitives for A4 page creation, application-supplied font loading, headings, styled text, table headers, table rows, table columns, wrapped cell content, and continuation context; a plain line-dump renderer is not a valid PDF implementation.
+- **FR-032**: When PDF output is selected, the system MUST generate every page using landscape A4 orientation.
+- **FR-033**: When PDF output is selected, the system MUST keep table columns inside the printable page area with visible right padding, no right-edge clipping, and wrapped cell content where values exceed the column width.
+- **FR-034**: When PDF output is selected, the system MUST maintain non-overlapping vertical spacing between adjacent text blocks, headings, subheadings, and tables, including the `Report Calculation Currency` line, `Gains-And-Losses Summary` subtitle, `Asset Detail` headings, `In-Year Activity` subheadings, and Annex 1 per-asset subheadings.
+- **FR-035**: When PDF output is selected, the system MUST render `Overall Yearly Net Total` as the final row or footer inside the Gains-And-Losses Summary table.
+- **FR-036**: When PDF output is selected, the system MUST render the Rate Source Summary as bold classifier label lines followed by non-bold values and MUST NOT render it as a table titled `Rate Source Summary Table`.
+- **FR-037**: When PDF output is selected, the system MUST NOT introduce generated helper subheadings that are not part of the report presentation contract, including `Reference Table` under the Reference Section.
+- **FR-038**: Before drawing a PDF table row or its borders, the system MUST determine whether the complete row fits inside the remaining printable height while preserving the bottom margin; otherwise it MUST advance the row to a continuation page with visible table or section context and MUST NOT clip row text, cells, borders, or the bottom margin.
+- **FR-039**: When PDF output is selected, the system MUST size each table to use the available landscape printable width with equal left and right outer margins while retaining the padding, wrapping, and no-clipping requirements of FR-033.
+- **FR-040**: ~~When PDF output is selected, the system MUST maintain at least 12 points of vertical separation at the affected transitions covered by FR-034.~~ **Superseded by BUG-006** and replaced by the 24-point definition in FR-041.
+- **FR-041**: When PDF output is selected, the system MUST maintain at least 24 points of vertical separation before the `Gains-And-Losses Summary`, `Rate Source Summary`, `Reference Section`, `Asset Detail: <asset symbol>`, and `In-Year Activity` subheadings when they follow preceding content on the same page.
+- **FR-042**: When a PDF table continues onto a new page, the system MUST render continuation context only on that continuation page, using the exact format `<section or table context> (continued)` without a `Continued: ` prefix; it MUST NOT render a continuation label when no table has continued.
+- **FR-043**: For the deterministic 10,000-activity performance scenario, the system MUST measure one selected-format report request per timing interval. Each Markdown and PDF interval MUST independently cover request validation, calculation, selected renderer execution, final save, and opener invocation, and MUST NOT aggregate elapsed time across separate output-format requests.
 
 ### Financial Calculation Evidence *(include when feature affects financial calculations)*
 
@@ -152,7 +207,7 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 
 - **Report Output Format Selection**: The user's selected output format for a report generation run, either PDF or Markdown.
 - **Main Capital Gains And Losses Report**: The primary report containing selected inputs, summaries, reference sections, asset details, and other non-annex report content.
-- **PDF Report Output**: The A4 paged report file that contains the main report and Annex 1 in one file.
+- **PDF Report Output**: The landscape A4 paged report file that contains the main report and Annex 1 in one file.
 - **Markdown Report Output**: The Markdown main report file generated for the selected report inputs.
 - **Reported Asset**: An asset identity selected by the existing report inclusion or reference-section rules for the selected year. This includes assets in Asset Detail, assets represented in the gains-and-losses summary before zero-net presentation filtering, and assets that appear only in the Reference Section. It excludes synced assets that are not selected by those rules for the generated report.
 - **Audit Annex**: Annex 1 of the report, titled `Annex 1 - Audit`, containing per-asset audit evidence followed by Currency Conversion Audit.
@@ -175,6 +230,12 @@ As a user auditing the report, I want Annex 1 to contain detailed per-asset acti
 - **SC-008**: Annex 1 allows a reviewer to trace 100% of each reported asset's activities on or before the report year end, including reference-only reported assets, to post-activity held quantity, cost-basis effect, full liquidation status, and gain or loss effect, while excluding activities after the report year end.
 - **SC-009**: PDF output generation and Annex 1 rendering support the existing 10,000 cached-activity report scale and do not introduce a lower activity-count limit than Markdown output.
 - **SC-010**: In generated PDF reports, 100% of required report text is emitted as selectable text rather than rasterized page images.
+- **SC-011**: In generated PDF reports, 0 Markdown structural syntax markers are visible as report presentation for headings, tables, emphasis, or Annex 1 sections.
+- **SC-012**: PDF layout verification confirms required report samples render with visible heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context rather than as sequential dumped lines.
+- **SC-013**: PDF layout verification confirms required report samples use landscape A4 pages, keep all table columns within the printable area without right-edge clipping, avoid overlapping adjacent text sections, place `Overall Yearly Net Total` inside the Gains-And-Losses Summary table, render Rate Source Summary as label/value lines, omit the extra `Reference Table` subheading, and preserve top margin before main-report and Annex 1 asset subheadings.
+- **SC-014**: PDF layout verification confirms required wide-table samples use the available landscape printable width with equal left and right margins, ~~affected section transitions have at least 12 points of vertical separation~~ **the superseding BUG-006 24-point spacing definition in SC-015 applies**, and every continued table row and border remains wholly inside the printable area with a preserved bottom margin and visible continuation context.
+- **SC-015**: PDF layout verification confirms the named main-report subheadings have at least 24 points of vertical separation, actual table continuation pages use `<section or table context> (continued)`, and unsplit table samples contain no continuation label.
+- **SC-016**: With the deterministic 10,000-activity fixture, one Markdown report generation and one PDF report generation each complete their independently measured request validation, calculation, selected renderer execution, final save, and opener invocation in under two minutes; no assertion combines the durations of both selected-format requests.
 
 ## Assumptions
 

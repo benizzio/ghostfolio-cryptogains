@@ -67,6 +67,14 @@ func replayAssetInput(basisState assetBasisState, scopedInput scopedActivityInpu
 	}
 
 	var replayResult = assetInputReplayResult{reachedZero: application.reachedZero}
+	if input.SourceYear > selectedYear {
+		return replayResult, nil
+	}
+
+	replayResult.auditEntry, err = buildAuditActivityEntry(input, basisAfter, quantityAfter, application)
+	if err != nil {
+		return assetInputReplayResult{}, err
+	}
 	if input.SourceYear != selectedYear {
 		return replayResult, nil
 	}

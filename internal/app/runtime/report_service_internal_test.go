@@ -17,6 +17,7 @@ import (
 	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	reportoutput "github.com/benizzio/ghostfolio-cryptogains/internal/report/output"
+	reportpdf "github.com/benizzio/ghostfolio-cryptogains/internal/report/pdf"
 	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
@@ -32,7 +33,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 	t.Run("fails when no readable cache is unlocked", func(t *testing.T) {
 		t.Parallel()
 
-		var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
+		var request = reportRequestFixture(t, 2024)
 		var service = &reportService{}
 
 		var outcome = service.Generate(context.Background(), ReportGenerationRequest{Request: request})
@@ -50,7 +51,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 	t.Run("fails when readable cache has no reportable years", func(t *testing.T) {
 		t.Parallel()
 
-		var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
+		var request = reportRequestFixture(t, 2024)
 		var snapshots = reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache)
 		var cache, _ = snapshots.ReadableProtectedActivityCache()
 		cache.AvailableReportYears = nil
@@ -66,7 +67,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 	t.Run("returns unsupported calculation when selected year is unavailable", func(t *testing.T) {
 		t.Parallel()
 
-		var request = reportRequestFixture(t, 2030, reportmodel.CostBasisMethodFIFO)
+		var request = reportRequestFixture(t, 2030)
 		var service = &reportService{snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache)}
 
 		var outcome = service.Generate(context.Background(), ReportGenerationRequest{Request: request})
@@ -100,18 +101,18 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 	t.Run("returns unsupported calculation when rendering fails", func(t *testing.T) {
 		t.Parallel()
 
-		var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
+		var request = reportRequestFixture(t, 2024)
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
 			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
-			render: func(reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
-				return reportmodel.ReportDocument{}, errors.New(" render boom ")
+			renderBundle: func(reportmodel.ReportOutputFormat, reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+				return nil, errors.New(" render boom ")
 			},
-			write: func(reportmodel.ReportDocument) (reportmodel.ReportOutputFile, error) {
+			writeBundle: func(reportmodel.ReportOutputFormat, []reportmodel.ReportDocument) (reportmodel.ReportOutputBundle, error) {
 				t.Fatalf("write should not be called after render failure")
-				return reportmodel.ReportOutputFile{}, nil
+				return reportmodel.ReportOutputBundle{}, nil
 			},
 		}
 
@@ -131,7 +132,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 	})
 
 	t.Run("saves and requests automatic opening on success", func(t *testing.T) {
-		var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
+		var request = reportRequestFixture(t, 2024)
 		var fixture = testutil.NewReportIOFixture(t)
 		var opener = testutil.NewOpenPathSpy(nil)
 		var savedPath string
@@ -140,12 +141,12 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
-			render: func(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
-				return reportDocumentFixture(t, report, "# Report\n"), nil
+			renderBundle: func(_ reportmodel.ReportOutputFormat, report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+				return reportDocumentBundleFixture(t, report), nil
 			},
-			write: func(document reportmodel.ReportDocument) (reportmodel.ReportOutputFile, error) {
+			writeBundle: func(_ reportmodel.ReportOutputFormat, documents []reportmodel.ReportDocument) (reportmodel.ReportOutputBundle, error) {
 				savedPath = filepath.Join(fixture.DocumentsDir, "ghostfolio-capital-gains-2024-fifo-2026-05-20_15-04-05.md")
-				return reportmodel.NewReportOutputFile(fixture.DocumentsDir, filepath.Base(savedPath), savedPath, document.GeneratedAt, false, "")
+				return reportOutputBundleFixture(t, fixture.DocumentsDir, savedPath, documents[0].GeneratedAt), nil
 			},
 			open: opener.Open,
 		}
@@ -154,7 +155,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		if !outcome.Success || outcome.FailureReason != ReportFailureNone {
 			t.Fatalf("expected successful outcome, got %#v", outcome)
 		}
-		if !outcome.OutputFile.OpenRequested || outcome.OutputFile.Path != savedPath {
+		if outcome.OutputFile.Path != savedPath {
 			t.Fatalf("expected saved output with open request, got %#v", outcome.OutputFile)
 		}
 		if opener.CallCount() != 1 || len(opener.Paths()) != 1 || opener.Paths()[0] != savedPath {
@@ -166,7 +167,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 	})
 
 	t.Run("preserves success with warning when automatic open fails", func(t *testing.T) {
-		var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
+		var request = reportRequestFixture(t, 2024)
 		var fixture = testutil.NewReportIOFixture(t)
 		var opener = testutil.NewOpenPathSpy(errors.New("open boom"))
 		var savedPath = filepath.Join(fixture.DocumentsDir, "report.md")
@@ -175,11 +176,11 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
-			render: func(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
-				return reportDocumentFixture(t, report, "# Report\n"), nil
+			renderBundle: func(_ reportmodel.ReportOutputFormat, report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+				return reportDocumentBundleFixture(t, report), nil
 			},
-			write: func(document reportmodel.ReportDocument) (reportmodel.ReportOutputFile, error) {
-				return reportmodel.NewReportOutputFile(fixture.DocumentsDir, filepath.Base(savedPath), savedPath, document.GeneratedAt, false, "")
+			writeBundle: func(_ reportmodel.ReportOutputFormat, documents []reportmodel.ReportDocument) (reportmodel.ReportOutputBundle, error) {
+				return reportOutputBundleFixture(t, fixture.DocumentsDir, savedPath, documents[0].GeneratedAt), nil
 			},
 			open: opener.Open,
 		}
@@ -191,7 +192,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		if outcome.FailureReason != ReportFailureAutomaticOpenFailedAfterSave {
 			t.Fatalf("expected automatic-open warning, got %#v", outcome)
 		}
-		if !outcome.OutputFile.OpenRequested || outcome.OutputFile.OpenError == "" {
+		if !strings.Contains(outcome.Message, "open boom") {
 			t.Fatalf("expected preserved saved file with open error, got %#v", outcome.OutputFile)
 		}
 		if opener.CallCount() != 1 {
@@ -200,7 +201,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 	})
 
 	t.Run("fails with warning reason when opener is unavailable", func(t *testing.T) {
-		var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
+		var request = reportRequestFixture(t, 2024)
 		var fixture = testutil.NewReportIOFixture(t)
 		var savedPath = filepath.Join(fixture.DocumentsDir, "report.md")
 		var service = &reportService{
@@ -208,18 +209,18 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
-			render: func(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
-				return reportDocumentFixture(t, report, "# Report\n"), nil
+			renderBundle: func(_ reportmodel.ReportOutputFormat, report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+				return reportDocumentBundleFixture(t, report), nil
 			},
-			write: func(document reportmodel.ReportDocument) (reportmodel.ReportOutputFile, error) {
-				return reportmodel.NewReportOutputFile(fixture.DocumentsDir, filepath.Base(savedPath), savedPath, document.GeneratedAt, false, "")
+			writeBundle: func(_ reportmodel.ReportOutputFormat, documents []reportmodel.ReportDocument) (reportmodel.ReportOutputBundle, error) {
+				return reportOutputBundleFixture(t, fixture.DocumentsDir, savedPath, documents[0].GeneratedAt), nil
 			},
 			open: nil,
 		}
 
 		var outcome = service.Generate(context.Background(), ReportGenerationRequest{Request: request})
-		if outcome.Success {
-			t.Fatalf("expected nil opener to return warning failure outcome, got %#v", outcome)
+		if !outcome.Success {
+			t.Fatalf("expected nil opener to preserve saved-output success, got %#v", outcome)
 		}
 		if outcome.FailureReason != ReportFailureAutomaticOpenFailedAfterSave {
 			t.Fatalf("expected automatic-open warning reason, got %#v", outcome)
@@ -230,21 +231,17 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 	})
 
 	t.Run("fails when saved output cannot be finalized before open request", func(t *testing.T) {
-		var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
+		var request = reportRequestFixture(t, 2024)
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
 			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
-			render: func(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
-				return reportDocumentFixture(t, report, "# Report\n"), nil
+			renderBundle: func(_ reportmodel.ReportOutputFormat, report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+				return reportDocumentBundleFixture(t, report), nil
 			},
-			write: func(document reportmodel.ReportDocument) (reportmodel.ReportOutputFile, error) {
-				return reportmodel.ReportOutputFile{
-					DocumentsDirectory: "/tmp/docs",
-					Path:               "/tmp/docs/report.md",
-					SavedAt:            document.GeneratedAt,
-				}, nil
+			writeBundle: func(_ reportmodel.ReportOutputFormat, documents []reportmodel.ReportDocument) (reportmodel.ReportOutputBundle, error) {
+				return reportmodel.ReportOutputBundle{OutputFormat: reportmodel.ReportOutputFormatMarkdown, Files: []reportmodel.ReportOutputFile{{DocumentsDirectory: "/tmp/docs", Path: "/tmp/docs/report.md", Role: reportmodel.ReportDocumentRoleMain, MediaType: reportmodel.ReportMediaTypeMarkdown, SavedAt: documents[0].GeneratedAt}}, SavedAt: documents[0].GeneratedAt}, nil
 			},
 			open: func(string) error { return nil },
 		}
@@ -264,17 +261,17 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 	t.Run("classifies documents resolution failure", func(t *testing.T) {
 		t.Parallel()
 
-		var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
+		var request = reportRequestFixture(t, 2024)
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
 			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
-			render: func(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
-				return reportDocumentFixture(t, report, "# Report\n"), nil
+			renderBundle: func(_ reportmodel.ReportOutputFormat, report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+				return reportDocumentBundleFixture(t, report), nil
 			},
-			write: func(reportmodel.ReportDocument) (reportmodel.ReportOutputFile, error) {
-				return reportmodel.ReportOutputFile{}, reportoutputFailure(
+			writeBundle: func(reportmodel.ReportOutputFormat, []reportmodel.ReportDocument) (reportmodel.ReportOutputBundle, error) {
+				return reportmodel.ReportOutputBundle{}, reportoutputFailure(
 					reportoutput.FailureCategoryDocumentsDirectoryUnavailable,
 					"resolve user home directory: boom",
 				)
@@ -291,17 +288,17 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 	t.Run("classifies final write failure", func(t *testing.T) {
 		t.Parallel()
 
-		var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
+		var request = reportRequestFixture(t, 2024)
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
 			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
 				return capitalGainsReportFixture(t, request), nil
 			},
-			render: func(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
-				return reportDocumentFixture(t, report, "# Report\n"), nil
+			renderBundle: func(_ reportmodel.ReportOutputFormat, report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+				return reportDocumentBundleFixture(t, report), nil
 			},
-			write: func(reportmodel.ReportDocument) (reportmodel.ReportOutputFile, error) {
-				return reportmodel.ReportOutputFile{}, reportoutputFailure(
+			writeBundle: func(reportmodel.ReportOutputFormat, []reportmodel.ReportDocument) (reportmodel.ReportOutputBundle, error) {
+				return reportmodel.ReportOutputBundle{}, reportoutputFailure(
 					reportoutput.FailureCategoryReportFileWriteFailed,
 					"write report file \"/tmp/report.md\": permission denied",
 				)
@@ -325,7 +322,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 	})
 
 	t.Run("production calculation failure exposes pending diagnostics with original persisted record", func(t *testing.T) {
-		var request = reportRequestFixture(t, 2025, reportmodel.CostBasisMethodFIFO)
+		var request = reportRequestFixture(t, 2025)
 		var offendingRecord = reportFailureActivityRecordFixture(t)
 		var service = &reportService{
 			snapshots:         reportSnapshotLifecycleWithCache(syncmodel.ProtectedActivityCache{ActivityCount: 1, AvailableReportYears: []int{2025}, Activities: []syncmodel.ActivityRecord{offendingRecord}}),
@@ -355,7 +352,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 
 	t.Run("explicit development mode auto-writes report diagnostics with explicit null fields", func(t *testing.T) {
 		var baseDir = t.TempDir()
-		var request = reportRequestFixture(t, 2025, reportmodel.CostBasisMethodFIFO)
+		var request = reportRequestFixture(t, 2025)
 		var offendingRecord = reportFailureActivityRecordFixture(t)
 		var service = &reportService{
 			snapshots:         reportSnapshotLifecycleWithCache(syncmodel.ProtectedActivityCache{ActivityCount: 1, AvailableReportYears: []int{2025}, Activities: []syncmodel.ActivityRecord{offendingRecord}}),
@@ -399,7 +396,7 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 func TestReportServiceHelperFunctionsCoverRemainingBranches(t *testing.T) {
 	t.Parallel()
 
-	var request = reportRequestFixture(t, 2024, reportmodel.CostBasisMethodFIFO)
+	var request = reportRequestFixture(t, 2024)
 	var service = &reportService{
 		snapshots:     reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
 		currencyRates: reportProviderCategoryRateService{},
@@ -547,6 +544,153 @@ func TestReportServiceHelperFunctionsCoverRemainingBranches(t *testing.T) {
 	})
 }
 
+// TestRenderReportOutputBundleCoversPDFSelectionFailures verifies unsupported
+// format and PDF renderer option failures before runtime save logic begins.
+// Authored by: OpenCode
+func TestRenderReportOutputBundleCoversPDFSelectionFailures(t *testing.T) {
+	var request = reportRequestFixture(t, 2024)
+	var report = capitalGainsReportFixture(t, request)
+
+	if _, err := renderReportOutputBundle(reportmodel.ReportOutputFormat("html"), report); err == nil || !strings.Contains(err.Error(), "unsupported report output format") {
+		t.Fatalf("expected unsupported output format failure, got %v", err)
+	}
+
+	var previousOptions = reportPDFRenderOptions
+	defer func() {
+		reportPDFRenderOptions = previousOptions
+	}()
+	reportPDFRenderOptions = func() reportpdf.RenderOptions {
+		return reportpdf.RenderOptions{Fonts: reportpdf.FontData{}}
+	}
+
+	if _, err := renderReportOutputBundle(reportmodel.ReportOutputFormatPDF, report); err == nil || !strings.Contains(err.Error(), "font data") {
+		t.Fatalf("expected PDF renderer option failure, got %v", err)
+	}
+
+	reportPDFRenderOptions = previousOptions
+	var previousReportDocumentConstructor = newReportDocumentForRuntime
+	defer func() {
+		newReportDocumentForRuntime = previousReportDocumentConstructor
+	}()
+	newReportDocumentForRuntime = func(reportmodel.ReportDocumentType, reportmodel.ReportDocumentRole, []byte, int, reportmodel.CostBasisMethod, time.Time) (reportmodel.ReportDocument, error) {
+		return reportmodel.ReportDocument{}, errors.New("pdf document finalization boom")
+	}
+	if _, err := renderReportOutputBundle(reportmodel.ReportOutputFormatPDF, report); err == nil || !strings.Contains(err.Error(), "pdf document finalization boom") {
+		t.Fatalf("expected PDF document finalization failure, got %v", err)
+	}
+}
+
+// TestReportServiceWriteReportOutputBundleBranches verifies bundle-writer seams.
+// Authored by: OpenCode
+func TestReportServiceWriteReportOutputBundleBranches(t *testing.T) {
+	var request = reportRequestFixture(t, 2024)
+	var report = capitalGainsReportFixture(t, request)
+	var documents = reportDocumentBundleFixture(t, report)
+	var savedAt = time.Date(2026, time.May, 20, 15, 4, 5, 0, time.UTC)
+
+	var unavailableService = &reportService{}
+	if _, err := unavailableService.writeReportDocuments(reportmodel.ReportOutputFormatMarkdown, documents); err == nil || !strings.Contains(err.Error(), "report writer is unavailable") {
+		t.Fatalf("expected unavailable bundle writer failure, got %v", err)
+	}
+
+	var writeFailureService = &reportService{
+		writeBundle: func(reportmodel.ReportOutputFormat, []reportmodel.ReportDocument) (reportmodel.ReportOutputBundle, error) {
+			return reportmodel.ReportOutputBundle{}, errors.New("bundle write boom")
+		},
+	}
+	if _, err := writeFailureService.writeReportDocuments(reportmodel.ReportOutputFormatMarkdown, documents); err == nil || !strings.Contains(err.Error(), "bundle write boom") {
+		t.Fatalf("expected bundle writer error to be returned, got %v", err)
+	}
+
+	var successService = &reportService{
+		writeBundle: func(reportmodel.ReportOutputFormat, []reportmodel.ReportDocument) (reportmodel.ReportOutputBundle, error) {
+			return reportOutputBundleFixture(t, "/tmp", "/tmp/report.md", savedAt), nil
+		},
+	}
+	var bundle, err = successService.writeReportDocuments(reportmodel.ReportOutputFormatMarkdown, documents)
+	if err != nil || len(bundle.Files) != 2 {
+		t.Fatalf("expected valid bundle writer result, got bundle=%#v err=%v", bundle, err)
+	}
+}
+
+// TestRequestAutomaticOpenBundleAdditionalBranches verifies bundle finalization
+// and unavailable-opener behavior for multi-file report output.
+// Authored by: OpenCode
+func TestRequestAutomaticOpenBundleAdditionalBranches(t *testing.T) {
+	var request = reportRequestFixture(t, 2024)
+	var savedAt = time.Date(2026, time.May, 20, 15, 4, 5, 0, time.UTC)
+	var mainFile, err = reportmodel.NewReportOutputFile("/tmp", "main.md", "/tmp/main.md", reportmodel.ReportDocumentRoleMain, reportmodel.ReportMediaTypeMarkdown, savedAt)
+	if err != nil {
+		t.Fatalf("new main output file: %v", err)
+	}
+	var annexFile reportmodel.ReportOutputFile
+	annexFile, err = reportmodel.NewReportOutputFile("/tmp", "annex.md", "/tmp/annex.md", reportmodel.ReportDocumentRoleAnnex, reportmodel.ReportMediaTypeMarkdown, savedAt)
+	if err != nil {
+		t.Fatalf("new annex output file: %v", err)
+	}
+
+	_, outcome := requestAutomaticOpenBundle(request, reportmodel.ReportOutputBundle{}, func(string) error { return nil })
+	if outcome == nil || outcome.FailureReason != ReportFailureReportFileWriteFailed || !strings.Contains(outcome.Message, "Could not finalize") {
+		t.Fatalf("expected invalid bundle finalization failure, got %#v", outcome)
+	}
+
+	var bundle reportmodel.ReportOutputBundle
+	bundle, err = reportmodel.NewReportOutputBundle(reportmodel.ReportOutputFormatMarkdown, []reportmodel.ReportOutputFile{mainFile, annexFile}, savedAt, false, "")
+	if err != nil {
+		t.Fatalf("new output bundle: %v", err)
+	}
+	var openedBundle reportmodel.ReportOutputBundle
+	openedBundle, outcome = requestAutomaticOpenBundle(request, bundle, nil)
+	if outcome == nil || !outcome.Success || outcome.FailureReason != ReportFailureAutomaticOpenFailedAfterSave {
+		t.Fatalf("expected unavailable opener warning success, got bundle=%#v outcome=%#v", openedBundle, outcome)
+	}
+	if !openedBundle.OpenRequested || !strings.Contains(openedBundle.OpenError, "automatic opening is unavailable") {
+		t.Fatalf("expected unavailable opener metadata, got %#v", openedBundle)
+	}
+
+	if got := reportOutputBundleForOpen(reportmodel.ReportOutputFormatMarkdown, nil, ""); got.OutputFormat != "" || len(got.Files) != 0 || !got.SavedAt.IsZero() {
+		t.Fatalf("expected empty files to produce empty open bundle, got %#v", got)
+	}
+	if got := reportOutputBundleForOpen(reportmodel.ReportOutputFormatPDF, []reportmodel.ReportOutputFile{mainFile}, ""); got.OutputFormat != "" || len(got.Files) != 0 || !got.SavedAt.IsZero() {
+		t.Fatalf("expected invalid file shape to produce empty open bundle, got %#v", got)
+	}
+}
+
+// TestReportServiceRenderFallbackBranches verifies unavailable bundle seams.
+// Authored by: OpenCode
+func TestReportServiceLegacyAndRenderFallbackBranches(t *testing.T) {
+	var request = reportRequestFixture(t, 2024)
+	var service = &reportService{
+		snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
+		calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			return capitalGainsReportFixture(t, request), nil
+		},
+		renderBundle: func(_ reportmodel.ReportOutputFormat, report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+			return reportDocumentBundleFixture(t, report), nil
+		},
+		writeBundle: nil,
+	}
+
+	var outcome = service.Generate(context.Background(), ReportGenerationRequest{Request: request})
+	if outcome.FailureReason != ReportFailureReportFileWriteFailed || !strings.Contains(outcome.Message, "report writer is unavailable") {
+		t.Fatalf("expected legacy unavailable writer failure, got %#v", outcome)
+	}
+
+	var renderUnavailableService = &reportService{}
+	if _, err := renderUnavailableService.renderReportDocuments(reportmodel.ReportOutputFormatMarkdown, reportmodel.CapitalGainsReport{}); err == nil || !strings.Contains(err.Error(), "report renderer is unavailable") {
+		t.Fatalf("expected unavailable renderer failure, got %v", err)
+	}
+}
+
+// TestRenderReportOutputBundleCoversPDFRenderFailure verifies PDF render errors
+// are returned before output writing begins.
+// Authored by: OpenCode
+func TestRenderReportOutputBundleCoversPDFRenderFailure(t *testing.T) {
+	if _, err := renderReportOutputBundle(reportmodel.ReportOutputFormatPDF, reportmodel.CapitalGainsReport{}); err == nil {
+		t.Fatalf("expected invalid report to fail PDF rendering")
+	}
+}
+
 // reportSnapshotLifecycleWithCache returns one shared readable snapshot
 // lifecycle seeded with the provided protected cache.
 // Authored by: OpenCode
@@ -559,13 +703,14 @@ func reportSnapshotLifecycleWithCache(cache syncmodel.ProtectedActivityCache) *s
 // reportRequestFixture returns one valid runtime report request for internal
 // report-service tests.
 // Authored by: OpenCode
-func reportRequestFixture(t *testing.T, year int, method reportmodel.CostBasisMethod) reportmodel.ReportRequest {
+func reportRequestFixture(t *testing.T, year int) reportmodel.ReportRequest {
 	t.Helper()
 
 	var request, err = reportmodel.NewReportRequest(
 		year,
-		method,
+		reportmodel.CostBasisMethodFIFO,
 		reportmodel.ReportBaseCurrencyUSD,
+		reportmodel.ReportOutputFormatMarkdown,
 		time.Date(2026, time.May, 20, 15, 4, 5, 0, time.UTC),
 	)
 	if err != nil {
@@ -635,15 +780,49 @@ func capitalGainsReportFixture(t *testing.T, request reportmodel.ReportRequest) 
 // reportDocumentFixture returns one valid rendered Markdown document for runtime
 // report-service tests.
 // Authored by: OpenCode
-func reportDocumentFixture(t *testing.T, report reportmodel.CapitalGainsReport, content string) reportmodel.ReportDocument {
+func reportDocumentFixture(t *testing.T, report reportmodel.CapitalGainsReport) reportmodel.ReportDocument {
 	t.Helper()
 
-	var document, err = reportmodel.NewReportDocument(reportmodel.ReportDocumentTypeMarkdown, content, report.Year, report.CostBasisMethod, report.GeneratedAt)
+	var document, err = reportmodel.NewReportDocument(reportmodel.ReportDocumentTypeMarkdown, reportmodel.ReportDocumentRoleMain, []byte("# Report\n"), report.Year, report.CostBasisMethod, report.GeneratedAt)
 	if err != nil {
 		t.Fatalf("new report document: %v", err)
 	}
 
 	return document
+}
+
+// reportDocumentBundleFixture returns the valid Markdown main-plus-annex bundle
+// required by runtime report-service tests.
+// Authored by: OpenCode
+func reportDocumentBundleFixture(t *testing.T, report reportmodel.CapitalGainsReport) []reportmodel.ReportDocument {
+	var main = reportDocumentFixture(t, report)
+	var annex, err = reportmodel.NewReportDocument(reportmodel.ReportDocumentTypeMarkdown, reportmodel.ReportDocumentRoleAnnex, []byte("# Annex 1 - Audit\n"), report.Year, report.CostBasisMethod, report.GeneratedAt)
+	if err != nil {
+		t.Fatalf("new annex report document: %v", err)
+	}
+	return []reportmodel.ReportDocument{main, annex}
+}
+
+// reportOutputBundleFixture returns valid saved metadata for a Markdown bundle.
+// Authored by: OpenCode
+func reportOutputBundleFixture(t *testing.T, directory string, mainPath string, savedAt time.Time) reportmodel.ReportOutputBundle {
+	t.Helper()
+	var main, err = reportmodel.NewReportOutputFile(directory, filepath.Base(mainPath), mainPath, reportmodel.ReportDocumentRoleMain, reportmodel.ReportMediaTypeMarkdown, savedAt)
+	if err != nil {
+		t.Fatalf("new main report output file: %v", err)
+	}
+	var annexPath = strings.TrimSuffix(mainPath, ".md") + "-annex-1.md"
+	var annex reportmodel.ReportOutputFile
+	annex, err = reportmodel.NewReportOutputFile(directory, filepath.Base(annexPath), annexPath, reportmodel.ReportDocumentRoleAnnex, reportmodel.ReportMediaTypeMarkdown, savedAt)
+	if err != nil {
+		t.Fatalf("new annex report output file: %v", err)
+	}
+	var bundle reportmodel.ReportOutputBundle
+	bundle, err = reportmodel.NewReportOutputBundle(reportmodel.ReportOutputFormatMarkdown, []reportmodel.ReportOutputFile{main, annex}, savedAt, false, "")
+	if err != nil {
+		t.Fatalf("new report output bundle: %v", err)
+	}
+	return bundle
 }
 
 // reportFailureActivityRecordFixture returns one persisted activity record with

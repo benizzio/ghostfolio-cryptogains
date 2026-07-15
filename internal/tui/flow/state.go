@@ -70,12 +70,14 @@ type reportState struct {
 	YearIndex            int
 	MethodIndex          int
 	BaseCurrencyIndex    int
+	OutputFormatIndex    int
 	ActionIndex          int
 	Busy                 bool
 	BusyText             string
 	AttemptID            string
 	SelectedYear         int
 	SelectedBaseCurrency reportmodel.ReportBaseCurrency
+	SelectedOutputFormat reportmodel.ReportOutputFormat
 }
 
 // serverReplacementState holds transient UI state for server-mismatch confirmation.
@@ -148,7 +150,7 @@ func newSyncReportsContextState(serverOrigin string, protectedData runtime.Prote
 // newReportState creates the initial report workflow state.
 // Authored by: OpenCode
 func newReportState(years []int) reportState {
-	var state = reportState{FocusArea: 0, MethodIndex: 0, BaseCurrencyIndex: 0, SelectedBaseCurrency: reportBaseCurrencyForIndex(0)}
+	var state = reportState{FocusArea: 0, MethodIndex: 0, BaseCurrencyIndex: 0, OutputFormatIndex: 0, SelectedBaseCurrency: reportBaseCurrencyForIndex(0), SelectedOutputFormat: reportOutputFormatForIndex(0)}
 	if len(years) > 0 {
 		state.SelectedYear = years[0]
 	}

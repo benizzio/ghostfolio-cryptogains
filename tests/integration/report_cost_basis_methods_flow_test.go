@@ -91,8 +91,8 @@ func TestReportGenerationMatchesControlledLedgersAcrossCostBasisMethods(t *testi
 			}
 			var reportText = string(rawReport)
 			for _, required := range []string{
-				"- Cost Basis Method: " + method.Label(),
-				"- Report Calculation Currency: " + expected.ReportCalculationCurrency,
+				"- **Cost Basis Method:** " + method.Label(),
+				"- **Report Calculation Currency:** " + expected.ReportCalculationCurrency,
 				"## Gains-And-Losses Summary",
 				"## Reference Section",
 			} {
@@ -197,7 +197,7 @@ func TestReportCalculationRetainsFragmentLevelPricedLiquidationMatchesAcrossMeth
 	for _, method := range methods {
 		var method = method
 		t.Run(string(method), func(t *testing.T) {
-			var request, err = reportmodel.NewReportRequest(2024, method, reportmodel.ReportBaseCurrencyUSD, mustIntegrationTime())
+			var request, err = reportmodel.NewReportRequest(2024, method, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown, mustIntegrationTime())
 			if err != nil {
 				t.Fatalf("new report request: %v", err)
 			}
@@ -274,6 +274,9 @@ func assertExpectedReportLedger(t *testing.T, reportText string, expected testut
 	t.Helper()
 
 	for _, entry := range expected.SummaryByAsset {
+		if entry.NetGainOrLoss == "0" {
+			continue
+		}
 		var row = "| " + entry.DisplayLabel + " | " + entry.NetGainOrLoss + " | " + expected.ReportCalculationCurrency + " |"
 		if !strings.Contains(reportText, row) {
 			t.Fatalf("expected summary row %q in report %q", row, reportText)
@@ -300,6 +303,10 @@ func assertExpectedReportLedger(t *testing.T, reportText string, expected testut
 			assertExpectedActivityRow(t, reportText, row)
 		}
 		for _, liquidation := range detail.LiquidationSummaries {
+			var row = "| " + liquidation.SourceID + " |"
+			if !strings.Contains(reportText, row) {
+				t.Fatalf("expected liquidation row %q in report %q", row, reportText)
+			}
 			for _, part := range []string{
 				liquidation.SourceID,
 				liquidation.DisposedQuantity,

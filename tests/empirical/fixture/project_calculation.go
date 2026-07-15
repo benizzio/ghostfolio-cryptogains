@@ -22,7 +22,7 @@ import (
 // Authored by: OpenCode
 func BuildProjectReportRequest(year int, method reportmodel.CostBasisMethod) (reportmodel.ReportRequest, error) {
 	var requestedAt = time.Date(year+1, time.January, 1, 0, 0, 0, 0, time.UTC)
-	return reportmodel.NewReportRequest(year, method, reportmodel.ReportBaseCurrencyUSD, requestedAt)
+	return reportmodel.NewReportRequest(year, method, reportmodel.ReportBaseCurrencyUSD, reportmodel.ReportOutputFormatMarkdown, requestedAt)
 }
 
 // RunProjectCalculation executes the pure report calculator for one translated

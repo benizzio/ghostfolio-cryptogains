@@ -16,11 +16,11 @@ const notApplicableCalculationCurrency = "NOT APPLICABLE"
 // weakening the validated helper behavior.
 // Authored by: OpenCode
 var (
-	renderWriteSummarySection         = writeSummarySection
-	renderWriteRateSourceSummary      = writeRateSourceSummary
-	renderWriteReferenceSection       = writeReferenceSection
-	renderWriteDetailSections         = writeDetailSections
-	renderWriteConversionAuditSection = writeConversionAuditSection
+	renderWriteSummarySection    = writeSummarySection
+	renderWriteRateSourceSummary = writeRateSourceSummary
+	renderWriteReferenceSection  = writeReferenceSection
+	renderWriteDetailSections    = writeDetailSections
+	renderAnnexForDocuments      = RenderAnnex
 )
 
 // Render converts one calculated yearly capital-gains report into the Markdown
@@ -56,25 +56,41 @@ func Render(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, 
 	if err := renderWriteDetailSections(&builder, report, calculationCurrency); err != nil {
 		return reportmodel.ReportDocument{}, err
 	}
-	if err := renderWriteConversionAuditSection(&builder, report); err != nil {
-		return reportmodel.ReportDocument{}, err
-	}
-
 	return reportmodel.NewReportDocument(
 		reportmodel.ReportDocumentTypeMarkdown,
-		builder.String(),
+		reportmodel.ReportDocumentRoleMain,
+		[]byte(builder.String()),
 		report.Year,
 		report.CostBasisMethod,
 		report.GeneratedAt,
 	)
 }
 
+// RenderDocuments converts one calculated report into its ordered Markdown
+// bundle: the main report followed by a separate Annex 1 document. For example,
+// pass its result to `output.WriteReportOutputBundle(model.ReportOutputFormatMarkdown, documents)`.
+// Authored by: OpenCode
+func RenderDocuments(report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+	var mainDocument, err = Render(report)
+	if err != nil {
+		return nil, err
+	}
+
+	var annexDocument reportmodel.ReportDocument
+	annexDocument, err = renderAnnexForDocuments(report)
+	if err != nil {
+		return nil, err
+	}
+
+	return []reportmodel.ReportDocument{mainDocument, annexDocument}, nil
+}
+
 // writeHeader renders the required document heading and metadata block.
 // Authored by: OpenCode
 func writeHeader(builder *strings.Builder, report reportmodel.CapitalGainsReport, calculationCurrency string) {
 	builder.WriteString("# Ghostfolio Capital Gains And Losses Report\n\n")
-	builder.WriteString(fmt.Sprintf("- Year: %d\n", report.Year))
-	builder.WriteString(fmt.Sprintf("- Cost Basis Method: %s\n", report.CostBasisMethod.Label()))
-	builder.WriteString(fmt.Sprintf("- Generated At: %s\n", report.GeneratedAt.Local().Format("2006-01-02 15:04:05 MST")))
-	builder.WriteString(fmt.Sprintf("- Report Calculation Currency: %s\n\n", calculationCurrency))
+	fmt.Fprintf(builder, "- **Year:** %d\n", report.Year)
+	fmt.Fprintf(builder, "- **Cost Basis Method:** %s\n", report.CostBasisMethod.Label())
+	fmt.Fprintf(builder, "- **Generated At:** %s\n", report.GeneratedAt.Local().Format("2006-01-02 15:04:05 MST"))
+	fmt.Fprintf(builder, "- **Report Calculation Currency:** %s\n\n", calculationCurrency)
 }

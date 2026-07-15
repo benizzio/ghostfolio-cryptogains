@@ -52,7 +52,7 @@ func TestReportGenerationResponsivenessLargeCrossCurrencyFixture(t *testing.T) {
 		t.Fatalf("read saved report: %v", err)
 	}
 	var reportText = string(reportBytes)
-	for _, expected := range []string{"- Report Calculation Currency: USD", "Federal Reserve Board H.10/Data Download Program", "responsiveness-eur-buy-00000", "responsiveness-gbp-buy-00001"} {
+	for _, expected := range []string{"- **Report Calculation Currency:** USD", "Federal Reserve Board H.10/Data Download Program", "responsiveness-eur-buy-00000", "responsiveness-gbp-buy-00001"} {
 		if !strings.Contains(reportText, expected) {
 			t.Fatalf("expected report to contain %q", expected)
 		}

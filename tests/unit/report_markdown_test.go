@@ -29,10 +29,10 @@ func TestRenderMarkdownIncludesHeaderSectionOrderAndRequiredTables(t *testing.T)
 		t,
 		document.Content,
 		"# Ghostfolio Capital Gains And Losses Report",
-		"- Year: 2024",
-		"- Cost Basis Method: Average Cost Basis",
-		"- Generated At:",
-		"- Report Calculation Currency: USD",
+		"- **Year:** 2024",
+		"- **Cost Basis Method:** Average Cost Basis",
+		"- **Generated At:**",
+		"- **Report Calculation Currency:** USD",
 		"## Gains-And-Losses Summary",
 		"## Reference Section",
 		"## Asset Detail: BTC",
@@ -42,7 +42,7 @@ func TestRenderMarkdownIncludesHeaderSectionOrderAndRequiredTables(t *testing.T)
 		t,
 		document.Content,
 		"| Asset | Net Gain Or Loss | Report Calculation Currency |",
-		"| Asset | Full Liquidation Count Through Year End | Main Section Status |",
+		"| Asset | Historical Full Liquidation Count | Main Section Status |",
 		"### In-Year Activity",
 		"| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |",
 		"### Liquidation Calculations",
@@ -62,7 +62,7 @@ func TestRenderMarkdownRendersEmptyStates(t *testing.T) {
 		t.Fatalf("render empty markdown report: %v", err)
 	}
 
-	assertContainsString(t, document.Content, "No assets qualified for the main report sections in the selected year.")
+	assertContainsString(t, document.Content, "No assets had a non-zero net gain or loss in the selected year.")
 	assertContainsString(t, document.Content, "| Overall Yearly Net Total | 0 | USD |")
 	assertContainsString(t, document.Content, "No assets reached full liquidation by year end.")
 	assertNotContainsString(t, document.Content, "## Asset Detail:")
@@ -96,7 +96,11 @@ func TestRenderMarkdownRendersNoInYearActivityAndOmitsLiquidationTable(t *testin
 		t.Fatalf("render no-activity markdown report: %v", err)
 	}
 
-	assertContainsString(t, document.Content, "No in-year activity for the selected year.")
+	assertContainsString(t, document.Content, "### Historical Position")
+	assertContainsString(t, document.Content, "- **Quantity:** 1.25")
+	assertNotContainsString(t, document.Content, "No in-year activity for the selected year.")
+	assertNotContainsString(t, document.Content, "### Opening Position")
+	assertNotContainsString(t, document.Content, "### Closing Position")
 	assertNotContainsString(t, document.Content, "### Liquidation Calculations")
 }
 
@@ -116,7 +120,7 @@ func TestRenderMarkdownCanonicalDecimalsCurrenciesAndSecretExclusion(t *testing.
 	assertContainsString(t, document.Content, "| ETH | -10 | USD |")
 	assertContainsString(t, document.Content, "| Overall Yearly Net Total | 1240.5 | USD |")
 	assertContainsString(t, document.Content, "| btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | 1 | 22009 | USD | USD |")
-	assertContainsString(t, document.Content, "| xrp-reduction-2024-001 | SELL | 200 | 0 | 0 | 0 | 800 | 400 |  | USD |  | manual custody transfer token=[REDACTED] jwt=[REDACTED] payload=[REDACTED] |")
+	assertContainsString(t, document.Content, "| xrp-reduction-2024-001 | BLOCKCHAIN OP | 200 | 0 | 0 | 0 | 800 | 400 |  | USD |  | manual custody transfer token=[REDACTED] jwt=[REDACTED] payload=[REDACTED] |")
 	assertContainsString(t, document.Content, "| btc-sell-2024-001 | 1 | 22009 | 25000 | 2991 | USD |")
 	assertNotContainsString(t, document.Content, "secret-token")
 	assertNotContainsString(t, document.Content, "secret-jwt")
@@ -147,6 +151,7 @@ func populatedMarkdownReportFixture() reportmodel.CapitalGainsReport {
 			},
 		},
 		YearlyNetTotal: mustMarkdownDecimal(nil, "1240.500"),
+		AuditAnnex:     reportmodel.DefaultAuditAnnex(),
 		ReferenceEntries: []reportmodel.ReferenceLiquidationEntry{
 			{
 				AssetIdentityKey:                   "asset-eth",
@@ -175,9 +180,9 @@ func populatedMarkdownReportFixture() reportmodel.CapitalGainsReport {
 					OccurredAt:          time.Date(2024, time.January, 1, 0, 15, 0, 0, time.Local),
 					ActivityType:        reportmodel.ActivityTypeSell,
 					Quantity:            mustMarkdownDecimal(nil, "1.000"),
-					UnitPrice:           markdownDecimalPointer(nil, "25000.000"),
-					GrossValue:          markdownDecimalPointer(nil, "25000.000"),
-					FeeAmount:           markdownDecimalPointer(nil, "0.000"),
+					UnitPrice:           markdownDecimalPointer("25000.000"),
+					GrossValue:          markdownDecimalPointer("25000.000"),
+					FeeAmount:           markdownDecimalPointer("0.000"),
 					ActivityCurrency:    "USD",
 					BasisAfterRow:       mustMarkdownDecimal(nil, "22009.000"),
 					CalculationCurrency: "USD",
@@ -207,9 +212,9 @@ func populatedMarkdownReportFixture() reportmodel.CapitalGainsReport {
 					OccurredAt:                  time.Date(2024, time.April, 1, 12, 0, 0, 0, time.Local),
 					ActivityType:                reportmodel.ActivityTypeSell,
 					Quantity:                    mustMarkdownDecimal(nil, "200.000"),
-					UnitPrice:                   markdownDecimalPointer(nil, "0.000"),
-					GrossValue:                  markdownDecimalPointer(nil, "0.000"),
-					FeeAmount:                   markdownDecimalPointer(nil, "0.000"),
+					UnitPrice:                   markdownDecimalPointer("0.000"),
+					GrossValue:                  markdownDecimalPointer("0.000"),
+					FeeAmount:                   markdownDecimalPointer("0.000"),
 					BasisAfterRow:               mustMarkdownDecimal(nil, "400.000"),
 					CalculationCurrency:         "USD",
 					QuantityAfterRow:            mustMarkdownDecimal(nil, "800.000"),
@@ -230,6 +235,7 @@ func emptyMarkdownReportFixture() reportmodel.CapitalGainsReport {
 		GeneratedAt:               time.Date(2026, time.May, 21, 12, 34, 56, 0, time.Local),
 		ReportCalculationCurrency: "USD",
 		YearlyNetTotal:            mustMarkdownDecimal(nil, "0.000"),
+		AuditAnnex:                reportmodel.DefaultAuditAnnex(),
 	}
 }
 
@@ -255,22 +261,23 @@ func mustMarkdownDecimal(t *testing.T, raw string) apd.Decimal {
 
 // markdownDecimalPointer returns one parsed decimal pointer for test fixtures.
 // Authored by: OpenCode
-func markdownDecimalPointer(t *testing.T, raw string) *apd.Decimal {
-	var value = mustMarkdownDecimal(t, raw)
+func markdownDecimalPointer(raw string) *apd.Decimal {
+	var value = mustMarkdownDecimal(nil, raw)
 	return &value
 }
 
 // assertContainsInOrder verifies that all expected substrings appear in the
 // rendered Markdown in the required order.
 // Authored by: OpenCode
-func assertContainsInOrder(t *testing.T, content string, expected ...string) {
+func assertContainsInOrder(t *testing.T, content any, expected ...string) {
 	t.Helper()
 
+	var rendered = string(reportDocumentContent(content))
 	var offset int
 	for _, current := range expected {
-		var index = strings.Index(content[offset:], current)
+		var index = strings.Index(rendered[offset:], current)
 		if index < 0 {
-			t.Fatalf("expected %q after offset %d in content %q", current, offset, content)
+			t.Fatalf("expected %q after offset %d in content %q", current, offset, rendered)
 		}
 		offset += index + len(current)
 	}
@@ -279,9 +286,9 @@ func assertContainsInOrder(t *testing.T, content string, expected ...string) {
 // assertContainsString verifies that the rendered Markdown includes one required
 // substring.
 // Authored by: OpenCode
-func assertContainsString(t *testing.T, content string, expected string) {
+func assertContainsString(t *testing.T, content any, expected string) {
 	t.Helper()
-	if !strings.Contains(content, expected) {
+	if !strings.Contains(string(reportDocumentContent(content)), expected) {
 		t.Fatalf("expected content to contain %q", expected)
 	}
 }
@@ -289,9 +296,22 @@ func assertContainsString(t *testing.T, content string, expected string) {
 // assertNotContainsString verifies that the rendered Markdown excludes one
 // forbidden substring.
 // Authored by: OpenCode
-func assertNotContainsString(t *testing.T, content string, unexpected string) {
+func assertNotContainsString(t *testing.T, content any, unexpected string) {
 	t.Helper()
-	if strings.Contains(content, unexpected) {
+	if strings.Contains(string(reportDocumentContent(content)), unexpected) {
 		t.Fatalf("expected content not to contain %q", unexpected)
+	}
+}
+
+// reportDocumentContent normalizes Markdown payloads for test assertions.
+// Authored by: OpenCode
+func reportDocumentContent(content any) []byte {
+	switch value := content.(type) {
+	case string:
+		return []byte(value)
+	case []byte:
+		return value
+	default:
+		panic("unsupported report document content")
 	}
 }

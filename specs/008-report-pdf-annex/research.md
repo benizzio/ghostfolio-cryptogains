@@ -9,11 +9,13 @@
 - Dependency evidence from GitHub MCP and `go list -m -json` for `github.com/signintech/gopdf`, `github.com/phpdave11/gofpdi`, `golang.org/x/image`, `github.com/pdfcpu/pdfcpu`, and `github.com/johnfercher/maroto/v2`
 - Context7 documentation for `/signintech/gopdf`
 
+**Bugfix**: 2026-07-13 — [BUG-007] Recorded one selected-format request as one independent performance measurement and prohibited aggregate Markdown/PDF timing.
+
 ## Output Format Selection
 
 Decision: Add a report output format to the report request and TUI workflow with two valid values: Markdown and PDF.
 
-Rationale: The user must choose the output format before generation begins, and Markdown must remain available. Modeling the choice in the report request keeps runtime generation deterministic and avoids hidden renderer defaults. The format is transient to one report run and is not persisted.
+Rationale: The user must choose the output format before generation begins, and Markdown must remain available. Modeling the choice in the report request keeps runtime generation deterministic and avoids hidden renderer defaults. The format is transient to one report run and is not persisted. One selected-format request invokes one renderer and produces one output bundle, so it also defines one performance measurement boundary; separate Markdown and PDF requests must not share an elapsed-time assertion.
 
 Alternatives considered: Use a command-line flag only, but current report generation is a TUI workflow. Generate both formats every time, but the spec requires a user choice and would create extra files the user did not request.
 
@@ -40,6 +42,16 @@ Decision: Generate PDF pages with text drawing operations and embedded TTF fonts
 Rationale: The spec requires text-based searchable PDF output with selectable report text. `gopdf` text APIs emit text into PDF content streams and can embed fonts from `io.Reader`. Rendering from report-domain rows into text/table operations preserves searchability better than rendering screenshots or canvases. Tests can verify that required report strings are emitted through the PDF renderer's text path and that the renderer does not create page image replacements.
 
 Alternatives considered: Render Markdown to an image and place it in a PDF, but that would violate the selectable text requirement. Use an external `pdftotext`-style binary in tests, but that would add a platform dependency outside Go test control. Add a PDF text-extraction dependency immediately, but the first implementation can validate renderer behavior without another PDF dependency unless test evidence later proves insufficient.
+
+BUG-002 reassessment, 2026-07-05: `gopdf` remains suitable for the selected local-only renderer boundary. The renderer must not pass Markdown-rendered source text into the PDF body and must reject visible Markdown heading markers, bold markers, table pipes, and table separators as PDF presentation.
+
+BUG-003 reassessment, 2026-07-07: `gopdf` remains suitable only if the implementation uses its concrete layout primitives for human-legible PDF structure. Required renderer evidence must cover A4 page creation, application-supplied font loading, heading hierarchy, styled classifier labels, table headers, table rows, table columns, wrapped cell content, and continuation context through `gopdf` APIs such as `Start`, `AddPage`, `AddTTFFontByReader`, `SetFont`, `Text`, `Cell` or `MultiCell`, `NewTableLayout`, `AddColumn`, `AddRow` or `AddStyledRow`, and `DrawTable`. A renderer that serializes report-domain data into sequential text lines, even when selectable and free of Markdown syntax, does not satisfy the dependency decision. No local-only alternative is needed unless `gopdf` cannot provide this layout boundary during implementation.
+
+BUG-004 reassessment, 2026-07-09: `gopdf` remains suitable only when configured for landscape A4 pages and paired with explicit renderer layout policy for the report's wide tables and section flow. Required renderer evidence must show landscape A4 page dimensions, table widths derived from the printable landscape area with visible right padding, wrapped cell content instead of clipped columns, positive vertical spacing between adjacent text blocks and tables, `Overall Yearly Net Total` inside the Gains-And-Losses Summary table, Rate Source Summary rendered as label/value lines instead of a table, no generated `Reference Table` helper subheading, and adequate top margin before main-report and Annex 1 asset subheadings. No local-only alternative is needed unless `gopdf` cannot satisfy these layout constraints without remote services, browser services, external binaries, platform font paths, or rasterized report text.
+
+BUG-005 reassessment, 2026-07-09: `gopdf` remains suitable only when the renderer allocates every table across the complete landscape printable width between equal left and right margins, retains at least 12 points of separation before affected section titles, subheadings, and tables, and preflights each complete table row and its borders before drawing. When a row would cross the bottom margin, the renderer must advance it to a continuation page before drawing any part of that row, then repeat visible table or section context. No local-only alternative is needed unless `gopdf` cannot provide these width, spacing, and atomic-row layout policies without remote services, browser services, external binaries, platform font paths, or rasterized report text.
+
+BUG-006 reassessment, 2026-07-10: `gopdf` remains suitable when the renderer reserves at least 24 points of vertical separation before the `Gains-And-Losses Summary`, `Rate Source Summary`, `Reference Section`, `Asset Detail: <asset symbol>`, and `In-Year Activity` subheadings when they follow preceding content on the same page. Only a table that actually advances to a continuation page may emit continuation context, using the exact format `<section or table context> (continued)` without a `Continued:` prefix; unsplit tables must emit no continuation label. Renderer verification must exercise both split-table and unsplit-table paths.
 
 ## Embedded Font Strategy
 
@@ -107,9 +119,9 @@ Alternatives considered: Replace underscores at render time, but that hides unma
 
 ## Testing Evidence Strategy
 
-Decision: Use deterministic project-owned fixtures for automated tests and keep existing empirical financial data read-only.
+Decision: Use deterministic project-owned fixtures for automated tests, keep existing empirical financial data read-only, and measure the 10,000-activity Markdown and PDF requests independently.
 
-Rationale: Report output format, annex, and PDF rendering can be tested without live services. Existing conversion-provider deterministic fixtures from the prior feature remain applicable for converted activity evidence. The financial empirical dataset continues to guard calculation behavior and should not be mutated for a presentation/output feature.
+Rationale: Report output format, annex, and PDF rendering can be tested without live services. Existing conversion-provider deterministic fixtures from the prior feature remain applicable for converted activity evidence. The financial empirical dataset continues to guard calculation behavior and should not be mutated for a presentation/output feature. The isolated performance suite may run Markdown and PDF sequentially against the same fixture, but each selected-format `Generate` call must have its own timing interval covering request validation, calculation, selected rendering, final save, and opener invocation. Each interval must be asserted independently against two minutes and report its selected format and measured duration; fixture setup and output-contract assertions remain outside the interval where they are not part of the request.
 
 Alternatives considered: Use live PDF viewers or OS text extraction tools in automated tests, but those are platform-dependent. Change empirical fixtures to include annex-specific assertions, but the active feature is not a dataset-maintenance spec.
 

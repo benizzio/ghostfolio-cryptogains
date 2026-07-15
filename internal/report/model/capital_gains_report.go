@@ -82,8 +82,8 @@ func NewCapitalGainsReportWithConversionArtifacts(
 		YearlyNetTotal:            yearlyNetTotal,
 		ReferenceEntries:          append([]ReferenceLiquidationEntry(nil), referenceEntries...),
 		DetailSections:            cloneAssetDetailSections(detailSections),
-		ConversionAuditEntries:    cloneConversionAuditEntries(conversionAuditEntries),
 		RateSources:               cloneExchangeRateEvidence(rateSources),
+		AuditAnnex:                AuditAnnex{Title: AuditAnnexTitle(), SectionOrder: RequiredAuditAnnexSectionOrder(), ConversionAuditEntries: cloneConversionAuditEntries(conversionAuditEntries)},
 	}
 
 	if err := report.Validate(); err != nil {
@@ -96,6 +96,25 @@ func NewCapitalGainsReportWithConversionArtifacts(
 // Validate verifies one fully calculated report and its nested sections.
 // Authored by: OpenCode
 func (report CapitalGainsReport) Validate() error {
+	if err := report.validateMetadata(); err != nil {
+		return err
+	}
+	if err := report.validateSections(); err != nil {
+		return err
+	}
+	if err := report.validateConversionArtifacts(); err != nil {
+		return err
+	}
+	if err := report.validateAuditAnnex(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateMetadata verifies report-level scalar fields.
+// Authored by: OpenCode
+func (report CapitalGainsReport) validateMetadata() error {
 	if report.Year <= 0 {
 		return fmt.Errorf("capital gains report year must be greater than zero")
 	}
@@ -112,6 +131,12 @@ func (report CapitalGainsReport) Validate() error {
 		return err
 	}
 
+	return nil
+}
+
+// validateSections verifies nested summary, reference, and detail sections.
+// Authored by: OpenCode
+func (report CapitalGainsReport) validateSections() error {
 	for index, entry := range report.SummaryEntries {
 		if err := entry.Validate(); err != nil {
 			return fmt.Errorf("capital gains report summary entry %d: %w", index, err)
@@ -127,8 +152,16 @@ func (report CapitalGainsReport) Validate() error {
 			return fmt.Errorf("capital gains report detail section %d: %w", index, err)
 		}
 	}
-	if err := report.validateConversionArtifacts(); err != nil {
-		return err
+
+	return nil
+}
+
+// validateAuditAnnex verifies the detailed audit annex.
+// Authored by: OpenCode
+func (report CapitalGainsReport) validateAuditAnnex() error {
+	var annex = report.AuditAnnex
+	if err := annex.Validate(); err != nil {
+		return fmt.Errorf("capital gains report audit annex: %w", err)
 	}
 
 	return nil
@@ -147,10 +180,7 @@ func (report CapitalGainsReport) validateConversionArtifacts() error {
 		}
 	}
 
-	for index, entry := range report.ConversionAuditEntries {
-		if err := entry.Validate(); err != nil {
-			return fmt.Errorf("capital gains report conversion audit entry %d: %w", index, err)
-		}
+	for index, entry := range report.AuditAnnex.ConversionAuditEntries {
 		if !report.hasMatchingRateSource(entry) {
 			return fmt.Errorf("capital gains report conversion audit entry %d: matching rate source is required", index)
 		}

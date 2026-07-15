@@ -123,7 +123,7 @@ func TestNewFailsWithoutResolvableUserConfigDir(t *testing.T) {
 func TestRunCoversInvalidAuthPayload(t *testing.T) {
 	t.Parallel()
 
-	var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	var server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		_, _ = writer.Write([]byte(`{"authToken":""}`))
 	}))

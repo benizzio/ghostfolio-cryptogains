@@ -105,7 +105,7 @@ func TestCalculateRejectsInvalidRequestAndUnavailableYear(t *testing.T) {
 		t.Fatalf("expected invalid request detail, got %q", calcErr.Error())
 	}
 
-	var request = validReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO)
+	var request = validReportRequest(t)
 	_, err = Calculate(request, syncmodel.ProtectedActivityCache{AvailableReportYears: []int{2023}})
 	calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindUnavailableReportYear)
 	if !strings.Contains(calcErr.Error(), "report year 2024 is not available") {
@@ -119,7 +119,7 @@ func TestCalculateRejectsInvalidRequestAndUnavailableYear(t *testing.T) {
 func TestCalculatePropagatesActivitySelectionFailures(t *testing.T) {
 	t.Parallel()
 
-	var request = validReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO)
+	var request = validReportRequest(t)
 	var cache = syncmodel.ProtectedActivityCache{
 		AvailableReportYears: []int{2024},
 		Activities: []syncmodel.ActivityRecord{{
@@ -156,7 +156,7 @@ func TestCalculateBuildsReportFromIncludedResults(t *testing.T) {
 		calculateAssetGroupFunc = originalCalculateAssetGroupFunc
 	}()
 
-	calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ syncmodel.ProtectedActivityCache, group assetInputGroup) (assetCalculationResult, error) {
+	calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, group assetInputGroup) (assetCalculationResult, error) {
 		switch group.AssetIdentityKey {
 		case "asset-btc":
 			return assetCalculationResult{
@@ -185,7 +185,7 @@ func TestCalculateBuildsReportFromIncludedResults(t *testing.T) {
 	}
 
 	var report, err = Calculate(
-		validReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO),
+		validReportRequest(t),
 		syncmodel.ProtectedActivityCache{
 			AvailableReportYears: []int{2024},
 			Activities: []syncmodel.ActivityRecord{
@@ -219,7 +219,7 @@ func TestCalculateWrapsCalculatedReportValidationFailure(t *testing.T) {
 		newCapitalGainsReport = originalNewCapitalGainsReport
 	}()
 
-	calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ syncmodel.ProtectedActivityCache, _ assetInputGroup) (assetCalculationResult, error) {
+	calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ assetInputGroup) (assetCalculationResult, error) {
 		return assetCalculationResult{
 			IncludeInMain: true,
 			SummaryEntry:  validAssetSummaryEntry(t, "asset-btc", "BTC", "1"),
@@ -242,7 +242,7 @@ func TestCalculateWrapsCalculatedReportValidationFailure(t *testing.T) {
 	}
 
 	_, err := Calculate(
-		validReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO),
+		validReportRequest(t),
 		syncmodel.ProtectedActivityCache{
 			AvailableReportYears: []int{2024},
 			Activities: []syncmodel.ActivityRecord{
@@ -256,6 +256,82 @@ func TestCalculateWrapsCalculatedReportValidationFailure(t *testing.T) {
 	}
 }
 
+// TestCalculateWrapsAuditAnnexAndFinalValidationFailures verifies calculator
+// wrappers that are only reachable through package-local seams.
+// Authored by: OpenCode
+func TestCalculateWrapsAuditAnnexAndFinalValidationFailures(t *testing.T) {
+	t.Run("wraps detailed audit annex validation failure", func(t *testing.T) {
+		var originalCalculateAssetGroupFunc = calculateAssetGroupFunc
+		defer func() {
+			calculateAssetGroupFunc = originalCalculateAssetGroupFunc
+		}()
+
+		calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ assetInputGroup) (assetCalculationResult, error) {
+			return assetCalculationResult{
+				IncludeInAudit: true,
+				AuditSection: reportmodel.PerAssetAuditSection{
+					AssetIdentityKey: " ",
+					DisplayLabel:     "BTC",
+				},
+			}, nil
+		}
+
+		_, err := Calculate(validReportRequest(t), syncmodel.ProtectedActivityCache{
+			AvailableReportYears: []int{2024},
+			Activities: []syncmodel.ActivityRecord{
+				zeroPricedHoldingReductionRecord(t, "btc-sell-1", "2024-01-02T10:00:00Z", "asset-btc", "BTC", "Bitcoin"),
+			},
+		})
+		var calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+		if !strings.Contains(calcErr.Error(), "calculated report audit annex validation failed") {
+			t.Fatalf("expected wrapped audit annex failure, got %q", calcErr.Error())
+		}
+	})
+
+	t.Run("wraps post-annex report validation failure", func(t *testing.T) {
+		var originalCalculateAssetGroupFunc = calculateAssetGroupFunc
+		var originalNewCapitalGainsReport = newCapitalGainsReport
+		defer func() {
+			calculateAssetGroupFunc = originalCalculateAssetGroupFunc
+			newCapitalGainsReport = originalNewCapitalGainsReport
+		}()
+
+		calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ assetInputGroup) (assetCalculationResult, error) {
+			return assetCalculationResult{}, nil
+		}
+		newCapitalGainsReport = func(
+			reportmodel.ReportRequest,
+			time.Time,
+			string,
+			[]reportmodel.AssetSummaryEntry,
+			apd.Decimal,
+			[]reportmodel.ReferenceLiquidationEntry,
+			[]reportmodel.AssetDetailSection,
+			[]reportmodel.ConversionAuditEntry,
+			[]reportmodel.ExchangeRateEvidence,
+		) (reportmodel.CapitalGainsReport, error) {
+			return reportmodel.CapitalGainsReport{
+				Year:                      2024,
+				CostBasisMethod:           reportmodel.CostBasisMethodFIFO,
+				GeneratedAt:               time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
+				ReportCalculationCurrency: "USD",
+				YearlyNetTotal:            reportInvalidDecimalForCalculator(),
+			}, nil
+		}
+
+		_, err := Calculate(validReportRequest(t), syncmodel.ProtectedActivityCache{
+			AvailableReportYears: []int{2024},
+			Activities: []syncmodel.ActivityRecord{
+				zeroPricedHoldingReductionRecord(t, "btc-sell-1", "2024-01-02T10:00:00Z", "asset-btc", "BTC", "Bitcoin"),
+			},
+		})
+		var calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+		if !strings.Contains(calcErr.Error(), "calculated report validation failed") {
+			t.Fatalf("expected wrapped post-annex report validation failure, got %q", calcErr.Error())
+		}
+	})
+}
+
 // TestCalculateAndAssetReplayWrapWrapperFailures verifies the remaining direct
 // calculator wrapper branches through package-local seams.
 // Authored by: OpenCode
@@ -266,12 +342,12 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 			calculateAssetGroupFunc = originalCalculateAssetGroupFunc
 		}()
 
-		calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ syncmodel.ProtectedActivityCache, _ assetInputGroup) (assetCalculationResult, error) {
+		calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ assetInputGroup) (assetCalculationResult, error) {
 			return assetCalculationResult{}, errors.New("asset group boom")
 		}
 
 		_, err := Calculate(
-			validReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO),
+			validReportRequest(t),
 			syncmodel.ProtectedActivityCache{
 				AvailableReportYears: []int{2024},
 				Activities: []syncmodel.ActivityRecord{
@@ -290,7 +366,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 			calculateAssetGroupFunc = originalCalculateAssetGroupFunc
 		}()
 
-		calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ syncmodel.ProtectedActivityCache, _ assetInputGroup) (assetCalculationResult, error) {
+		calculateAssetGroupFunc = func(_ reportmodel.CostBasisMethod, _ int, _ assetInputGroup) (assetCalculationResult, error) {
 			return assetCalculationResult{
 				IncludeInMain: true,
 				SummaryEntry:  validAssetSummaryEntry(t, "asset-btc", "BTC", "1"),
@@ -300,7 +376,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 		}
 
 		_, err := Calculate(
-			validReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO),
+			validReportRequest(t),
 			syncmodel.ProtectedActivityCache{
 				AvailableReportYears: []int{2024},
 				Activities: []syncmodel.ActivityRecord{
@@ -324,7 +400,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 			return nil, errors.New("basis constructor boom")
 		}
 
-		_, err := calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+		_, err := calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, assetInputGroup{
 			AssetIdentityKey: "asset-btc",
 			DisplayLabel:     "BTC",
 		})
@@ -344,7 +420,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 			return nil, errors.New("scope resolution boom")
 		}
 
-		_, err := calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+		_, err := calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, assetInputGroup{
 			AssetIdentityKey: "asset-btc",
 			DisplayLabel:     "BTC",
 		})
@@ -380,7 +456,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 			}}}, nil
 		}
 
-		_, err := calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+		_, err := calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, assetInputGroup{
 			AssetIdentityKey: "asset-btc",
 			DisplayLabel:     "BTC",
 		})
@@ -417,7 +493,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 			}}}, nil
 		}
 
-		_, err := calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+		_, err := calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, assetInputGroup{
 			AssetIdentityKey: "asset-btc",
 			DisplayLabel:     "BTC",
 		})
@@ -459,7 +535,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 				openBasisFunc:    func() (apd.Decimal, error) { return mustReportDecimal(t, "10"), nil },
 			}, nil
 		}
-		_, err := calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+		_, err := calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, assetInputGroup{
 			AssetIdentityKey: "asset-btc",
 			DisplayLabel:     "BTC",
 		})
@@ -476,7 +552,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 				openBasisFunc:    func() (apd.Decimal, error) { return mustReportDecimal(t, "10"), nil },
 			}, nil
 		}
-		_, err = calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+		_, err = calculateAssetGroup(reportmodel.CostBasisMethodAverageCost, 2024, assetInputGroup{
 			AssetIdentityKey: "asset-btc",
 			DisplayLabel:     "BTC",
 		})
@@ -493,7 +569,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 				openBasisFunc:    func() (apd.Decimal, error) { return apd.Decimal{}, errors.New("closing basis boom") },
 			}, nil
 		}
-		_, err = calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+		_, err = calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, assetInputGroup{
 			AssetIdentityKey: "asset-btc",
 			DisplayLabel:     "BTC",
 		})
@@ -511,7 +587,7 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 				openBasisFunc:    func() (apd.Decimal, error) { return mustReportDecimal(t, "10"), nil },
 			}, nil
 		}
-		_, err = calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, syncmodel.ProtectedActivityCache{}, assetInputGroup{
+		_, err = calculateAssetGroup(reportmodel.CostBasisMethodFIFO, 2024, assetInputGroup{
 			AssetIdentityKey: "asset-btc",
 			DisplayLabel:     "BTC",
 		})
@@ -541,8 +617,8 @@ func TestCalculateAndAssetReplayWrapWrapperFailures(t *testing.T) {
 			SelectedCurrencyCode: "USD",
 		}}, 1, 2024)
 		var calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
-		if !strings.Contains(calcErr.Error(), "could not build the in-year activity row") {
-			t.Fatalf("expected wrapped in-year artifact failure, got %q", calcErr.Error())
+		if !strings.Contains(calcErr.Error(), "could not build the audit activity entry") {
+			t.Fatalf("expected wrapped audit artifact failure, got %q", calcErr.Error())
 		}
 	})
 
@@ -643,7 +719,7 @@ func TestCalculateZeroPricedHoldingReductionDoesNotLookupCrossCurrencyRate(t *te
 	var reduction = zeroPricedHoldingReductionRecord(t, "zero-reduction-eur-sell", "2024-02-02T10:00:00Z", "asset-zero-no-lookup", "ZNL", "Zero No Lookup")
 	reduction.OrderCurrency = "EUR"
 
-	var report, err = calculator.Calculate(context.Background(), validReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO), syncmodel.ProtectedActivityCache{
+	var report, err = calculator.Calculate(context.Background(), validReportRequest(t), syncmodel.ProtectedActivityCache{
 		AvailableReportYears: []int{2024},
 		Activities:           []syncmodel.ActivityRecord{buy, reduction},
 	})
@@ -653,7 +729,7 @@ func TestCalculateZeroPricedHoldingReductionDoesNotLookupCrossCurrencyRate(t *te
 	if len(service.requests) != 0 {
 		t.Fatalf("expected no lookup for zero-priced holding reduction, got %#v", service.requests)
 	}
-	if len(report.RateSources) != 0 || len(report.ConversionAuditEntries) != 0 {
+	if len(report.RateSources) != 0 || len(report.AuditAnnex.ConversionAuditEntries) != 0 {
 		t.Fatalf("expected no conversion artifacts for zero-priced holding reduction, got %#v", report)
 	}
 }
@@ -669,7 +745,7 @@ func TestCalculateFutureZeroPricedHoldingReductionDoesNotLookupRate(t *testing.T
 	var reduction = zeroPricedHoldingReductionRecord(t, "future-zero-reduction-gbp-sell", "2025-02-02T10:00:00Z", "asset-zero-no-lookup", "ZNL", "Zero No Lookup")
 	reduction.OrderCurrency = "GBP"
 
-	_, err := calculator.Calculate(context.Background(), validReportRequest(t, 2024, reportmodel.CostBasisMethodFIFO), syncmodel.ProtectedActivityCache{
+	_, err := calculator.Calculate(context.Background(), validReportRequest(t), syncmodel.ProtectedActivityCache{
 		AvailableReportYears: []int{2024},
 		Activities:           []syncmodel.ActivityRecord{reduction},
 	})
@@ -678,6 +754,53 @@ func TestCalculateFutureZeroPricedHoldingReductionDoesNotLookupRate(t *testing.T
 	}
 	if len(service.requests) != 0 {
 		t.Fatalf("expected no lookup for future zero-priced holding reduction, got %#v", service.requests)
+	}
+}
+
+// TestCalculateBuildsAuditAnnexThroughSelectedYear verifies Annex 1 scope covers
+// replayed pre-year and in-year activities for reported assets while excluding
+// post-year activity.
+// Authored by: OpenCode
+func TestCalculateBuildsAuditAnnexThroughSelectedYear(t *testing.T) {
+	t.Parallel()
+
+	var report, err = Calculate(validReportRequest(t), syncmodel.ProtectedActivityCache{
+		AvailableReportYears: []int{2023, 2024, 2025},
+		Activities: []syncmodel.ActivityRecord{
+			annexPricedRecord(t, "btc-buy-2023", "2023-06-01T10:00:00Z", syncmodel.ActivityTypeBuy, "asset-btc-annex", "BTC", "Bitcoin", "2", "200"),
+			annexPricedRecord(t, "btc-sell-2024", "2024-03-01T10:00:00Z", syncmodel.ActivityTypeSell, "asset-btc-annex", "BTC", "Bitcoin", "1", "150"),
+			annexPricedRecord(t, "btc-sell-2025", "2025-03-01T10:00:00Z", syncmodel.ActivityTypeSell, "asset-btc-annex", "BTC", "Bitcoin", "1", "160"),
+			annexPricedRecord(t, "eth-buy-2023", "2023-01-01T10:00:00Z", syncmodel.ActivityTypeBuy, "asset-eth-annex", "ETH", "Ether", "1", "50"),
+			annexPricedRecord(t, "eth-sell-2023", "2023-02-01T10:00:00Z", syncmodel.ActivityTypeSell, "asset-eth-annex", "ETH", "Ether", "1", "60"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("calculate report: %v", err)
+	}
+
+	var sections = report.AuditAnnex.PerAssetAuditSections
+	if len(sections) != 2 {
+		t.Fatalf("expected two per-asset audit sections, got %#v", sections)
+	}
+	var btcSection = requireAuditSection(t, sections, "asset-btc-annex")
+	if len(btcSection.Entries) != 2 {
+		t.Fatalf("expected BTC pre-year and in-year entries only, got %#v", btcSection.Entries)
+	}
+	assertAuditEntrySourceIDs(t, btcSection.Entries, []string{"btc-buy-2023", "btc-sell-2024"})
+	if btcSection.Entries[1].GainOrLoss == nil || btcSection.Entries[1].GainOrLoss.Cmp(apd.New(50, 0)) != 0 {
+		t.Fatalf("expected BTC in-year liquidation gain in audit entry, got %#v", btcSection.Entries[1])
+	}
+	var ethSection = requireAuditSection(t, sections, "asset-eth-annex")
+	assertAuditEntrySourceIDs(t, ethSection.Entries, []string{"eth-buy-2023", "eth-sell-2023"})
+	if !ethSection.Entries[1].FullLiquidationEvent {
+		t.Fatalf("expected reference-only ETH liquidation event in annex, got %#v", ethSection.Entries[1])
+	}
+	for _, section := range sections {
+		for _, entry := range section.Entries {
+			if entry.SourceID == "btc-sell-2025" {
+				t.Fatalf("post-year activity must be excluded from annex: %#v", sections)
+			}
+		}
 	}
 }
 
@@ -956,8 +1079,8 @@ func TestReportCurrencyBoundaryAttachesRedactedDiagnosticRecord(t *testing.T) {
 		Comment:    "private user comment",
 	}})
 	var calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindActivityInput)
-	var diagnosticErr, ok = err.(diagnosticCalculationError)
-	if !ok {
+	var diagnosticErr diagnosticCalculationError
+	if !errors.As(err, &diagnosticErr) {
 		t.Fatalf("expected diagnostic calculation error, got %T", err)
 	}
 	var context = diagnosticErr.DiagnosticReportContext()
@@ -991,8 +1114,13 @@ func TestReportCurrencyBoundaryDefensiveConversionBranches(t *testing.T) {
 		GrossValue:           decimalPointer(t, "100"),
 		SelectedCurrencyCode: "EUR",
 	}
+	var nilContext context.Context
+	var _, nilContextErr = applyReportCurrencyBoundary(nilContext, &stubCurrencyRateService{}, reportmodel.ReportBaseCurrencyUSD, nil)
+	if nilContextErr != nil {
+		t.Fatalf("expected nil context boundary fallback to succeed for empty input, got %v", nilContextErr)
+	}
 
-	var _, nilServiceErr = applyReportCurrencyBoundary(nil, nil, reportmodel.ReportBaseCurrencyUSD, []assetInputGroup{{
+	var _, nilServiceErr = applyReportCurrencyBoundary(context.TODO(), nil, reportmodel.ReportBaseCurrencyUSD, []assetInputGroup{{
 		AssetIdentityKey: "asset-btc",
 		DisplayLabel:     "BTC",
 		Inputs:           []reportmodel.ActivityCalculationInput{input},
@@ -1091,11 +1219,11 @@ func TestReportCurrencyBoundaryHelperFallbackBranches(t *testing.T) {
 
 	var boundary = &reportCurrencyBoundaryContext{recordBySourceID: map[string]syncmodel.ActivityRecord{"other": {SourceID: "other"}}}
 	var passthrough = errors.New("plain")
-	if got := boundary.withInputDiagnosticRecord(reportmodel.ActivityCalculationInput{SourceID: "missing"}, passthrough); got != passthrough {
+	if got := boundary.withInputDiagnosticRecord(reportmodel.ActivityCalculationInput{SourceID: "missing"}, passthrough); !errors.Is(got, passthrough) {
 		t.Fatalf("expected non-calculation error passthrough")
 	}
 	var calcErr = reportmodel.NewCalculationError(reportmodel.CalculationErrorKindActivityInput, "failure", "missing", "", nil)
-	if got := boundary.withInputDiagnosticRecord(reportmodel.ActivityCalculationInput{SourceID: "missing"}, calcErr); got != calcErr {
+	if got := boundary.withInputDiagnosticRecord(reportmodel.ActivityCalculationInput{SourceID: "missing"}, calcErr); !errors.Is(got, calcErr) {
 		t.Fatalf("expected missing diagnostic record passthrough")
 	}
 	var indexed = recordBySourceID([]syncmodel.ActivityRecord{{SourceID: " "}, {SourceID: " kept "}})
@@ -1104,7 +1232,8 @@ func TestReportCurrencyBoundaryHelperFallbackBranches(t *testing.T) {
 	}
 
 	var calculator = NewCalculator(nil)
-	_, err := calculator.Calculate(nil, reportmodel.ReportRequest{}, syncmodel.ProtectedActivityCache{})
+	var nilContext context.Context
+	_, err := calculator.Calculate(nilContext, reportmodel.ReportRequest{}, syncmodel.ProtectedActivityCache{})
 	if err == nil || !strings.Contains(err.Error(), "report request year") {
 		t.Fatalf("expected nil context calculator path to validate request, got %v", err)
 	}
@@ -1434,6 +1563,50 @@ func TestReplayAssetInputCoversYearBoundariesAndWrappedStateFailures(t *testing.
 	if !strings.Contains(calcErr.Error(), "could not determine the asset quantity after applying the activity") {
 		t.Fatalf("expected wrapped post-apply quantity failure, got %q", calcErr.Error())
 	}
+
+	replayResult, err = replayAssetInput(stubAssetBasisState{
+		addAcquisitionFunc: func(basisAcquisitionInput) error { return nil },
+		openQuantityFunc:   func() (apd.Decimal, error) { return mustReportDecimal(t, "1"), nil },
+		openBasisFunc:      func() (apd.Decimal, error) { return mustReportDecimal(t, "10"), nil },
+	}, scopedActivityInput{Input: reportmodel.ActivityCalculationInput{
+		SourceID:         "buy-post-year",
+		OccurredAt:       time.Date(2025, time.January, 2, 0, 0, 0, 0, time.UTC),
+		SourceYear:       2025,
+		ActivityType:     reportmodel.ActivityTypeBuy,
+		AssetIdentityKey: "asset-btc",
+		DisplayLabel:     "BTC",
+		Quantity:         mustReportDecimal(t, "1"),
+		GrossValue:       decimalPointer(t, "10"),
+		FeeAmount:        decimalPointer(t, "0"),
+	}}, 1, 2024)
+	if err != nil {
+		t.Fatalf("replay post-year activity: %v", err)
+	}
+	if replayResult.auditEntry != nil || replayResult.activityRow != nil || replayResult.liquidationSummary != nil || replayResult.yearlyNetDelta.Sign() != 0 {
+		t.Fatalf("expected post-year replay to skip report artifacts, got %#v", replayResult)
+	}
+
+	_, err = replayAssetInput(stubAssetBasisState{
+		disposeFunc: func(_ basisDisposalInput) (basisDisposalResult, error) {
+			return basisDisposalResult{AllocatedBasis: mustReportDecimal(t, "7")}, nil
+		},
+		openQuantityFunc: func() (apd.Decimal, error) { return mustReportDecimal(t, "0"), nil },
+		openBasisFunc:    func() (apd.Decimal, error) { return mustReportDecimal(t, "0"), nil },
+	}, scopedActivityInput{Input: reportmodel.ActivityCalculationInput{
+		SourceID:         "sell-artifact-fail",
+		OccurredAt:       time.Date(2024, time.January, 3, 0, 0, 0, 0, time.UTC),
+		SourceYear:       2024,
+		ActivityType:     reportmodel.ActivityTypeSell,
+		AssetIdentityKey: "asset-btc",
+		DisplayLabel:     "BTC",
+		Quantity:         mustReportDecimal(t, "1"),
+		GrossValue:       decimalPointer(t, "12"),
+		FeeAmount:        decimalPointer(t, "2"),
+	}}, 1, 2024)
+	calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+	if !strings.Contains(calcErr.Error(), "could not build the liquidation summary") {
+		t.Fatalf("expected wrapped in-year artifact failure, got %q", calcErr.Error())
+	}
 }
 
 // TestApplyBasisInputRoutesActivities verifies basis-routing behavior for
@@ -1481,7 +1654,7 @@ func TestApplyBasisInputRoutesActivities(t *testing.T) {
 		DisplayLabel:     "BTC",
 		Quantity:         mustReportDecimal(t, "1"),
 	}}, 1)
-	requireCalculationError(t, err, reportmodel.CalculationErrorKindActivityInput)
+	_ = requireCalculationError(t, err, reportmodel.CalculationErrorKindActivityInput)
 
 	var pricedSellResult basisApplicationResult
 	pricedSellResult, err = applyBasisInput(stubAssetBasisState{
@@ -1519,7 +1692,7 @@ func TestApplyBasisInputRoutesActivities(t *testing.T) {
 
 	var zeroPricedResult basisApplicationResult
 	zeroPricedResult, err = applyBasisInput(stubAssetBasisState{
-		disposeFunc: func(input basisDisposalInput) (basisDisposalResult, error) {
+		disposeFunc: func(basisDisposalInput) (basisDisposalResult, error) {
 			return basisDisposalResult{AllocatedBasis: mustReportDecimal(t, "5"), ReachedZero: false}, nil
 		},
 	}, scopedActivityInput{Input: reportmodel.ActivityCalculationInput{
@@ -1549,7 +1722,7 @@ func TestApplyBasisInputRoutesActivities(t *testing.T) {
 		DisplayLabel:     "BTC",
 		Quantity:         mustReportDecimal(t, "1"),
 	}}, 1)
-	requireCalculationError(t, err, reportmodel.CalculationErrorKindActivityInput)
+	_ = requireCalculationError(t, err, reportmodel.CalculationErrorKindActivityInput)
 
 	var invalid apd.Decimal
 	invalid.Form = apd.Infinite
@@ -1564,7 +1737,7 @@ func TestApplyBasisInputRoutesActivities(t *testing.T) {
 		GrossValue:       &invalid,
 		FeeAmount:        decimalPointer(t, "1"),
 	}}, 1)
-	requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+	_ = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
 
 	_, err = applyAcquisition(stubAssetBasisState{addAcquisitionFunc: func(basisAcquisitionInput) error {
 		return errors.New("add boom")
@@ -1579,7 +1752,7 @@ func TestApplyBasisInputRoutesActivities(t *testing.T) {
 		GrossValue:       decimalPointer(t, "10"),
 		FeeAmount:        decimalPointer(t, "1"),
 	}}, 1)
-	requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+	_ = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
 
 	_, err = applyZeroPricedHoldingReduction(stubAssetBasisState{disposeFunc: func(basisDisposalInput) (basisDisposalResult, error) {
 		return basisDisposalResult{}, errors.New("dispose boom")
@@ -1593,7 +1766,7 @@ func TestApplyBasisInputRoutesActivities(t *testing.T) {
 		Quantity:                     mustReportDecimal(t, "1"),
 		IsZeroPricedHoldingReduction: true,
 	}})
-	requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+	_ = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
 
 	_, err = applyPricedLiquidation(stubAssetBasisState{}, scopedActivityInput{Input: reportmodel.ActivityCalculationInput{
 		SourceID:         "sell-missing-values",
@@ -1604,7 +1777,7 @@ func TestApplyBasisInputRoutesActivities(t *testing.T) {
 		DisplayLabel:     "BTC",
 		Quantity:         mustReportDecimal(t, "1"),
 	}})
-	requireCalculationError(t, err, reportmodel.CalculationErrorKindActivityInput)
+	_ = requireCalculationError(t, err, reportmodel.CalculationErrorKindActivityInput)
 
 	_, err = applyPricedLiquidation(stubAssetBasisState{}, scopedActivityInput{Input: reportmodel.ActivityCalculationInput{
 		SourceID:         "sell-invalid-proceeds",
@@ -1617,7 +1790,7 @@ func TestApplyBasisInputRoutesActivities(t *testing.T) {
 		GrossValue:       &invalid,
 		FeeAmount:        decimalPointer(t, "1"),
 	}})
-	requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+	_ = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
 
 	_, err = applyPricedLiquidation(stubAssetBasisState{disposeFunc: func(basisDisposalInput) (basisDisposalResult, error) {
 		return basisDisposalResult{}, errors.New("dispose boom")
@@ -1652,7 +1825,7 @@ func TestApplyBasisInputRoutesActivities(t *testing.T) {
 		GrossValue:       decimalPointer(t, "12"),
 		FeeAmount:        decimalPointer(t, "1"),
 	}})
-	requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+	_ = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
 
 	result, err := applyPricedLiquidation(stubAssetBasisState{disposeFunc: func(basisDisposalInput) (basisDisposalResult, error) {
 		return basisDisposalResult{
@@ -1968,6 +2141,14 @@ func TestBuildAssetCalculationResultCoversReferenceOnlyIncludedAndValidationFail
 		t.Fatalf("expected mixed calculation currency failure, got %q cause %v", calcErr.Error(), calcErr.Unwrap())
 	}
 
+	_, err = buildAssetCalculationResult(assetInputGroup{AssetIdentityKey: "asset-invalid-audit", DisplayLabel: "BTC"}, assetReplayState{
+		auditEntries: []reportmodel.AuditActivityEntry{{}},
+	})
+	calcErr = requireCalculationError(t, err, reportmodel.CalculationErrorKindBasisAllocation)
+	if !strings.Contains(calcErr.Error(), "could not build the per-asset audit section") {
+		t.Fatalf("expected wrapped per-asset audit section failure, got %q", calcErr.Error())
+	}
+
 	_, err = buildAssetCalculationResult(assetInputGroup{AssetIdentityKey: " ", DisplayLabel: "BTC"}, assetReplayState{
 		closingQuantity:          mustReportDecimal(t, "1"),
 		hadInYearFullLiquidation: true,
@@ -2073,8 +2254,8 @@ func TestNewAssetBasisStateAndCalculationHelpers(t *testing.T) {
 	if recordCalcErr.SourceID() != "rec-1" || recordCalcErr.DisplayLabel() != "BTC" {
 		t.Fatalf("expected record error references, got %#v", recordCalcErr)
 	}
-	var diagnosticRecordErr, ok = recordErr.(diagnosticCalculationError)
-	if !ok {
+	var diagnosticRecordErr diagnosticCalculationError
+	if !errors.As(recordErr, &diagnosticRecordErr) {
 		t.Fatalf("expected diagnostic calculation error, got %T", recordErr)
 	}
 	var stringTarget string
@@ -2089,7 +2270,7 @@ func TestNewAssetBasisStateAndCalculationHelpers(t *testing.T) {
 		t.Fatalf("expected nil calculation error passthrough, got %#v", passthrough)
 	}
 	var orphanCalcErr = reportmodel.NewCalculationError(reportmodel.CalculationErrorKindActivityInput, "orphan", "", "", nil)
-	if passthrough := withPersistedActivityRecord(orphanCalcErr, nil); passthrough != orphanCalcErr {
+	if passthrough := withPersistedActivityRecord(orphanCalcErr, nil); !errors.Is(passthrough, orphanCalcErr) {
 		t.Fatalf("expected missing record to preserve calculation error pointer")
 	}
 
@@ -2180,13 +2361,14 @@ func requireCalculationError(t *testing.T, err error, kind reportmodel.Calculati
 
 // validReportRequest returns one validated report request for calculator tests.
 // Authored by: OpenCode
-func validReportRequest(t *testing.T, year int, method reportmodel.CostBasisMethod) reportmodel.ReportRequest {
+func validReportRequest(t *testing.T) reportmodel.ReportRequest {
 	t.Helper()
 
 	var request, err = reportmodel.NewReportRequest(
-		year,
-		method,
+		2024,
+		reportmodel.CostBasisMethodFIFO,
 		reportmodel.ReportBaseCurrencyUSD,
+		reportmodel.ReportOutputFormatMarkdown,
 		time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
 	)
 	if err != nil {
@@ -2274,6 +2456,55 @@ func zeroPricedNoLookupAcquisitionRecord(t *testing.T) syncmodel.ActivityRecord 
 		OrderUnitPrice:   decimalPointer(t, "10"),
 		OrderGrossValue:  decimalPointer(t, "10"),
 		OrderFeeAmount:   decimalPointer(t, "0"),
+	}
+}
+
+// annexPricedRecord returns one same-currency priced record for Annex 1 scope
+// tests.
+// Authored by: OpenCode
+func annexPricedRecord(t *testing.T, sourceID string, occurredAt string, activityType syncmodel.ActivityType, assetIdentityKey string, assetSymbol string, assetName string, quantity string, grossValue string) syncmodel.ActivityRecord {
+	t.Helper()
+
+	return syncmodel.ActivityRecord{
+		SourceID:         sourceID,
+		OccurredAt:       occurredAt,
+		ActivityType:     activityType,
+		AssetIdentityKey: assetIdentityKey,
+		AssetSymbol:      assetSymbol,
+		AssetName:        assetName,
+		Quantity:         mustReportDecimal(t, quantity),
+		OrderCurrency:    "USD",
+		OrderGrossValue:  decimalPointer(t, grossValue),
+		OrderFeeAmount:   decimalPointer(t, "0"),
+	}
+}
+
+// requireAuditSection returns one Annex 1 audit section by asset identity key.
+// Authored by: OpenCode
+func requireAuditSection(t *testing.T, sections []reportmodel.PerAssetAuditSection, assetIdentityKey string) reportmodel.PerAssetAuditSection {
+	t.Helper()
+
+	for _, section := range sections {
+		if section.AssetIdentityKey == assetIdentityKey {
+			return section
+		}
+	}
+	t.Fatalf("missing audit section %q in %#v", assetIdentityKey, sections)
+	return reportmodel.PerAssetAuditSection{}
+}
+
+// assertAuditEntrySourceIDs verifies exact Annex 1 audit-entry order.
+// Authored by: OpenCode
+func assertAuditEntrySourceIDs(t *testing.T, entries []reportmodel.AuditActivityEntry, want []string) {
+	t.Helper()
+
+	if len(entries) != len(want) {
+		t.Fatalf("audit entry count = %d, want %d: %#v", len(entries), len(want), entries)
+	}
+	for index, sourceID := range want {
+		if entries[index].SourceID != sourceID {
+			t.Fatalf("audit entry %d source ID = %q, want %q in %#v", index, entries[index].SourceID, sourceID, entries)
+		}
 	}
 }
 

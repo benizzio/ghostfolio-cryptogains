@@ -173,6 +173,36 @@ func TestCloneCreatesDefensiveDecimalCopy(t *testing.T) {
 	}
 }
 
+// TestClonePointerPreservesNilAndCreatesDefensiveDecimalCopy verifies optional
+// decimals retain nil and do not share coefficient storage with their source.
+// Authored by: OpenCode
+func TestClonePointerPreservesNilAndCreatesDefensiveDecimalCopy(t *testing.T) {
+	t.Parallel()
+
+	if cloned := ClonePointer(nil); cloned != nil {
+		t.Fatalf("expected nil optional decimal clone to stay nil, got %#v", cloned)
+	}
+
+	var value, _, err = ParseString("123456789.987654321")
+	if err != nil {
+		t.Fatalf("parse decimal: %v", err)
+	}
+	var cloned = ClonePointer(&value)
+	if cloned == nil || cloned == &value || cloned.Cmp(&value) != 0 {
+		t.Fatalf("expected optional decimal clone to copy the source value, got source=%#v cloned=%#v", value, cloned)
+	}
+	value.Coeff.SetInt64(2)
+
+	var canonical string
+	canonical, err = CanonicalStringPointer(cloned)
+	if err != nil {
+		t.Fatalf("canonical cloned decimal: %v", err)
+	}
+	if canonical != "123456789.987654321" {
+		t.Fatalf("unexpected cloned decimal: got %q want %q", canonical, "123456789.987654321")
+	}
+}
+
 // TestInternalDecimalHelpersCoverRemainingBranches verifies the direct helper
 // branches that package-level API calls do not reach naturally.
 // Authored by: OpenCode

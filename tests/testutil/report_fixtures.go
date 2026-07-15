@@ -21,6 +21,30 @@ type ReportLedgerFixture struct {
 	ExpectedReports             map[reportmodel.CostBasisMethod]ExpectedReportLedger
 }
 
+// ReportOutputFormatFixture stores one deterministic supported report output
+// format from the report model plus contract-facing file expectations.
+// Authored by: OpenCode
+type ReportOutputFormatFixture struct {
+	Format      reportmodel.ReportOutputFormat
+	Code        string
+	Label       string
+	FileCount   int
+	Extensions  []string
+	Description string
+}
+
+// ReportRequestFixture stores one deterministic validated report request for a
+// selected output format.
+// Authored by: OpenCode
+type ReportRequestFixture struct {
+	Request            reportmodel.ReportRequest
+	Year               int
+	CostBasisMethod    reportmodel.CostBasisMethod
+	ReportBaseCurrency reportmodel.ReportBaseCurrency
+	OutputFormat       reportmodel.ReportOutputFormat
+	RequestedAt        time.Time
+}
+
 // ExpectedReportLedger stores one deterministic expected yearly report outcome
 // for one cost-basis method.
 // Authored by: OpenCode
@@ -373,6 +397,56 @@ func DeterministicReportLedgerFixture() ReportLedgerFixture {
 		IncompleteContextReportYear: 2025,
 		CurrencylessOrderReportYear: 2026,
 		ExpectedReports:             deterministicExpectedReportsByMethod(),
+	}
+}
+
+// DeterministicReportOutputFormatFixtures returns the user-selectable output
+// formats from the report-output contract using the validated report model
+// constants.
+//
+// Authored by: OpenCode
+func DeterministicReportOutputFormatFixtures() []ReportOutputFormatFixture {
+	return []ReportOutputFormatFixture{
+		{
+			Format:      reportmodel.ReportOutputFormatMarkdown,
+			Code:        string(reportmodel.ReportOutputFormatMarkdown),
+			Label:       reportmodel.ReportOutputFormatMarkdown.Label(),
+			FileCount:   2,
+			Extensions:  []string{".md", ".md"},
+			Description: "Main Markdown report plus separate Annex 1 Markdown file",
+		},
+		{
+			Format:      reportmodel.ReportOutputFormatPDF,
+			Code:        string(reportmodel.ReportOutputFormatPDF),
+			Label:       reportmodel.ReportOutputFormatPDF.Label(),
+			FileCount:   1,
+			Extensions:  []string{".pdf"},
+			Description: "One PDF containing the main report and Annex 1",
+		},
+	}
+}
+
+// DeterministicReportRequestFixture returns one validated report request for the
+// provided output format and the shared primary report scenario.
+//
+// Authored by: OpenCode
+func DeterministicReportRequestFixture(outputFormat reportmodel.ReportOutputFormat) ReportRequestFixture {
+	var year = 2024
+	var method = reportmodel.CostBasisMethodFIFO
+	var reportBaseCurrency = reportmodel.ReportBaseCurrencyUSD
+	var requestedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
+	var request, err = reportmodel.NewReportRequest(year, method, reportBaseCurrency, outputFormat, requestedAt)
+	if err != nil {
+		panic(err)
+	}
+
+	return ReportRequestFixture{
+		Request:            request,
+		Year:               year,
+		CostBasisMethod:    method,
+		ReportBaseCurrency: reportBaseCurrency,
+		OutputFormat:       outputFormat,
+		RequestedAt:        requestedAt,
 	}
 }
 

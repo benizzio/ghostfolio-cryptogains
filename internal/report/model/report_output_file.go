@@ -5,6 +5,7 @@ package model
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -16,16 +17,16 @@ type ReportOutputFile struct {
 	DocumentsDirectory string
 	Filename           string
 	Path               string
+	Role               ReportDocumentRole
+	MediaType          string
 	SavedAt            time.Time
-	OpenRequested      bool
-	OpenError          string
 }
 
 // NewReportOutputFile creates one validated report save outcome.
 //
 // Example:
 //
-//	outputFile, err := model.NewReportOutputFile("/tmp/Documents", "report.md", "/tmp/Documents/report.md", time.Now(), true, "")
+//	outputFile, err := model.NewReportOutputFile("/tmp/Documents", "report.md", "/tmp/Documents/report.md", model.ReportDocumentRoleMain, model.ReportMediaTypeMarkdown, time.Now())
 //	if err != nil {
 //		panic(err)
 //	}
@@ -36,17 +37,17 @@ func NewReportOutputFile(
 	documentsDirectory string,
 	filename string,
 	path string,
+	role ReportDocumentRole,
+	mediaType string,
 	savedAt time.Time,
-	openRequested bool,
-	openError string,
 ) (ReportOutputFile, error) {
 	var outputFile = ReportOutputFile{
 		DocumentsDirectory: strings.TrimSpace(documentsDirectory),
 		Filename:           strings.TrimSpace(filename),
 		Path:               strings.TrimSpace(path),
+		Role:               role,
+		MediaType:          strings.TrimSpace(mediaType),
 		SavedAt:            savedAt,
-		OpenRequested:      openRequested,
-		OpenError:          strings.TrimSpace(openError),
 	}
 
 	if err := outputFile.Validate(); err != nil {
@@ -68,11 +69,34 @@ func (outputFile ReportOutputFile) Validate() error {
 	if outputFile.Path == "" {
 		return fmt.Errorf("report output path is required")
 	}
+	if err := validateReportDocumentRole(outputFile.Role); err != nil {
+		return fmt.Errorf("report output role: %w", err)
+	}
+	if outputFile.MediaType != ReportMediaTypeMarkdown && outputFile.MediaType != ReportMediaTypePDF {
+		return fmt.Errorf("unsupported report output media type %q", outputFile.MediaType)
+	}
 	if outputFile.SavedAt.IsZero() {
 		return fmt.Errorf("report output saved-at timestamp is required")
 	}
-	if !outputFile.OpenRequested && outputFile.OpenError != "" {
-		return fmt.Errorf("report output open error requires an open request")
+	if err := outputFile.validatePathInsideDocumentsDirectory(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validatePathInsideDocumentsDirectory verifies persisted output metadata stays
+// scoped to its resolved Documents directory.
+// Authored by: OpenCode
+func (outputFile ReportOutputFile) validatePathInsideDocumentsDirectory() error {
+	var documentsDirectory = filepath.Clean(outputFile.DocumentsDirectory)
+	var path = filepath.Clean(outputFile.Path)
+	var relativePath, err = filepath.Rel(documentsDirectory, path)
+	if err != nil {
+		return fmt.Errorf("report output path must be inside documents directory: %w", err)
+	}
+	if relativePath == "." || strings.HasPrefix(relativePath, ".."+string(filepath.Separator)) || relativePath == ".." {
+		return fmt.Errorf("report output path must be inside documents directory")
 	}
 
 	return nil
