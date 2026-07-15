@@ -8,65 +8,65 @@
 
 ## Requirement Completeness
 
-- [ ] CHK001 Does the specification define the warning's document scope and occurrence unit for the two-file Markdown bundle and the combined PDF, including its exclusion from the separate Markdown Annex? [Completeness, Spec §FR-001–FR-003, Spec §SC-001]
-- [ ] CHK002 Is the inventory of report-visible currency-denominated amounts and unit prices exhaustive rather than left open by the phrase "at minimum"? [Completeness, Ambiguity, Spec §FR-004–FR-005]
-- [ ] CHK003 Are all inherited report obligations that remain in force, including output bundle shape, section order, PDF layout, selectable text, and security constraints, explicitly enumerated or incorporated through a stable reference? [Completeness, Gap, Spec §FR-021, Contract §Scope, Contract §PDF Contract]
+- [x] CHK001 Does the specification define the warning's document scope and occurrence unit for the two-file Markdown bundle and the combined PDF, including its exclusion from the separate Markdown Annex? [Completeness, Spec §FR-001–FR-003, Spec §SC-001]
+- [x] CHK002 Is the inventory of report-visible currency-denominated amounts and unit prices exhaustive rather than left open by the phrase "at minimum"? [Completeness, Ambiguity, Spec §FR-004–FR-005]
+- [x] CHK003 Are all inherited report obligations that remain in force, including output bundle shape, section order, PDF layout, selectable text, and security constraints, explicitly enumerated or incorporated through a stable reference? [Completeness, Gap, Spec §FR-021, Contract §Scope, Contract §PDF Contract]
 - [ ] CHK004 Does the specification define required outcomes for every identified report-preparation failure class, including non-finite or unrepresentable values, PDF layout preparation failures, and PDF finalization failures? [Completeness, Gap, Contract §Failure Contract, Plan §Constitution Prerequisite]
 - [ ] CHK005 Are requirements documented for partial output-bundle failures, including whether reserved or written files remain, what constitutes a successful result, and which cleanup guarantees apply? [Completeness, Recovery, Gap, Plan §Technical Context, Data Model §Existing ReportDocument And Output Bundle]
-- [ ] CHK006 Are requirements-level escaping, sanitization, delimiter-control, and secret-redaction obligations defined for dynamic converted-amount content and failure information in both formats? [Completeness, Security, Gap, Spec §Security, Persistence, And Integration Evidence, Contract §Markdown Contract, Contract §Failure Contract]
+- [x] CHK006 Are requirements-level escaping, sanitization, delimiter-control, and secret-redaction obligations defined for dynamic converted-amount content and failure information in both formats? [Completeness, Security, Gap, Spec §Security, Persistence, And Integration Evidence, Contract §Markdown Contract, Contract §Failure Contract]
 
 ## Requirement Clarity
 
-- [ ] CHK007 Are "present financial value," "currency-denominated amount," "unit price," and acceptable surrounding currency context defined precisely enough to classify every visible numeric field? [Clarity, Spec §FR-004–FR-005, Spec §Key Entities]
-- [ ] CHK008 Does the specification define the exact visible number grammar, including the literal decimal separator, fixed-point notation, trailing zeros, sign handling, and whether grouping separators are permitted? [Clarity, Ambiguity, Spec §FR-004, Spec §FR-011]
+- [x] CHK007 Are "present financial value," "currency-denominated amount," "unit price," and acceptable surrounding currency context defined precisely enough to classify every visible numeric field? [Clarity, Spec §FR-004–FR-005, Spec §Key Entities]
+- [x] CHK008 Does the specification define the exact visible number grammar, including the literal decimal separator, fixed-point notation, trailing zeros, sign handling, and whether grouping separators are permitted? [Clarity, Ambiguity, Spec §FR-004, Spec §FR-011]
 - [ ] CHK009 Is "established provider-published precision" tied to an objective source representation, including how source trailing zeros and normalized rate values are treated? [Clarity, Ambiguity, Spec §FR-005, Spec §FR-009, Spec §Assumptions]
 - [ ] CHK010 Is "established exact report representation" for quantities tied to a stable baseline that an acceptance reviewer can identify without consulting current implementation output? [Clarity, Ambiguity, Spec §FR-009, Spec §SC-004]
 - [ ] CHK011 Are the exact source conditions for a "zero-priced holding reduction" and an "applicable non-zero source price" defined independently of visible rounded values? [Clarity, Spec §FR-013–FR-015, Spec §Key Entities]
-- [ ] CHK012 Is "separate visible line" defined for the first entry, subsequent entries, and entries that wrap internally, with logical entry boundaries distinguished from width-driven wraps? [Clarity, Ambiguity, Spec §FR-016–FR-018, Spec §Edge Cases]
+- [x] CHK012 Is "separate visible line" defined for the first entry, subsequent entries, and entries that wrap internally, with logical entry boundaries distinguished from width-driven wraps? [Clarity, Ambiguity, Spec §FR-016–FR-018, Spec §Edge Cases]
 
 ## Requirement Consistency
 
-- [ ] CHK013 Does the broad requirement to apply presentation changes to both formats and Annex content consistently distinguish the warning rule, which excludes the separate Markdown Annex? [Consistency, Spec §FR-001–FR-003, Spec §SC-001]
-- [ ] CHK014 Is the requirement for "every structured boolean" consistent with the stated current scope of one Annex field and the exclusion of arbitrary note text? [Consistency, Spec §FR-012, Spec §Key Entities, Contract §Structured Boolean Contract]
-- [ ] CHK015 Do the requirements consistently distinguish retaining the pre-format audit currency from blanking only its visible `Original Activity Currency` value for a qualifying row? [Consistency, Spec §FR-013–FR-015, Plan §Presentation And Rendering Boundary, Contract §Original Activity Currency Contract]
+- [x] CHK013 Does the broad requirement to apply presentation changes to both formats and Annex content consistently distinguish the warning rule, which excludes the separate Markdown Annex? [Consistency, Spec §FR-001–FR-003, Spec §SC-001]
+- [x] CHK014 Is the requirement for "every structured boolean" consistent with the stated current scope of one Annex field and the exclusion of arbitrary note text? [Consistency, Spec §FR-012, Spec §Key Entities, Contract §Structured Boolean Contract]
+- [x] CHK015 Do the requirements consistently distinguish retaining the pre-format audit currency from blanking only its visible `Original Activity Currency` value for a qualifying row? [Consistency, Spec §FR-013–FR-015, Plan §Presentation And Rendering Boundary, Contract §Original Activity Currency Contract]
 - [ ] CHK016 Is the contract's new rejection of duplicate or non-canonical converted amount kinds consistent with the specification's presentation-only scope and its statement that existing entry order is retained? [Consistency, Conflict, Spec §FR-019, Spec §Scope Boundaries, Contract §Converted Amounts Contract]
-- [ ] CHK017 Are cross-format parity requirements consistent with the explicitly permitted differences in syntax, pagination, page titles, and Markdown Annex separation? [Consistency, Spec §FR-020, Spec §SC-008, Contract §Cross-Format Parity]
+- [x] CHK017 Are cross-format parity requirements consistent with the explicitly permitted differences in syntax, pagination, page titles, and Markdown Annex separation? [Consistency, Spec §FR-020, Spec §SC-008, Contract §Cross-Format Parity]
 
 ## Acceptance Criteria Quality
 
-- [ ] CHK018 Can the warning's single occurrence, semantic placement, standalone status, and complete bold emphasis be assessed objectively when the sentence wraps into multiple PDF text fragments? [Measurability, Spec §FR-002–FR-003, Spec §SC-001]
+- [x] CHK018 Can the warning's single occurrence, semantic placement, standalone status, and complete bold emphasis be assessed objectively when the sentence wraps into multiple PDF text fragments? [Measurability, Spec §FR-002–FR-003, Spec §SC-001]
 - [ ] CHK019 Do acceptance criteria map every financial field class and every required numeric boundary to both output formats, rather than relying on representative examples alone? [Acceptance Criteria, Coverage, Spec §FR-004–FR-006, Spec §SC-002]
-- [ ] CHK020 Is the comparison baseline and observation point for "unchanged before visible formatting" defined objectively for calculations, currencies, rates, quantities, inclusion decisions, and audit values? [Measurability, Spec §FR-007–FR-008, Spec §SC-003]
-- [ ] CHK021 Can the one-to-one relationship between included converted entries and separately started visible lines be measured objectively when an individual entry wraps within a narrow column? [Measurability, Ambiguity, Spec §SC-007, Spec §Edge Cases]
+- [x] CHK020 Is the comparison baseline and observation point for "unchanged before visible formatting" defined objectively for calculations, currencies, rates, quantities, inclusion decisions, and audit values? [Measurability, Spec §FR-007–FR-008, Spec §SC-003]
+- [x] CHK021 Can the one-to-one relationship between included converted entries and separately started visible lines be measured objectively when an individual entry wraps within a narrow column? [Measurability, Ambiguity, Spec §SC-007, Spec §Edge Cases]
 - [ ] CHK022 Is the two-minute, 10,000-activity target accompanied by a defined fixture, timing boundary, execution environment, and independent per-format measurement rule? [Acceptance Criteria, Measurability, Spec §SC-010, Spec §Testing Evidence]
 
 ## Scenario Coverage
 
-- [ ] CHK023 Are primary-flow requirements complete for the Markdown main document, Markdown Annex, PDF main section, and PDF Annex across every listed financial and audit field class? [Coverage, Primary Flow, Spec §FR-001, Spec §FR-004–FR-005]
-- [ ] CHK024 Are alternate-flow requirements complete for both boolean states, zero- and non-zero-priced activities, and zero, one, two, and three converted entries using every valid canonical subsequence? [Coverage, Alternate Flow, Spec §User Story 2, Spec §User Story 3]
+- [x] CHK023 Are primary-flow requirements complete for the Markdown main document, Markdown Annex, PDF main section, and PDF Annex across every listed financial and audit field class? [Coverage, Primary Flow, Spec §FR-001, Spec §FR-004–FR-005]
+- [x] CHK024 Are alternate-flow requirements complete for both boolean states, zero- and non-zero-priced activities, and zero, one, two, and three converted entries using every valid canonical subsequence? [Coverage, Alternate Flow, Spec §User Story 2, Spec §User Story 3]
 - [ ] CHK025 Are exception-flow requirements specified for non-finite values, formatting limits, PDF layout failures, and PDF finalization failure without process termination or false success? [Coverage, Exception Flow, Gap, Contract §Failure Contract, Plan §Constitution Prerequisite]
 - [ ] CHK026 Are recovery requirements defined for failed Markdown bundles and failed PDF output, including cleanup, retained prior files, and the absence of a misleading successful result? [Coverage, Recovery, Gap, Plan §Technical Context, Contract §Failure Contract]
 - [ ] CHK027 Are non-functional scale requirements complete for reports whose multiline converted entries increase row height and page count at the established 10,000-activity scale? [Coverage, Non-Functional, Spec §SC-010, Contract §PDF Contract]
 
 ## Edge Case Coverage
 
-- [ ] CHK028 Do requirements consistently preserve exact-value inclusion, omission, and classification decisions when a non-zero amount is visibly presented as `0.00`? [Edge Case, Consistency, Spec §FR-007–FR-008, Spec §FR-019, Spec §Edge Cases]
-- [ ] CHK029 Are the distinct blank states for an absent financial value, no applicable converted entries, and a suppressed original activity currency explicitly differentiated? [Edge Case, Clarity, Spec §FR-010, Spec §FR-013, Spec §Edge Cases]
-- [ ] CHK030 Are acceptable magnitude and precision limits defined for very large values, and is the required outcome specified when a value cannot be represented in the required visible form? [Edge Case, Gap, Spec §Edge Cases, Contract §Failure Contract]
-- [ ] CHK031 Do rounding requirements cover positive and negative ties, carry into a new whole-number digit, values on either side of a tie, exact zero, and negative values that become zero? [Edge Case, Coverage, Spec §FR-006, Spec §FR-011, Spec §Edge Cases]
+- [x] CHK028 Do requirements consistently preserve exact-value inclusion, omission, and classification decisions when a non-zero amount is visibly presented as `0.00`? [Edge Case, Consistency, Spec §FR-007–FR-008, Spec §FR-019, Spec §Edge Cases]
+- [x] CHK029 Are the distinct blank states for an absent financial value, no applicable converted entries, and a suppressed original activity currency explicitly differentiated? [Edge Case, Clarity, Spec §FR-010, Spec §FR-013, Spec §Edge Cases]
+- [x] CHK030 Are acceptable magnitude and precision limits defined for very large values, and is the required outcome specified when a value cannot be represented in the required visible form? [Edge Case, Gap, Spec §Edge Cases, Contract §Failure Contract]
+- [x] CHK031 Do rounding requirements cover positive and negative ties, carry into a new whole-number digit, values on either side of a tie, exact zero, and negative values that become zero? [Edge Case, Coverage, Spec §FR-006, Spec §FR-011, Spec §Edge Cases]
 - [ ] CHK032 Does the specification define the required PDF outcome when a wrapped converted-amount row is taller than the remaining page area or taller than one printable page? [Edge Case, Recovery, Gap, Spec §Edge Cases, Contract §Converted Amounts Contract]
 
 ## Non-Functional Requirements
 
 - [ ] CHK033 Are confidentiality requirements complete for generated documents, errors, diagnostics, examples, fixtures, and all reusable authentication or protected-payload material? [Security, Completeness, Spec §Security, Persistence, And Integration Evidence]
-- [ ] CHK034 Are the retained local-export protections, including requested file permissions, local-only processing, reservation, cleanup, and prohibition of remote persistence, stated as normative requirements rather than plan assumptions? [Security, Consistency, Gap, Spec §Security, Persistence, And Integration Evidence, Plan §Technical Context]
+- [x] CHK034 Are the retained local-export protections, including requested file permissions, local-only processing, reservation, cleanup, and prohibition of remote persistence, stated as normative requirements rather than plan assumptions? [Security, Consistency, Gap, Spec §Security, Persistence, And Integration Evidence, Plan §Technical Context]
 - [ ] CHK035 Are accessibility and readability requirements for warning emphasis, multiline tables, searchable/selectable PDF text, and assistive consumption explicitly retained or intentionally excluded? [Non-Functional, Accessibility, Gap, Contract §PDF Contract]
 - [ ] CHK036 Are audit-integrity requirements measurable for currency identity, provider-rate precision, exact source values, and the prohibition on feeding visible rounded values back into financial decisions? [Non-Functional, Measurability, Spec §FR-005, Spec §FR-007–FR-008, Spec §Financial Calculation Evidence]
 
 ## Dependencies & Assumptions
 
 - [ ] CHK037 Is the assumption that existing local report capabilities require no new dependency or external integration documented consistently, including the requirement outcome if that assumption proves false? [Assumption, Dependency, Spec §Security, Persistence, And Integration Evidence, Plan §Dependencies And Integrations]
-- [ ] CHK038 Is the read-only empirical dataset assumption connected clearly to the calculation-regression evidence it supports and distinguished from new presentation-specific acceptance evidence? [Assumption, Traceability, Spec §Financial Calculation Evidence, Spec §Testing Evidence]
+- [x] CHK038 Is the read-only empirical dataset assumption connected clearly to the calculation-regression evidence it supports and distinguished from new presentation-specific acceptance evidence? [Assumption, Traceability, Spec §Financial Calculation Evidence, Spec §Testing Evidence]
 
 ## Ambiguities & Conflicts
 
