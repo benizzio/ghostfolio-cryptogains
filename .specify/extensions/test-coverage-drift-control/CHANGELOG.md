@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0] - 2026-07-12
+
+- Make report reruns incremental by preserving historical findings with stable `COV-DRIFT-###` identifiers and `Pending`/`Resolved` status
+- Limit remediation planning and task generation to pending findings while preserving existing tasks
+- Record evidence-based, behavior-preserving remediation plans in report findings before generating implementation tasks
+- Add a final remediation task that marks only successfully remediated and validated findings as `Resolved` with resolution notes
+
 ## [0.2.1] - 2026-05-31
 
 - Remove source command metadata markers so installed opencode command wrappers do not duplicate extension/config comments
