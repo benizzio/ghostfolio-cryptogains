@@ -102,6 +102,23 @@
 - **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
 - **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
 
+### Security, Persistence, And User Export Evidence *(mandatory)*
+
+- **Application-Managed Persistence**: [List retained configuration, state,
+  caches, snapshots, history, diagnostics, temporary artifacts, and output
+  metadata, or state that none are added. For financial or person-linked data,
+  document token-derived encryption and OWASP Cryptographic Storage Cheat Sheet
+  controls; otherwise record N/A with rationale]
+- **Explicit User-Requested Exports**: [List exported fields, why cleartext is
+  necessary, local destination and access controls, saved-path disclosure,
+  failed-attempt cleanup, removal guidance, and confirmation that no report
+  state or automatic re-ingestion is added, or state N/A]
+- **Token And Sensitive-Data Handling**: [Describe token lifetime and redaction
+  of real user financial data from non-export channels; examples and fixtures
+  must use synthetic data]
+- **External Integration Impact**: [Describe network, remote storage, telemetry,
+  renderer, or third-party impacts, or state that none apply]
+
 ### Financial Calculation Evidence *(include when feature affects financial calculations)*
 
 - **Numeric Representation**: [Describe required exact-decimal or integer-unit handling, scale, and currency identity]

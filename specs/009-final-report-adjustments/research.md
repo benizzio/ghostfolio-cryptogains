@@ -84,8 +84,13 @@ Rationale: A non-zero value such as `0.004` may display as `0.00` but remains a
 non-zero calculated value. Summary omission must therefore use
 `Decimal.Sign() == 0`, converted components must continue to be omitted only when
 both exact amounts are zero, and zero-priced holding reductions must use the
-existing `IsZeroPricedHoldingReduction` classification. This preserves report
-membership and audit meaning while changing only visible precision.
+existing `IsZeroPricedHoldingReduction` classification. At the report input
+boundary that inherited compatibility predicate accepts an explained `SELL`
+whose every present source monetary field is exact zero; no field must be
+present, so all-missing and mixed missing-and-zero shapes qualify without
+creating zero values. Sync admission remains unchanged and continues to require
+resolvable amount evidence. This preserves report membership and audit meaning
+while changing only visible precision.
 
 Alternatives considered: Make decisions from the two-place string, but that
 would incorrectly omit small non-zero values and could misclassify activity.
@@ -132,7 +137,11 @@ Decision: Add the existing `IsZeroPricedHoldingReduction` classification to the
 transient `AuditActivityEntry` report model while retaining its existing
 pre-format `ActivityCurrency` value. `BuildAnnexActivityRow` leaves only the
 visible activity currency empty when that classification is true. Keep
-`CalculationCurrency` and every other audit field unchanged.
+`CalculationCurrency` and every other audit field unchanged. Preserve the
+existing report-level source-shape predicate: the explained `SELL` qualifies
+when all present order, asset-profile, and base monetary values are finite exact
+zeros, including when every monetary value is missing or when missing and zero
+values are mixed. Missing values remain nil and visible blanks.
 
 Rationale: At construction time the exact domain classification is available.
 Zero-priced reductions intentionally have no selected currency context, and the
@@ -142,14 +151,19 @@ preserves pre-feature model behavior without inventing source provenance. The
 shared presentation row gives both formats the required blank cell without
 renderer-side financial inference. The added boolean is transient report
 evidence copied from an existing input; it does not alter calculation, storage,
-currency selection, or inclusion.
+currency selection, or inclusion. The separate sync validator still requires
+resolvable amount evidence for newly admitted activity history; this feature
+does not turn the report-level all-missing compatibility shape into a new sync
+input contract.
 
 Alternatives considered: Infer applicability in renderers from activity labels
 and visible price, but that duplicates logic and can confuse a rounded non-zero
 price with exact zero. Clear `ActivityCurrency` in the calculated audit model,
 but that would change its pre-format value. Derive a source currency from
 explicit zero fields, but those fields can be absent or span different tiers and
-do not define one authoritative source context.
+do not define one authoritative source context. Require a present zero unit
+price, but that would regress the established all-missing report input and could
+change calculation routing and rate lookup.
 
 ## Converted Amount Entry Representation
 
@@ -308,18 +322,24 @@ the feature remains incomplete.
 ## Security Review
 
 Decision: Treat the feature as a controlled presentation change inside the
-existing explicit local export boundary and review it against OWASP Top 10:2025.
+explicit user-requested export boundary defined by constitution v3.0.0 and
+review it against OWASP Top 10:2025.
 
 Rationale: The relevant risks are local output access (A01), renderer
 configuration (A02), dependency integrity (A03), token disclosure (A04/A07),
 injection through Markdown or PDF delimiters (A05), misleading rounded or
 missing values (A06/A08), sensitive failure logging (A09), and render/layout or
 write failures (A10). The existing writer continues to request mode `0600` and
-use its reserve/write/cleanup sequence; this feature adds no output persistence
-path. SEC-001 applies to successful documents, returned and wrapped errors,
-diagnostics, examples, and fixtures and excludes real credentials, reusable
-authentication or decryption material, and raw protected-payload serialization.
-Only clearly synthetic non-reusable redaction sentinels are permitted. Generated
+use its reserve/write/cleanup sequence. Final report files qualify as explicit
+user-requested exports because processing is local, every path and the cleartext
+financial-data status are disclosed, deletion guidance is shown, and no
+additional cleartext copy, report history, durable path state, reopen catalog, or
+automatic re-ingestion is retained. SEC-001 applies to successful documents,
+returned and wrapped errors, diagnostics, screenshots, examples, and fixtures
+and excludes real credentials, reusable authentication or decryption material,
+raw protected-payload serialization, and real user financial data outside
+contracted export fields and separately reviewed diagnostic modes. Only clearly
+synthetic non-reusable redaction sentinels are permitted. Generated
 Converted Amounts dynamic components are escaped and sanitized before fixed
 entry syntax and controlled `<br>` or newline delimiters are inserted. The
 isolated PDF finalization prerequisite replaces process exit with normal error
@@ -327,6 +347,8 @@ propagation. No network, authentication, remote storage, or cryptographic
 boundary changes.
 
 Alternatives considered: Treat generated reports as protected application
-snapshots, but they are explicit user-requested cleartext exports. Add remote
-rendering for visual verification, but that would create an unnecessary data
-disclosure surface.
+snapshots, but that would make ordinary Markdown and PDF exports unusable and is
+unnecessary under the narrow constitution v3.0.0 boundary. Retain cleartext
+temporary files or report history, but those remain application-managed
+persistence and are prohibited. Add remote rendering for visual verification,
+but that would create an unnecessary data disclosure surface.

@@ -20,6 +20,19 @@ write/sync/close completion point, failed-attempt cleanup, collision retention,
 or post-save opener-warning behavior. Every reserved report path is requested
 with owner-read and owner-write permissions only, mode `0600`, before writing.
 
+## Explicit User Export Contract
+
+- Markdown and PDF output follows a direct user request and is generated and
+  saved locally to the user-controlled Documents directory.
+- Every successful result, including opener-warning success, identifies the
+  files as cleartext financial-data exports, reports every saved path, and tells
+  the user to delete all listed files to remove the exported data.
+- No additional cleartext copy, temporary report file, report history, durable
+  output-path state, reopen catalog, remote transfer, or automatic re-ingestion
+  is permitted.
+- Failed-attempt cleanup removes only current-attempt paths. Successful files
+  become user-managed after the optional operating-system open handoff.
+
 ## Main Report Warning
 
 The main report must contain this exact sentence once:
@@ -152,12 +165,16 @@ rewritten.
 
 Source-price predicates are evaluated before conversion and visible formatting.
 An exact zero is a present finite decimal numerically equal to zero regardless
-of exponent, trailing-zero scale, or negative-zero sign; a missing value does
-not establish zero. A zero-priced holding reduction is the inherited
-classification for a normalized `SELL` with positive quantity, a non-empty
-trimmed explanation, a present exact-zero normalized source unit price, no
+of exponent, trailing-zero scale, or negative-zero sign. A zero-priced holding
+reduction is the inherited report-calculation compatibility classification for a
+normalized `SELL` with positive quantity, a non-empty trimmed explanation, no
 negative running-holdings result, and no non-zero present source monetary field
-across the order, asset-profile, or base tiers.
+across the order, asset-profile, or base tiers. No monetary field is required:
+all-missing, mixed missing-and-zero, explicit-zero-unit-price, and
+all-explicit-zero shapes qualify. Missing fields remain missing and render blank;
+they are not numeric-zero evidence or manufactured `0.00` values. This does not
+broaden inherited sync admission, which continues to require resolvable amount
+evidence.
 
 For a Detailed Per-Asset Audit Report row carrying that exact pre-format
 classification:
@@ -172,10 +189,14 @@ classification:
   liquidation evidence, gain or loss, conversion status, and note remain
   unchanged and visible when otherwise applicable.
 
-An applicable non-zero source price exists when the selected pre-conversion
-single-tier context has a non-empty source currency and a present finite unit
-price, source-provided or same-tier derived, that is numerically greater than
-zero. `Original Activity Currency` retains that selected source currency even
+An applicable non-zero source price exists when the inherited selector chooses
+the first complete `order -> asset_profile -> base` priority tier without mixing
+tier values. A complete tier has a non-empty source currency, a present finite
+fee including exact zero, a finite gross value that is present or derived from
+same-tier unit price and quantity, and a finite unit price that is present or
+derived from same-tier gross value and quantity. Missing fee makes a tier
+incomplete; the selector continues to the next tier. The chosen unit price is
+numerically greater than zero. `Original Activity Currency` retains that selected source currency even
 when the price displays as `0.00`. Rows satisfying neither predicate retain
 their inherited visible currency behavior.
 
@@ -303,22 +324,25 @@ pagination, PDF page titles, and separate Markdown Annex output.
 
 SEC-001 applies to successful and failed rendering across generated documents,
 result and error text including wrapped causes, diagnostics, documentation and
-test examples, and committed or generated fixtures. A contextual error may
-identify the failing field or row, but project-owned boundaries must redact or
-suppress real credentials, bearer or JWT values, reusable authentication or
-decryption material, token-derived verifiers or keys, and raw encrypted or
-decrypted protected-payload serialization or reversible encodings. Contracted
-cleartext financial fields and inherited mode-authorized modeled non-secret
-diagnostic fields do not authorize raw snapshot, envelope, payload, credential,
-verifier, or key material. Redaction tests may use only clearly synthetic,
-non-reusable sentinels.
+test examples, screenshots, and committed or generated fixtures. A contextual
+error may identify the failing stage, field, or row, but project-owned boundaries
+must redact or suppress real credentials, bearer or JWT values, reusable
+authentication or decryption material, token-derived verifiers or keys, raw
+encrypted or decrypted protected-payload serialization or reversible encodings,
+and real user financial data outside contracted export fields and separately
+reviewed diagnostic modes. Contracted cleartext financial fields do not authorize
+the same values in errors, logs, screenshots, examples, fixtures, or unrelated
+document content. Examples, fixtures, and redaction sentinels must be clearly
+synthetic and non-reusable.
 
 ## Failure Contract
 
 - A non-finite decimal, finite but unrepresentable value, formatting precision
   or exponent limit, unexpected decimal condition, or PDF measurement,
   wrapping, page-fit, drawing, or byte-finalization failure returns a contextual
-  non-secret render error and must not create a successful output result.
+  non-secret render error identifying the failed stage and applicable semantic
+  field or table-row context, wraps only a redacted cause, leaves the application
+  available for retry, and must not create a successful output result.
 - PDF byte finalization means serializing the completed in-memory PDF layout
   into the byte payload used to construct the combined PDF report document. It
   occurs before output-path reservation and must use an error-returning path.
@@ -375,9 +399,10 @@ Automated tests must cover both formats and prove:
 - the existing calculated audit `ActivityCurrency` value remains unchanged
   before a zero-priced presentation cell becomes blank
 - zero-priced blank and non-zero-priced retained visible activity currencies
-- exact-zero, missing-price, positive `0.004`, same-tier-derived price, and
-  contradictory non-zero source-field cases exercise the FR-013 and FR-015
-  predicates before formatting
+- all-missing, mixed missing-and-zero, explicit-zero, all-zero, positive `0.004`,
+  same-tier-derived positive, and contradictory non-zero source-field cases
+  exercise the FR-013 and FR-015 predicates before formatting; sync admission is
+  separately characterized as unchanged
 - zero, one, two, and three included converted-entry cases covering each of the
   eight FR-019 canonical subsequences
 - received converted-entry order is preserved without new duplicate-kind or
@@ -387,6 +412,11 @@ Automated tests must cover both formats and prove:
   line
 - PDF measured and drawn line counts, row height, and bottom-margin preflight
   agree for explicit newlines and long space-wrapped content
+- table-start relocation before the first row emits no continuation label, while
+  actual continuation pages retain inherited context and repeated headers
+- normal success and opener-warning result copy identify cleartext financial
+  exports, report every saved path, provide deletion guidance, and retain no
+  report or path history after result-flow exit
 - a row that fits only the fresh-page row area advances before drawing and is
   drawn whole once, while a row exceeding that area returns a layout error and
   does not finalize or save a PDF

@@ -6,7 +6,11 @@ This feature adds no persisted schema, protected snapshot field, normalized
 activity field, calculation algorithm, report section, or output format. It adds
 one transient zero-priced-reduction classification to `AuditActivityEntry` and
 defines derived presentation values over the existing exact report model.
-Generated Markdown and PDF files remain intentional cleartext user exports.
+Generated Markdown and PDF files remain intentional cleartext user exports under
+EXP-001: they are direct local requests, every path and the cleartext
+financial-data status are disclosed, and users are told to delete every listed
+file to remove the data. No temporary cleartext file, additional copy, report
+history, durable path state, reopen catalog, or automatic re-ingestion is added.
 
 The authoritative source remains `CapitalGainsReport` and its existing nested
 models. Every source monetary amount, quantity, exchange rate, and currency
@@ -17,8 +21,10 @@ The validated `CapitalGainsReport` immediately before presentation is the
 AUD-001 comparison baseline. Rendering leaves every exact decimal, currency,
 quantity, rate and metadata field, inclusion or omission state, and
 classification equal to that baseline. Intentional cleartext export status
-authorizes only contracted report fields; it does not authorize any material
-prohibited by SEC-001 in documents, errors, diagnostics, examples, or fixtures.
+authorizes only contracted report fields; it does not authorize real user
+financial data or other SEC-001-prohibited material in errors, logs, screenshots,
+documentation examples, committed or generated fixtures, or unrelated document
+content. Diagnostics retain their separately reviewed mode-specific policy.
 
 ## LegalUseWarning
 
@@ -213,8 +219,8 @@ State transitions:
 
 ## ZeroPricedHoldingReductionAuditPresentation
 
-Purpose: The Annex 1 currency applicability rule for an activity that reduces
-holdings with an exact zero source unit price.
+Purpose: The Annex 1 currency applicability rule for an activity carrying the
+inherited report-level zero-priced holding-reduction classification.
 
 Fields:
 
@@ -239,11 +245,17 @@ Validation rules:
 
 - The copied classification is authoritative for presentation and is computed
   before conversion or formatting from the inherited normalized `SELL`, positive
-  holding-reduction quantity, non-empty explanation, present exact-zero source
-  unit price, nonnegative running holdings, and absence of any non-zero present
-  source monetary field across the order, asset-profile, and base tiers.
-- Missing is not zero. A positive selected or same-tier-derived source unit price
-  remains non-zero even when it displays as `0.00`.
+  holding-reduction quantity, non-empty explanation, nonnegative running holdings,
+  and the rule that every present source monetary field across the order,
+  asset-profile, and base tiers is finite and numerically zero.
+- No monetary field must be present for the inherited report-level compatibility
+  classification. All-missing, mixed missing-and-zero, explicit-zero-unit-price,
+  and all-explicit-zero shapes qualify. Missing remains nil and visible blank; it
+  is not converted into a numeric zero.
+- Sync admission remains unchanged and continues to require resolvable amount
+  evidence for newly synced activities.
+- A positive selected or same-tier-derived source unit price remains non-zero
+  even when it displays as `0.00`.
 - A classified zero-priced holding reduction retains
   `pre_format_activity_currency` but has blank
   `visible_original_activity_currency`.
@@ -368,6 +380,12 @@ The existing output models do not change:
   unchanged.
 - Opener failure after bundle success retains every file and produces a
   success-with-warning result.
+- Normal success and opener-warning success identify every saved file as a
+  cleartext financial-data export and instruct the user to delete all listed
+  paths to remove the exported data.
+- Leaving the result flow clears transient report content and paths. No report
+  history, reopen catalog, durable path state, additional cleartext copy, or
+  automatic re-ingestion is created.
 - The warning and derived display strings are document content only and do not
   add fields to `ReportDocument`, `ReportOutputFile`, or `ReportOutputBundle`.
 
@@ -376,6 +394,7 @@ Output state transitions:
 - `reserved -> all_files_written_synced_closed -> bundle_validated -> success`
 - `any_pre_success_failure -> remove_current_attempt_reservations -> failure`
 - `success -> opener_failure -> success_with_warning_and_files_retained`
+- `success_or_opener_warning -> disclose_paths_and_deletion -> user_managed_files`
 
 Overall transient flow:
 

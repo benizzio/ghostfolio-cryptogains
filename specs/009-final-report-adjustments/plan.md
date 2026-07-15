@@ -19,7 +19,10 @@ as explicit newlines measured with the same word-wrap policy used for drawing.
 The exact legal-use warning will be inserted once in each main report, and
 zero-priced holding reductions will retain their existing pre-format audit
 currency value while omitting that non-applicable value from the visible Annex 1
-cell.
+cell. The inherited report-calculation classification continues to accept
+all-missing and mixed missing-and-zero monetary shapes without manufacturing
+zero values or broadening sync admission. Successful result copy will disclose
+cleartext financial exports, every saved path, and deletion guidance.
 
 ## Technical Context
 
@@ -33,11 +36,19 @@ standard library. No dependency or version change is planned. This no-change
 decision is conditional on the capability evidence and stop/replan gate in
 DEP-001.
 
-**Storage**: Existing user-requested cleartext Markdown and PDF exports in the
-resolved local Documents directory. Exports retain the existing writer's
-requested `0600` mode and remain outside the established application-managed
-persistence boundary. No new cache, snapshot field, report history, telemetry,
-remote storage, or automatic report re-ingestion is added.
+**Storage And User Exports**: Existing direct user-requested cleartext Markdown
+and PDF exports in the resolved local user-controlled Documents directory.
+Under constitution v3.0.0 these final files remain outside application-managed
+persistence because every saved path and the cleartext financial-data status are
+disclosed, owner-only mode `0600` is requested where supported, failed-attempt
+files are removed, and the application retains no additional cleartext copy,
+report history, reopen catalog, durable output-path state, or automatic
+re-ingestion. Successful result copy tells the user to delete every listed path
+to remove the exported data. No new cache, snapshot field, temporary cleartext
+file, telemetry, remote storage, or automatic processing is added. New OWASP
+Cryptographic Storage evidence is N/A because no financial or person-linked data
+enters application-managed persistence; existing protected snapshots remain
+unchanged and token-derived encrypted.
 
 **Testing**: Go `testing` across package-local report tests, `tests/unit`,
 `tests/contract`, `tests/integration`, existing `tests/empirical`, and the
@@ -83,7 +94,8 @@ existing landscape A4 PDF pagination, searchable text, embedded fonts, complete
 row preflight, output reservation/cleanup sequence, and secret redaction remain
 intact; the constitution-required PDF finalization seam must return errors instead
 of terminating the process; SEC-001 applies to every document, error, diagnostic,
-example, and fixture channel; searchable/selectable PDF text and readable layout
+example, and fixture channel, while EXP-001 and FR-028 govern cleartext and path
+disclosure plus deletion guidance; searchable/selectable PDF text and readable layout
 remain while ACC-002 excludes broader assistive-conformance claims; DEP-001
 blocks unplanned capability fallbacks; production statement, line, branch, and
 per-file coverage remains 100% as enforced by the repository gate.
@@ -102,14 +114,18 @@ validation.
 
 Pre-research gate status: PASS
 Post-design gate status: PASS
+Post-analysis remediation gate status against constitution v3.0.0: PASS
 
-- [x] Security: Under the repository's established boundary, reports remain
-  explicit cleartext user-owned exports written with requested mode `0600`, not
-  application-managed persistence. SEC-001 applies to documents, returned and
-  wrapped errors, diagnostics, examples, and fixtures and prohibits reusable
-  authentication/decryption material and raw protected-payload serialization.
-  Output reservation/cleanup and modeled non-secret diagnostic boundaries remain
-  unchanged.
+- [x] Security: Under constitution v3.0.0, reports remain explicit cleartext
+  user-requested exports, not application-managed persistence, only because they
+  are local and user-controlled, use requested mode `0600` where supported,
+  disclose cleartext status and every saved path, include deletion guidance,
+  clean current-attempt failures, and add no retained copy, history, durable path
+  state, reopen catalog, or automatic re-ingestion. SEC-001 prohibits reusable
+  authentication/decryption material, raw protected-payload serialization, and
+  real user financial data outside contracted export fields and separately
+  reviewed diagnostic modes. Output reservation/cleanup remains unchanged while
+  result copy gains the required disclosure and removal guidance.
   The OWASP Top 10:2025 review covers A01 local file access boundaries, A02
   local-only renderer configuration, A03 supply-chain risk with no new modules,
   A04 and A07 token exclusion, A05 sanitization before controlled Markdown/PDF
@@ -161,8 +177,10 @@ Post-design gate status: PASS
   pagination stay in `internal/report/pdf/`; the existing zero-priced audit
   classification is copied by `internal/report/calculate/` into the transient
   report model under `internal/report/model/`, and only presentation suppresses
-  the visible non-applicable currency. Runtime and output writing remain
-  unchanged.
+  the visible non-applicable currency. `internal/sync/validate/` remains
+  unchanged and is covered only to characterize the inherited sync-admission
+  boundary. Runtime and output writing remain unchanged; `internal/tui/screen/`
+  owns the successful-result cleartext, path, and deletion copy.
 
 ## Project Structure
 
@@ -170,24 +188,32 @@ Post-design gate status: PASS
 
 ```text
 specs/009-final-report-adjustments/
+├── spec.md
 ├── plan.md
 ├── research.md
 ├── data-model.md
 ├── quickstart.md
 ├── contracts/
 │   └── report-rendering.md
-└── tasks.md             # Created later by /speckit.tasks
+├── checklists/
+│   ├── report-contract.md
+│   └── requirements.md
+└── tasks.md
 ```
 
 ### Source Code (repository root)
 ```text
 internal/
+├── sync/
+│   └── validate/        # Characterize unchanged sync admission; no source change planned
 ├── report/
 │   ├── model/           # Retain pre-format currency and copy zero-priced classification without new list validation
 │   ├── calculate/       # Populate the transient audit classification without changing financial results
 │   ├── presentation/    # Shared financial display strings, boolean labels, and logical converted entries
 │   ├── markdown/        # Warning emphasis, direct summary/position values, and controlled <br> table breaks
 │   └── pdf/             # Bold warning, matched wrap measurement, row preflight, and safe finalization prerequisite
+├── tui/
+│   └── screen/          # Cleartext export, saved-path, and deletion result guidance
 └── support/
     └── decimal/         # Existing canonical quantity/rate formatting remains unchanged
 
@@ -210,13 +236,27 @@ not a general decimal rule.
 
 ## Presentation And Rendering Boundary
 
-1. `internal/report/calculate/` continues to produce exact `CapitalGainsReport`
-   values. While constructing an Annex audit row, it retains the existing
-   `ActivityCurrency` value and copies the existing
-   `IsZeroPricedHoldingReduction` classification into the transient audit model.
-   A zero-priced reduction may have no selected source currency, so this feature
-   does not invent provenance. No financial value, currency identity, or
-   activity inclusion changes before presentation.
+1. `internal/sync/validate/` keeps its inherited admission rule: newly synced
+   activities still require resolvable amount evidence, so this feature does not
+   admit an all-monetary-values-missing upstream row. At the downstream report
+   compatibility boundary, `internal/report/calculate/` preserves the existing
+   zero-priced holding-reduction predicate for explained `SELL` rows whose every
+   present source monetary value is exact zero; no monetary value must be
+   present, and missing values remain nil. While constructing an Annex audit row,
+   calculation retains the existing `ActivityCurrency` value and copies the
+   existing `IsZeroPricedHoldingReduction` classification into the transient
+   audit model. A classified reduction may have no selected source currency, so
+   this feature does not invent provenance. Positive quantity and nonnegative
+   running holdings remain enforced by inherited validation and replay. No
+   financial value, currency identity, sync admission, or report inclusion
+   changes before presentation.
+   The inherited priced selector remains separate: it evaluates
+   `order -> asset_profile -> base` and selects the first tier with an explicit
+   currency, present finite fee including exact zero, finite gross value present
+   or derived from same-tier unit price and quantity, and finite unit price
+   present or derived from same-tier gross value and quantity. A missing fee or
+   other incomplete requirement causes fallback to the next tier; values are
+   never mixed across tiers.
 2. `internal/report/presentation/` formats monetary values from defensive
    decimal copies at two places with HALF UP, canonicalizes quantities and
    rates through existing helpers, maps the report boolean to `Yes` or `No`, and
@@ -248,7 +288,9 @@ not a general decimal rule.
    Rendering and PDF finalization complete before path reservation. The output
    package remains the sole owner of exclusive reservation, complete-bundle
    commit, current-attempt cleanup, prior-file retention, and post-save opener
-   warnings under FR-024 and FR-025.
+   warnings under FR-024 and FR-025. `internal/tui/screen/` renders every saved
+   path and identifies it as cleartext financial data with instructions to delete
+   all listed files; leaving the result flow retains no report state or path list.
 
 ## Testing Strategy
 
@@ -262,6 +304,11 @@ not a general decimal rule.
   values that display as `0.00`. Tests prove the received converted-entry order
   remains unchanged without adding list-level validation and prove the existing
   audit currency value remains unchanged before the presentation row is built.
+- Report-calculation input tests cover all-missing, mixed missing-and-zero,
+  explicit-zero, and all-zero reduction shapes without manufacturing values.
+  Sync validation tests separately characterize unchanged admission: explicit
+  resolvable zero evidence with an explanation remains accepted, while an
+  all-monetary-values-missing upstream activity remains rejected.
 - Markdown tests assert the exact bold warning once and in order, exact two-place
   values, valid pipe-table rows, `<br>` converted-entry boundaries, and no
   changed quantity or rate text.
@@ -276,6 +323,9 @@ not a general decimal rule.
   and bundle-recording failures. They prove current-attempt cleanup, preservation
   of colliding sentinel files and earlier bundles, no partial saved paths, and
   success-with-warning file retention after opener failure.
+- Result-screen and workflow contracts prove normal success and opener-warning
+  success identify cleartext financial exports, list every saved path, instruct
+  deletion of all listed files, and retain no path or report history after exit.
 - Extend the project-owned generated-PDF inspector with ordered text runs that
   expose page, font resource, and coordinates. Concrete PDF contract tests use
   those runs to prove every warning fragment including the final period uses the
@@ -285,10 +335,13 @@ not a general decimal rule.
   and compare all AUD-001 fields before and after each renderer while updating
   only rendered monetary expectations and asserting the pre-format audit
   currency remains unchanged before presentation.
-- Confidentiality tests apply clearly synthetic SEC-001 sentinels to successful
-  documents, errors and wrapped causes, diagnostics, examples, and generated
-  fixtures. Readability evidence proves complete searchable/selectable text and
-  non-overlapping layout without claiming ACC-002-excluded conformance.
+- Confidentiality tests apply clearly synthetic SEC-001 credential,
+  protected-payload, and user-financial-data sentinels to successful documents,
+  errors and wrapped causes, diagnostics, examples, and generated fixtures.
+  Contracted report fields remain allowed only in the user export; other channels
+  redact real financial data under their existing policies. Readability evidence
+  proves complete searchable/selectable text and non-overlapping layout without
+  claiming ACC-002-excluded conformance.
 - Existing empirical fixtures remain unchanged. The named performance fixture
   independently times both formats, verifies exactly 6,666 three-entry
   conversion rows, and proves the PDF conversion audit spans continuation pages

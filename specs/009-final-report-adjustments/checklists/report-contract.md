@@ -13,7 +13,7 @@
 - [x] CHK003 Are all inherited report obligations that remain in force, including output bundle shape, section order, PDF layout, selectable text, and security constraints, explicitly enumerated or incorporated through a stable reference? [Completeness, Gap, Spec §FR-021, Contract §Scope, Contract §PDF Contract]
 - [x] CHK004 Does the specification define required outcomes for every identified report-preparation failure class, including non-finite or unrepresentable values, PDF layout preparation failures, and PDF finalization failures? [Completeness, Gap, Contract §Failure Contract, Plan §Constitution Prerequisite]
 - [x] CHK005 Are requirements documented for partial output-bundle failures, including whether reserved or written files remain, what constitutes a successful result, and which cleanup guarantees apply? [Completeness, Recovery, Gap, Plan §Technical Context, Data Model §Existing ReportDocument And Output Bundle]
-- [x] CHK006 Are requirements-level escaping, sanitization, delimiter-control, and secret-redaction obligations defined for dynamic converted-amount content and failure information in both formats? [Completeness, Security, Gap, Spec §Security, Persistence, And Integration Evidence, Contract §Markdown Contract, Contract §Failure Contract]
+- [x] CHK006 Are requirements-level escaping, sanitization, delimiter-control, and secret-redaction obligations defined for dynamic converted-amount content and failure information in both formats? [Completeness, Security, Gap, Spec §Security, Persistence, And User Export Evidence, Contract §Markdown Contract, Contract §Failure Contract]
 
 ## Requirement Clarity
 
@@ -21,12 +21,12 @@
 - [x] CHK008 Does the specification define the exact visible number grammar, including the literal decimal separator, fixed-point notation, trailing zeros, sign handling, and whether grouping separators are permitted? [Clarity, Ambiguity, Spec §FR-004, Spec §FR-011]
 - [x] CHK009 Is provider-published rate precision tied to an objective normalized source representation, including how source trailing zeros and normalized rate values are treated? [Clarity, Spec §FR-005, Spec §AUD-002, Spec §Assumptions]
 - [x] CHK010 Is the canonical report representation for quantities tied to a stable baseline that an acceptance reviewer can identify without consulting current implementation output? [Clarity, Spec §FR-009, Spec §SC-004]
-- [x] CHK011 Are the exact source conditions for a "zero-priced holding reduction" and an "applicable non-zero source price" defined independently of visible rounded values? [Clarity, Spec §FR-013–FR-015, Spec §Key Entities]
+- [x] CHK011 Are the exact source conditions for a "zero-priced holding reduction," including all-missing and mixed missing-and-zero compatibility shapes, and the complete single-tier selection rule for an "applicable non-zero source price" defined independently of visible rounded values? [Clarity, Spec §FR-013–FR-015, Spec §Key Entities]
 - [x] CHK012 Is "separate visible line" defined for the first entry, subsequent entries, and entries that wrap internally, with logical entry boundaries distinguished from width-driven wraps? [Clarity, Ambiguity, Spec §FR-016–FR-018, Spec §Edge Cases]
 
 ## Requirement Consistency
 
-- [x] CHK013 Does the broad requirement to apply presentation changes to both formats and Annex content consistently distinguish the warning rule, which excludes the separate Markdown Annex? [Consistency, Spec §FR-001–FR-003, Spec §SC-001]
+- [x] CHK013 Does the boundary-specific requirement distinguish the main-only warning from financial and audit rules that apply to identified main and Annex fields without duplicating the parity requirement? [Consistency, Spec §FR-001–FR-003, Spec §FR-020, Spec §SC-001]
 - [x] CHK014 Is the requirement for "every structured boolean" consistent with the stated current scope of one Annex field and the exclusion of arbitrary note text? [Consistency, Spec §FR-012, Spec §Key Entities, Contract §Structured Boolean Contract]
 - [x] CHK015 Do the requirements consistently distinguish retaining the pre-format audit currency from blanking only its visible `Original Activity Currency` value for a qualifying row? [Consistency, Spec §FR-013–FR-015, Plan §Presentation And Rendering Boundary, Contract §Original Activity Currency Contract]
 - [x] CHK016 Has the proposed duplicate or non-canonical converted-kind rejection been removed so received-order preservation remains consistent with the presentation-only scope? [Consistency, Resolution, Spec §FR-019, Spec §Scope Boundaries, Contract §Converted Amounts Contract]
@@ -43,7 +43,7 @@
 ## Scenario Coverage
 
 - [x] CHK023 Are primary-flow requirements complete for the Markdown main document, Markdown Annex, PDF main section, and PDF Annex across every listed financial and audit field class? [Coverage, Primary Flow, Spec §FR-001, Spec §FR-004–FR-005]
-- [x] CHK024 Are alternate-flow requirements complete for both boolean states, zero- and non-zero-priced activities, and zero, one, two, and three converted entries using every valid canonical subsequence? [Coverage, Alternate Flow, Spec §User Story 2, Spec §User Story 3]
+- [x] CHK024 Are alternate-flow requirements complete for both boolean states, all-missing, mixed missing-and-zero, explicit-zero, and non-zero-priced activities, and zero, one, two, and three converted entries using every valid canonical subsequence? [Coverage, Alternate Flow, Spec §User Story 2, Spec §User Story 3]
 - [x] CHK025 Are exception-flow requirements specified for non-finite values, formatting limits, PDF layout failures, and PDF finalization failure without process termination or false success? [Coverage, Exception Flow, Gap, Contract §Failure Contract, Plan §Constitution Prerequisite]
 - [x] CHK026 Are recovery requirements defined for failed Markdown bundles and failed PDF output, including cleanup, retained prior files, and the absence of a misleading successful result? [Coverage, Recovery, Gap, Plan §Technical Context, Contract §Failure Contract]
 - [x] CHK027 Are non-functional scale requirements complete for reports whose multiline converted entries increase row height and page count at the established 10,000-activity scale? [Coverage, Non-Functional, Spec §SC-010–SC-011, Contract §PDF Contract]
@@ -58,8 +58,8 @@
 
 ## Non-Functional Requirements
 
-- [x] CHK033 Are confidentiality requirements complete for generated documents, errors, diagnostics, examples, fixtures, and all reusable authentication or protected-payload material? [Security, Completeness, Spec §Security, Persistence, And Integration Evidence]
-- [x] CHK034 Are the retained local-export protections, including requested file permissions, local-only processing, reservation, cleanup, and prohibition of remote persistence, stated as normative requirements rather than plan assumptions? [Security, Consistency, Gap, Spec §Security, Persistence, And Integration Evidence, Plan §Technical Context]
+- [x] CHK033 Are confidentiality requirements complete for contracted export fields and for redaction of credentials, protected-payload material, and real user financial data from non-export channels, with synthetic-only examples and fixtures? [Security, Completeness, Spec §Security, Persistence, And User Export Evidence]
+- [x] CHK034 Are the explicit user-export protections, including cleartext and saved-path disclosure, deletion guidance, requested permissions, local-only processing, reservation, failed-attempt cleanup, non-retention, non-re-ingestion, and prohibition of remote persistence, normative rather than plan assumptions? [Security, Consistency, Gap, Spec §Security, Persistence, And User Export Evidence, Plan §Technical Context]
 - [x] CHK035 Are accessibility and readability requirements for warning emphasis, multiline tables, searchable/selectable PDF text, and assistive consumption explicitly retained or intentionally excluded? [Non-Functional, Accessibility, Gap, Contract §PDF Contract]
 - [x] CHK036 Are audit-integrity requirements measurable for currency identity, provider-rate precision, exact source values, and the prohibition on feeding visible rounded values back into financial decisions? [Non-Functional, Measurability, Spec §FR-005, Spec §FR-007–FR-008, Spec §Financial Calculation Evidence]
 

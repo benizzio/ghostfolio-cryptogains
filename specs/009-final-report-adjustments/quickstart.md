@@ -72,8 +72,10 @@ Expected result:
   currency
 - non-zero-priced control rows retain original currency
 - a positive source price such as `0.004` retains original currency even though
-  it displays as `0.00`; missing and contradictory source-price cases are not
-  misclassified as zero-priced reductions
+  it displays as `0.00`; all-missing, mixed missing-and-zero, and explicit-zero
+  report-level compatibility cases are classified without manufacturing values,
+  while contradictory non-zero cases are not misclassified and sync admission
+  remains unchanged
 - zero-to-three Converted Amounts entries cover all eight canonical subsequences
   with exact spacing, semicolons, order, and distinct visible-line encodings
   with generated-PDF coordinates proving each entry starts on a later line
@@ -171,6 +173,13 @@ go run ./cmd/ghostfolio-cryptogains
 Generate Markdown and PDF with the same year, cost-basis method, calculation
 currency, and deterministic or development activity history.
 
+Verify each successful result, including an opener-warning result:
+
+- it identifies the output as cleartext financial data
+- it lists every saved path, meaning both Markdown paths or the combined PDF path
+- it tells the user to delete every listed file to remove the exported data
+- leaving the result flow retains no report history, reopen catalog, or path list
+
 Verify the Markdown main report:
 
 - the exact warning is one fully bold standalone logical paragraph; PDF may wrap
@@ -188,6 +197,8 @@ Verify the Markdown Annex:
 - `Full Liquidation Event` cells read `Yes` or `No`
 - a zero-priced holding reduction has a blank `Original Activity Currency` cell
   and a populated `Calculation Currency` cell
+- all-missing classified monetary fields remain blank, while present exact-zero
+  fields display as `0.00`
 - a non-zero-priced row retains its original activity currency
 - each Converted Amounts entry starts after a visible break and follows exact
   colon, arrow, and semicolon spacing
@@ -206,6 +217,8 @@ Open the generated PDF in a reader that supports selectable text and verify:
 - expanded rows do not overlap borders, following rows, or the bottom margin
 - a row that fits only a fresh page moves before any part is drawn; an
   intentionally overheight row fails instead of splitting or clipping
+- relocating a table before its first row does not emit a continuation label;
+  actual continuation pages retain their inherited label and repeated header
 - every page remains landscape A4 with searchable/selectable text
 
 These checks do not establish tagged-PDF, PDF/UA, semantic table association,
@@ -229,6 +242,9 @@ Review calculation-level assertions separately from rendered-string assertions:
   as `0.00` remains present
 - conversion component omission continues to require exact zero-to-zero values
 - zero-priced classification is not inferred from displayed `0.00`
+- report-level all-missing and mixed zero/missing compatibility inputs preserve
+  missing values, while the sync validator's amount-resolution admission rule is
+  unchanged
 
 Do not run `make regenerate-empirical-fixtures`. The YAML dataset and generated
 oracle fixtures under `testdata/empirical/` are read-only for this feature.
@@ -239,8 +255,10 @@ oracle fixtures under `testdata/empirical/` are read-only for this feature.
   diagnostics, documentation examples, and generated test artifacts. Confirm
   they contain no real credential, bearer or JWT value, reusable authentication
   or decryption material, or raw encrypted/decrypted protected-payload
-  serialization. Redaction tests may use only clearly synthetic non-reusable
-  sentinels.
+  serialization. Confirm real user financial data appears only in contracted
+  user-export fields and separately authorized diagnostic modes, not errors,
+  logs, screenshots, examples, or committed/generated fixtures. Redaction tests
+  and all examples and fixtures use only clearly synthetic non-reusable data.
 - Confirm controlled Markdown `<br>` and PDF newline delimiters are inserted
   only after dynamic entry components are escaped and sanitized and fixed entry
   syntax is assembled.
@@ -252,5 +270,11 @@ oracle fixtures under `testdata/empirical/` are read-only for this feature.
 - Confirm the existing requested `0600` file mode and reservation/cleanup
   sequence removes only current-attempt paths on failure and preserves colliding
   pre-existing files and earlier successful bundles.
+- Confirm cleartext status, every saved path, and deletion guidance are shown for
+  normal and opener-warning success, and leaving the result flow retains no
+  report copy, path state, history, reopen catalog, or automatic re-ingestion.
 - Confirm no new dependency, network request, authentication path, telemetry,
   report history, or automatic report re-ingestion was introduced.
+- Confirm new OWASP Cryptographic Storage evidence remains N/A because no
+  financial or person-linked data enters application-managed persistence and
+  existing token-derived encrypted snapshots are unchanged.
