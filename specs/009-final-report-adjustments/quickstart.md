@@ -11,7 +11,8 @@ financial calculations or empirical fixtures.
   high-precision, exact-half, very small, and optional monetary values.
 - Fixtures containing high-precision quantities and exchange rates, true and
   false Annex boolean values, zero- and non-zero-priced holding reductions, and
-  conversion rows with one, two, and three included amount components.
+  conversion rows covering zero, one, two, and three entries and all eight
+  FR-019 canonical subsequences.
 - No live Ghostfolio, exchange-rate provider, PDF service, browser renderer,
   external PDF binary, or remote font is required.
 
@@ -32,17 +33,24 @@ Expected result:
 - every financial amount and unit price uses two-place HALF UP display
 - optional nil values remain blank and rounded negative zero is `0.00`
 - source decimals remain unchanged
-- quantities and rate values retain canonical precision
+- quantities follow the FR-009 fixed-point baseline, and normalized rates such
+  as provider spellings `1.094600` and `1.0900` render as `1.0946` and `1.09`
+- FR-004a adjusted-exponent and precision guards accept their inclusive bounds
+  at the formatter seam and reject out-of-domain Markdown and PDF attempts
+  without visible or saved output
 - `Full Liquidation Event` uses `Yes` and `No`
 - the existing audit currency value remains unchanged before zero-priced
   presentation
-- converted entries preserve exact-zero omission and validated canonical order
-- duplicate and out-of-order converted kinds are rejected
+- converted entries preserve exact-zero omission and received order without new
+  duplicate-kind or supported-kind order validation
 - PDF uses a fully bold warning operation in the required order
 - PDF measurement and drawing produce the same line count for explicit newlines
   and long space-wrapped content
 - the isolated PDF finalization seam returns an error without terminating the
-  process
+  process, invoking output writing, or invoking the opener
+- a row that fits only on a fresh PDF page advances before drawing and remains
+  whole, while a row exceeding fresh-page capacity returns a layout error and
+  finalizes no PDF
 
 Run the report-facing black-box suites:
 
@@ -56,17 +64,21 @@ Expected result:
   metadata and before `Gains-And-Losses Summary`
 - generated PDF text runs contain the same warning at the same semantic boundary
   and show every warning fragment uses the embedded bold font
-- summary, position, activity, liquidation, Annex, and converted monetary values
-  agree between formats at two places
-- quantities and provider-published rates are unchanged
+- every Financial Presentation Acceptance Matrix field/vector/output combination
+  has the required two-place semantic value in generated Markdown and PDF
+- quantities equal their FR-009 canonical baseline, and rates equal normalized
+  AUD-002 evidence with metadata unchanged
 - zero-priced Annex rows have blank original currency and retain calculation
   currency
 - non-zero-priced control rows retain original currency
-- one-to-three Converted Amounts entries have exact spacing, semicolons, order,
-  and distinct visible-line encodings
+- a positive source price such as `0.004` retains original currency even though
+  it displays as `0.00`; missing and contradictory source-price cases are not
+  misclassified as zero-priced reductions
+- zero-to-three Converted Amounts entries cover all eight canonical subsequences
+  with exact spacing, semicolons, order, and distinct visible-line encodings
   with generated-PDF coordinates proving each entry starts on a later line
 - calculated-model assertions retain exact pre-format values and the existing
-  audit currency value
+  audit currency value, with population numerator and denominator counts reported
 
 ## Full Deterministic Suite
 
@@ -82,6 +94,9 @@ Expected result:
 - Markdown and PDF generation preserve existing output bundle shapes
 - report rendering and failure paths do not expose secret material
 - empirical calculation comparisons pass without fixture changes
+- Markdown second-file and PDF save failures remove only current-attempt files,
+  preserve pre-existing colliding sentinel files, and report no partial success
+- opener failure after complete save retains all files and reports a warning
 
 ## Coverage Gate
 
@@ -109,11 +124,19 @@ make test-performance
 
 Expected result:
 
-- the deterministic fixture contains exactly 10,000 cached activities
-- one Markdown generation and one PDF generation are timed independently
-- each selected-format generation completes in under two minutes
-- presentation formatting does not introduce a lower scale limit for either
-  format
+- the deterministic fixture contains exactly 10,000 quantity-`1` priced
+  activities across two assets, 3,334 USD, 3,333 EUR, and 3,333 GBP rows
+- the request is 2025/HIFO/USD at `2026-05-21T10:00:00Z`, and the local rate
+  service supplies exact `1.1` without network access
+- exactly 6,666 conversion rows contain all three converted entries in both
+  formats, and the PDF audit spans continuation pages without clipping or loss
+- one Markdown generation and one PDF generation are timed independently from
+  immediately before generation through save, bundle validation, and opener
+  return; fixture setup and output inspection remain outside each interval
+- each selected-format generation completes in strictly under two minutes and
+  records its format and elapsed duration separately
+- `test-performance / run` records the Ubuntu runner image/version, architecture,
+  available CPU count, and Go version used for authoritative evidence
 - no performance coverage artifact is created
 
 ## Changed-Source Quality Gate
@@ -130,6 +153,9 @@ Expected result:
 - `go.mod` and `go.sum` remain unchanged because no dependency is required
 - the command exits successfully; if implementation unexpectedly contains no
   source changes, each scanner emits its explicit skip message
+- any unexpected dependency-file change, executable prerequisite, network path,
+  or inability to produce required evidence is a DEP-001 stop signal; passing
+  quality checks does not replace required review and replanning
 
 The corresponding CI checks are exactly `test / run`, `coverage / run`,
 `test-performance / run`, and `quality`.
@@ -147,11 +173,14 @@ currency, and deterministic or development activity history.
 
 Verify the Markdown main report:
 
-- the exact warning is one fully bold standalone line
+- the exact warning is one fully bold standalone logical paragraph; PDF may wrap
+  it into multiple ordered physical lines or text runs without creating another
+  occurrence
 - it follows `Report Calculation Currency` and precedes
   `Gains-And-Losses Summary`
 - every monetary amount and unit price has two fractional digits
-- quantities retain their established representation
+- quantities equal the FR-009 canonical representation computed from exact model
+  values
 - the separate Annex file does not repeat the warning
 
 Verify the Markdown Annex:
@@ -162,18 +191,26 @@ Verify the Markdown Annex:
 - a non-zero-priced row retains its original activity currency
 - each Converted Amounts entry starts after a visible break and follows exact
   colon, arrow, and semicolon spacing
-- rate values retain provider precision
+- rate values retain every significant digit of normalized provider evidence
+  while provider lexical trailing zeros remain omitted
 
 Open the generated PDF in a reader that supports selectable text and verify:
 
 - the warning is fully bold, readable, and placed before the summary
 - displayed financial, quantity, rate, boolean, and currency values agree with
   Markdown
-- each Converted Amounts entry begins on a separate visible line
+- each Converted Amounts entry has one logical start; physical wrapping within
+  one entry does not count as another start
 - long entries may wrap within their own line, but the next entry still starts
   on a new line
 - expanded rows do not overlap borders, following rows, or the bottom margin
+- a row that fits only a fresh page moves before any part is drawn; an
+  intentionally overheight row fails instead of splitting or clipping
 - every page remains landscape A4 with searchable/selectable text
+
+These checks do not establish tagged-PDF, PDF/UA, semantic table association,
+assistive reading-order, or screen-reader conformance and must not be reported as
+such.
 
 Manual PDF inspection supplements automated layout-recorder and concrete-PDF
 text-run tests for reader-specific visual behavior; the extended project
@@ -184,7 +221,8 @@ inspector supplies the automated font and coordinate evidence.
 Review calculation-level assertions separately from rendered-string assertions:
 
 - exact basis, proceeds, gains, losses, totals, quantities, conversion amounts,
-  and rates remain unchanged before rendering
+  rates, rate metadata, currencies, inclusion and omission states, and
+  classifications remain unchanged before and after each renderer
 - the existing calculated audit activity-currency value remains unchanged and is
   suppressed only in the qualifying visible presentation row
 - summary inclusion continues to use exact zero, so a non-zero value displayed
@@ -197,16 +235,22 @@ oracle fixtures under `testdata/empirical/` are read-only for this feature.
 
 ## Security Review
 
-- Confirm generated reports and failures contain no Ghostfolio token, bearer
-  material, protected payload bytes, or reusable verifier.
+- Inspect generated documents, result and error text including wrapped causes,
+  diagnostics, documentation examples, and generated test artifacts. Confirm
+  they contain no real credential, bearer or JWT value, reusable authentication
+  or decryption material, or raw encrypted/decrypted protected-payload
+  serialization. Redaction tests may use only clearly synthetic non-reusable
+  sentinels.
 - Confirm controlled Markdown `<br>` and PDF newline delimiters are inserted
   only after dynamic entry components are escaped and sanitized and fixed entry
   syntax is assembled.
 - Confirm PDF generation remains in-process and local-only with application
   fonts and no remote service.
 - Confirm the constitution-prerequisite PDF finalization error returns through
-  normal report error handling before output writing.
+  normal report error handling before output reservation or writing, leaves the
+  process running, and invokes no opener.
 - Confirm the existing requested `0600` file mode and reservation/cleanup
-  sequence are unchanged.
+  sequence removes only current-attempt paths on failure and preserves colliding
+  pre-existing files and earlier successful bundles.
 - Confirm no new dependency, network request, authentication path, telemetry,
   report history, or automatic report re-ingestion was introduced.

@@ -97,7 +97,9 @@ unit price can also render as `0.00`.
 Decision: Define the exact warning once as shared report presentation text.
 Markdown emits it as one standalone `**...**` paragraph after the initial
 metadata. PDF adds a dedicated fully bold wrapped-paragraph layout operation at
-the same semantic position before the summary heading.
+the same semantic position before the summary heading. Standalone describes one
+logical paragraph, not one physical PDF line; width-driven lines and text runs
+remain ordered bold fragments of the same occurrence.
 
 Rationale: A shared literal prevents wording drift, while each renderer must own
 its emphasis mechanism. The existing PDF `AddParagraph` is regular and
@@ -152,11 +154,12 @@ do not define one authoritative source context.
 ## Converted Amount Entry Representation
 
 Decision: Change the shared conversion presentation from one delimiter-bearing
-string to an ordered list of single-line logical entries. Strengthen
-`ConversionAuditEntry` validation to reject duplicate amount kinds and require
-the canonical existing order `unit_price`, `gross_value`, `fee_amount` for the
-kinds that are present. Preserve exact zero-to-zero omission. Each renderer
-sanitizes entries separately and joins them with its own visible separator:
+string to an ordered list of single-line logical entries. Treat the inherited
+`ConversionAuditEntry.Amounts` sequence as read-only, preserve the relative order
+after exact zero-to-zero omission, and add no duplicate-kind or supported-kind
+order validation. Generated reports retain the calculator's existing
+`unit_price`, `gross_value`, `fee_amount` subsequences. Each renderer sanitizes
+entries separately and joins them with its own visible separator:
 `;<br>` for Markdown table cells and `;\n` for PDF table cells. Markdown escapes
 HTML-sensitive and table-delimiter characters in the dynamic label and amount
 components before assembling the fixed literal `: ` and ` -> ` syntax and
@@ -166,16 +169,19 @@ Rationale: A raw newline would terminate a Markdown pipe-table row, while a
 controlled `<br>` provides an inline visible break. PDF table cells accept
 explicit newlines through `MultiCellWithOption`. A logical list prevents either
 format's delimiter from leaking into the other and makes one-, two-, and
-three-entry contracts directly testable. Model validation turns the calculator's
-existing append order into an invariant for every valid report, rather than
-assuming all callers construct the slice correctly. Escaping before joining
-ensures only the renderer can add the HTML break used by this cell.
+three-entry contracts plus the empty case and all eight canonical subsequences
+directly testable. Preserving the received order avoids a
+new report-generation failure that would conflict with this feature's
+presentation-only scope. Escaping before joining ensures only the renderer can
+add the HTML break used by this cell.
 
 Alternatives considered: Keep `; `, but it fails the visible-line requirement.
 Put literal newlines in Markdown cells, but that breaks table structure. Put
 `<br>` in shared presentation data, but PDF must not expose Markdown/HTML syntax.
 Create separate converted-entry model copies per renderer, but format-neutral
-entry strings are sufficient.
+entry strings are sufficient. Strengthen list-level duplicate or order
+validation, but that would change accepted model behavior without a calculation
+or audit-integrity requirement and is outside this feature.
 
 ## PDF Newline Measurement And Sanitization
 
@@ -196,7 +202,11 @@ cell. Pre-splitting with the drawing option and measuring the resulting lines
 makes predicted line count and height match drawing. Splitting, sanitizing, and
 rejoining only controlled table content retains redaction while allowing the
 required layout. Existing complete-row preflight then applies to the expanded
-height.
+height. If the row fits only the fresh-page row area, preflight advances before
+drawing and keeps the row whole. If it cannot fit that area, rendering returns a
+layout error rather than splitting the row, clipping content, or looping through
+empty continuation pages. Row splitting was rejected because it would conflict
+with the inherited complete-row contract and broaden the presentation model.
 
 Alternatives considered: Raise every conversion row to a hard-coded height, but
 wrapped long entries still need measurement. Preserve newlines in the generic
@@ -209,26 +219,35 @@ section evidence.
 Decision: Isolate one prerequisite correction in the existing PDF adapter:
 change its byte-finalization seam to return `([]byte, error)`, use
 `gopdf.GetBytesPdfReturnErr`, and propagate the error through `Renderer.Render`
-before output writing.
+before output reservation or writing, as required by FR-022 and FR-023.
 
 Rationale: The current `GetBytesPdf` convenience method calls `log.Fatalf` when
 finalization fails. That terminates the process and bypasses report failure
 handling, which is incompatible with the constitution's exceptional-condition
 gate and OWASP A10:2025 review. The pinned dependency already exposes the needed
 error-returning API. The correction changes no successful report content and is
-kept outside the user-visible rendering contract.
+part of the normative render-failure contract without changing successful
+visible content.
 
 Alternatives considered: Leave the existing path unchanged because it predates
 this feature, but the post-design constitution gate cannot pass with a known
 fatal failure path in the PDF adapter being modified. Recover from `log.Fatalf`,
 but process exit is not recoverable.
 
+Render failures occur before reservation and therefore create no report output
+path. Writer failures occur after exclusive reservation and remain governed by
+the inherited output transaction: every path reserved by the current attempt is
+removed, while colliding pre-existing files and earlier successful bundles are
+retained. Opener failure after complete bundle success remains a warning and
+does not trigger cleanup.
+
 ## Testing Evidence Strategy
 
-Decision: Combine pure shared-presentation tests, exact Markdown contracts, PDF
-layout recorder tests, extended concrete generated-PDF inspection, runtime
-parity tests, unchanged empirical calculation tests, and the existing isolated
-performance scenario.
+Decision: Combine the closed acceptance manifest and field/vector/output matrix,
+pure shared-presentation tests, exact Markdown contracts, PDF layout recorder
+tests, extended concrete generated-PDF inspection, runtime parity and AUD-001
+model-equality tests, confidentiality sentinels, unchanged empirical calculation
+tests, and the isolated named performance scenario.
 
 Rationale: The current project PDF inspector proves landscape page geometry and
 searchable normalized text, but its normalization removes punctuation,
@@ -239,8 +258,21 @@ including the final period, uses the embedded bold font and that each converted
 entry starts at a later vertical coordinate. Package-local recorder tests still
 prove operation order, exact strings, matching measurement/drawing line counts,
 complete-row preflight, and safe finalization error propagation. Runtime and
-empirical tests protect the boundary before formatting, and performance remains
-outside deterministic coverage.
+empirical tests protect the boundary before formatting. Searchable/selectable
+text and readable non-overlapping layout remain the accessibility boundary;
+tagged-PDF, PDF/UA, semantic reading-order, and screen-reader claims are excluded
+and cannot be inferred from text-run inspection. Performance remains outside
+deterministic coverage.
+
+Failure and recovery evidence also forces unrenderable decimal, PDF layout,
+finalization, Markdown second-file, PDF save, and post-save opener failures.
+Sentinel colliding files prove that cleanup is limited to current-attempt paths.
+The performance fixture keeps its exact 10,000-activity, two-asset,
+three-currency composition and 6,666 three-entry conversion rows. Separate
+Markdown and PDF timers include generation, multiline PDF pagination and
+finalization, save, bundle validation, and opener invocation. Fixture setup and
+post-generation row, entry, page, header, and continuation inspection stay
+outside the measured intervals.
 
 Alternatives considered: Depend only on normalized extracted text, but it cannot
 prove the new requirements. Add a second PDF parser, but the existing
@@ -265,6 +297,14 @@ Alternatives considered: Add a money-formatting library or PDF extraction
 library, but the existing APIs and test seams are sufficient. Use an HTML/PDF
 service, but that would expose financial data and violate the local-only design.
 
+Capability contingency: This decision remains valid only if the pinned APIs and
+project-owned inspection seams produce every normative rendering and acceptance
+result. Contrary evidence is a DEP-001 planning failure, not authorization for a
+fallback. Work stops while compliant local-only alternatives and dependency
+risk are documented and the specification, plan, constitution checks, security
+review, tasks, and acceptance evidence are revised. If no compliant plan exists,
+the feature remains incomplete.
+
 ## Security Review
 
 Decision: Treat the feature as a controlled presentation change inside the
@@ -276,7 +316,10 @@ injection through Markdown or PDF delimiters (A05), misleading rounded or
 missing values (A06/A08), sensitive failure logging (A09), and render/layout or
 write failures (A10). The existing writer continues to request mode `0600` and
 use its reserve/write/cleanup sequence; this feature adds no output persistence
-path. Token exclusion and single-line redaction remain in force. Generated
+path. SEC-001 applies to successful documents, returned and wrapped errors,
+diagnostics, examples, and fixtures and excludes real credentials, reusable
+authentication or decryption material, and raw protected-payload serialization.
+Only clearly synthetic non-reusable redaction sentinels are permitted. Generated
 Converted Amounts dynamic components are escaped and sanitized before fixed
 entry syntax and controlled `<br>` or newline delimiters are inserted. The
 isolated PDF finalization prerequisite replaces process exit with normal error

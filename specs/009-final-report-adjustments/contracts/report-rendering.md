@@ -9,6 +9,17 @@ for currency-denominated amounts and unit prices. Existing section order,
 calculation rules, quantity formatting, exchange-rate precision, output bundle
 shape, PDF layout requirements, and security rules remain in force.
 
+In this contract, inherited provider-published rate precision means the
+canonical normalized exact-decimal rate value, not the provider response's
+lexical scale.
+
+The output transaction remains governed by
+`specs/008-report-pdf-annex/contracts/report-output.md`. This feature does not
+change the bundle shape, exclusive reservation, matched Markdown suffix,
+write/sync/close completion point, failed-attempt cleanup, collision retention,
+or post-save opener-warning behavior. Every reserved report path is requested
+with owner-read and owner-write permissions only, mode `0600`, before writing.
+
 ## Main Report Warning
 
 The main report must contain this exact sentence once:
@@ -21,7 +32,11 @@ Rules:
 
 - It appears immediately after the initial `Report Calculation Currency` field.
 - It appears immediately before `Gains-And-Losses Summary`.
-- It is a standalone paragraph.
+- It is one standalone logical paragraph. No other metadata, heading, table
+  content, or prose shares or interrupts that paragraph.
+- Markdown encodes that paragraph on one source line. PDF may wrap it into
+  multiple physical lines or text runs because of available width; the ordered
+  fragments remain one occurrence and every fragment remains bold.
 - The complete sentence, including its final period, is bold.
 - The Markdown main document uses exactly:
 
@@ -38,6 +53,11 @@ Rules:
 Every present currency-denominated amount and unit price has exactly two digits
 after the decimal separator in both formats.
 
+Its complete visible grammar is fixed-point ASCII
+`^-?[0-9]+\.[0-9]{2}$`. The decimal separator is the literal `.`, the only
+permitted sign is one leading `-`, and grouping, leading `+`, whitespace,
+alternate separators, and exponent notation are forbidden.
+
 Included value classes:
 
 | Report area | Financial values |
@@ -51,6 +71,14 @@ Included value classes:
 
 Rules:
 
+- Accepted sources are finite decimals whose adjusted exponent, source exponent
+  plus coefficient digit count minus one, is from `-100000` through `100000` and
+  whose correctly rounded scale-2 result, including a carry, also has adjusted
+  exponent no greater than `100000`. Scale-2 quantization precision, including
+  coefficient expansion and one carry digit, must not exceed `4294967295`.
+  Successful formatting rules apply only inside that domain. Values outside it,
+  including an upper-bound carry to adjusted exponent `100001`, fail under the
+  Failure Contract before visible output.
 - Use exact-decimal HALF UP rounding at two places.
 - HALF UP applies symmetrically, so an exact negative tie rounds away from zero.
 - Round only while deriving final visible strings.
@@ -59,8 +87,8 @@ Rules:
 - Retain the existing explicit currency identity or currency column for each
   value.
 - A present whole or one-place value receives trailing zeros.
-- A present exact zero renders `0.00`.
-- A negative value that rounds to zero renders `0.00`, not `-0.00`.
+- An accepted present exact zero renders `0.00`.
+- An accepted negative value that rounds to zero renders `0.00`, not `-0.00`.
 - A missing optional value remains blank.
 - A small exact non-zero value that renders `0.00` remains included wherever the
   exact value was included before this feature.
@@ -77,7 +105,11 @@ Required examples:
 
 ## Values Excluded From Two-Decimal Formatting
 
-Quantity values retain their established exact canonical representation.
+Quantity values use the FR-009 canonical fixed-point representation computed
+from the exact pre-presentation model value: no exponent or grouping separator,
+no leading `+`, no rounding or fractional padding, and no fractional trailing
+zeros. A decimal separator appears only when a fractional part remains, and
+numeric zero renders as `0`.
 
 Examples:
 
@@ -87,9 +119,13 @@ Examples:
 | `0.1` | `0.1` |
 | `0.00000001` | `0.00000001` |
 
-Disclosed `Rate Value` exchange-rate ratios also retain established
-provider-published precision. For example, `1.0946` remains `1.0946`, not
-`1.09`.
+Disclosed `Rate Value` ratios use the canonical normalized fixed-point
+representation of the exact validated rate evidence and never pass through
+two-decimal formatting. Provider lexical trailing zeros are not retained:
+`0.86010`, `16.9140`, `1.094600`, and `2.00` render as `0.8601`, `16.914`,
+`1.0946`, and `2`. No significant digit may be rounded or discarded, and the
+source currency, report base currency, rate date, and quote direction come from
+the same pre-presentation evidence.
 
 The following decisions continue to use exact values, not displayed values:
 
@@ -114,8 +150,17 @@ rewritten.
 
 ## Original Activity Currency Contract
 
-For a Detailed Per-Asset Audit Report row classified from exact source data as a
-zero-priced holding reduction:
+Source-price predicates are evaluated before conversion and visible formatting.
+An exact zero is a present finite decimal numerically equal to zero regardless
+of exponent, trailing-zero scale, or negative-zero sign; a missing value does
+not establish zero. A zero-priced holding reduction is the inherited
+classification for a normalized `SELL` with positive quantity, a non-empty
+trimmed explanation, a present exact-zero normalized source unit price, no
+negative running-holdings result, and no non-zero present source monetary field
+across the order, asset-profile, or base tiers.
+
+For a Detailed Per-Asset Audit Report row carrying that exact pre-format
+classification:
 
 - The calculated audit model retains its existing pre-format `ActivityCurrency`
   value and the exact zero-priced-reduction classification before presentation;
@@ -127,8 +172,12 @@ zero-priced holding reduction:
   liquidation evidence, gain or loss, conversion status, and note remain
   unchanged and visible when otherwise applicable.
 
-For an activity with an applicable non-zero source price,
-`Original Activity Currency` retains the selected source activity currency.
+An applicable non-zero source price exists when the selected pre-conversion
+single-tier context has a non-empty source currency and a present finite unit
+price, source-provided or same-tier derived, that is numerically greater than
+zero. `Original Activity Currency` retains that selected source currency even
+when the price displays as `0.00`. Rows satisfying neither predicate retain
+their inherited visible currency behavior.
 
 No renderer may infer this rule from a two-decimal `Unit Price` string.
 
@@ -142,20 +191,30 @@ Each included conversion component uses this logical entry syntax:
 
 Rules:
 
-- Labels and order remain `unit_price`, `gross_value`, `fee_amount`.
-- A valid conversion audit entry contains no duplicate amount kind and uses only
-  the canonical subsequence of that order.
+- Presentation acceptance fixtures cover exactly the eight order-preserving
+  subsequences of `unit_price`, `gross_value`, and `fee_amount`: empty, each of
+  the three singletons, `[unit_price, gross_value]`, `[unit_price, fee_amount]`,
+  `[gross_value, fee_amount]`, and the complete three-entry sequence. This set
+  does not constrain inherited calculator output or define list validity.
+- Presentation treats the received supported-kind sequence as read-only and
+  does not sort, deduplicate, synthesize, or reorder it. This feature adds no
+  duplicate-kind or list-order validation failure, including for a supported
+  received sequence outside the canonical fixture set.
 - There is exactly one ordinary space after `:`.
 - There is exactly one ordinary space on each side of `->`.
 - Original and converted amounts follow the two-decimal financial contract.
 - A component is omitted only when its exact original and converted amounts are
   both zero.
-- Every included entry begins on a separate visible line in the existing
-  `Converted Amounts` cell.
+- Every included entry has one distinct logical start in the existing
+  `Converted Amounts` cell. The first starts at the cell origin, and each later
+  entry starts after the renderer-controlled boundary following the prior
+  semicolon. Width-driven physical wraps inside an entry create no additional
+  logical start.
 - Every non-final entry ends with `;` followed by a format-appropriate visible
   line break.
 - The final entry has no trailing semicolon.
-- A single entry occupies one line and has no semicolon.
+- A single entry starts at the cell origin and has no semicolon or controlled
+  line boundary. It may occupy multiple physical lines through width wrapping.
 - No included entries preserves the existing empty-cell behavior.
 
 Required three-entry visible content:
@@ -176,6 +235,14 @@ PDF encoding uses explicit newlines in the table-cell value. PDF measurement
 must apply the same indicator-sensitive word-wrap option as table drawing and
 must account for those newlines before complete-row page preflight. Drawing must
 not clip or overlap subsequent rows, borders, or the bottom printable margin.
+
+For this contract, the fresh-page row area is the vertical space between the
+first valid data-row origin after mandatory page context, table header, and
+spacing and the preserved bottom printable margin. If a measured row does not
+fit the current page but fits that fresh-page row area, the renderer advances
+before drawing any part of the row and draws it whole exactly once. If it cannot
+fit that fresh-page row area, rendering fails without row splitting, clipping,
+overlap, repeated empty continuation pages, PDF finalization, or output success.
 
 ## Markdown Contract
 
@@ -200,8 +267,22 @@ not clip or overlap subsequent rows, borders, or the bottom printable margin.
   searchable/selectable text, printable-width tables, heading spacing, Annex
   page break, repeated continuation context, and complete-row preflight remain
   unchanged.
+- Complete-row preflight follows FR-026 and FR-027 for both remaining-page and
+  fresh-page capacity. A logical row is never split across pages.
 - Existing arbitrary report text stays single-line sanitized. Only controlled
   Converted Amounts cell boundaries are preserved as newlines.
+
+## Accessibility And Readability Contract
+
+The inherited searchable/selectable PDF-text and human-readable layout
+requirements remain normative for the warning and multiline Converted Amounts
+content. The warning's meaning remains explicit in its complete text rather than
+depending on bold style alone. Searchable/selectable means emitted report text
+remains searchable and selectable in a supporting PDF reader; it does not imply
+tagged-PDF semantics, PDF/UA conformance, semantic table associations,
+guaranteed assistive reading order, or screen-reader interoperability. Markdown
+`<br>` and PDF newline boundaries are visible layout encodings and create no
+additional assistive-technology conformance claim.
 
 ## Cross-Format Parity
 
@@ -218,37 +299,113 @@ For identical report inputs, Markdown and PDF must agree on:
 Permitted differences remain limited to Markdown syntax, PDF styling and
 pagination, PDF page titles, and separate Markdown Annex output.
 
+## Confidentiality Contract
+
+SEC-001 applies to successful and failed rendering across generated documents,
+result and error text including wrapped causes, diagnostics, documentation and
+test examples, and committed or generated fixtures. A contextual error may
+identify the failing field or row, but project-owned boundaries must redact or
+suppress real credentials, bearer or JWT values, reusable authentication or
+decryption material, token-derived verifiers or keys, and raw encrypted or
+decrypted protected-payload serialization or reversible encodings. Contracted
+cleartext financial fields and inherited mode-authorized modeled non-secret
+diagnostic fields do not authorize raw snapshot, envelope, payload, credential,
+verifier, or key material. Redaction tests may use only clearly synthetic,
+non-reusable sentinels.
+
 ## Failure Contract
 
-- A non-finite or otherwise unrenderable decimal returns a contextual render
-  error and must not create a successful output result.
-- A PDF measurement or drawing failure returns an error before successful
-  output is reported.
-- This feature does not change the existing output writer's reservation and
-  cleanup sequence.
-- Errors and generated documents must not expose tokens, protected payload
-  bytes, or reusable authentication material.
+- A non-finite decimal, finite but unrepresentable value, formatting precision
+  or exponent limit, unexpected decimal condition, or PDF measurement,
+  wrapping, page-fit, drawing, or byte-finalization failure returns a contextual
+  non-secret render error and must not create a successful output result.
+- PDF byte finalization means serializing the completed in-memory PDF layout
+  into the byte payload used to construct the combined PDF report document. It
+  occurs before output-path reservation and must use an error-returning path.
+- A render or finalization failure discards partial bytes, returns no successful
+  report document, leaves the application process running, and invokes neither
+  the output writer nor the opener.
+- Selected-format output success occurs only after every required file has been
+  exclusively reserved, fully written, synced, closed, validated, and recorded.
+  Candidate collisions use the inherited suffix retry and are not terminal
+  failures. Any unrecoverable reservation or later pre-success writer or bundle
+  failure removes every path reserved or created by that attempt and reports no
+  saved path.
+- Failed-attempt cleanup must not overwrite, truncate, remove, or otherwise
+  change a pre-existing colliding file or an earlier successful report bundle.
+- An opener failure after output success is a success-with-warning. All saved
+  paths remain present and are reported.
+- Every successful and failed channel follows the Confidentiality Contract.
+- Capability insufficiency must not trigger a remote renderer, browser, external
+  binary, platform service, dependency change, or reduced report contract at
+  runtime. It is a DEP-001 planning blocker.
 
 ## Automated Evidence
+
+Automated acceptance must use the closed manifest and semantic occurrence keys
+defined by the specification. A failed listed format attempt remains in its
+applicable populations. Evidence reports numerator and denominator counts for
+`A`, `W`, `V`, `R`, `M`, `Q`, `B`, `Z`, `N`, `C`, `P`, and `E`; none may be
+empty. `A` is generated only from the closed case-ID schemas, tables, and literal
+sets in the specification, while `R` is enumerated from the pinned baseline test
+tree and is not treated as a renderer-attempt population.
 
 Automated tests must cover both formats and prove:
 
 - exact warning text, one occurrence, and placement
 - generated-PDF text runs covering the complete warning, including the final
   period, all use the embedded bold font
-- whole, one-place, two-place, high-precision, positive and negative exact-half,
-  very small, very large, zero, negative-zero, and absent financial cases
+- the complete Financial Presentation Acceptance Matrix cross-product at each
+  specified Markdown and PDF semantic field boundary, not only a shared
+  formatter or aggregate extracted-text sample
+- inclusive FR-004a adjusted-exponent and precision arithmetic at the formatter
+  boundary including an accepted upper-bound non-carry case, plus Markdown and
+  PDF failures immediately outside either exponent bound, on upper-bound carry,
+  and above the precision limit with no visible or saved output
 - unchanged quantities, exchange rates, calculated values, and exact inclusion
   decisions
+- canonical rate cases prove that significant digits remain while provider
+  lexical trailing zeros are removed identically in both formats
+- every quantity occurrence equals the FR-009 canonical value computed from its
+  exact pre-presentation decimal without using prior output as a baseline
+- pre-render and post-render model equality for every AUD-001 exact decimal,
+  currency, quantity, rate and metadata field, inclusion or omission state, and
+  classification
 - both boolean labels
 - the existing calculated audit `ActivityCurrency` value remains unchanged
   before a zero-priced presentation cell becomes blank
 - zero-priced blank and non-zero-priced retained visible activity currencies
-- zero, one, two, and three included converted-entry cases
-- duplicate and out-of-order converted amount kinds fail report validation
+- exact-zero, missing-price, positive `0.004`, same-tier-derived price, and
+  contradictory non-zero source-field cases exercise the FR-013 and FR-015
+  predicates before formatting
+- zero, one, two, and three included converted-entry cases covering each of the
+  eight FR-019 canonical subsequences
+- received converted-entry order is preserved without new duplicate-kind or
+  supported-kind order validation
 - exact colon, arrow, semicolon, order, and line-boundary behavior
 - generated-PDF coordinates show each converted entry starts on a later visible
   line
 - PDF measured and drawn line counts, row height, and bottom-margin preflight
   agree for explicit newlines and long space-wrapped content
-- unchanged 10,000-activity selected-format performance limits
+- a row that fits only the fresh-page row area advances before drawing and is
+  drawn whole once, while a row exceeding that area returns a layout error and
+  does not finalize or save a PDF
+- non-finite, unrepresentable, layout, drawing, and byte-finalization failures
+  return normally with no successful document, output path, or opener request
+- Markdown second-file failure and PDF save failure remove only current-attempt
+  paths, preserve sentinel contents in colliding prior files, and report no
+  partial success
+- opener failure after complete output success retains and reports every file
+- SEC-001 sentinels are absent from successful documents, returned and wrapped
+  errors, diagnostics, examples, and generated fixtures
+- warning and converted-entry content remains complete searchable/selectable
+  text with preserved order and non-overlapping layout, without claiming the
+  assistive capabilities excluded by ACC-002
+- the named 10,000-activity fixture produces exactly 6,666 three-entry
+  conversion rows in both formats; the PDF audit spans multiple pages with every
+  row and entry present, searchable, inside printable bounds, and accompanied by
+  repeated header and continuation context where applicable
+- separate Markdown and PDF duration records use the specified CI environment
+  and timing boundary, including PDF multiline measurement, pagination,
+  finalization, save, and opener invocation while excluding fixture setup and
+  post-generation inspection
