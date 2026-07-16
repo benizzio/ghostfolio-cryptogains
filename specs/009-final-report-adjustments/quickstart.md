@@ -169,7 +169,9 @@ go run ./cmd/ghostfolio-cryptogains
 ```
 
 Generate Markdown and PDF with the same year, cost-basis method, calculation
-currency, and deterministic or development activity history.
+currency, and deterministic synthetic fixtures or synthetic development history.
+Never use real user financial data in manual verification inputs, examples, or
+verification artifacts.
 
 Verify each successful result, including an opener-warning result:
 
