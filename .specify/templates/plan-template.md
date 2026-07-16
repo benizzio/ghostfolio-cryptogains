@@ -22,7 +22,13 @@
 
 **Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]
 
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
+**Storage And User Exports**: [Distinguish application-managed persistence from
+explicit user-requested exports. For persistence, describe protection and
+removal and, for financial or person-linked data, token-derived encryption and
+OWASP Cryptographic Storage Cheat Sheet controls; record N/A with rationale when
+those controls do not apply. For exports, describe cleartext necessity, local
+destination, access controls, saved-path disclosure, cleanup, user removal
+guidance, non-retention, and non-re-ingestion, or state N/A]
 
 **Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]
 
@@ -43,8 +49,11 @@ or NEEDS CLARIFICATION]
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-- [ ] Security: Document persistence, token handling, redaction, and relevant
-  OWASP review scope.
+- [ ] Security: Classify application-managed persistence, diagnostics, temporary
+  artifacts, and explicit user-requested exports; document token handling,
+  non-export-channel financial-data redaction, export access and cleanup
+  controls, removal guidance, applicable token-derived encryption and OWASP
+  Cryptographic Storage evidence or N/A rationale, and relevant OWASP review scope.
 - [ ] Precision: Define numeric representation, scale, currency identity,
   conversion boundaries, rounding rules, and auditability requirements.
 - [ ] Testing: Define integration coverage, coverage-gate verification, and any
@@ -68,6 +77,7 @@ or NEEDS CLARIFICATION]
 
 ```text
 specs/[###-feature]/
+├── spec.md              # Feature specification (/speckit.specify command output)
 ├── plan.md              # This file (/speckit.plan command output)
 ├── research.md          # Phase 0 output (/speckit.plan command)
 ├── data-model.md        # Phase 1 output (/speckit.plan command)

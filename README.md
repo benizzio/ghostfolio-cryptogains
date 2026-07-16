@@ -80,7 +80,7 @@ Empirical data and golden oracle fixtures live under `testdata/empirical/`; ordi
 `.github/workflows/test.yml` invokes the reusable test-suite workflow. Its check names are `test / run`, `coverage / run`, and `test-performance / run`; the separate changed-source check is `quality`. These checks run independently on fresh Ubuntu runners, and none runs external integration.
 `make quality` runs the changed-source quality gate for `*.go`, `go.mod`, and `go.sum` changes using `golangci-lint`, `govulncheck`, and `gitleaks`. It must pass for every feature, including the explicit skip path when no source inputs changed.
 
-## Local Storage
+## Local Storage And User Exports
 
 Bootstrap setup stays in a single machine-local JSON file named `setup.json`.
 
@@ -123,7 +123,9 @@ Protection notes:
 - Windows uses the current user's application-data directory and does not rely on Unix permission bits.
 - Protected snapshots use token-derived encryption and store normalized activity history, not the Ghostfolio token or JWT.
 - Report generation reads only the unlocked protected snapshot. It does not persist report content, report paths, or report history back into `setup.json`, snapshots, or diagnostics.
-- Successful report output is one cleartext Markdown file in the user's Documents folder. The application keeps report content in memory until that final save succeeds.
+- A successful user-requested report export is either one cleartext Markdown main file plus one matching Markdown Annex file or one combined cleartext PDF in the user's Documents folder.
+- Report exports contain financial data. The application requests mode `0600` where permission bits are supported and reports every saved path. Feature 009 requires the result screen to add explicit cleartext status and instructions to delete every listed file.
+- Report rendering and saving are local-only. The application keeps report content in memory until the selected-format bundle succeeds and retains no report history, durable output-path state, reopen catalog, extra cleartext copy, or automatic re-ingestion.
 - Eligible synced-data failures can write structured local diagnostic reports. Outside explicit development mode those reports redact financial-value fields.
 - The application does not persist the Ghostfolio security token, Ghostfolio JWT, or raw unprotected Ghostfolio payloads in this slice.
 
@@ -137,7 +139,7 @@ Delete the bootstrap setup file to force the next launch back to first-run setup
 
 - Delete the `snapshots/` directory under the same application root to remove protected synced activity history.
 - Delete the `diagnostics/` directory under the same application root to remove local synced-data diagnostic reports.
-- Delete generated `ghostfolio-capital-gains-*.md` files from the user's Documents folder to remove cleartext report output.
+- Delete generated `ghostfolio-capital-gains-*.md` and `ghostfolio-capital-gains-*.pdf` files from the user's Documents folder to remove cleartext report exports. Delete every path reported for the selected format.
 - If `setup.json` is removed after startup, the current run keeps its in-memory server selection until the application exits.
 
 ## Development Mode
@@ -163,7 +165,7 @@ Current behavior:
 - unlocked synced data shows last successful sync metadata and available report years without forcing a new sync
 - report generation uses the unlocked protected snapshot as input, not a fresh Ghostfolio API call
 - report generation supports FIFO, LIFO, HIFO, Average Cost Basis, and Scope-Local Exact Unit Matching, otherwise Scope-Local Average Cost with Oldest-Acquired Deemed-Disposal Order
-- successful report generation writes one timestamped Markdown file to Documents, requests one OS default-app open, and shows the saved path with user file-removal guidance
+- successful report generation writes either one timestamped Markdown main file plus its matching Annex or one combined PDF to Documents, requests one OS default-app open, and shows every saved path; feature 009 adds explicit cleartext and file-removal guidance
 - automatic-open failure leaves the saved report file in place and reports the warning without treating the save as failed
 - leaving the result screen or the unlocked context clears transient in-memory report state so the application keeps no report history or reopen list
 - same-token refresh replaces the existing selected-server snapshot only after the new protected write succeeds atomically

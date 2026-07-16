@@ -1,10 +1,10 @@
 <!--
 Sync Impact Report
-Version change: 2.3.0 -> 2.4.0
+Version change: 2.4.0 -> 3.0.0
 Modified principles:
-- III. Testability with Full Coverage -> III. Testability, Coverage, and Quality Gates
+- I. Security-First Financial Data Handling
 Modified sections:
-- III. Testability, Coverage, and Quality Gates
+- I. Security-First Financial Data Handling
 - Operational Constraints
 - Delivery Workflow & Quality Gates
 Added sections:
@@ -18,6 +18,15 @@ Templates requiring updates:
 Runtime guidance requiring updates:
 - ✅ README.md
 - ✅ AGENTS.md
+Active feature guidance requiring updates:
+- ✅ specs/009-final-report-adjustments/spec.md
+- ✅ specs/009-final-report-adjustments/plan.md
+- ✅ specs/009-final-report-adjustments/research.md
+- ✅ specs/009-final-report-adjustments/data-model.md
+- ✅ specs/009-final-report-adjustments/contracts/report-rendering.md
+- ✅ specs/009-final-report-adjustments/quickstart.md
+- ✅ specs/009-final-report-adjustments/tasks.md
+- ✅ specs/009-final-report-adjustments/checklists/report-contract.md
 Follow-up TODOs:
 - None
 -->
@@ -28,23 +37,52 @@ Follow-up TODOs:
 ### I. Security-First Financial Data Handling
 - Security MUST be the first decision filter for design, implementation, testing,
   and review because the application processes financial data.
-- Data MUST NOT be persisted unless the feature specification or implementation
-  plan explicitly justifies why persistence is necessary.
-- Persisted data MUST remain local to the user's machine. Remote storage,
-  synchronization, telemetry export, or third-party persistence of financial data
-  is prohibited unless this constitution is amended.
-- Persisted data that contains financial information or can be connected to a
-  specific person or user MUST be encrypted at rest with key material derived
-  from the active Ghostfolio security token so that the stored data is
-  unreadable without re-supplying a valid token in a later session.
-- Persisted data that contains neither financial information nor person- or
-  user-linkable data MAY use proportionate machine-local protection instead of
-  Ghostfolio-token-derived encryption, but the feature specification or
-  implementation plan MUST explicitly justify the stored fields, show that they
-  do not cross that sensitivity threshold, and document the local protection
+- Application-managed persistence means configuration, state, cache, snapshot,
+  history, diagnostics, temporary residue, retained output metadata, or any data
+  the application keeps or automatically processes after the operation that
+  created it. Data MUST NOT enter application-managed persistence unless the
+  feature specification or implementation plan explicitly justifies why it is
+  necessary.
+- Application-managed persisted data MUST remain local to the user's machine.
+  Remote storage, synchronization, telemetry export, or third-party persistence
+  of financial data is prohibited unless this constitution is amended.
+- Application-managed persisted data that contains financial information or can
+  be connected to a specific person or user MUST be encrypted at rest with key
+  material derived from the active Ghostfolio security token so that the stored
+  data is unreadable without re-supplying a valid token in a later session.
+- Application-managed persisted data that contains neither financial information
+  nor person- or user-linkable data MAY use proportionate machine-local protection
+  instead of Ghostfolio-token-derived encryption, but the feature specification
+  or implementation plan MUST explicitly justify the stored fields, show that
+  they do not cross that sensitivity threshold, and document the local protection
   approach.
-- When persisted data contains financial information or can be connected to a
-  specific person or user, its cryptographic storage design MUST follow the
+- A final report file MAY be treated as an explicit user-requested export rather
+  than application-managed persistence only when generation follows a direct user
+  request, every saved path is disclosed, the destination is local and
+  user-controlled, and the application retains no additional cleartext copy,
+  report history, reopen catalog, or durable output-path state and performs no
+  automatic re-ingestion or later management except the requested operating-system
+  open handoff.
+- An explicit user-requested report export MAY be cleartext and need not use
+  token-derived encryption. It MUST contain only contracted report fields, exclude
+  credentials and unrelated sensitive data, use local-only processing, request
+  owner-only access such as mode `0600` where supported, avoid overwriting
+  existing files, remove current-attempt files after unsuccessful generation,
+  disclose that the files contain cleartext financial data, report every saved
+  path, and explain that deletion of those files removes the exported data.
+- Cleartext temporary files, report caches, report history, retained output
+  metadata, automatic re-ingestion, and diagnostic artifacts are not explicit
+  user-requested report exports and remain governed by the application-managed
+  persistence rules.
+- Authorization to include contracted financial fields in an explicit report
+  export MUST NOT authorize those fields in logs, returned errors, screenshots,
+  documentation examples, or committed or generated test fixtures. Real user
+  financial data MUST be redacted from those channels; examples and fixtures MUST
+  use synthetic data. Diagnostics remain subject to their separately reviewed
+  mode-specific redaction policy.
+- When application-managed persisted data contains financial information or can
+  be connected to a specific person or user, its cryptographic storage design
+  MUST follow the
   [OWASP Cryptographic Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html),
   including minimizing stored sensitive data, using established algorithms,
   providing integrity protection, generating salts/nonces/IVs from a
@@ -58,9 +96,9 @@ Follow-up TODOs:
   authenticated request path to the Ghostfolio API.
 - Every feature MUST document a review of the most recent published OWASP Top 10
   relevant to the attack surface before merge.
-- Every feature that persists financial information or person- or user-linkable
-  data MUST document how its storage design follows the OWASP Cryptographic
-  Storage Cheat Sheet before merge.
+- Every feature that places financial information or person- or user-linkable
+  data in application-managed persistence MUST document how its storage design
+  follows the OWASP Cryptographic Storage Cheat Sheet before merge.
 Rationale: Financial data and authentication secrets create direct privacy,
 fraud, and account access risk.
 
@@ -176,12 +214,16 @@ the codebase maintainable.
 
 ## Operational Constraints
 
-- The default persistence policy is no persistence. When persistence is needed,
-  the specification or plan MUST record what is stored, why it is stored, how it
-  is protected, and how the user can remove it. When the persisted data contains
-  financial information or person- or user-linkable data, this documentation
-  MUST also describe token-derived encryption and the applicable OWASP
-  Cryptographic Storage Cheat Sheet controls.
+- The default application-managed persistence policy is no persistence. When
+  persistence is needed, the specification or plan MUST record what is stored,
+  why it is stored, how it is protected, and how the user can remove it. When the
+  persisted data contains financial information or person- or user-linkable data,
+  this documentation MUST also describe token-derived encryption and the
+  applicable OWASP Cryptographic Storage Cheat Sheet controls.
+- A feature that creates explicit user-requested report exports MUST document the
+  exported fields, why cleartext is necessary, the local destination and access
+  controls, saved-path disclosure, failed-attempt cleanup, user removal guidance,
+  and the absence of retained report state and automatic re-ingestion.
 - Secret handling is runtime-only. Tokens, credentials, and sensitive financial
   data MUST be redacted from logs, screenshots, examples, fixtures, and
   documentation.
@@ -195,33 +237,39 @@ the codebase maintainable.
   Implementations MAY extend project-owned tests around it but MUST NOT mutate
   the dataset unless the active spec is explicitly dedicated to dataset
   maintenance.
-- Unsupported practices include plaintext local caches, cloud persistence of
-  sensitive data, floating-point ledger math, storing currency-denominated
-  values without an explicit currency, cross-currency conversion before a
-  documented feature-defined boundary, mutating the empirical external dataset
-  during ordinary feature implementation, unreviewed dependency additions,
+- Unsupported practices include plaintext local caches, cleartext temporary
+  report files, retained report copies or history, automatic report re-ingestion,
+  undisclosed or unrequested exports, cloud persistence of sensitive data,
+  floating-point ledger math, storing currency-denominated values without an
+  explicit currency, cross-currency conversion before a documented
+  feature-defined boundary, mutating the empirical external dataset during
+  ordinary feature implementation, unreviewed dependency additions,
   undocumented API version assumptions, and merging a feature with a failing or
   unexecuted changed-source quality gate.
 
 ## Delivery Workflow & Quality Gates
 
-- Every feature specification MUST capture the feature's impacts on persistence,
-  token handling, financial precision and currency handling, testing strategy,
+- Every feature specification MUST capture the feature's impacts on
+  application-managed persistence, explicit user-requested exports, token
+  handling, financial precision and currency handling, testing strategy,
   changed-source quality-gate expectations, dependency choices, and external
   integrations when applicable.
 - Every feature that changes financial calculations MUST state whether existing
   `empirical solidified financial tests` apply and MUST explicitly record that
   empirical dataset changes are out of scope unless the spec is dedicated to
   dataset maintenance.
-- Every feature or change that persists financial information or person- or
-  user-linkable data MUST record its OWASP Cryptographic Storage Cheat Sheet
-  compliance evidence in `spec.md`, `plan.md`, `tasks.md`, or equivalent review
-  notes.
+- Every feature or change that places financial information or person- or
+  user-linkable data in application-managed persistence MUST record its OWASP
+  Cryptographic Storage Cheat Sheet compliance evidence in `spec.md`, `plan.md`,
+  `tasks.md`, or equivalent review notes.
 - Every implementation plan MUST pass a constitution check before research and
   again before implementation.
 - Every task list MUST include work for automated integration testing, coverage
   verification, changed-source quality-gate verification, security review, and
-  any required dependency or API research.
+  any required dependency or API research. When explicit user-requested exports
+  are affected, tasks MUST also verify local-only processing, access controls,
+  saved-path and cleartext disclosure, failed-attempt cleanup, removal guidance,
+  non-retention, non-re-ingestion, and non-export-channel redaction.
 - Task lists MUST treat `empirical external dataset` changes as isolated work in
   dedicated dataset-maintenance specs and MUST NOT bundle dataset mutations into
   ordinary implementation tasks.
@@ -259,4 +307,4 @@ the codebase maintainable.
   review notes, or equivalent artifacts. Missing evidence counts as
   non-compliance.
 
-**Version**: 2.4.0 | **Ratified**: 2026-05-01 | **Last Amended**: 2026-07-02
+**Version**: 3.0.0 | **Ratified**: 2026-05-01 | **Last Amended**: 2026-07-16

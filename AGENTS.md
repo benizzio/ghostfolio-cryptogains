@@ -1,7 +1,7 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/008-report-pdf-annex/plan.md
+at specs/009-final-report-adjustments/plan.md
 <!-- SPECKIT END -->
 
 <!--suppress HtmlUnknownTag -->
@@ -85,6 +85,7 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
   - `internal/support/text/` centralizes small reusable plain-text predicates and string matching helpers.
   - Before adding package-local helpers for decimal parsing or formatting, exact arithmetic, rounding, redaction, sanitization, or plain-text predicates, reuse or extend `internal/support/` when the behavior is domain-neutral.
   - Do not move package-specific domain rules into `internal/support/`. Shared helpers must stay general, policy-light, and reusable across app, sync, report, tests, and tools.
+  - Explicit report fields do not authorize real user financial data in logs, returned errors, screenshots, documentation examples, or committed or generated test fixtures. Use synthetic data in examples and fixtures; diagnostics retain their separately reviewed mode-specific redaction policy.
 
 - Bootstrap setup persistence:
   - `internal/config/model/` defines the persisted `setup.json` model and origin normalization rules.
@@ -109,7 +110,8 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
   - `internal/report/basis/` owns cost-basis state and allocation rules, including average cost, FIFO, LIFO, HIFO, and scope-local hybrid behavior.
   - `internal/report/calculate/` owns yearly gains-and-losses calculation from the protected synced activity cache.
   - `internal/report/markdown/` owns Markdown rendering for calculated reports and the externally visible Markdown document contract.
-  - `internal/report/output/` owns local report-file naming, Documents-directory resolution, file writing, cleanup, and post-save opening.
+  - `internal/report/output/` owns the explicit user-requested export boundary: local report-file naming, Documents-directory resolution, owner-only reservation where supported, file writing, failed-attempt cleanup, saved-path reporting, and post-save opening.
+  - Explicit report exports are not application-managed persistence only while they remain direct user requests, local and user-controlled, fully disclosed, and absent from report history, durable path state, automatic re-ingestion, or any additional retained cleartext copy.
   - Keep report-specific financial rules here. Do not put them in `internal/app/runtime/`, `internal/tui/`, or generic `internal/support/` helpers.
 
 - Protected snapshot storage:
@@ -157,6 +159,7 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
   - Keep `testdata/empirical/` and its golden fixtures read-only except for dedicated empirical dataset or oracle maintenance.
   - Never add or merge performance coverage into canonical coverage.
   - Refer to CI checks by their exact names: `test / run`, `coverage / run`, `test-performance / run`, and `quality`.
+  - For explicit report exports, preserve local-only generation, requested mode `0600` where supported, collision safety, current-attempt cleanup, cleartext and saved-path disclosure, user deletion guidance, and the prohibition on retained report state or automatic re-ingestion.
   - The `dist/` directory is generated output. Prefer editing source under `cmd/`, `internal/`, `tests/`, `tools/`, and `specs/`.
 
 </CodeStructure>

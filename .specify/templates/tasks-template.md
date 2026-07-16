@@ -16,7 +16,14 @@ only when justified by complexity or by gaps that integration tests cannot cover
 realistically. `Empirical solidified financial tests` are optional and apply
 only when the feature touches financial calculations covered by an existing
 read-only `empirical external dataset` or by a dedicated dataset-maintenance
-spec.
+spec. When a feature affects explicit user-requested exports, tasks MUST verify
+local-only processing, access controls, cleartext and saved-path disclosure,
+failed-attempt cleanup, user removal guidance, non-retention, non-re-ingestion,
+and redaction of real user financial data from non-export channels.
+When a feature adds application-managed persistence for financial or
+person-linked data, tasks MUST produce token-derived encryption and OWASP
+Cryptographic Storage Cheat Sheet compliance evidence; otherwise the artifacts
+must record why that evidence is not applicable.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -168,6 +175,9 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX [P] Coverage verification and any applicable empirical financial integration verification
 - [ ] TXXX Run changed-source quality gate with `make quality QUALITY_BASE_REF=<base-ref>`
 - [ ] TXXX Security hardening
+- [ ] TXXX Application-managed persistence encryption and OWASP Cryptographic Storage evidence, or verified N/A rationale
+- [ ] TXXX User-export boundary, cleanup, disclosure, removal, and non-retention verification
+- [ ] TXXX Non-export-channel credential and real financial-data redaction verification
 - [ ] TXXX Run quickstart.md validation
 
 ---
