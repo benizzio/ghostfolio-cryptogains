@@ -23,7 +23,7 @@ description: "Executable task list for final report presentation adjustments"
 
 **Purpose**: Establish reusable deterministic acceptance fixtures and concrete PDF inspection evidence needed by all three stories.
 
-- [ ] T001 Create the finalized closed acceptance case manifest, semantic occurrence keys, both-format attempts, and non-empty `A`, `W`, `V`, `M`, `Q`, `B`, `Z`, `N`, `C`, `P`, and `E` counters in `tests/testutil/report_presentation_fixtures.go`, including distinct all-missing, mixed missing-and-zero, explicit-zero, and contradictory non-zero source controls under FR-013 and FR-015, without changing `testdata/empirical/`
+- [ ] T001 Create the finalized closed acceptance case manifest, semantic occurrence keys, both-format attempts, and non-empty `A`, `W`, `V`, `M`, `Q`, `B`, `Z`, `N`, `C`, `P`, and `E` counters in `tests/testutil/report_presentation_fixtures.go`, including already-classified and unclassified Annex activity controls under FR-013 and FR-015, without changing `testdata/empirical/`
 - [ ] T002 [P] Extend generated-PDF inspection with ordered text runs containing page number, decoded text, font resource, and text coordinates while preserving existing page-box and searchable-text behavior, and cover parsing/error branches in `tests/testutil/pdf_inspection.go` and `tests/testutil/pdf_inspection_test.go`
 
 **Checkpoint**: Shared fixtures can identify every acceptance occurrence, and project-owned PDF inspection can prove font and vertical-position contracts.
@@ -85,25 +85,25 @@ description: "Executable task list for final report presentation adjustments"
 
 **Goal**: Render structured Annex booleans as `Yes` or `No` and suppress only the visible original currency for an exact pre-format zero-priced holding reduction.
 
-**Independent Test**: Generate both formats with true and false liquidation states plus report-level all-missing, mixed missing-and-zero, explicit-zero, non-zero-priced, tiny-positive, same-tier-derived-positive, and contradictory-source-field controls. Verify the labels, blank/retained original currency, retained calculation currency, missing-value preservation, unchanged sync admission, and unchanged pre-format audit model.
+**Independent Test**: Generate both formats with true and false liquidation states plus already-classified and unclassified Annex activity controls. Verify the labels, blank/retained original currency, retained calculation currency, and unchanged pre-format audit model without retesting upstream classification or sync admission.
 
 ### Tests for User Story 2
 
 > Write these tests first and verify they fail for missing classification propagation or incorrect visible labels/currency.
 
-- [ ] T018 [P] [US2] Add report-input predicate tests for all-missing, mixed missing-and-zero, explicit-zero, all-zero, zero scale/sign variants, tiny positive values, `order -> asset_profile -> base` selection, same-tier derivation, present exact-zero fee completeness, missing-fee fallback to the next complete tier, incomplete higher-tier fallback, explanations, positive quantity, nonnegative post-reduction holdings, non-finite values, and contradictory non-zero fields; separately characterize unchanged sync admission by proving resolvable explained explicit zero remains accepted and all-monetary-values-missing upstream input remains rejected in `internal/report/calculate/activity_input_internal_test.go`, `internal/sync/validate/activity_history_internal_test.go`, `tests/unit/report_activity_input_test.go`, and `tests/integration/activity_validation_flow_test.go`
+- [ ] T018 [P] [US2] Add presentation fixtures supplied with inherited `IsZeroPricedHoldingReduction` true and false values, including an unclassified tiny-positive control that displays as `0.00`, and verify only classified Annex rows blank visible activity currency without adding classification-predicate or sync-admission tests in `internal/report/presentation/rows_test.go` and `tests/unit/report_markdown_test.go`
 - [ ] T019 [P] [US2] Add tests proving `AuditActivityEntry` receives and clones the inherited zero-priced classification while retaining its pre-format `ActivityCurrency` and every other audit value in `internal/report/calculate/calculator_internal_test.go` and `internal/report/model/report_internal_test.go`
-- [ ] T020 [US2] Add shared-row and Markdown renderer tests for exact `Yes`/`No` mapping, direct consumption of the shared label, and blank-only-when-classified original currency while calculation currency and tiny-positive controls remain visible in `internal/report/presentation/rows_test.go` and `internal/report/markdown/renderer_internal_test.go`
+- [ ] T020 [US2] Add shared-row and Markdown renderer tests for exact `Yes`/`No` mapping, direct consumption of the shared label, and blank-only-when-classified original currency while calculation currency and unclassified controls remain visible in `internal/report/presentation/rows_test.go` and `internal/report/markdown/renderer_internal_test.go`
 - [ ] T021 [US2] Extend generated Markdown and concrete PDF Annex contracts for both boolean states and all `Z`/`N` currency controls, including non-empty population counts and no lowercase boolean field values, in `tests/contract/report_annex_contract_test.go`
 - [ ] T022 [P] [US2] Add runtime-backed Annex parity and AUD-001 equality checks proving only the visible classified currency cell is suppressed and the calculated audit currency/classification remain unchanged in `tests/integration/report_audit_presentation_flow_test.go`
 
 ### Implementation for User Story 2
 
 - [ ] T023 [P] [US2] Add the transient `IsZeroPricedHoldingReduction` classification to `AuditActivityEntry` without adding persistence or unrelated validation and preserve it through defensive copies in `internal/report/model/audit_activity_entry.go`
-- [ ] T024 [US2] Preserve the inherited report-level zero-priced holding-reduction predicate without adding a present-value guard or changing sync admission, basis, conversion, gain/loss, currency identity, or activity inclusion, then copy that exact classification into each calculated audit entry while retaining missing values, the existing activity-currency value, and all financial evidence in `internal/report/calculate/activity_input.go` and `internal/report/calculate/artifacts.go`
+- [ ] T024 [US2] Consume and copy the existing `IsZeroPricedHoldingReduction` classification inherited from Feature 003 FR-017 and Feature 005 FR-029/FR-029a into each calculated audit entry while retaining the existing activity-currency value and all financial evidence, without recomputing or changing classification, sync admission, basis, conversion, gain/loss, currency identity, or activity inclusion in `internal/report/calculate/artifacts.go`
 - [ ] T025 [US2] Derive `Yes`/`No` and the classified visible-currency blank in the shared Annex row, then make Markdown consume the shared boolean label directly without `%t` conversion in `internal/report/presentation/rows.go` and `internal/report/markdown/renderer_annex.go`
 
-**Checkpoint**: User Story 2 passes independently with the reviewed predicate applicability from T018 and no unapproved basis, conversion, gain/loss, persistence, source-currency inference, or activity-inclusion change.
+**Checkpoint**: User Story 2 passes independently with classified and unclassified presentation coverage and no upstream classification, sync-admission, basis, conversion, gain/loss, persistence, source-currency inference, or activity-inclusion change.
 
 ---
 

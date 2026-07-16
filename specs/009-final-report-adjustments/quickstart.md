@@ -70,12 +70,10 @@ Expected result:
   AUD-002 evidence with metadata unchanged
 - zero-priced Annex rows have blank original currency and retain calculation
   currency
-- non-zero-priced control rows retain original currency
-- a positive source price such as `0.004` retains original currency even though
-  it displays as `0.00`; all-missing, mixed missing-and-zero, and explicit-zero
-  report-level compatibility cases are classified without manufacturing values,
-  while contradictory non-zero cases are not misclassified and sync admission
-  remains unchanged
+- unclassified control rows retain original currency, including a positive
+  source price such as `0.004` that displays as `0.00`
+- fixtures consume inherited true and false `IsZeroPricedHoldingReduction`
+  values without retesting upstream classification or sync admission
 - zero-to-three Converted Amounts entries cover all eight canonical subsequences
   with exact spacing, semicolons, order, and distinct visible-line encodings
   with generated-PDF coordinates proving each entry starts on a later line
@@ -197,9 +195,8 @@ Verify the Markdown Annex:
 - `Full Liquidation Event` cells read `Yes` or `No`
 - a zero-priced holding reduction has a blank `Original Activity Currency` cell
   and a populated `Calculation Currency` cell
-- all-missing classified monetary fields remain blank, while present exact-zero
-  fields display as `0.00`
-- a non-zero-priced row retains its original activity currency
+- its pre-format activity currency and every other row field remain unchanged
+- an unclassified row retains its original activity currency
 - each Converted Amounts entry starts after a visible break and follows exact
   colon, arrow, and semicolon spacing
 - rate values retain every significant digit of normalized provider evidence
@@ -242,9 +239,8 @@ Review calculation-level assertions separately from rendered-string assertions:
   as `0.00` remains present
 - conversion component omission continues to require exact zero-to-zero values
 - zero-priced classification is not inferred from displayed `0.00`
-- report-level all-missing and mixed zero/missing compatibility inputs preserve
-  missing values, while the sync validator's amount-resolution admission rule is
-  unchanged
+- classification remains the inherited Feature 003 FR-017 and Feature 005
+  FR-029/FR-029a input; Feature 009 does not recompute it or test sync admission
 
 Do not run `make regenerate-empirical-fixtures`. The YAML dataset and generated
 oracle fixtures under `testdata/empirical/` are read-only for this feature.

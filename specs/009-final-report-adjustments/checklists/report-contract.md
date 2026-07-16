@@ -21,7 +21,7 @@
 - [x] CHK008 Does the specification define the exact visible number grammar, including the literal decimal separator, fixed-point notation, trailing zeros, sign handling, and whether grouping separators are permitted? [Clarity, Ambiguity, Spec §FR-004, Spec §FR-011]
 - [x] CHK009 Is provider-published rate precision tied to an objective normalized source representation, including how source trailing zeros and normalized rate values are treated? [Clarity, Spec §FR-005, Spec §AUD-002, Spec §Assumptions]
 - [x] CHK010 Is the canonical report representation for quantities tied to a stable baseline that an acceptance reviewer can identify without consulting current implementation output? [Clarity, Spec §FR-009, Spec §SC-004]
-- [x] CHK011 Are the exact source conditions for a "zero-priced holding reduction," including all-missing and mixed missing-and-zero compatibility shapes, and the complete single-tier selection rule for an "applicable non-zero source price" defined independently of visible rounded values? [Clarity, Spec §FR-013–FR-015, Spec §Key Entities]
+- [x] CHK011 Is `IsZeroPricedHoldingReduction` explicitly inherited from Feature 003 FR-017 and Feature 005 FR-029/FR-029a, with Feature 009 prohibited from recomputing or broadening it and visible behavior defined independently of rounded values? [Clarity, Spec §FR-013–FR-015, Spec §Key Entities]
 - [x] CHK012 Is "separate visible line" defined for the first entry, subsequent entries, and entries that wrap internally, with logical entry boundaries distinguished from width-driven wraps? [Clarity, Ambiguity, Spec §FR-016–FR-018, Spec §Edge Cases]
 
 ## Requirement Consistency
@@ -43,7 +43,7 @@
 ## Scenario Coverage
 
 - [x] CHK023 Are primary-flow requirements complete for the Markdown main document, Markdown Annex, PDF main section, and PDF Annex across every listed financial and audit field class? [Coverage, Primary Flow, Spec §FR-001, Spec §FR-004–FR-005]
-- [x] CHK024 Are alternate-flow requirements complete for both boolean states, all-missing, mixed missing-and-zero, explicit-zero, and non-zero-priced activities, and zero, one, two, and three converted entries using every valid canonical subsequence? [Coverage, Alternate Flow, Spec §User Story 2, Spec §User Story 3]
+- [x] CHK024 Are alternate-flow requirements complete for both boolean states, classified and unclassified Annex activities, and zero, one, two, and three converted entries using every valid canonical subsequence? [Coverage, Alternate Flow, Spec §User Story 2, Spec §User Story 3]
 - [x] CHK025 Are exception-flow requirements specified for non-finite values, formatting limits, PDF layout failures, and PDF finalization failure without process termination or false success? [Coverage, Exception Flow, Gap, Contract §Failure Contract, Plan §Constitution Prerequisite]
 - [x] CHK026 Are recovery requirements defined for failed Markdown bundles and failed PDF output, including cleanup, retained prior files, and the absence of a misleading successful result? [Coverage, Recovery, Gap, Plan §Technical Context, Contract §Failure Contract]
 - [x] CHK027 Are non-functional scale requirements complete for reports whose multiline converted entries increase row height and page count at the established 10,000-activity scale? [Coverage, Non-Functional, Spec §SC-010–SC-011, Contract §PDF Contract]

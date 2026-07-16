@@ -76,21 +76,18 @@ rounding.
 
 ## Exact Decisions Before Visible Rounding
 
-Decision: Continue making inclusion, omission, classification, and currency
-applicability decisions from exact model values and existing classifications
-before formatting any display string.
+Decision: Continue making inclusion and omission decisions from exact model
+values, and consume existing classifications for currency applicability, before
+formatting any display string.
 
 Rationale: A non-zero value such as `0.004` may display as `0.00` but remains a
 non-zero calculated value. Summary omission must therefore use
 `Decimal.Sign() == 0`, converted components must continue to be omitted only when
 both exact amounts are zero, and zero-priced holding reductions must use the
-existing `IsZeroPricedHoldingReduction` classification. At the report input
-boundary that inherited compatibility predicate accepts an explained `SELL`
-whose every present source monetary field is exact zero; no field must be
-present, so all-missing and mixed missing-and-zero shapes qualify without
-creating zero values. Sync admission remains unchanged and continues to require
-resolvable amount evidence. This preserves report membership and audit meaning
-while changing only visible precision.
+existing `IsZeroPricedHoldingReduction` classification inherited from Feature
+003 FR-017 and Feature 005 FR-029/FR-029a. Feature 009 does not recompute or test
+that classification and does not change sync admission. This preserves report
+membership and audit meaning while changing only visible precision.
 
 Alternatives considered: Make decisions from the two-place string, but that
 would incorrectly omit small non-zero values and could misclassify activity.
@@ -137,33 +134,27 @@ Decision: Add the existing `IsZeroPricedHoldingReduction` classification to the
 transient `AuditActivityEntry` report model while retaining its existing
 pre-format `ActivityCurrency` value. `BuildAnnexActivityRow` leaves only the
 visible activity currency empty when that classification is true. Keep
-`CalculationCurrency` and every other audit field unchanged. Preserve the
-existing report-level source-shape predicate: the explained `SELL` qualifies
-when all present order, asset-profile, and base monetary values are finite exact
-zeros, including when every monetary value is missing or when missing and zero
-values are mixed. Missing values remain nil and visible blanks.
+`CalculationCurrency` and every other audit field unchanged. Treat the
+classification inherited from Feature 003 FR-017 and Feature 005 FR-029/FR-029a
+as authoritative input. Feature 009 neither recomputes nor broadens it, and every
+unclassified row retains its existing visible activity currency.
 
 Rationale: At construction time the exact domain classification is available.
-Zero-priced reductions intentionally have no selected currency context, and the
+Zero-priced reductions may have no selected currency context, and the
 currency boundary currently supplies report calculation currency as an audit
 fallback. Retaining that existing field value and adding only the classification
 preserves pre-feature model behavior without inventing source provenance. The
 shared presentation row gives both formats the required blank cell without
 renderer-side financial inference. The added boolean is transient report
 evidence copied from an existing input; it does not alter calculation, storage,
-currency selection, or inclusion. The separate sync validator still requires
-resolvable amount evidence for newly admitted activity history; this feature
-does not turn the report-level all-missing compatibility shape into a new sync
-input contract.
+currency selection, inclusion, upstream classification, or sync admission.
 
 Alternatives considered: Infer applicability in renderers from activity labels
 and visible price, but that duplicates logic and can confuse a rounded non-zero
 price with exact zero. Clear `ActivityCurrency` in the calculated audit model,
-but that would change its pre-format value. Derive a source currency from
-explicit zero fields, but those fields can be absent or span different tiers and
-do not define one authoritative source context. Require a present zero unit
-price, but that would regress the established all-missing report input and could
-change calculation routing and rate lookup.
+but that would change its pre-format value. Re-evaluate source monetary fields in
+Feature 009, but that would duplicate and potentially broaden the inherited
+classification contract.
 
 ## Converted Amount Entry Representation
 

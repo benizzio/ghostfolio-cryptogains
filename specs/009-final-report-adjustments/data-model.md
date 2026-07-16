@@ -243,27 +243,18 @@ Relationships:
 
 Validation rules:
 
-- The copied classification is authoritative for presentation and is computed
-  before conversion or formatting from the inherited normalized `SELL`, positive
-  holding-reduction quantity, non-empty explanation, nonnegative running holdings,
-  and the rule that every present source monetary field across the order,
-  asset-profile, and base tiers is finite and numerically zero.
-- No monetary field must be present for the inherited report-level compatibility
-  classification. All-missing, mixed missing-and-zero, explicit-zero-unit-price,
-  and all-explicit-zero shapes qualify. Missing remains nil and visible blank; it
-  is not converted into a numeric zero.
-- Sync admission remains unchanged and continues to require resolvable amount
-  evidence for newly synced activities.
-- A positive selected or same-tier-derived source unit price remains non-zero
-  even when it displays as `0.00`.
+- The copied `IsZeroPricedHoldingReduction` classification is authoritative for
+  presentation and is inherited from Feature 003 FR-017 and Feature 005 FR-029
+  and FR-029a. Feature 009 does not recompute, redefine, broaden, or validate the
+  classification and does not change sync admission.
 - A classified zero-priced holding reduction retains
   `pre_format_activity_currency` but has blank
   `visible_original_activity_currency`.
 - `calculation_currency` remains populated.
 - Quantity, activity classification, held quantity, basis, proceeds, gains or
   losses, conversion status, and notes are not changed by this rule.
-- An applicable non-zero-priced activity retains its selected source activity
-  currency.
+- Every unclassified activity retains its existing activity currency, including
+  when a non-zero unit price displays as `0.00`.
 - Applicability is never inferred from a two-decimal display string.
 
 State transitions:

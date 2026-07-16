@@ -163,18 +163,11 @@ rewritten.
 
 ## Original Activity Currency Contract
 
-Source-price predicates are evaluated before conversion and visible formatting.
-An exact zero is a present finite decimal numerically equal to zero regardless
-of exponent, trailing-zero scale, or negative-zero sign. A zero-priced holding
-reduction is the inherited report-calculation compatibility classification for a
-normalized `SELL` with positive quantity, a non-empty trimmed explanation, no
-negative running-holdings result, and no non-zero present source monetary field
-across the order, asset-profile, or base tiers. No monetary field is required:
-all-missing, mixed missing-and-zero, explicit-zero-unit-price, and
-all-explicit-zero shapes qualify. Missing fields remain missing and render blank;
-they are not numeric-zero evidence or manufactured `0.00` values. This does not
-broaden inherited sync admission, which continues to require resolvable amount
-evidence.
+`IsZeroPricedHoldingReduction` is authoritative input inherited from the
+explained zero-priced `SELL` rule in Feature 003 FR-017 and its reporting
+treatment in Feature 005 FR-029/FR-029a. Feature 009 does not recompute,
+redefine, broaden, or validate that classification and does not change sync
+admission.
 
 For a Detailed Per-Asset Audit Report row carrying that exact pre-format
 classification:
@@ -189,18 +182,11 @@ classification:
   liquidation evidence, gain or loss, conversion status, and note remain
   unchanged and visible when otherwise applicable.
 
-An applicable non-zero source price exists when the inherited selector chooses
-the first complete `order -> asset_profile -> base` priority tier without mixing
-tier values. A complete tier has a non-empty source currency, a present finite
-fee including exact zero, a finite gross value that is present or derived from
-same-tier unit price and quantity, and a finite unit price that is present or
-derived from same-tier gross value and quantity. Missing fee makes a tier
-incomplete; the selector continues to the next tier. The chosen unit price is
-numerically greater than zero. `Original Activity Currency` retains that selected source currency even
-when the price displays as `0.00`. Rows satisfying neither predicate retain
-their inherited visible currency behavior.
+For every row where `IsZeroPricedHoldingReduction` is false, `Original Activity
+Currency` retains its existing value, including when a non-zero price displays
+as `0.00`.
 
-No renderer may infer this rule from a two-decimal `Unit Price` string.
+No renderer may infer the classification from a two-decimal `Unit Price` string.
 
 ## Converted Amounts Contract
 
@@ -398,11 +384,10 @@ Automated tests must cover both formats and prove:
 - both boolean labels
 - the existing calculated audit `ActivityCurrency` value remains unchanged
   before a zero-priced presentation cell becomes blank
-- zero-priced blank and non-zero-priced retained visible activity currencies
-- all-missing, mixed missing-and-zero, explicit-zero, all-zero, positive `0.004`,
-  same-tier-derived positive, and contradictory non-zero source-field cases
-  exercise the FR-013 and FR-015 predicates before formatting; sync admission is
-  separately characterized as unchanged
+- classified blank and unclassified retained visible activity currencies,
+  including an unclassified positive `0.004` control that displays as `0.00`
+- presentation fixtures receive existing true and false classifications without
+  exercising upstream classification predicates or sync admission
 - zero, one, two, and three included converted-entry cases covering each of the
   eight FR-019 canonical subsequences
 - received converted-entry order is preserved without new duplicate-kind or

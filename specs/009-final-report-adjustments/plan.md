@@ -19,10 +19,10 @@ as explicit newlines measured with the same word-wrap policy used for drawing.
 The exact legal-use warning will be inserted once in each main report, and
 zero-priced holding reductions will retain their existing pre-format audit
 currency value while omitting that non-applicable value from the visible Annex 1
-cell. The inherited report-calculation classification continues to accept
-all-missing and mixed missing-and-zero monetary shapes without manufacturing
-zero values or broadening sync admission. Successful result copy will disclose
-cleartext financial exports, every saved path, and deletion guidance.
+cell only when the inherited `IsZeroPricedHoldingReduction` classification from
+Feature 003 FR-017 and Feature 005 FR-029/FR-029a is true. Feature 009 does not
+recompute that classification or change sync admission. Successful result copy
+will disclose cleartext financial exports, every saved path, and deletion guidance.
 
 ## Technical Context
 
@@ -177,10 +177,10 @@ Post-analysis remediation gate status against constitution v3.0.0: PASS
   pagination stay in `internal/report/pdf/`; the existing zero-priced audit
   classification is copied by `internal/report/calculate/` into the transient
   report model under `internal/report/model/`, and only presentation suppresses
-  the visible non-applicable currency. `internal/sync/validate/` remains
-  unchanged and is covered only to characterize the inherited sync-admission
-  boundary. Runtime and output writing remain unchanged; `internal/tui/screen/`
-  owns the successful-result cleartext, path, and deletion copy.
+  the visible non-applicable currency. Feature 009 does not redefine or test
+  upstream classification or sync-admission semantics. Runtime and output
+  writing remain unchanged; `internal/tui/screen/` owns the successful-result
+  cleartext, path, and deletion copy.
 
 ## Project Structure
 
@@ -204,11 +204,9 @@ specs/009-final-report-adjustments/
 ### Source Code (repository root)
 ```text
 internal/
-├── sync/
-│   └── validate/        # Characterize unchanged sync admission; no source change planned
 ├── report/
 │   ├── model/           # Retain pre-format currency and copy zero-priced classification without new list validation
-│   ├── calculate/       # Populate the transient audit classification without changing financial results
+│   ├── calculate/       # Copy the transient audit classification without changing financial results
 │   ├── presentation/    # Shared financial display strings, boolean labels, and logical converted entries
 │   ├── markdown/        # Warning emphasis, direct summary/position values, and controlled <br> table breaks
 │   └── pdf/             # Bold warning, matched wrap measurement, row preflight, and safe finalization prerequisite
@@ -236,27 +234,16 @@ not a general decimal rule.
 
 ## Presentation And Rendering Boundary
 
-1. `internal/sync/validate/` keeps its inherited admission rule: newly synced
-   activities still require resolvable amount evidence, so this feature does not
-   admit an all-monetary-values-missing upstream row. At the downstream report
-   compatibility boundary, `internal/report/calculate/` preserves the existing
-   zero-priced holding-reduction predicate for explained `SELL` rows whose every
-   present source monetary value is exact zero; no monetary value must be
-   present, and missing values remain nil. While constructing an Annex audit row,
-   calculation retains the existing `ActivityCurrency` value and copies the
-   existing `IsZeroPricedHoldingReduction` classification into the transient
-   audit model. A classified reduction may have no selected source currency, so
-   this feature does not invent provenance. Positive quantity and nonnegative
-   running holdings remain enforced by inherited validation and replay. No
-   financial value, currency identity, sync admission, or report inclusion
-   changes before presentation.
-   The inherited priced selector remains separate: it evaluates
-   `order -> asset_profile -> base` and selects the first tier with an explicit
-   currency, present finite fee including exact zero, finite gross value present
-   or derived from same-tier unit price and quantity, and finite unit price
-   present or derived from same-tier gross value and quantity. A missing fee or
-   other incomplete requirement causes fallback to the next tier; values are
-   never mixed across tiers.
+1. `internal/report/calculate/` consumes the existing
+   `IsZeroPricedHoldingReduction` classification inherited from Feature 003
+   FR-017 and Feature 005 FR-029/FR-029a. While constructing an Annex audit row,
+   calculation retains the existing `ActivityCurrency` value and copies that
+   classification into the transient audit model. Feature 009 does not recompute,
+   redefine, broaden, or test the upstream classification and does not change sync
+   admission. A classified reduction may have no selected source currency, so
+   this feature does not invent provenance. No financial value, currency identity,
+   sync admission, or report inclusion changes before presentation. Every
+   unclassified row retains its existing visible activity currency.
 2. `internal/report/presentation/` formats monetary values from defensive
    decimal copies at two places with HALF UP, canonicalizes quantities and
    rates through existing helpers, maps the report boolean to `Yes` or `No`, and
@@ -304,11 +291,9 @@ not a general decimal rule.
   values that display as `0.00`. Tests prove the received converted-entry order
   remains unchanged without adding list-level validation and prove the existing
   audit currency value remains unchanged before the presentation row is built.
-- Report-calculation input tests cover all-missing, mixed missing-and-zero,
-  explicit-zero, and all-zero reduction shapes without manufacturing values.
-  Sync validation tests separately characterize unchanged admission: explicit
-  resolvable zero evidence with an explanation remains accepted, while an
-  all-monetary-values-missing upstream activity remains rejected.
+- Annex presentation tests provide already-classified and unclassified rows and
+  verify the inherited classification is copied without mutation. They do not
+  add upstream classification-predicate or sync-admission tests.
 - Markdown tests assert the exact bold warning once and in order, exact two-place
   values, valid pipe-table rows, `<br>` converted-entry boundaries, and no
   changed quantity or rate text.
