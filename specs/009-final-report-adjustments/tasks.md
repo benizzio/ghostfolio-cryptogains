@@ -11,13 +11,107 @@ description: "Executable task list for final report presentation adjustments"
 
 **Tests and Quality Gates**: The feature specification explicitly requires automated package, unit, contract, integration, empirical-regression, and isolated performance evidence. New-behavior tests in each user-story phase must be written first and observed failing for the intended reason before implementation; characterization tests may pass while locking existing recovery behavior. Production statement, line, branch, and per-file coverage must remain 100%. The empirical dataset and generated oracle fixtures under `testdata/empirical/` are read-only. Explicit user-export evidence must cover local-only generation, requested owner-only permissions, cleartext and saved-path disclosure, deletion guidance, failed-attempt cleanup, non-retention, non-re-ingestion, and non-export-channel redaction.
 
-**Organization**: Tasks are grouped by user story so each story can be implemented and tested independently after the shared prerequisites.
+**Organization**: Tasks are grouped by user story so each story can be implemented and tested independently after the shared prerequisites. The context-orchestration work-unit ledger is the execution control plane for parent agents and clean-context subagents.
 
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel after its stated prerequisites because it uses different files and does not depend on another incomplete task in the same wave
 - **[Story]**: Maps a task to User Story 1, 2, or 3 from `spec.md`
 - Every task names the exact source, test, or verification path it affects
+
+## Context Orchestration Process
+
+### Parent Orchestrator Rules
+
+- Execute work units in ledger order unless the ledger explicitly marks units as parallel candidates and their prerequisites are verified.
+- The task checkboxes remain authoritative; a ledger unit is complete only when every referenced task is checked after parent verification.
+- Use a clean subagent session for each delegated work unit.
+- Include all required handoff context in the subagent prompt; do not rely on prior conversation state.
+- Keep subagents inside the listed scope and require them to stop before editing outside allowed paths.
+- Require fail-first behavior for test tasks: add the specified test, run it before implementation, and record that it fails for the intended missing behavior rather than a setup or compile defect. Characterization tests may pass where the task says so.
+- Before starting a dependent unit, the parent must inspect diffs, run targeted verification, check for unrelated changes, and fix or re-delegate inconsistencies.
+- The parent owns final validation and must rerun final gates even if a subagent helped triage command output.
+- Treat `[P]` as a local implementation hint only. The ledger controls cross-unit ordering, allowed parallelism, and verification.
+
+### Required Subagent Handoff Packet
+
+Every delegated prompt must include:
+
+- The work unit ID, phase, task IDs, exact checklist task descriptions, and every exact path named by those tasks.
+- Relevant sources from `spec.md`, `plan.md`, `research.md`, `data-model.md`, `contracts/report-rendering.md`, and `quickstart.md`; include inherited contracts only when the referenced feature source requires them.
+- Non-negotiable constraints: presentation-only HALF UP formatting from defensive exact-decimal copies; exact-value inclusion and classification decisions; unchanged quantities, rates, calculations, currencies, bundle shapes, and protected snapshots; no dependency, network, remote renderer, new persistence, report history, or automatic re-ingestion; local explicit exports retain requested `0600`, cleanup, cleartext/path disclosure, and deletion guidance; `testdata/empirical/` and generated oracle fixtures are read-only; SEC-001 permits only synthetic non-reusable test data outside contracted exports; DEP-001 requires stopping and replanning rather than adding a fallback.
+- Current implementation status from every previously verified unit relevant to the work.
+- Allowed edit paths from the ledger and explicit forbidden paths, including `.specify/templates/`, `testdata/empirical/`, unrelated feature artifacts, dependency files unless the task names them for no-change verification, and all implementation areas outside the unit scope.
+- Tests or validation commands to run, including the expected fail-first result where applicable.
+- Required final response fields: files changed, task IDs completed, tests run with results, expected failures, assumptions, and parent follow-up.
+
+### Parent Verification Gate
+
+For every unit, the parent must:
+
+- Inspect `git diff -- <unit paths>` plus every extra path reported by the subagent.
+- Confirm edits remain inside unit scope or are justified adjacent changes required by the referenced task, and reject unrelated changes.
+- Run the ledger's targeted tests or the closest compiling package test; for fail-first units, confirm failures identify only the intended missing behavior.
+- Re-read relevant contract and data-model sections whenever public report types, visible output, renderer seams, persistence, security, or diagnostics boundaries change.
+- Confirm forbidden generated, empirical fixture, secret-bearing, dependency, and persistence paths remain unchanged where the feature restrictions apply. In particular, never regenerate `testdata/empirical/` or add an unplanned dependency or remote capability.
+- Mark the referenced task checkboxes only after the gate passes. A subagent report alone never completes a task.
+
+### Context Compaction Recovery
+
+After context compaction or parent-session replacement:
+
+- Read this orchestration process, the complete ledger, and the authoritative checklist before editing.
+- Run `git status --short` and inspect existing diffs before assigning work.
+- Resume at the first ledger unit with unchecked referenced tasks unless an earlier unit has a partial diff.
+- Reconstruct prior state from checked tasks, current diffs, and targeted tests rather than assumptions or conversation summaries.
+- Finish and verify a partial unit before opening a new clean subagent session.
+
+### Work Unit Ledger
+
+| Unit | Phase | Tasks | Atomic scope and touched paths | Prerequisites | Required handoff sources | Parent verification |
+|------|-------|-------|--------------------------------|---------------|--------------------------|---------------------|
+| WU01 | Phase 1: Setup (Shared Test Infrastructure) | T001 | Build the closed acceptance manifest and semantic counters in `tests/testutil/report_presentation_fixtures.go` while keeping `testdata/empirical/` unchanged. | None | `tasks.md`, `spec.md`, `plan.md`, `data-model.md`, `contracts/report-rendering.md` | Inspect the fixture manifest and run `go test ./tests/testutil -count=1`; confirm `testdata/empirical/` is unchanged. |
+| WU02 | Phase 1: Setup (Shared Test Infrastructure) | T002 | Extend ordered PDF text-run inspection and its tests in `tests/testutil/pdf_inspection.go` and `tests/testutil/pdf_inspection_test.go`. | None; parallel candidate with WU01 | `tasks.md`, `plan.md`, `research.md`, `contracts/report-rendering.md`, `quickstart.md` | Run `go test ./tests/testutil -count=1`; inspect font, coordinate, page-box, searchable-text, and parser-error coverage. |
+| WU03 | Phase 2: Foundational (Blocking Prerequisites) | T003 | Add fail-first PDF finalization tests in `internal/report/pdf/renderer_internal_test.go`. | WU01-WU02 | `tasks.md`, `spec.md`, `plan.md`, `research.md`, `contracts/report-rendering.md` | Run `go test ./internal/report/pdf -count=1` before implementation and confirm the new cases fail only because the error-returning finalization seam is missing. |
+| WU04 | Phase 2: Foundational (Blocking Prerequisites) | T004 | Characterize runtime render/finalization recovery in `internal/app/runtime/report_service_internal_test.go`. | WU01-WU02; parallel candidate with WU03 | `tasks.md`, `spec.md`, `plan.md`, `contracts/report-rendering.md` | Run `go test ./internal/app/runtime -count=1`; confirm the characterization covers no writer, opener, alternate renderer, successful payload, or path, plus redacted context and retry. |
+| WU05 | Phase 2: Foundational (Blocking Prerequisites) | T005 | Add exhaustive fail-first financial formatting tests in `internal/report/presentation/financial_test.go`. | WU01-WU02; parallel candidate with WU03-WU04 | `tasks.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/report-rendering.md` | Run `go test ./internal/report/presentation -count=1` before implementation and confirm failures are the missing scale-2 HALF UP formatter and guards. |
+| WU06 | Phase 2: Foundational (Blocking Prerequisites) | T006 | Implement error-returning PDF finalization in `internal/report/pdf/layout_contract.go`, `internal/report/pdf/gopdf_document.go`, and `internal/report/pdf/renderer.go`. | WU03-WU04 | `tasks.md`, `spec.md`, `plan.md`, `research.md`, `contracts/report-rendering.md` | Run `go test ./internal/report/pdf ./internal/app/runtime -count=1`; inspect the public seam and redacted stage error, discarded bytes, process survival, and no-output behavior. |
+| WU07 | Phase 2: Foundational (Blocking Prerequisites) | T007 | Implement exact financial and optional-financial formatting in `internal/report/presentation/financial.go`. | WU05; parallel candidate with WU06 | `tasks.md`, `spec.md`, `plan.md`, `research.md`, `data-model.md`, `contracts/report-rendering.md` | Run `go test ./internal/report/presentation -count=1`; verify defensive copies, HALF UP, unsigned zero, grammar, bounds, condition masks, and nil handling against the contract. |
+| WU08 | Phase 3: User Story 1 - Read Release-Ready Report Values (Priority: P1) MVP | T008 | Add fail-first shared-row financial matrix tests in `internal/report/presentation/rows_test.go`. | WU06-WU07 | `tasks.md`, `spec.md`, `data-model.md`, `contracts/report-rendering.md` | Run `go test ./internal/report/presentation -count=1` before story implementation; verify failures identify missing row financial formatting while canonical quantities/rates and source immutability remain enforced. |
+| WU09 | Phase 3: User Story 1 - Read Release-Ready Report Values (Priority: P1) MVP | T009 | Add fail-first Markdown warning and financial-field tests in `internal/report/markdown/renderer_internal_test.go` and `tests/unit/report_markdown_test.go`. | WU06-WU07; parallel candidate with WU08 | `tasks.md`, `spec.md`, `data-model.md`, `contracts/report-rendering.md`, `quickstart.md` | Run `go test ./internal/report/markdown ./tests/unit -count=1` before story implementation; confirm only the intended warning or presentation assertions fail. |
+| WU10 | Phase 3: User Story 1 - Read Release-Ready Report Values (Priority: P1) MVP | T010 | Add fail-first PDF recorder coverage in `internal/report/pdf/renderer_internal_test.go`. | WU06-WU07; parallel candidate with WU08-WU09 | `tasks.md`, `spec.md`, `plan.md`, `contracts/report-rendering.md` | Run `go test ./internal/report/pdf -count=1` before story implementation; confirm failures identify the missing bold warning operation or financial presentation. |
+| WU11 | Phase 3: User Story 1 - Read Release-Ready Report Values (Priority: P1) MVP | T011 | Add US1 closed-manifest contracts in `tests/contract/report_rendering_values_contract_test.go`, `tests/contract/markdown_report_contract_test.go`, and `tests/contract/report_annex_contract_test.go`. | WU06-WU07; parallel candidate with WU08-WU10 | `tasks.md`, `spec.md`, `plan.md`, `contracts/report-rendering.md`, `quickstart.md` | Run `go test ./tests/contract -count=1` before story implementation; verify intended failures preserve non-empty populations, semantic fields, bold text-run evidence, rejection, and searchability. |
+| WU12 | Phase 3: User Story 1 - Read Release-Ready Report Values (Priority: P1) MVP | T012 | Add runtime-backed US1 parity and model-equality checks in `tests/integration/report_value_presentation_flow_test.go`, `tests/integration/report_generation_flow_test.go`, `tests/integration/report_failure_flow_test.go`, and `tests/integration/report_cost_basis_methods_flow_test.go`. | WU06-WU07; parallel candidate with WU08-WU11 | `tasks.md`, `spec.md`, `plan.md`, `contracts/report-rendering.md`, `quickstart.md` | Run `go test ./tests/integration -count=1` before story implementation; confirm expected failures are visible-value behavior only and AUD-001 equality remains intact. |
+| WU13 | Phase 3: User Story 1 - Read Release-Ready Report Values (Priority: P1) MVP | T013, T016 | Add the shared legal warning and Markdown warning/direct financial rendering in `internal/report/presentation/legal_warning.go`, `internal/report/markdown/renderer.go`, `internal/report/markdown/renderer_summary.go`, and `internal/report/markdown/renderer_details.go`. | WU08-WU12 | `tasks.md`, `spec.md`, `plan.md`, `data-model.md`, `contracts/report-rendering.md` | Run `go test ./internal/report/markdown ./tests/unit -count=1`; inspect exact standalone bold placement, direct financial values, exact-sign inclusion, canonical quantities, and any still-expected row-builder failures assigned to WU15. |
+| WU14 | Phase 3: User Story 1 - Read Release-Ready Report Values (Priority: P1) MVP | T014 | Add the dedicated measured bold wrapped-paragraph PDF operation in `internal/report/pdf/layout_contract.go` and `internal/report/pdf/gopdf_document.go`. | WU08-WU12; parallel candidate with WU13 | `tasks.md`, `spec.md`, `plan.md`, `research.md`, `contracts/report-rendering.md` | Run `go test ./internal/report/pdf -count=1`; verify operation ordering, full bold-font use, and measured vertical advance, allowing only recorded main-report integration failures assigned to WU16. |
+| WU15 | Phase 3: User Story 1 - Read Release-Ready Report Values (Priority: P1) MVP | T015 | Apply shared monetary formatting to format-neutral rows in `internal/report/presentation/rows.go`. | WU08-WU12; parallel candidate with WU13-WU14 | `tasks.md`, `spec.md`, `plan.md`, `data-model.md`, `contracts/report-rendering.md` | Run `go test ./internal/report/presentation -count=1`; verify all row monetary fields, contextual errors, quantity/rate preservation, and source immutability. |
+| WU16 | Phase 3: User Story 1 - Read Release-Ready Report Values (Priority: P1) MVP | T017 | Integrate the warning and direct financial formatting into `internal/report/pdf/main_report.go`. | WU13-WU15 | `tasks.md`, `spec.md`, `plan.md`, `contracts/report-rendering.md`, `quickstart.md` | Run `go test ./internal/report/presentation ./internal/report/markdown ./internal/report/pdf ./tests/unit ./tests/contract ./tests/integration -count=1`; verify the complete US1 slice and re-read warning and financial contracts. |
+| WU17 | Phase 4: User Story 2 - Interpret Audit Values Clearly (Priority: P2) | T018 | Add fail-first inherited-classification presentation and Markdown fixtures in `internal/report/presentation/rows_test.go` and `tests/unit/report_markdown_test.go`. | WU16 for shared-file serialization; semantic foundation is WU06-WU07 | `tasks.md`, `spec.md`, `plan.md`, `data-model.md`, `contracts/report-rendering.md` | Run `go test ./internal/report/presentation ./tests/unit -count=1` before US2 implementation; verify missing classification propagation/currency display fails without adding upstream classification tests. |
+| WU18 | Phase 4: User Story 2 - Interpret Audit Values Clearly (Priority: P2) | T019 | Add fail-first audit-entry propagation and clone tests in `internal/report/calculate/calculator_internal_test.go` and `internal/report/model/report_internal_test.go`. | WU06-WU07; parallel candidate with WU17 because paths are independent | `tasks.md`, `spec.md`, `plan.md`, `data-model.md` | Run `go test ./internal/report/model ./internal/report/calculate -count=1` before US2 implementation; confirm failures identify the missing transient classification only. |
+| WU19 | Phase 4: User Story 2 - Interpret Audit Values Clearly (Priority: P2) | T020 | Add fail-first shared-row and Markdown boolean/currency tests in `internal/report/presentation/rows_test.go` and `internal/report/markdown/renderer_internal_test.go`. | WU17; parallel candidate with WU18 | `tasks.md`, `spec.md`, `data-model.md`, `contracts/report-rendering.md` | Run `go test ./internal/report/presentation ./internal/report/markdown -count=1` before US2 implementation; verify intended `Yes`/`No` and classified-currency failures only. |
+| WU20 | Phase 4: User Story 2 - Interpret Audit Values Clearly (Priority: P2) | T021 | Add generated Markdown/PDF Annex contracts in `tests/contract/report_annex_contract_test.go`. | WU19 | `tasks.md`, `spec.md`, `contracts/report-rendering.md`, `quickstart.md` | Run `go test ./tests/contract -count=1` before US2 implementation; confirm failures cover both booleans, non-empty `Z`/`N`, and exact currency controls. |
+| WU21 | Phase 4: User Story 2 - Interpret Audit Values Clearly (Priority: P2) | T022 | Add runtime-backed Annex parity and AUD-001 checks in `tests/integration/report_audit_presentation_flow_test.go`. | WU06-WU07; parallel candidate with WU17-WU20 because its edit path is independent | `tasks.md`, `spec.md`, `plan.md`, `contracts/report-rendering.md` | Run `go test ./tests/integration -count=1` before US2 implementation; confirm intended visible-cell failures and unchanged model currency/classification. |
+| WU22 | Phase 4: User Story 2 - Interpret Audit Values Clearly (Priority: P2) | T023 | Add and defensively copy the transient classification in `internal/report/model/audit_activity_entry.go`. | WU17-WU21 | `tasks.md`, `spec.md`, `plan.md`, `data-model.md` | Run `go test ./internal/report/model -count=1`; inspect the public report model boundary and confirm no persistence or unrelated validation change. |
+| WU23 | Phase 4: User Story 2 - Interpret Audit Values Clearly (Priority: P2) | T024 | Copy the inherited classification into audit entries in `internal/report/calculate/artifacts.go`. | WU22 | `tasks.md`, `spec.md`, `plan.md`, `research.md`, `data-model.md` | Run `go test ./internal/report/calculate -count=1`; verify no recomputation, sync admission, financial calculation, currency identity, or inclusion change. |
+| WU24 | Phase 4: User Story 2 - Interpret Audit Values Clearly (Priority: P2) | T025 | Derive shared `Yes`/`No` and classified visible-currency presentation in `internal/report/presentation/rows.go` and consume it in `internal/report/markdown/renderer_annex.go`. | WU22; parallel candidate with WU23 | `tasks.md`, `spec.md`, `plan.md`, `data-model.md`, `contracts/report-rendering.md`, `quickstart.md` | After WU23 is also verified, run `go test ./internal/report/model ./internal/report/calculate ./internal/report/presentation ./internal/report/markdown ./tests/unit ./tests/contract ./tests/integration -count=1`; verify complete US2 behavior and AUD-001 equality. |
+| WU25 | Phase 5: User Story 3 - Scan Converted Amounts (Priority: P3) | T026 | Add fail-first ordered logical-entry tests in `internal/report/presentation/converted_amounts_test.go`. | WU24 for ledger serialization; semantic foundation is WU06-WU07 | `tasks.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/report-rendering.md` | Run `go test ./internal/report/presentation -count=1` before US3 implementation; verify failures identify the missing ordered entry representation and formatting only. |
+| WU26 | Phase 5: User Story 3 - Scan Converted Amounts (Priority: P3) | T027 | Add fail-first Markdown converted-entry tests in `internal/report/markdown/renderer_internal_test.go`. | WU24; parallel candidate with WU25 | `tasks.md`, `spec.md`, `plan.md`, `contracts/report-rendering.md` | Run `go test ./internal/report/markdown -count=1` before US3 implementation; confirm failures concern controlled `;<br>` boundaries, spacing, and escaping. |
+| WU27 | Phase 5: User Story 3 - Scan Converted Amounts (Priority: P3) | T028 | Add fail-first PDF multiline measurement, preflight, drawing, pagination, and failure tests in `internal/report/pdf/renderer_internal_test.go`. | WU24; parallel candidate with WU25-WU26 | `tasks.md`, `spec.md`, `plan.md`, `research.md`, `contracts/report-rendering.md` | Run `go test ./internal/report/pdf -count=1` before US3 implementation; confirm failures identify missing newline-preserving measurement or whole-row preflight, not generic sanitization regressions. |
+| WU28 | Phase 5: User Story 3 - Scan Converted Amounts (Priority: P3) | T029 | Add concrete converted-amount contracts in `tests/contract/report_converted_amounts_contract_test.go` and `tests/contract/report_annex_contract_test.go`. | WU24; parallel candidate with WU25-WU27 | `tasks.md`, `spec.md`, `contracts/report-rendering.md`, `quickstart.md` | Run `go test ./tests/contract -count=1` before US3 implementation; verify intended `C`/`E`, subsequence, semantic-cell, Y-coordinate, order, and searchable-text failures. |
+| WU29 | Phase 5: User Story 3 - Scan Converted Amounts (Priority: P3) | T030 | Add runtime-backed US3 parity, immutability, call-count, failure, and retry checks in `tests/integration/report_converted_amounts_flow_test.go`. | WU24; parallel candidate with WU25-WU28 | `tasks.md`, `spec.md`, `plan.md`, `contracts/report-rendering.md` | Run `go test ./tests/integration -count=1` before US3 implementation; confirm expected multiline behavior failures retain no-output/no-opener and successful retry evidence. |
+| WU30 | Phase 5: User Story 3 - Scan Converted Amounts (Priority: P3) | T031 | Replace delimiter-bearing presentation with immutable ordered entries in `internal/report/presentation/rows.go` and `internal/report/presentation/converted_amounts.go`. | WU25-WU29 | `tasks.md`, `spec.md`, `plan.md`, `research.md`, `data-model.md`, `contracts/report-rendering.md` | Run `go test ./internal/report/presentation -count=1`; verify exact zero-to-zero omission, supported-kind order, two-place values, component errors, and no new list validation. |
+| WU31 | Phase 5: User Story 3 - Scan Converted Amounts (Priority: P3) | T032 | Escape components and join controlled Markdown entries in `internal/report/markdown/renderer_conversion.go` and `internal/report/markdown/renderer_format.go`. | WU30 | `tasks.md`, `spec.md`, `plan.md`, `contracts/report-rendering.md` | Run `go test ./internal/report/markdown -count=1`; inspect escape-before-assembly ordering, valid table cells, and delimiter-free empty/singleton output. |
+| WU32 | Phase 5: User Story 3 - Scan Converted Amounts (Priority: P3) | T033 | Preserve only renderer-controlled PDF newlines in `internal/report/pdf/annex_report.go` and `internal/report/pdf/presentation.go`. | WU30; parallel candidate with WU31 | `tasks.md`, `spec.md`, `plan.md`, `research.md`, `contracts/report-rendering.md` | Run `go test ./internal/report/pdf -count=1`; verify dedicated cell sanitization and `;\n` joining while allowing only measurement/pagination failures assigned to WU33. |
+| WU33 | Phase 5: User Story 3 - Scan Converted Amounts (Priority: P3) | T034 | Implement drawing-equivalent PDF measurement and whole-row preflight in `internal/report/pdf/gopdf_seams.go`, `internal/report/pdf/gopdf_document.go`, and `internal/report/pdf/gopdf_table.go`. | WU31-WU32 | `tasks.md`, `spec.md`, `plan.md`, `research.md`, `contracts/report-rendering.md`, `quickstart.md` | Run `go test ./internal/report/presentation ./internal/report/markdown ./internal/report/pdf ./tests/contract ./tests/integration -count=1`; verify complete US3 behavior, fresh-page relocation, continuation context, bottom margin, and overheight failure before finalization. |
+| WU34 | Phase 6: Polish & Cross-Cutting Concerns | T035 | Complete output-transaction regression tests in `internal/report/output/writer_internal_test.go` and `tests/contract/report_output_contract_test.go`. | WU33 | `tasks.md`, `spec.md`, `plan.md`, `contracts/report-rendering.md`, `quickstart.md` | Run `go test ./internal/report/output ./tests/contract -count=1`; verify `0600`, collision retention, current-attempt cleanup, no partial paths, and opener-warning retention. |
+| WU35 | Phase 6: Polish & Cross-Cutting Concerns | T036 | Add SEC-001 confidentiality and delimiter-injection contracts in `tests/contract/report_rendering_confidentiality_test.go`. | WU33; parallel candidate with WU34 | `tasks.md`, `spec.md`, `plan.md`, `research.md`, `contracts/report-rendering.md`, `quickstart.md` | Run `go test ./tests/contract -count=1`; inspect synthetic sentinels and confirm prohibited material is absent from non-export channels, examples, and fixtures. |
+| WU36 | Phase 6: Polish & Cross-Cutting Concerns | T037 | Add fail-first export disclosure, deletion, and state-clearing tests in `internal/tui/component/component_internal_test.go`, `internal/tui/screen/report_screen_internal_test.go`, `internal/tui/flow/model_internal_test.go`, and `tests/contract/report_generation_workflow_contract_test.go`. | WU33; parallel candidate with WU34-WU35 | `tasks.md`, `spec.md`, `plan.md`, `data-model.md`, `contracts/report-rendering.md` | Run `go test ./internal/tui/component ./internal/tui/screen ./internal/tui/flow ./tests/contract -count=1` before T038 and confirm failures are the missing copy/state behavior only. |
+| WU37 | Phase 6: Polish & Cross-Cutting Concerns | T038 | Implement shared cleartext-export and deletion-guidance copy in `internal/tui/component/workflow_copy.go` and `internal/tui/screen/report_screen.go`. | WU36 | `tasks.md`, `spec.md`, `plan.md`, `data-model.md`, `contracts/report-rendering.md`, `quickstart.md` | Run `go test ./internal/tui/component ./internal/tui/screen ./internal/tui/flow ./tests/contract -count=1`; verify normal and opener-warning success list every path and exiting retains no report/path state. |
+| WU38 | Phase 6: Polish & Cross-Cutting Concerns | T039 | Update the isolated scale fixture and assertions in `tests/performance/helpers_test.go` and `tests/performance/report_performance_flow_test.go`. | WU33; parallel candidate with WU34-WU37 | `tasks.md`, `spec.md`, `plan.md`, `contracts/report-rendering.md`, `quickstart.md` | Run `make test-performance`; verify exact fixture composition, 6,666 rows per format, separate timers, multiline continuation evidence, environment data, and no performance coverage artifact. |
+| WU39 | Phase 6: Polish & Cross-Cutting Concerns | T040, T041 | Freeze calculation regression identities for `internal/report/basis/`, `internal/report/calculate/`, and `tests/empirical/` and add aggregate acceptance accounting in `tests/contract/testdata/report_calculation_regression_baseline.txt`, `tests/contract/report_calculation_regression_contract_test.go`, and `tests/contract/report_rendering_acceptance_test.go`. | WU33; parallel candidate with WU34-WU38 | `tasks.md`, `spec.md`, `plan.md`, `contracts/report-rendering.md`, `quickstart.md` | Run `go test ./tests/contract -count=1`; verify fixed baseline fingerprints, both attempts for all closed cases, failed-attempt denominators, all non-empty populations, and unchanged empirical fixtures. |
+| WU40 | Phase 6: Polish & Cross-Cutting Concerns | T042 | Inventory, format, document, co-author, and scope-review all current agent-touched declarations across `internal/report/presentation/`, `internal/report/markdown/`, `internal/report/pdf/`, `internal/report/model/`, `internal/report/calculate/`, `internal/app/runtime/`, `internal/tui/`, `tests/`, and `tests/contract/`. | WU34-WU39 | `tasks.md`, `plan.md`, `quickstart.md`, `AGENTS.md` | Regenerate the diff inventory against `origin/main`, run `gofmt` over its Go files, run `git diff --check`, inspect every touched declaration for required docs/co-authoring, and reject unrelated changes. |
+| WU41 | Phase 6: Polish & Cross-Cutting Concerns | T043, T044, T045, T046, T047, T048 | Parent-only final gate over `specs/009-final-report-adjustments/quickstart.md`, `internal/report/model/`, `internal/report/calculate/`, `internal/report/presentation/`, `internal/report/markdown/`, `internal/report/pdf/`, `internal/tui/component/`, `internal/tui/screen/`, `tests/testutil/`, `cmd/`, `internal/`, `tests/unit/`, `tests/contract/`, `tests/integration/`, `tests/empirical/`, `tools/`, `tests/performance/`, `dist/coverage.out`, `go.mod`, `go.sum`, `specs/009-final-report-adjustments/research.md`, `specs/009-final-report-adjustments/plan.md`, `specs/009-final-report-adjustments/spec.md`, and `specs/009-final-report-adjustments/tasks.md`. | WU40 | `tasks.md`, `spec.md`, `plan.md`, `research.md`, `data-model.md`, `contracts/report-rendering.md`, `quickstart.md`, `AGENTS.md` | Parent runs the focused command from `quickstart.md`, `make test`, `make coverage`, `make test-performance`, and `make quality QUALITY_BASE_REF=origin/main`, confirms `go.mod`, `go.sum`, empirical fixtures, and performance coverage boundaries are unchanged, then performs the complete manual readability, export, persistence-N/A, and security review without ACC-002 claims. |
+| WU42 | Phase 6: Polish & Cross-Cutting Concerns | T049 | Parent-only final diff inventory, format, documentation, co-authoring, and no-unrelated-change audit. No explicit path in task; parent must constrain before delegation. | WU41 | `tasks.md`, `plan.md`, `quickstart.md`, `AGENTS.md` | Regenerate the branch-diff inventory against `origin/main`, inspect every agent-touched Go declaration, run `gofmt` and `git diff --check`, then rerun every WU41 gate affected by a correction before checking T049. |
 
 ## Phase 1: Setup (Shared Test Infrastructure)
 
@@ -199,33 +293,46 @@ graph TD
 
 ## Parallel Execution Examples
 
-### User Story 1
+Work-unit ordering controls orchestration. `[P]` markers are local hints only, and the parent may use the following parallel candidates only after every listed prerequisite passes and while keeping shared-file edits serialized:
+
+- WU01 and WU02 may run concurrently.
+- After WU01-WU02, WU03-WU05 may run concurrently; WU06 and WU07 may then run concurrently after their matching test units.
+- US1 fail-first units WU08-WU12 may run concurrently. After all are verified, WU13-WU15 may run concurrently, and WU16 follows all three.
+- US2 may use WU17, WU18, and WU21 concurrently where the ledger permits; WU19 follows WU17 for shared test files, WU20 follows WU19, and WU23-WU24 may run concurrently after WU22.
+- US3 fail-first units WU25-WU29 may run concurrently after prior shared-file work is verified. WU31 and WU32 may run concurrently after WU30, and WU33 follows both.
+- Cross-cutting units WU34-WU39 may run concurrently only where their ledger prerequisites and edit paths permit. WU40, the parent-owned WU41 final gate, and WU42 remain sequential.
+- When parallel units finish, the parent verifies each diff and test result independently before opening any dependent unit.
+
+---
+
+## Subagent Handoff Examples
+
+### Test-Oriented Example: WU08
 
 ```text
-Test wave: T008 || T009 || T010 || T011 || T012
-Implementation wave: T013 || T014 || T015 || T016
-Dependent implementation: (T013 && T014) -> T017
-Validation wave: run all US1 package, contract, and integration tests together
+Work unit: WU08
+Phase: Phase 3: User Story 1 - Read Release-Ready Report Values (Priority: P1) MVP
+Task: T008 [P] [US1] Extend shared-row tests across every activity, liquidation, Annex, and conversion monetary field while proving optional blanks, exact-zero decisions, canonical quantities and rates, contextual errors, and unchanged source decimals in internal/report/presentation/rows_test.go
+Sources: tasks.md; spec.md FR-004 through FR-011, FR-020, FR-022, AUD-001, and the Financial Presentation Acceptance Matrix; data-model.md ReportVisibleFinancialValue and QuantityValue; contracts/report-rendering.md Financial Display Contract.
+Verified status: WU01-WU07 complete and parent-verified. The formatter exists, but US1 row integration has not started.
+Allowed edits: internal/report/presentation/rows_test.go only.
+Forbidden edits: production files; .specify/templates/; testdata/empirical/; dependency files; fixtures or files outside this unit.
+Required behavior: add the complete specified fail-first coverage, run go test ./internal/report/presentation -count=1 before implementation, and record failures that identify only missing row integration. Do not weaken canonical quantity/rate or source-immutability assertions.
+Final response: files changed; task IDs completed; tests run with results; expected failures; assumptions; parent follow-up.
 ```
 
-### User Story 2
+### Implementation-Oriented Example: WU07
 
 ```text
-Independent test wave after the finalized T001 fixture manifest: T018 || T019 || T022
-Coordinated shared-test sequence: T020 -> T021
-Implementation wave: T023
-Dependent implementation: T023 -> (T024 || T025)
-Validation wave: run all US2 calculation, presentation, contract, and integration tests together
-```
-
-### User Story 3
-
-```text
-Independent test wave: T026 || T030
-Coordinated shared-test sequence: T027 -> T028 -> T029
-Shared implementation: T031
-Renderer/layout waves: T031 -> T032 || (T031 -> T033 -> T034)
-Validation wave: run all US3 presentation, renderer, contract, and integration tests together
+Work unit: WU07
+Phase: Phase 2: Foundational (Blocking Prerequisites)
+Task: T007 [P] Implement report-domain financial and optional-financial formatting from defensive apd.Decimal copies at exponent -2 with apd.RoundHalfUp, checked precision/exponent guards, accepted condition masks, fixed-point grammar, and unsigned zero output in internal/report/presentation/financial.go
+Sources: tasks.md; spec.md FR-004, FR-004a, FR-006, FR-007, FR-010, FR-011, and FR-022; plan.md Presentation And Rendering Boundary; research.md Two-Decimal Financial Formatting; data-model.md ReportVisibleFinancialValue and OptionalReportVisibleFinancialValue; contracts/report-rendering.md Financial Display Contract.
+Verified status: WU05 is complete and parent-verified with intended fail-first failures. WU06 may proceed independently and must not be assumed complete.
+Allowed edits: internal/report/presentation/financial.go only.
+Forbidden edits: calculations, renderers, support decimal behavior, persistence, .specify/templates/, testdata/empirical/, go.mod, and go.sum.
+Required behavior: make WU05 tests pass with defensive copies, apd.RoundHalfUp, checked uint32 precision and adjusted-exponent handling, only expected condition flags, nil preservation, fixed-point output, and unsigned zero. Run go test ./internal/report/presentation -count=1.
+Final response: files changed; task IDs completed; tests run with results; expected failures; assumptions; parent follow-up.
 ```
 
 ---
@@ -256,11 +363,20 @@ Validation wave: run all US3 presentation, renderer, contract, and integration t
 3. Serialize the explicitly listed shared-file tasks or coordinate them in one work unit.
 4. Merge story increments only after each independent test criterion passes.
 
+### Context-Orchestrated Subagent Strategy
+
+1. Start from the first ledger unit with unchecked tasks and no earlier partial diff.
+2. Build the complete handoff packet from the authoritative checklist and feature artifacts, then delegate the bounded unit to a clean-context subagent.
+3. Keep parallel delegation limited to ledger-marked candidates whose prerequisites and paths have been independently verified.
+4. Apply the parent verification gate before checking tasks or starting dependent units.
+5. Keep WU41 and WU42 parent-owned, and rerun every final gate affected by a final-inventory correction.
+
 ---
 
 ## Notes
 
-- `[P]` marks only tasks safe to run concurrently after their explicit prerequisites.
+- `[P]` is a local concurrency hint only; ledger prerequisites and parent verification control cross-unit orchestration.
+- Task checkboxes remain authoritative and are changed only after the parent verification gate passes.
 - Story labels provide traceability to the three prioritized scenarios in `spec.md`.
 - Every rendering error must identify the failed stage and applicable semantic field or row, wrap only a redacted cause, leave the application available for retry, and remain non-secret.
 - Quantities and disclosed rates never use the two-decimal financial formatter.
