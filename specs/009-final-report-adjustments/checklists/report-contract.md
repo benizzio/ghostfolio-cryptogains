@@ -37,7 +37,7 @@
 - [x] CHK018 Can the warning's single occurrence, semantic placement, standalone status, and complete bold emphasis be assessed objectively when the sentence wraps into multiple PDF text fragments? [Measurability, Spec §FR-002–FR-003, Spec §SC-001]
 - [x] CHK019 Do acceptance criteria map every financial field class and every required successful rounding boundary to both output formats, rather than relying on representative examples alone? [Acceptance Criteria, Coverage, Spec §Financial Presentation Acceptance Matrix, Spec §SC-002]
 - [x] CHK020 Is the comparison baseline and observation point for "unchanged before visible formatting" defined objectively for calculations, currencies, rates, quantities, inclusion decisions, and audit values? [Measurability, Spec §FR-007–FR-008, Spec §SC-003]
-- [x] CHK021 Can the one-to-one relationship between included converted entries and separately started visible lines be measured objectively when an individual entry wraps within a narrow column? [Measurability, Ambiguity, Spec §SC-007, Spec §Edge Cases]
+- [x] CHK021 Can the one-to-one relationship between included converted entries and logical entry starts be measured objectively while ensuring width-driven wrapping within one entry is not counted as another converted entry or logical entry start? [Measurability, Ambiguity, Spec §SC-007, Spec §Edge Cases]
 - [x] CHK022 Is the two-minute, 10,000-activity target accompanied by a defined fixture, timing boundary, execution environment, and independent per-format measurement rule? [Acceptance Criteria, Measurability, Spec §SC-010, Spec §Testing Evidence]
 
 ## Scenario Coverage
