@@ -1826,6 +1826,89 @@ func TestCloneAuditAnnexCopiesNestedSlices(t *testing.T) {
 	assertOptionalDecimalString(t, cloned.PerAssetAuditSections[0].Entries[0].GrossValue, "10")
 }
 
+// TestNewPerAssetAuditSectionClonesInheritedClassificationAndAuditValues verifies
+// the Annex 1 model retains the inherited classification and every audit value
+// after the caller mutates its source entry.
+// Authored by: OpenCode
+func TestNewPerAssetAuditSectionClonesInheritedClassificationAndAuditValues(t *testing.T) {
+	t.Parallel()
+
+	var activityDate = time.Date(2024, time.January, 5, 0, 0, 0, 0, time.UTC)
+	var quantity = mustReportDecimal(t, "1")
+	var quantityAfter = mustReportDecimal(t, "1")
+	var basisAfter = mustReportDecimal(t, "11")
+	var entries = []AuditActivityEntry{{
+		SourceID:                     "audit-buy-1",
+		OccurredAt:                   activityDate,
+		ActivityType:                 ActivityTypeBuy,
+		Quantity:                     quantity,
+		UnitPrice:                    decimalPointer(t, "10"),
+		GrossValue:                   decimalPointer(t, "10"),
+		FeeAmount:                    decimalPointer(t, "1"),
+		ActivityCurrency:             "EUR",
+		CalculationCurrency:          "USD",
+		QuantityAfterActivity:        quantityAfter,
+		BasisAfterActivity:           basisAfter,
+		FullLiquidationEvent:         true,
+		IsZeroPricedHoldingReduction: true,
+		AllocatedBasis:               decimalPointer(t, "11"),
+		NetLiquidationProceeds:       decimalPointer(t, "10"),
+		GainOrLoss:                   decimalPointer(t, "-1"),
+		ConversionStatus:             ConversionStatusConverted,
+		Note:                         "audit note",
+	}}
+
+	var section, err = NewPerAssetAuditSection("asset-btc", "BTC", entries)
+	if err != nil {
+		t.Fatalf("new per-asset audit section: %v", err)
+	}
+
+	entries[0].SourceID = "mutated-source"
+	entries[0].OccurredAt = activityDate.Add(time.Hour)
+	entries[0].ActivityType = ActivityTypeSell
+	entries[0].Quantity = mustReportDecimal(t, "2")
+	*entries[0].UnitPrice = mustReportDecimal(t, "20")
+	*entries[0].GrossValue = mustReportDecimal(t, "20")
+	*entries[0].FeeAmount = mustReportDecimal(t, "2")
+	entries[0].ActivityCurrency = "GBP"
+	entries[0].CalculationCurrency = "EUR"
+	entries[0].QuantityAfterActivity = mustReportDecimal(t, "0")
+	entries[0].BasisAfterActivity = mustReportDecimal(t, "0")
+	entries[0].FullLiquidationEvent = false
+	entries[0].IsZeroPricedHoldingReduction = false
+	*entries[0].AllocatedBasis = mustReportDecimal(t, "20")
+	*entries[0].NetLiquidationProceeds = mustReportDecimal(t, "20")
+	*entries[0].GainOrLoss = mustReportDecimal(t, "0")
+	entries[0].ConversionStatus = ConversionStatusSameCurrency
+	entries[0].Note = "mutated note"
+
+	var cloned = section.Entries[0]
+	if cloned.SourceID != "audit-buy-1" || !cloned.OccurredAt.Equal(activityDate) || cloned.ActivityType != ActivityTypeBuy {
+		t.Fatalf("expected cloned audit identity values to remain unchanged, got %#v", cloned)
+	}
+	if cloned.Quantity.Cmp(&quantity) != 0 {
+		t.Fatalf("expected cloned quantity to remain unchanged, got %s", cloned.Quantity.Text('f'))
+	}
+	assertOptionalDecimalString(t, cloned.UnitPrice, "10")
+	assertOptionalDecimalString(t, cloned.GrossValue, "10")
+	assertOptionalDecimalString(t, cloned.FeeAmount, "1")
+	if cloned.ActivityCurrency != "EUR" || cloned.CalculationCurrency != "USD" {
+		t.Fatalf("expected cloned currencies to retain pre-format values, got %#v", cloned)
+	}
+	if cloned.QuantityAfterActivity.Cmp(&quantityAfter) != 0 || cloned.BasisAfterActivity.Cmp(&basisAfter) != 0 {
+		t.Fatalf("expected cloned replay values to remain unchanged, got %#v", cloned)
+	}
+	if !cloned.FullLiquidationEvent || !cloned.IsZeroPricedHoldingReduction {
+		t.Fatalf("expected cloned boolean audit values to remain unchanged, got %#v", cloned)
+	}
+	assertOptionalDecimalString(t, cloned.AllocatedBasis, "11")
+	assertOptionalDecimalString(t, cloned.NetLiquidationProceeds, "10")
+	assertOptionalDecimalString(t, cloned.GainOrLoss, "-1")
+	if cloned.ConversionStatus != ConversionStatusConverted || cloned.Note != "audit note" {
+		t.Fatalf("expected cloned classification and note values to remain unchanged, got %#v", cloned)
+	}
+}
+
 // TestAuditModelRemainingValidationBranches verifies focused guardrails that are
 // otherwise only reached by malformed Annex 1 or renderer/output wiring.
 // Authored by: OpenCode

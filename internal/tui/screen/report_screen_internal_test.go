@@ -244,6 +244,81 @@ func TestReportResultScreenViewRendersPDFBundlePath(t *testing.T) {
 	assertReportScreenContainsAll(t, content, []string{"Output Format: PDF", "Saved PDF Path: /tmp/Documents/ghostfolio-capital-gains-2024-fifo.pdf"})
 }
 
+// TestReportResultScreenViewDisclosesCleartextFilesAndDeletionGuidance verifies
+// normal Markdown and opener-warning PDF results disclose every saved path.
+// Authored by: OpenCode
+func TestReportResultScreenViewDisclosesCleartextFilesAndDeletionGuidance(t *testing.T) {
+	t.Parallel()
+
+	var savedAt = time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC)
+	testCases := []struct {
+		name          string
+		requestFormat reportmodel.ReportOutputFormat
+		failureReason runtime.ReportFailureReason
+		message       string
+		files         []reportmodel.ReportOutputFile
+	}{
+		{
+			name:          "normal Markdown success",
+			requestFormat: reportmodel.ReportOutputFormatMarkdown,
+			message:       "Saved both Markdown report files and requested automatic opening.",
+			files: []reportmodel.ReportOutputFile{
+				{DocumentsDirectory: "/tmp/Documents", Filename: "synthetic-report.md", Path: "/tmp/Documents/synthetic-report.md", Role: reportmodel.ReportDocumentRoleMain, MediaType: reportmodel.ReportMediaTypeMarkdown, SavedAt: savedAt},
+				{DocumentsDirectory: "/tmp/Documents", Filename: "synthetic-report-annex-1.md", Path: "/tmp/Documents/synthetic-report-annex-1.md", Role: reportmodel.ReportDocumentRoleAnnex, MediaType: reportmodel.ReportMediaTypeMarkdown, SavedAt: savedAt},
+			},
+		},
+		{
+			name:          "opener-warning PDF success",
+			requestFormat: reportmodel.ReportOutputFormatPDF,
+			failureReason: runtime.ReportFailureAutomaticOpenFailedAfterSave,
+			message:       "Saved the PDF report, but automatic opening failed. Open the file manually.",
+			files: []reportmodel.ReportOutputFile{
+				{DocumentsDirectory: "/tmp/Documents", Filename: "synthetic-report.pdf", Path: "/tmp/Documents/synthetic-report.pdf", Role: reportmodel.ReportDocumentRoleCombined, MediaType: reportmodel.ReportMediaTypePDF, SavedAt: savedAt},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, testCase.requestFormat, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
+			if err != nil {
+				t.Fatalf("new report request: %v", err)
+			}
+			var bundle, bundleErr = reportmodel.NewReportOutputBundle(testCase.requestFormat, testCase.files, savedAt, true, "")
+			if bundleErr != nil {
+				t.Fatalf("new report output bundle: %v", bundleErr)
+			}
+
+			var content = ReportResultScreenView(ReportResultScreenParams{
+				Theme:       component.DefaultTheme(),
+				Width:       100,
+				Height:      32,
+				MethodLabel: reportmodel.CostBasisMethodFIFO.Label(),
+				MenuItems:   []component.MenuItem{{Label: component.BackToSyncReportsActionLabel, Enabled: true}},
+				Outcome: runtime.ReportOutcome{
+					Success:       true,
+					FailureReason: testCase.failureReason,
+					Message:       testCase.message,
+					Request:       request,
+					OutputFormat:  testCase.requestFormat,
+					OutputFile:    testCase.files[0],
+					OutputBundle:  bundle,
+				},
+			})
+
+			assertReportScreenContainsAll(t, content, []string{
+				component.ReportCleartextExportDisclosureText,
+				component.ReportCleartextExportDeletionGuidanceText,
+			})
+			for _, file := range testCase.files {
+				if !strings.Contains(content, file.Path) {
+					t.Fatalf("expected saved path %q, got %q", file.Path, content)
+				}
+			}
+		})
+	}
+}
+
 // assertReportScreenContainsAll verifies that rendered report content includes
 // every expected plain-text fragment.
 // Authored by: OpenCode

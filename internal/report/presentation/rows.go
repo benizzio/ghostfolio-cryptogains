@@ -75,9 +75,12 @@ type ConversionAuditRow struct {
 	RateDate           string
 	SourceCurrency     string
 	ReportBaseCurrency string
-	ConvertedAmounts   string
-	QuoteDirection     string
-	RateValue          string
+	// ConvertedAmountEntries contains one delimiter-free logical entry per
+	// included converted amount, in the received order.
+	// Authored by: OpenCode
+	ConvertedAmountEntries []string
+	QuoteDirection         string
+	RateValue              string
 }
 
 // BuildActivityRow canonicalizes report-domain activity fields for either
@@ -88,19 +91,19 @@ func BuildActivityRow(row reportmodel.AssetActivityRow) (ActivityRow, error) {
 	if err != nil {
 		return ActivityRow{}, fmt.Errorf("render activity row %q quantity: %w", row.SourceID, err)
 	}
-	unitPrice, err := decimalsupport.CanonicalStringPointer(row.UnitPrice)
+	unitPrice, err := formatOptionalFinancialValue(row.UnitPrice)
 	if err != nil {
 		return ActivityRow{}, fmt.Errorf("render activity row %q unit price: %w", row.SourceID, err)
 	}
-	grossValue, err := decimalsupport.CanonicalStringPointer(row.GrossValue)
+	grossValue, err := formatOptionalFinancialValue(row.GrossValue)
 	if err != nil {
 		return ActivityRow{}, fmt.Errorf("render activity row %q gross value: %w", row.SourceID, err)
 	}
-	fee, err := decimalsupport.CanonicalStringPointer(row.FeeAmount)
+	fee, err := formatOptionalFinancialValue(row.FeeAmount)
 	if err != nil {
 		return ActivityRow{}, fmt.Errorf("render activity row %q fee: %w", row.SourceID, err)
 	}
-	basisAfterRow, err := decimalsupport.CanonicalString(row.BasisAfterRow)
+	basisAfterRow, err := formatFinancialValue(row.BasisAfterRow)
 	if err != nil {
 		return ActivityRow{}, fmt.Errorf("render activity row %q basis after row: %w", row.SourceID, err)
 	}
@@ -149,15 +152,15 @@ func BuildLiquidationRow(liquidation reportmodel.LiquidationCalculation, fallbac
 	if err != nil {
 		return LiquidationRow{}, fmt.Errorf("render liquidation %q disposed quantity: %w", liquidation.SourceID, err)
 	}
-	allocatedBasis, err := decimalsupport.CanonicalString(liquidation.AllocatedBasis)
+	allocatedBasis, err := formatFinancialValue(liquidation.AllocatedBasis)
 	if err != nil {
 		return LiquidationRow{}, fmt.Errorf("render liquidation %q allocated basis: %w", liquidation.SourceID, err)
 	}
-	netProceeds, err := decimalsupport.CanonicalString(liquidation.NetLiquidationProceeds)
+	netProceeds, err := formatFinancialValue(liquidation.NetLiquidationProceeds)
 	if err != nil {
 		return LiquidationRow{}, fmt.Errorf("render liquidation %q net proceeds: %w", liquidation.SourceID, err)
 	}
-	gainOrLoss, err := decimalsupport.CanonicalString(liquidation.GainOrLoss)
+	gainOrLoss, err := formatFinancialValue(liquidation.GainOrLoss)
 	if err != nil {
 		return LiquidationRow{}, fmt.Errorf("render liquidation %q gain or loss: %w", liquidation.SourceID, err)
 	}
@@ -173,15 +176,15 @@ func BuildAnnexActivityRow(entry reportmodel.AuditActivityEntry) (AnnexActivityR
 	if err != nil {
 		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q quantity: %w", entry.SourceID, err)
 	}
-	unitPrice, err := decimalsupport.CanonicalStringPointer(entry.UnitPrice)
+	unitPrice, err := formatOptionalFinancialValue(entry.UnitPrice)
 	if err != nil {
 		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q unit price: %w", entry.SourceID, err)
 	}
-	grossValue, err := decimalsupport.CanonicalStringPointer(entry.GrossValue)
+	grossValue, err := formatOptionalFinancialValue(entry.GrossValue)
 	if err != nil {
 		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q gross value: %w", entry.SourceID, err)
 	}
-	fee, err := decimalsupport.CanonicalStringPointer(entry.FeeAmount)
+	fee, err := formatOptionalFinancialValue(entry.FeeAmount)
 	if err != nil {
 		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q fee: %w", entry.SourceID, err)
 	}
@@ -189,19 +192,19 @@ func BuildAnnexActivityRow(entry reportmodel.AuditActivityEntry) (AnnexActivityR
 	if err != nil {
 		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q quantity after activity: %w", entry.SourceID, err)
 	}
-	basisAfter, err := decimalsupport.CanonicalString(entry.BasisAfterActivity)
+	basisAfter, err := formatFinancialValue(entry.BasisAfterActivity)
 	if err != nil {
 		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q basis after activity: %w", entry.SourceID, err)
 	}
-	allocatedBasis, err := decimalsupport.CanonicalStringPointer(entry.AllocatedBasis)
+	allocatedBasis, err := formatOptionalFinancialValue(entry.AllocatedBasis)
 	if err != nil {
 		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q allocated basis: %w", entry.SourceID, err)
 	}
-	netProceeds, err := decimalsupport.CanonicalStringPointer(entry.NetLiquidationProceeds)
+	netProceeds, err := formatOptionalFinancialValue(entry.NetLiquidationProceeds)
 	if err != nil {
 		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q net liquidation proceeds: %w", entry.SourceID, err)
 	}
-	gainOrLoss, err := decimalsupport.CanonicalStringPointer(entry.GainOrLoss)
+	gainOrLoss, err := formatOptionalFinancialValue(entry.GainOrLoss)
 	if err != nil {
 		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q gain or loss: %w", entry.SourceID, err)
 	}
@@ -217,7 +220,7 @@ func BuildAnnexActivityRow(entry reportmodel.AuditActivityEntry) (AnnexActivityR
 		}
 	}
 
-	return AnnexActivityRow{Date: entry.OccurredAt.UTC().Format("2006-01-02 15:04:05"), SourceID: sanitize(entry.SourceID), ActivityType: sanitize(activityType), Quantity: quantity, UnitPrice: unitPrice, GrossValue: grossValue, Fee: fee, ActivityCurrency: sanitize(entry.ActivityCurrency), CalculationCurrency: sanitize(entry.CalculationCurrency), QuantityAfter: quantityAfter, BasisAfter: basisAfter, FullLiquidationEvent: fmt.Sprintf("%t", entry.FullLiquidationEvent), AllocatedBasis: allocatedBasis, NetProceeds: netProceeds, GainOrLoss: gainOrLoss, ConversionStatus: sanitize(conversionStatus), Note: sanitize(entry.Note)}, nil
+	return AnnexActivityRow{Date: entry.OccurredAt.UTC().Format("2006-01-02 15:04:05"), SourceID: sanitize(entry.SourceID), ActivityType: sanitize(activityType), Quantity: quantity, UnitPrice: unitPrice, GrossValue: grossValue, Fee: fee, ActivityCurrency: annexActivityCurrency(entry), CalculationCurrency: sanitize(entry.CalculationCurrency), QuantityAfter: quantityAfter, BasisAfter: basisAfter, FullLiquidationEvent: booleanLabel(entry.FullLiquidationEvent), AllocatedBasis: allocatedBasis, NetProceeds: netProceeds, GainOrLoss: gainOrLoss, ConversionStatus: sanitize(conversionStatus), Note: sanitize(entry.Note)}, nil
 }
 
 // BuildConversionAuditRow builds visible conversion-audit values without
@@ -228,7 +231,7 @@ func BuildConversionAuditRow(index int, entry reportmodel.ConversionAuditEntry) 
 	if err != nil {
 		return ConversionAuditRow{}, fmt.Errorf("render conversion audit entry %d rate value: %w", index, err)
 	}
-	amounts, err := ConvertedAmounts(index, entry.Amounts)
+	amountEntries, err := ConvertedAmounts(index, entry.Amounts)
 	if err != nil {
 		return ConversionAuditRow{}, err
 	}
@@ -236,28 +239,17 @@ func BuildConversionAuditRow(index int, entry reportmodel.ConversionAuditEntry) 
 	if err != nil {
 		return ConversionAuditRow{}, fmt.Errorf("render conversion audit entry %d quote direction: %w", index, err)
 	}
-	return ConversionAuditRow{Date: datesupport.FormatCalendarDate(entry.ActivityDate), SourceID: sanitize(entry.SourceID), Asset: sanitize(entry.AssetLabel), RateDate: datesupport.FormatCalendarDate(entry.RateDate), SourceCurrency: sanitize(entry.SourceCurrency), ReportBaseCurrency: sanitize(entry.ReportBaseCurrency.Label()), ConvertedAmounts: sanitize(amounts), QuoteDirection: sanitize(quoteDirection), RateValue: rateValue}, nil
-}
-
-// ConvertedAmounts formats non-zero converted amount evidence in report order.
-// Authored by: OpenCode
-func ConvertedAmounts(entryIndex int, amounts []reportmodel.ConvertedActivityAmount) (string, error) {
-	var rendered []string
-	for amountIndex, amount := range amounts {
-		if amount.OriginalAmount.Sign() == 0 && amount.ConvertedAmount.Sign() == 0 {
-			continue
-		}
-		original, err := decimalsupport.CanonicalString(amount.OriginalAmount)
-		if err != nil {
-			return "", fmt.Errorf("render conversion audit entry %d amount %d original amount: %w", entryIndex, amountIndex, err)
-		}
-		converted, err := decimalsupport.CanonicalString(amount.ConvertedAmount)
-		if err != nil {
-			return "", fmt.Errorf("render conversion audit entry %d amount %d converted amount: %w", entryIndex, amountIndex, err)
-		}
-		rendered = append(rendered, fmt.Sprintf("%s: %s -> %s", sanitize(string(amount.AmountKind)), original, converted))
-	}
-	return strings.Join(rendered, "; "), nil
+	return ConversionAuditRow{
+		Date:                   datesupport.FormatCalendarDate(entry.ActivityDate),
+		SourceID:               sanitize(entry.SourceID),
+		Asset:                  sanitize(entry.AssetLabel),
+		RateDate:               datesupport.FormatCalendarDate(entry.RateDate),
+		SourceCurrency:         sanitize(entry.SourceCurrency),
+		ReportBaseCurrency:     sanitize(entry.ReportBaseCurrency.Label()),
+		ConvertedAmountEntries: amountEntries,
+		QuoteDirection:         sanitize(quoteDirection),
+		RateValue:              rateValue,
+	}, nil
 }
 
 // CalculationCurrencyLabel returns the report-visible fallback for an absent
@@ -278,6 +270,25 @@ func CalculationCurrencyLabelWithFallback(raw string, fallback string) string {
 		return normalized
 	}
 	return CalculationCurrencyLabel(fallback)
+}
+
+// booleanLabel maps a structured report boolean to its reader-facing label.
+// Authored by: OpenCode
+func booleanLabel(value bool) string {
+	if value {
+		return "Yes"
+	}
+	return "No"
+}
+
+// annexActivityCurrency derives the visible Annex activity currency from the
+// inherited classification without changing the retained audit entry.
+// Authored by: OpenCode
+func annexActivityCurrency(entry reportmodel.AuditActivityEntry) string {
+	if entry.IsZeroPricedHoldingReduction {
+		return ""
+	}
+	return sanitize(entry.ActivityCurrency)
 }
 
 // activityCurrency keeps explanatory rows without monetary context blank.

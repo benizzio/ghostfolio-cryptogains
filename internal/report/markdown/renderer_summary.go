@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
-	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
 )
 
 // writeSummarySection renders the summary heading, optional empty state, and
@@ -21,11 +21,11 @@ func writeSummarySection(builder *strings.Builder, report reportmodel.CapitalGai
 		netGainOrLoss string
 	}
 	for _, entry := range report.SummaryEntries {
-		var netGainOrLoss, err = decimalsupport.CanonicalString(entry.NetGainOrLoss)
+		var netGainOrLoss, err = presentation.FormatFinancialValue(entry.NetGainOrLoss)
 		if err != nil {
 			return fmt.Errorf("render summary entry %q net gain or loss: %w", entry.AssetIdentityKey, err)
 		}
-		if netGainOrLoss == "0" {
+		if entry.NetGainOrLoss.Sign() == 0 {
 			continue
 		}
 		renderedEntries = append(renderedEntries, struct {
@@ -49,7 +49,7 @@ func writeSummarySection(builder *strings.Builder, report reportmodel.CapitalGai
 		)
 	}
 
-	var yearlyNetTotal, err = decimalsupport.CanonicalString(report.YearlyNetTotal)
+	var yearlyNetTotal, err = presentation.FormatFinancialValue(report.YearlyNetTotal)
 	if err != nil {
 		return fmt.Errorf("render yearly net total: %w", err)
 	}

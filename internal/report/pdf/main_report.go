@@ -22,19 +22,22 @@ func renderMainReport(document pdfContentLayout, report reportmodel.CapitalGains
 
 	var calculationCurrency = calculationCurrencyLabel(report.ReportCalculationCurrency)
 	if err := document.AddTitle(MainReportTitle); err != nil {
-		return err
+		return fmt.Errorf("add main report title: %w", err)
 	}
 	if err := document.AddKeyValue("Year", fmt.Sprintf("%d", report.Year)); err != nil {
-		return err
+		return fmt.Errorf("add year metadata: %w", err)
 	}
 	if err := document.AddKeyValue("Cost Basis Method", report.CostBasisMethod.Label()); err != nil {
-		return err
+		return fmt.Errorf("add cost basis method metadata: %w", err)
 	}
 	if err := document.AddKeyValue("Generated At", report.GeneratedAt.Local().Format("2006-01-02 15:04:05 MST")); err != nil {
-		return err
+		return fmt.Errorf("add generated-at metadata: %w", err)
 	}
 	if err := document.AddKeyValue("Report Calculation Currency", calculationCurrency); err != nil {
-		return err
+		return fmt.Errorf("add report calculation currency metadata: %w", err)
+	}
+	if err := document.AddBoldParagraph(presentation.LegalWarningText); err != nil {
+		return fmt.Errorf("add legal-use warning: %w", err)
 	}
 	if err := renderSummarySection(document, report, calculationCurrency); err != nil {
 		return err
@@ -52,9 +55,9 @@ func renderMainReport(document pdfContentLayout, report reportmodel.CapitalGains
 // Authored by: OpenCode
 func renderSummarySection(document pdfContentLayout, report reportmodel.CapitalGainsReport, calculationCurrency string) error {
 	if err := document.AddSectionHeading("Gains-And-Losses Summary"); err != nil {
-		return err
+		return fmt.Errorf("add gains-and-losses summary heading: %w", err)
 	}
-	var yearlyNetTotal, err = decimalsupport.CanonicalString(report.YearlyNetTotal)
+	var yearlyNetTotal, err = presentation.FormatFinancialValue(report.YearlyNetTotal)
 	if err != nil {
 		return fmt.Errorf("render yearly net total: %w", err)
 	}
@@ -64,7 +67,7 @@ func renderSummarySection(document pdfContentLayout, report reportmodel.CapitalG
 			continue
 		}
 		var netGainOrLoss string
-		netGainOrLoss, err = decimalsupport.CanonicalString(entry.NetGainOrLoss)
+		netGainOrLoss, err = presentation.FormatFinancialValue(entry.NetGainOrLoss)
 		if err != nil {
 			return fmt.Errorf("render summary entry %q net gain or loss: %w", entry.AssetIdentityKey, err)
 		}
@@ -76,9 +79,12 @@ func renderSummarySection(document pdfContentLayout, report reportmodel.CapitalG
 	}
 	if len(rows) == 0 {
 		if err := document.AddParagraph("No assets had a non-zero net gain or loss in the selected year."); err != nil {
-			return err
+			return fmt.Errorf("add empty summary paragraph: %w", err)
 		}
-		return document.AddKeyValue("Overall Yearly Net Total", yearlyNetTotal+" "+calculationCurrency)
+		if err := document.AddKeyValue("Overall Yearly Net Total", yearlyNetTotal+" "+calculationCurrency); err != nil {
+			return fmt.Errorf("add overall yearly net total: %w", err)
+		}
+		return nil
 	} else if err := document.AddTable(pdfTable{
 		Title:             "Gains-And-Losses Summary Table",
 		ContinuationTitle: "Gains-And-Losses Summary Table (continued)",
@@ -90,7 +96,7 @@ func renderSummarySection(document pdfContentLayout, report reportmodel.CapitalG
 		Rows:          append(rows, []string{"Overall Yearly Net Total", yearlyNetTotal, calculationCurrency}),
 		StyledLastRow: true,
 	}); err != nil {
-		return err
+		return fmt.Errorf("add gains-and-losses summary table: %w", err)
 	}
 	return nil
 }
@@ -99,13 +105,16 @@ func renderSummarySection(document pdfContentLayout, report reportmodel.CapitalG
 // Authored by: OpenCode
 func renderRateSourceSection(document pdfContentLayout, report reportmodel.CapitalGainsReport) error {
 	if err := document.AddSectionHeading("Rate Source Summary"); err != nil {
-		return err
+		return fmt.Errorf("add rate source summary heading: %w", err)
 	}
 	if err := document.AddKeyValue("Report Base Currency", calculationCurrencyLabel(report.ReportCalculationCurrency)); err != nil {
-		return err
+		return fmt.Errorf("add report base currency: %w", err)
 	}
 	if len(report.RateSources) == 0 {
-		return document.AddParagraph("Exchange Rate Use: No activity required exchange-rate conversion.")
+		if err := document.AddParagraph("Exchange Rate Use: No activity required exchange-rate conversion."); err != nil {
+			return fmt.Errorf("add empty rate source paragraph: %w", err)
+		}
+		return nil
 	}
 
 	var rendered = make(map[string]bool)
@@ -116,16 +125,16 @@ func renderRateSourceSection(document pdfContentLayout, report reportmodel.Capit
 		}
 		rendered[key] = true
 		if err := document.AddKeyValue("Authority", sanitizeText(reportmodel.RateAuthorityDisplayLabel(source.Authority))); err != nil {
-			return err
+			return fmt.Errorf("add rate source authority: %w", err)
 		}
 		if err := document.AddKeyValue("Provider", rateProviderLabel(source.ProviderID)); err != nil {
-			return err
+			return fmt.Errorf("add rate source provider: %w", err)
 		}
 		if err := document.AddKeyValue("Rate Kind", sanitizeText(source.RateKind)); err != nil {
-			return err
+			return fmt.Errorf("add rate source kind: %w", err)
 		}
 		if err := document.AddKeyValue("Unavailable-Date Rule", sanitizeText(reportmodel.RateProviderUnavailableDateRule(source.ProviderID))); err != nil {
-			return err
+			return fmt.Errorf("add rate source unavailable-date rule: %w", err)
 		}
 	}
 	return nil
@@ -135,10 +144,13 @@ func renderRateSourceSection(document pdfContentLayout, report reportmodel.Capit
 // Authored by: OpenCode
 func renderReferenceSection(document pdfContentLayout, report reportmodel.CapitalGainsReport) error {
 	if err := document.AddSectionHeading("Reference Section"); err != nil {
-		return err
+		return fmt.Errorf("add reference section heading: %w", err)
 	}
 	if len(report.ReferenceEntries) == 0 {
-		return document.AddParagraph("No assets reached full liquidation by year end.")
+		if err := document.AddParagraph("No assets reached full liquidation by year end."); err != nil {
+			return fmt.Errorf("add empty reference paragraph: %w", err)
+		}
+		return nil
 	}
 
 	var rows [][]string
@@ -149,7 +161,7 @@ func renderReferenceSection(document pdfContentLayout, report reportmodel.Capita
 			sanitizeText(string(entry.MainSectionStatus)),
 		})
 	}
-	return document.AddTable(pdfTable{
+	if err := document.AddTable(pdfTable{
 		ContinuationTitle: "Reference Section (continued)",
 		Columns: []pdfColumn{
 			{Header: "Asset", Width: 170, Align: "left"},
@@ -157,7 +169,10 @@ func renderReferenceSection(document pdfContentLayout, report reportmodel.Capita
 			{Header: "Main Section Status", Width: 160, Align: "left"},
 		},
 		Rows: rows,
-	})
+	}); err != nil {
+		return fmt.Errorf("add reference table: %w", err)
+	}
+	return nil
 }
 
 // renderDetailSections renders asset detail sections from report-domain rows.
@@ -175,7 +190,7 @@ func renderDetailSections(document pdfContentLayout, report reportmodel.CapitalG
 // Authored by: OpenCode
 func renderDetailSection(document pdfContentLayout, section reportmodel.AssetDetailSection, calculationCurrency string) error {
 	if err := document.AddSectionHeading("Asset Detail: " + renderDisplayLabel(section.DisplayLabel, section.AssetIdentityKey)); err != nil {
-		return err
+		return fmt.Errorf("add asset detail heading for %q: %w", section.AssetIdentityKey, err)
 	}
 	if len(section.ActivityRows) == 0 {
 		return renderHistoricalDetailSection(document, section, calculationCurrency)
@@ -214,24 +229,27 @@ func renderActiveDetailSection(document pdfContentLayout, section reportmodel.As
 // Authored by: OpenCode
 func renderPositionBlock(document pdfContentLayout, heading string, quantity apd.Decimal, basis apd.Decimal, sectionCurrency string, fallbackCurrency string) error {
 	if err := document.AddSubsectionHeading(heading); err != nil {
-		return err
+		return fmt.Errorf("add %s heading: %w", heading, err)
 	}
 	var quantityText, err = decimalsupport.CanonicalString(quantity)
 	if err != nil {
 		return fmt.Errorf("render quantity: %w", err)
 	}
 	var basisText string
-	basisText, err = decimalsupport.CanonicalString(basis)
+	basisText, err = presentation.FormatFinancialValue(basis)
 	if err != nil {
 		return fmt.Errorf("render cost basis: %w", err)
 	}
 	if err := document.AddKeyValue("Quantity", quantityText); err != nil {
-		return err
+		return fmt.Errorf("add %s quantity: %w", heading, err)
 	}
 	if err := document.AddKeyValue("Cost Basis", basisText); err != nil {
-		return err
+		return fmt.Errorf("add %s cost basis: %w", heading, err)
 	}
-	return document.AddKeyValue("Calculation Currency", calculationCurrencyLabelWithFallback(sectionCurrency, fallbackCurrency))
+	if err := document.AddKeyValue("Calculation Currency", calculationCurrencyLabelWithFallback(sectionCurrency, fallbackCurrency)); err != nil {
+		return fmt.Errorf("add %s calculation currency: %w", heading, err)
+	}
+	return nil
 }
 
 // renderActivityRows renders in-year asset activity as a table.
@@ -245,7 +263,7 @@ func renderActivityRows(document pdfContentLayout, section reportmodel.AssetDeta
 		}
 		rows = append(rows, rendered)
 	}
-	return document.AddTable(pdfTable{
+	if err := document.AddTable(pdfTable{
 		Title:             "In-Year Activity",
 		ContinuationTitle: "In-Year Activity (continued)",
 		Columns: []pdfColumn{
@@ -265,7 +283,10 @@ func renderActivityRows(document pdfContentLayout, section reportmodel.AssetDeta
 		},
 		Rows:      rows,
 		RowHeight: 32,
-	})
+	}); err != nil {
+		return fmt.Errorf("add in-year activity table: %w", err)
+	}
+	return nil
 }
 
 // renderActivityRow formats one in-year activity row for a PDF table.
@@ -294,7 +315,7 @@ func renderLiquidationRows(document pdfContentLayout, section reportmodel.AssetD
 		}
 		rows = append(rows, row)
 	}
-	return document.AddTable(pdfTable{
+	if err := document.AddTable(pdfTable{
 		Title:             "Liquidation Calculations",
 		ContinuationTitle: "Liquidation Calculations (continued)",
 		Columns: []pdfColumn{
@@ -307,7 +328,10 @@ func renderLiquidationRows(document pdfContentLayout, section reportmodel.AssetD
 			{Header: "Calculation Currency", Width: 88, Align: "left"},
 		},
 		Rows: rows,
-	})
+	}); err != nil {
+		return fmt.Errorf("add liquidation calculations table: %w", err)
+	}
+	return nil
 }
 
 // renderLiquidationRow formats one liquidation calculation row.

@@ -101,6 +101,16 @@ const (
 	// Authored by: OpenCode
 	ReportSavedPathsTransientStatusText = "Saved paths are transient and are cleared when this result is dismissed."
 
+	// ReportCleartextExportDisclosureText identifies successful report files as
+	// cleartext financial-data exports.
+	// Authored by: OpenCode
+	ReportCleartextExportDisclosureText = "The saved report files are cleartext financial data exports."
+
+	// ReportCleartextExportDeletionGuidanceText instructs users how to remove
+	// every successful report file shown on the result screen.
+	// Authored by: OpenCode
+	ReportCleartextExportDeletionGuidanceText = "To remove the exported financial data, delete every listed file."
+
 	// ReportDiagnosticAvailableFromScreenMessage explains that report diagnostics can be generated from the report-result screen.
 	// Authored by: OpenCode
 	ReportDiagnosticAvailableFromScreenMessage = "Generate Diagnostic Report is available for this failure from this screen."

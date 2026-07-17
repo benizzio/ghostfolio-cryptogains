@@ -43,32 +43,49 @@ func largeReportFixture(t *testing.T) largeReportPerformanceFixture {
 	const buysPerAsset = assetActivityCount / 2
 	const sellsPerAsset = assetActivityCount / 2
 	var activities = make([]syncmodel.ActivityRecord, 0, activityCount)
+	var activityIndex int
 	for _, asset := range []struct {
 		key, symbol, name          string
 		buyValue, sellValue        int
-		currencies                 []string
 		reliableScope              *syncmodel.SourceScope
 		forceUnavailableScopeEntry bool
 	}{
-		{"asset-btc-performance-001", "BTC", "Bitcoin", 100, 1200, []string{"USD", "EUR", "GBP"}, performanceWalletScope("wallet-performance-main", "Performance Main Wallet"), false},
-		{"asset-eth-performance-001", "ETH", "Ethereum", 300, 900, []string{"GBP", "USD", "EUR"}, performanceWalletScope("wallet-performance-fallback", "Performance Fallback Wallet"), true},
+		{"asset-btc-performance-001", "BTC", "Bitcoin", 100, 1200, performanceWalletScope("wallet-performance-main", "Performance Main Wallet"), false},
+		{"asset-eth-performance-001", "ETH", "Ethereum", 300, 900, performanceWalletScope("wallet-performance-fallback", "Performance Fallback Wallet"), true},
 	} {
 		for index := 0; index < buysPerAsset; index++ {
-			var currency = asset.currencies[index%len(asset.currencies)]
 			var sourceScope = performanceAssetScope(asset.reliableScope, asset.forceUnavailableScopeEntry, index)
-			activities = append(activities, largeReportActivity(t, asset.key, asset.symbol, asset.name, "buy", index, 2020+index%5, syncmodel.ActivityTypeBuy, asset.buyValue+index%900, currency, sourceScope))
+			activities = append(activities, largeReportActivity(t, asset.key, asset.symbol, asset.name, "buy", index, 2020+index%5, syncmodel.ActivityTypeBuy, asset.buyValue+index%900, performanceCurrencyForIndex(activityIndex), sourceScope))
+			activityIndex++
 		}
 		for index := 0; index < sellsPerAsset; index++ {
 			var fixtureIndex = index + buysPerAsset
-			var currency = asset.currencies[fixtureIndex%len(asset.currencies)]
 			var sourceScope = performanceAssetScope(asset.reliableScope, asset.forceUnavailableScopeEntry, fixtureIndex)
-			activities = append(activities, largeReportActivity(t, asset.key, asset.symbol, asset.name, "sell", index, 2025, syncmodel.ActivityTypeSell, asset.sellValue+index%700, currency, sourceScope))
+			activities = append(activities, largeReportActivity(t, asset.key, asset.symbol, asset.name, "sell", index, 2025, syncmodel.ActivityTypeSell, asset.sellValue+index%700, performanceCurrencyForIndex(activityIndex), sourceScope))
+			activityIndex++
 		}
 	}
 	var cache = syncmodel.ProtectedActivityCache{SyncedAt: time.Date(2026, time.May, 20, 15, 4, 5, 0, time.UTC), RetrievedCount: len(activities), ActivityCount: len(activities), AvailableReportYears: []int{2020, 2021, 2022, 2023, 2024, 2025}, ScopeReliability: syncmodel.ScopeReliabilityPartial, Activities: activities}
 	return largeReportPerformanceFixture{ProtectedActivityCache: cache, ReportYear: 2025, ActivityCount: len(activities), CalendarYearSpan: 6}
 }
 
+// performanceCurrencyForIndex assigns the exact three-currency distribution
+// required by the isolated 10,000-activity report fixture.
+// Authored by: OpenCode
+func performanceCurrencyForIndex(index int) string {
+	switch {
+	case index < 3334:
+		return "USD"
+	case index < 6667:
+		return "EUR"
+	default:
+		return "GBP"
+	}
+}
+
+// largeReportActivity creates one quantity-one, non-zero priced activity with
+// gross value and fee in one order tier so calculation derives its unit price.
+// Authored by: OpenCode
 func largeReportActivity(t *testing.T, key string, symbol string, name string, action string, index int, year int, activityType syncmodel.ActivityType, grossValue int, currency string, sourceScope *syncmodel.SourceScope) syncmodel.ActivityRecord {
 	t.Helper()
 	var sourceID = fmt.Sprintf("%s-%s-performance-%05d", strings.ToLower(symbol), action, index+1)
@@ -78,9 +95,9 @@ func largeReportActivity(t *testing.T, key string, symbol string, name string, a
 	record.AssetIdentityKey = key
 	record.AssetSymbol = symbol
 	record.AssetName = name
+	record.OrderUnitPrice = nil
 	record.OrderGrossValue = mustDecimalPointer(t, fmt.Sprintf("%d", grossValue))
 	record.OrderFeeAmount = mustDecimalPointer(t, fmt.Sprintf("%d", index%5+1))
-	record.OrderUnitPrice = nil
 	record.SourceScope = sourceScope
 	return record
 }

@@ -65,6 +65,20 @@ func TestContentWidthForScreenClampsPaddingBoundary(t *testing.T) {
 	}
 }
 
+// TestReportCleartextExportCopyCoversDisclosureAndDeletion verifies the shared
+// result-screen copy required for explicit report exports.
+// Authored by: OpenCode
+func TestReportCleartextExportCopyCoversDisclosureAndDeletion(t *testing.T) {
+	t.Parallel()
+
+	if !strings.Contains(ReportCleartextExportDisclosureText, "cleartext financial data") {
+		t.Fatalf("expected cleartext financial-data disclosure, got %q", ReportCleartextExportDisclosureText)
+	}
+	if !strings.Contains(ReportCleartextExportDeletionGuidanceText, "delete every listed file") {
+		t.Fatalf("expected deletion guidance for every listed file, got %q", ReportCleartextExportDeletionGuidanceText)
+	}
+}
+
 func quitBindingForTest() key.Binding {
 	return key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit"))
 }

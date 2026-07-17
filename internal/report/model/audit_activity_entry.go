@@ -16,23 +16,28 @@ import (
 // per-asset audit report.
 // Authored by: OpenCode
 type AuditActivityEntry struct {
-	SourceID               string
-	OccurredAt             time.Time
-	ActivityType           ActivityType
-	Quantity               apd.Decimal
-	UnitPrice              *apd.Decimal
-	GrossValue             *apd.Decimal
-	FeeAmount              *apd.Decimal
-	ActivityCurrency       string
-	CalculationCurrency    string
-	QuantityAfterActivity  apd.Decimal
-	BasisAfterActivity     apd.Decimal
-	FullLiquidationEvent   bool
-	AllocatedBasis         *apd.Decimal
-	NetLiquidationProceeds *apd.Decimal
-	GainOrLoss             *apd.Decimal
-	ConversionStatus       ConversionStatus
-	Note                   string
+	SourceID              string
+	OccurredAt            time.Time
+	ActivityType          ActivityType
+	Quantity              apd.Decimal
+	UnitPrice             *apd.Decimal
+	GrossValue            *apd.Decimal
+	FeeAmount             *apd.Decimal
+	ActivityCurrency      string
+	CalculationCurrency   string
+	QuantityAfterActivity apd.Decimal
+	BasisAfterActivity    apd.Decimal
+	FullLiquidationEvent  bool
+	// IsZeroPricedHoldingReduction preserves the inherited exact classification
+	// for transient Annex 1 presentation without changing the retained activity
+	// currency or being persisted as report state.
+	// Authored by: OpenCode
+	IsZeroPricedHoldingReduction bool
+	AllocatedBasis               *apd.Decimal
+	NetLiquidationProceeds       *apd.Decimal
+	GainOrLoss                   *apd.Decimal
+	ConversionStatus             ConversionStatus
+	Note                         string
 }
 
 // Validate verifies that an Annex 1 activity has the required identity, exact

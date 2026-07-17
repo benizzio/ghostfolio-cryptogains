@@ -5,6 +5,7 @@ package markdown
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -419,7 +420,7 @@ func TestRenderRendersReferenceEmptyState(t *testing.T) {
 		"## Reference Section",
 		"No assets reached full liquidation by year end.",
 		"No assets had a non-zero net gain or loss in the selected year.",
-		"| Overall Yearly Net Total | 0 | USD |",
+		"| Overall Yearly Net Total | 0.00 | USD |",
 		"### Historical Position",
 		"- **Quantity:** 0",
 	} {
@@ -446,7 +447,7 @@ func TestRenderAnnexRendersSeparateDetailedAuditDocument(t *testing.T) {
 		"## Currency Conversion Audit",
 		"### Asset: BTC",
 		"| Date/Time | Source ID | Activity Type | Quantity | Unit Price | Gross Value | Fee | Original Activity Currency | Calculation Currency | Quantity After Activity | Basis After Activity | Full Liquidation Event | Allocated Basis | Net Liquidation Proceeds | Gain/Loss | Conversion Status | Sanitized Note |",
-		"| audit-zero-sell | BLOCKCHAIN OP | 1 | 0 | 0 | 0 | USD | USD | 0 | 0 | true | 10 |  |  | Same currency | move token=[REDACTED] |",
+		"| audit-zero-sell | BLOCKCHAIN OP | 1 | 0.00 | 0.00 | 0.00 | USD | USD | 0 | 0.00 | Yes | 10.00 |  |  | Same currency | move token=[REDACTED] |",
 		"Source currency per base currency",
 	} {
 		if !strings.Contains(string(document.Content), expected) {
@@ -457,6 +458,49 @@ func TestRenderAnnexRendersSeparateDetailedAuditDocument(t *testing.T) {
 		if strings.Contains(string(document.Content), excluded) {
 			t.Fatalf("expected annex document to exclude %q, got %q", excluded, document.Content)
 		}
+	}
+}
+
+// TestWriteAnnexActivityEntryConsumesSharedBooleanAndCurrencyLabels verifies
+// Markdown renders the shared Yes/No label directly and preserves the
+// calculation currency while hiding only classified original currencies.
+// Authored by: OpenCode
+func TestWriteAnnexActivityEntryConsumesSharedBooleanAndCurrencyLabels(t *testing.T) {
+	for _, testCase := range []struct {
+		name            string
+		classified      bool
+		fullLiquidation bool
+		unitPrice       string
+		wantBoolean     string
+		wantActivity    string
+	}{
+		{name: "classified", classified: true, fullLiquidation: true, unitPrice: "0", wantBoolean: "Yes", wantActivity: ""},
+		{name: "unclassified tiny positive", classified: false, fullLiquidation: false, unitPrice: "0.00000001", wantBoolean: "No", wantActivity: "EUR"},
+	} {
+		var testCase = testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			var entry = validMarkdownAuditEntry("markdown-" + testCase.name)
+			entry.ActivityCurrency = "EUR"
+			entry.IsZeroPricedHoldingReduction = testCase.classified
+			entry.FullLiquidationEvent = testCase.fullLiquidation
+			var unitPrice = mustRendererDecimal(t, testCase.unitPrice)
+			var grossValue = mustRendererDecimal(t, testCase.unitPrice)
+			entry.UnitPrice = &unitPrice
+			entry.GrossValue = &grossValue
+
+			var builder strings.Builder
+			if err := writeAnnexActivityEntry(&builder, entry); err != nil {
+				t.Fatalf("write Annex activity entry: %v", err)
+			}
+			var rendered = builder.String()
+			var expected = "| 2024-01-02 10:00:00 | markdown-" + testCase.name + " | BUY | 1 | 0.00 | 0.00 | 0.00 | " + testCase.wantActivity + " | USD | 1 | 10.00 | " + testCase.wantBoolean + " | 0.00 |  |  | Same currency |  |"
+			if !strings.Contains(rendered, expected) {
+				t.Fatalf("rendered Annex row = %q, want %q", rendered, expected)
+			}
+			if strings.Contains(rendered, " | true |") || strings.Contains(rendered, " | false |") {
+				t.Fatalf("expected no lowercase boolean field value, got %q", rendered)
+			}
+		})
 	}
 }
 
@@ -535,8 +579,8 @@ func TestRenderCoversDetailAndLiquidationBranches(t *testing.T) {
 			"### Closing Position",
 			"| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |",
 			"| Date | Source ID | Disposed Quantity | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |",
-			"| sell-1 | SELL | 1 |  | 12 | 2 | 0 | 0 | USD | USD | Same currency |  |",
-			"| sell-1 | 1 | 10 | 10 | 0 | USD |",
+			"| sell-1 | SELL | 1 |  | 12.00 | 2.00 | 0 | 0.00 | USD | USD | Same currency |  |",
+			"| sell-1 | 1 | 10.00 | 10.00 | 0.00 | USD |",
 		} {
 			if !strings.Contains(string(document.Content), expected) {
 				t.Fatalf("expected rendered report to contain %q", expected)
@@ -684,7 +728,7 @@ func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 		t.Fatalf("write conversion audit section: %v", err)
 	}
 	var audit = builder.String()
-	for _, expected := range []string{"## Currency Conversion Audit", "eur-buy-1", "Base currency per source currency", "Rate Value", "1.0946", "unit_price: 100 -> 109.46; gross_value: 200 -> 218.92"} {
+	for _, expected := range []string{"## Currency Conversion Audit", "eur-buy-1", "Base currency per source currency", "Rate Value", "1.0946", "unit_price: 100.00 -> 109.46;<br>gross_value: 200.00 -> 218.92"} {
 		if !strings.Contains(audit, expected) {
 			t.Fatalf("expected conversion audit to contain %q, got %q", expected, audit)
 		}
@@ -695,7 +739,7 @@ func TestRendererRateSourceAndConversionAuditSections(t *testing.T) {
 		}
 	}
 	var expectedHeader = "| Date | Source ID | Asset | Rate Date | Source Currency | Report Base Currency | Converted Amounts | Quote Direction | Rate Value |"
-	var expectedRow = "| 2024-01-05 | eur-buy-1 | BTC | 2024-01-05 | EUR | USD | unit_price: 100 -> 109.46; gross_value: 200 -> 218.92 | Base currency per source currency | 1.0946 |"
+	var expectedRow = "| 2024-01-05 | eur-buy-1 | BTC | 2024-01-05 | EUR | USD | unit_price: 100.00 -> 109.46;<br>gross_value: 200.00 -> 218.92 | Base currency per source currency | 1.0946 |"
 	if !strings.Contains(audit, expectedHeader) || !strings.Contains(audit, expectedRow) {
 		t.Fatalf("expected grouped conversion audit order, got %q", audit)
 	}
@@ -743,10 +787,10 @@ func TestRendererUsesPreservedConversionStatusForAssetDetails(t *testing.T) {
 	if strings.Contains(rendered, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency |") {
 		t.Fatalf("expected old activity currency header to be absent, got %q", rendered)
 	}
-	if !strings.Contains(rendered, "| audited-converted-row | SELL | 1 |  | 12 |  | 0 | 0 | USD | USD | Converted |  |") {
+	if !strings.Contains(rendered, "| audited-converted-row | SELL | 1 |  | 12.00 |  | 0 | 0.00 | USD | USD | Converted |  |") {
 		t.Fatalf("expected preserved converted status in detail row, got %q", rendered)
 	}
-	if strings.Contains(rendered, "| audited-converted-row | SELL | 1 |  | 12 |  | 0 | 0 | USD | USD | same_currency |  |") {
+	if strings.Contains(rendered, "| audited-converted-row | SELL | 1 |  | 12.00 |  | 0 | 0.00 | USD | USD | same_currency |  |") {
 		t.Fatalf("expected audited converted row not to render as same-currency, got %q", rendered)
 	}
 }
@@ -798,9 +842,9 @@ func TestRendererAssetDetailCurrencyColumnContracts(t *testing.T) {
 	var rendered = builder.String()
 	for _, expected := range []string{
 		"| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |",
-		"| eth-sell | SELL | 2 | 100 | 200 | 1 | 3 | 50 | USD | EUR | Converted |  |",
+		"| eth-sell | SELL | 2 | 100.00 | 200.00 | 1.00 | 3 | 50.00 | USD | EUR | Converted |  |",
 		"| Date | Source ID | Disposed Quantity | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |",
-		"| eth-sell | 2 | 50 | 199 | 149 | EUR |",
+		"| eth-sell | 2 | 50.00 | 199.00 | 149.00 | EUR |",
 	} {
 		if !strings.Contains(rendered, expected) {
 			t.Fatalf("expected rendered detail section to contain %q, got %q", expected, rendered)
@@ -1170,6 +1214,373 @@ func TestRendererEmptyAndUnsupportedLabelBranches(t *testing.T) {
 	}
 }
 
+// TestRendererEmitsExactLegalWarning verifies the main-document warning line,
+// its metadata-to-summary placement, and its absence from Annex 1.
+// Authored by: OpenCode
+func TestRendererEmitsExactLegalWarning(t *testing.T) {
+	var report = minimalMarkdownReportFixture(t)
+	var warning = "The data in this report does not follow any legally required rules for any country's tax returns and is for reference only."
+	var expectedLine = "**" + warning + "**"
+
+	var document, err = Render(report)
+	if err != nil {
+		t.Fatalf("render main report: %v", err)
+	}
+	var content = string(document.Content)
+	if strings.Count(content, expectedLine) != 1 {
+		t.Fatalf("expected one fully bold warning line, got %d in %q", strings.Count(content, expectedLine), content)
+	}
+	if strings.Contains(strings.ReplaceAll(content, expectedLine, ""), warning) {
+		t.Fatalf("expected warning to be fully bold without a second plain occurrence, got %q", content)
+	}
+	var metadata = "- **Report Calculation Currency:** USD\n\n"
+	var summary = "## Gains-And-Losses Summary"
+	var metadataIndex = strings.Index(content, metadata)
+	var warningIndex = strings.Index(content, expectedLine)
+	var summaryIndex = strings.Index(content, summary)
+	if metadataIndex < 0 || warningIndex < metadataIndex+len(metadata) || summaryIndex <= warningIndex+len(expectedLine) {
+		t.Fatalf("expected metadata, warning, summary order, got %q", content)
+	}
+	if !strings.Contains(content[warningIndex+len(expectedLine):], "\n\n"+summary) {
+		t.Fatalf("expected warning to be a standalone paragraph before summary, got %q", content)
+	}
+
+	var annex, annexErr = RenderAnnex(report)
+	if annexErr != nil {
+		t.Fatalf("render annex: %v", annexErr)
+	}
+	if strings.Contains(string(annex.Content), warning) {
+		t.Fatalf("expected Annex 1 not to repeat the main-report warning, got %q", annex.Content)
+	}
+}
+
+// TestRendererFinancialMatrixUsesScaleTwoAndPreservesSources verifies every
+// direct and row-built Markdown financial field against the presentation
+// vectors, including exact-zero conversion omission and source immutability.
+// Authored by: OpenCode
+func TestRendererFinancialMatrixUsesScaleTwoAndPreservesSources(t *testing.T) {
+	for _, vector := range rendererFinancialVectors() {
+		var vector = vector
+		t.Run(vector.name, func(t *testing.T) {
+			var value = mustRendererDecimal(t, vector.exact)
+
+			var summaryBuilder strings.Builder
+			var summaryReport = reportmodel.CapitalGainsReport{
+				SummaryEntries: []reportmodel.AssetSummaryEntry{{
+					AssetIdentityKey:          "matrix-asset",
+					DisplayLabel:              "Matrix Asset",
+					NetGainOrLoss:             value,
+					ReportCalculationCurrency: "USD",
+				}},
+				YearlyNetTotal: value,
+			}
+			var summaryBefore = summaryReport
+			if err := writeSummarySection(&summaryBuilder, summaryReport, "USD"); err != nil {
+				t.Fatalf("write summary: %v", err)
+			}
+			var summary = summaryBuilder.String()
+			if !strings.Contains(summary, "| Overall Yearly Net Total | "+vector.expected+" | USD |") {
+				t.Fatalf("expected formatted yearly total %q, got %q", vector.expected, summary)
+			}
+			if value.Sign() == 0 {
+				if strings.Contains(summary, "| Matrix Asset | ") {
+					t.Fatalf("expected exact-zero summary entry to remain omitted, got %q", summary)
+				}
+			} else if !strings.Contains(summary, "| Matrix Asset | "+vector.expected+" | USD |") {
+				t.Fatalf("expected formatted summary value %q, got %q", vector.expected, summary)
+			}
+			if !reflect.DeepEqual(summaryReport, summaryBefore) {
+				t.Fatalf("summary source changed: before=%#v after=%#v", summaryBefore, summaryReport)
+			}
+
+			var basis = value
+			var positionBefore = basis
+			var positionBuilder strings.Builder
+			if err := writePositionBlock(&positionBuilder, "Opening Position", mustRendererDecimal(t, "0.00000001"), basis, "USD", "USD"); err != nil {
+				t.Fatalf("write position: %v", err)
+			}
+			if !strings.Contains(positionBuilder.String(), "- **Quantity:** 0.00000001") || !strings.Contains(positionBuilder.String(), "- **Cost Basis:** "+vector.expected) {
+				t.Fatalf("expected formatted position fields, got %q", positionBuilder.String())
+			}
+			if !reflect.DeepEqual(basis, positionBefore) {
+				t.Fatalf("position source changed: before=%#v after=%#v", positionBefore, basis)
+			}
+
+			var unitPrice = value
+			var grossValue = value
+			var feeAmount = value
+			var activityRow = reportmodel.AssetActivityRow{
+				SourceID:            "matrix-activity",
+				OccurredAt:          time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
+				ActivityType:        reportmodel.ActivityTypeBuy,
+				Quantity:            mustRendererDecimal(t, "0.00000001"),
+				UnitPrice:           &unitPrice,
+				GrossValue:          &grossValue,
+				FeeAmount:           &feeAmount,
+				ActivityCurrency:    "USD",
+				BasisAfterRow:       value,
+				CalculationCurrency: "USD",
+				QuantityAfterRow:    mustRendererDecimal(t, "0.1000"),
+			}
+			var activityBefore = activityRow
+			var activityBuilder strings.Builder
+			if err := writeActivityRow(&activityBuilder, activityRow); err != nil {
+				t.Fatalf("write activity row: %v", err)
+			}
+			var activity = activityBuilder.String()
+			var expectedActivity = "| matrix-activity | BUY | 0.00000001 | " + vector.expected + " | " + vector.expected + " | " + vector.expected + " | 0.1 | " + vector.expected + " | USD | USD |"
+			if !strings.Contains(activity, expectedActivity) {
+				t.Fatalf("expected formatted activity fields, got %q", activity)
+			}
+			if !reflect.DeepEqual(activityRow, activityBefore) {
+				t.Fatalf("activity source changed: before=%#v after=%#v", activityBefore, activityRow)
+			}
+
+			var liquidation = reportmodel.LiquidationCalculation{
+				SourceID:               "matrix-liquidation",
+				OccurredAt:             time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
+				DisposedQuantity:       mustRendererDecimal(t, "0.00000001"),
+				AllocatedBasis:         value,
+				NetLiquidationProceeds: value,
+				GainOrLoss:             value,
+				CalculationCurrency:    "USD",
+			}
+			var liquidationBefore = liquidation
+			var liquidationBuilder strings.Builder
+			if err := writeLiquidationRow(&liquidationBuilder, liquidation, "USD"); err != nil {
+				t.Fatalf("write liquidation row: %v", err)
+			}
+			var expectedLiquidation = "| matrix-liquidation | 0.00000001 | " + vector.expected + " | " + vector.expected + " | " + vector.expected + " | USD |"
+			if !strings.Contains(liquidationBuilder.String(), expectedLiquidation) {
+				t.Fatalf("expected formatted liquidation fields, got %q", liquidationBuilder.String())
+			}
+			if !reflect.DeepEqual(liquidation, liquidationBefore) {
+				t.Fatalf("liquidation source changed: before=%#v after=%#v", liquidationBefore, liquidation)
+			}
+
+			var annexUnitPrice = value
+			var annexGrossValue = value
+			var annexFeeAmount = value
+			var annexAllocatedBasis = value
+			var annexNetProceeds = value
+			var annexGainOrLoss = value
+			var annexEntry = reportmodel.AuditActivityEntry{
+				SourceID:               "matrix-annex",
+				OccurredAt:             time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC),
+				ActivityType:           reportmodel.ActivityTypeBuy,
+				Quantity:               mustRendererDecimal(t, "0.00000001"),
+				UnitPrice:              &annexUnitPrice,
+				GrossValue:             &annexGrossValue,
+				FeeAmount:              &annexFeeAmount,
+				ActivityCurrency:       "USD",
+				CalculationCurrency:    "USD",
+				QuantityAfterActivity:  mustRendererDecimal(t, "0.1000"),
+				BasisAfterActivity:     mustRendererDecimal(t, "2.000"),
+				FullLiquidationEvent:   true,
+				AllocatedBasis:         &annexAllocatedBasis,
+				NetLiquidationProceeds: &annexNetProceeds,
+				GainOrLoss:             &annexGainOrLoss,
+				ConversionStatus:       reportmodel.ConversionStatusSameCurrency,
+			}
+			var annexBefore = annexEntry
+			var annexBuilder strings.Builder
+			if err := writeAnnexActivityEntry(&annexBuilder, annexEntry); err != nil {
+				t.Fatalf("write Annex activity row: %v", err)
+			}
+			var expectedAnnex = "| matrix-annex | BUY | 0.00000001 | " + vector.expected + " | " + vector.expected + " | " + vector.expected + " | USD | USD | 0.1 | 2.00 |"
+			if !strings.Contains(annexBuilder.String(), expectedAnnex) {
+				t.Fatalf("expected formatted Annex activity fields, got %q", annexBuilder.String())
+			}
+			var expectedAnnexTail = "| " + vector.expected + " | " + vector.expected + " | " + vector.expected + " | Same currency |"
+			if !strings.Contains(annexBuilder.String(), expectedAnnexTail) {
+				t.Fatalf("expected formatted Annex liquidation fields, got %q", annexBuilder.String())
+			}
+			if !reflect.DeepEqual(annexEntry, annexBefore) {
+				t.Fatalf("Annex source changed: before=%#v after=%#v", annexBefore, annexEntry)
+			}
+
+			var rate = mustRendererDecimal(t, "0.86010")
+			var conversion = rendererConversionEntry("matrix-conversion", rate, value)
+			var conversionBefore = conversion
+			var conversionBuilder strings.Builder
+			if err := writeConversionAuditRow(&conversionBuilder, 0, conversion); err != nil {
+				t.Fatalf("write conversion audit row: %v", err)
+			}
+			var conversionText = conversionBuilder.String()
+			if !strings.Contains(conversionText, "| 0.8601 |") {
+				t.Fatalf("expected canonical rate value, got %q", conversionText)
+			}
+			if value.Sign() == 0 {
+				if strings.Contains(conversionText, "unit_price:") {
+					t.Fatalf("expected exact zero-to-zero conversion components to remain omitted, got %q", conversionText)
+				}
+			} else {
+				for _, amountKind := range []string{"unit_price", "gross_value", "fee_amount"} {
+					var expectedAmount = amountKind + ": " + vector.expected + " -> " + vector.expected
+					if !strings.Contains(conversionText, expectedAmount) {
+						t.Fatalf("expected formatted conversion amount %q, got %q", expectedAmount, conversionText)
+					}
+				}
+			}
+			if !reflect.DeepEqual(conversion, conversionBefore) {
+				t.Fatalf("conversion source changed: before=%#v after=%#v", conversionBefore, conversion)
+			}
+		})
+	}
+}
+
+// TestRendererLeavesNilOptionalFinancialFieldsBlank verifies that absent
+// activity and Annex amounts do not become visible zero values.
+// Authored by: OpenCode
+func TestRendererLeavesNilOptionalFinancialFieldsBlank(t *testing.T) {
+	var activityBuilder strings.Builder
+	var activity = validRendererActivityRow("nil-activity")
+	if err := writeActivityRow(&activityBuilder, activity); err != nil {
+		t.Fatalf("write nil activity row: %v", err)
+	}
+	if !strings.Contains(activityBuilder.String(), "| nil-activity | BUY | 1 |  |  |  | 1 | 1.00 |") {
+		t.Fatalf("expected nil activity amounts to remain blank, got %q", activityBuilder.String())
+	}
+
+	var annexEntry = validMarkdownAuditEntry("nil-annex")
+	annexEntry.UnitPrice = nil
+	annexEntry.GrossValue = nil
+	annexEntry.FeeAmount = nil
+	annexEntry.AllocatedBasis = nil
+	annexEntry.NetLiquidationProceeds = nil
+	annexEntry.GainOrLoss = nil
+	var annexBuilder strings.Builder
+	if err := writeAnnexActivityEntry(&annexBuilder, annexEntry); err != nil {
+		t.Fatalf("write nil Annex row: %v", err)
+	}
+	if !strings.Contains(annexBuilder.String(), "| nil-annex | BUY | 1 |  |  |  | USD | USD | 1 | 10.00 |") {
+		t.Fatalf("expected nil Annex amounts to remain blank, got %q", annexBuilder.String())
+	}
+}
+
+// TestRendererPreservesCanonicalQuantitiesAndRates verifies that quantity and
+// normalized rate fields do not use the two-decimal financial formatter.
+// Authored by: OpenCode
+func TestRendererPreservesCanonicalQuantitiesAndRates(t *testing.T) {
+	var activity = validRendererActivityRow("canonical-quantity")
+	activity.Quantity = mustRendererDecimal(t, "0.00000001")
+	activity.QuantityAfterRow = mustRendererDecimal(t, "0.1000")
+	var activityBuilder strings.Builder
+	if err := writeActivityRow(&activityBuilder, activity); err != nil {
+		t.Fatalf("write canonical quantity row: %v", err)
+	}
+	if !strings.Contains(activityBuilder.String(), "| canonical-quantity | BUY | 0.00000001 |") || !strings.Contains(activityBuilder.String(), "| 0.1 | 1.00 |  | USD |") {
+		t.Fatalf("expected canonical quantities, got %q", activityBuilder.String())
+	}
+
+	var rate = mustRendererDecimal(t, "0.86010")
+	var conversion = rendererConversionEntry("canonical-rate", rate, mustRendererDecimal(t, "1"))
+	var conversionBefore = conversion
+	var conversionBuilder strings.Builder
+	if err := writeConversionAuditRow(&conversionBuilder, 0, conversion); err != nil {
+		t.Fatalf("write canonical rate row: %v", err)
+	}
+	if !strings.Contains(conversionBuilder.String(), "| 0.8601 |") {
+		t.Fatalf("expected normalized canonical rate, got %q", conversionBuilder.String())
+	}
+	if strings.Contains(conversionBuilder.String(), "| 0.86 |") {
+		t.Fatalf("expected rate significant digits to remain, got %q", conversionBuilder.String())
+	}
+	if !reflect.DeepEqual(conversion, conversionBefore) {
+		t.Fatalf("rate source changed: before=%#v after=%#v", conversionBefore, conversion)
+	}
+}
+
+// TestRenderReturnsNoDocumentAfterInjectedFailure verifies that a Markdown
+// helper failure is returned normally without exposing a partial document.
+// Authored by: OpenCode
+func TestRenderReturnsNoDocumentAfterInjectedFailure(t *testing.T) {
+	var report = minimalMarkdownReportFixture(t)
+	var previous = renderWriteSummarySection
+	defer func() { renderWriteSummarySection = previous }()
+	renderWriteSummarySection = func(*strings.Builder, reportmodel.CapitalGainsReport, string) error {
+		return errors.New("synthetic summary render failure")
+	}
+
+	var document, err = Render(report)
+	if err == nil || !strings.Contains(err.Error(), "synthetic summary render failure") {
+		t.Fatalf("expected injected render failure, got %v", err)
+	}
+	if len(document.Content) != 0 {
+		t.Fatalf("expected no partial report document after render failure, got %q", document.Content)
+	}
+}
+
+// rendererFinancialVector identifies one exact source value and its expected
+// scale-two Markdown representation.
+// Authored by: OpenCode
+type rendererFinancialVector struct {
+	name     string
+	exact    string
+	expected string
+}
+
+// rendererFinancialVectors returns signed and non-negative presentation vectors
+// used by every direct and row-built Markdown financial field.
+// Authored by: OpenCode
+func rendererFinancialVectors() []rendererFinancialVector {
+	return []rendererFinancialVector{
+		{name: "zero", exact: "0", expected: "0.00"},
+		{name: "tiny-positive", exact: "0.00000001", expected: "0.00"},
+		{name: "whole", exact: "1", expected: "1.00"},
+		{name: "one-place", exact: "1.2", expected: "1.20"},
+		{name: "two-place", exact: "1.23", expected: "1.23"},
+		{name: "below-positive-tie", exact: "1.004", expected: "1.00"},
+		{name: "positive-tie", exact: "1.005", expected: "1.01"},
+		{name: "positive-carry", exact: "9.995", expected: "10.00"},
+		{name: "negative-whole", exact: "-1", expected: "-1.00"},
+		{name: "negative-below-tie", exact: "-1.004", expected: "-1.00"},
+		{name: "negative-tie", exact: "-1.005", expected: "-1.01"},
+		{name: "negative-carry", exact: "-9.995", expected: "-10.00"},
+		{name: "negative-zero", exact: "-0", expected: "0.00"},
+		{name: "negative-tiny", exact: "-0.004", expected: "0.00"},
+		{name: "negative-zero-adjacent-tie", exact: "-0.005", expected: "-0.01"},
+	}
+}
+
+// mustRendererDecimal parses one synthetic exact decimal for package-local
+// Markdown renderer tests.
+// Authored by: OpenCode
+func mustRendererDecimal(t *testing.T, raw string) apd.Decimal {
+	t.Helper()
+
+	var value apd.Decimal
+	if _, _, err := value.SetString(raw); err != nil {
+		t.Fatalf("parse renderer decimal %q: %v", raw, err)
+	}
+	return value
+}
+
+// rendererConversionEntry creates one conversion row with all three amount
+// kinds and a normalized rate control for Markdown renderer tests.
+// Authored by: OpenCode
+func rendererConversionEntry(sourceID string, rate apd.Decimal, value apd.Decimal) reportmodel.ConversionAuditEntry {
+	var activityDate = time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC)
+	var amounts = []reportmodel.ConvertedActivityAmount{
+		{AmountKind: reportmodel.ConvertedAmountKindUnitPrice, OriginalAmount: value, ConvertedAmount: value},
+		{AmountKind: reportmodel.ConvertedAmountKindGrossValue, OriginalAmount: value, ConvertedAmount: value},
+		{AmountKind: reportmodel.ConvertedAmountKindFeeAmount, OriginalAmount: value, ConvertedAmount: value},
+	}
+	return reportmodel.ConversionAuditEntry{
+		SourceID:           sourceID,
+		AssetLabel:         "Matrix Asset",
+		ActivityDate:       activityDate,
+		SourceCurrency:     "EUR",
+		ReportBaseCurrency: reportmodel.ReportBaseCurrencyUSD,
+		RateDate:           activityDate,
+		RateAuthority:      reportmodel.RateAuthorityFederalReserve,
+		RateKind:           "daily noon buying rate",
+		RateValue:          rate,
+		QuoteDirection:     reportmodel.QuoteDirectionSourcePerBase,
+		Amounts:            amounts,
+	}
+}
+
 // apdDecimalPointer returns one finite decimal pointer for renderer tests.
 // Authored by: OpenCode
 func apdDecimalPointer(value int64) *apd.Decimal {
@@ -1332,5 +1743,149 @@ func markdownAnnexConversionEntry() reportmodel.ConversionAuditEntry {
 		RateValue:          *apd.New(2, 0),
 		QuoteDirection:     reportmodel.QuoteDirectionSourcePerBase,
 		Amounts:            []reportmodel.ConvertedActivityAmount{amount},
+	}
+}
+
+// TestMarkdownConvertedAmountEntryBoundaries verifies empty, singleton, and
+// ordered multi-entry cells use the exact Markdown separator and spacing rules.
+// Authored by: OpenCode
+func TestMarkdownConvertedAmountEntryBoundaries(t *testing.T) {
+	var zero = mustRendererDecimal(t, "0")
+	var unitOriginal = mustRendererDecimal(t, "30754.70")
+	var unitConverted = mustRendererDecimal(t, "28673.04")
+	var grossOriginal = mustRendererDecimal(t, "254.76")
+	var grossConverted = mustRendererDecimal(t, "237.52")
+	var feeOriginal = mustRendererDecimal(t, "1.79")
+	var feeConverted = mustRendererDecimal(t, "1.67")
+
+	for _, testCase := range []struct {
+		name    string
+		amounts []reportmodel.ConvertedActivityAmount
+		cell    string
+	}{
+		{
+			name: "empty after exact zero-to-zero omission",
+			amounts: []reportmodel.ConvertedActivityAmount{
+				t027MarkdownConvertedAmount(reportmodel.ConvertedAmountKindUnitPrice, zero, zero),
+			},
+			cell: "",
+		},
+		{
+			name: "single",
+			amounts: []reportmodel.ConvertedActivityAmount{
+				t027MarkdownConvertedAmount(reportmodel.ConvertedAmountKindUnitPrice, unitOriginal, unitConverted),
+			},
+			cell: "unit_price: 30754.70 -> 28673.04",
+		},
+		{
+			name: "multiple in received order",
+			amounts: []reportmodel.ConvertedActivityAmount{
+				t027MarkdownConvertedAmount(reportmodel.ConvertedAmountKindUnitPrice, unitOriginal, unitConverted),
+				t027MarkdownConvertedAmount(reportmodel.ConvertedAmountKindGrossValue, grossOriginal, grossConverted),
+				t027MarkdownConvertedAmount(reportmodel.ConvertedAmountKindFeeAmount, feeOriginal, feeConverted),
+			},
+			cell: "unit_price: 30754.70 -> 28673.04;<br>gross_value: 254.76 -> 237.52;<br>fee_amount: 1.79 -> 1.67",
+		},
+	} {
+		var testCase = testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			var rendered = renderT027MarkdownConversionAuditRow(t, testCase.amounts)
+			var expected = "| 2024-01-02 | t027-source | Synthetic Asset | 2024-01-02 | EUR | USD | " + testCase.cell + " | Source currency per base currency | 1.25 |\n"
+			if rendered != expected {
+				t.Fatalf("rendered conversion row = %q, want %q", rendered, expected)
+			}
+			if strings.Count(rendered, "\n") != 1 {
+				t.Fatalf("expected one physical Markdown table row, got %q", rendered)
+			}
+			if strings.Contains(testCase.cell, ";<br>") && (strings.Contains(rendered, ":  ") || strings.Contains(rendered, "  ->") || strings.Contains(rendered, "->  ") || strings.Contains(rendered, "; <br>")) {
+				t.Fatalf("expected exact colon-arrow-semicolon spacing, got %q", rendered)
+			}
+		})
+	}
+}
+
+// TestMarkdownConvertedAmountComponentsEscapeBeforeDelimiters verifies dynamic
+// amount labels are escaped before fixed entry syntax and renderer boundaries.
+// Authored by: OpenCode
+func TestMarkdownConvertedAmountComponentsEscapeBeforeDelimiters(t *testing.T) {
+	var firstOriginal = mustRendererDecimal(t, "1")
+	var firstConverted = mustRendererDecimal(t, "2")
+	var secondOriginal = mustRendererDecimal(t, "3")
+	var secondConverted = mustRendererDecimal(t, "4")
+	var amounts = []reportmodel.ConvertedActivityAmount{
+		t027MarkdownConvertedAmount(reportmodel.ConvertedAmountKind("<label>|&"), firstOriginal, firstConverted),
+		t027MarkdownConvertedAmount(reportmodel.ConvertedAmountKindGrossValue, secondOriginal, secondConverted),
+	}
+
+	var rendered = renderT027MarkdownConversionAuditRow(t, amounts)
+	var expectedCell = "&lt;label&gt;\\|&amp;: 1.00 -> 2.00;<br>gross_value: 3.00 -> 4.00"
+	var expected = "| 2024-01-02 | t027-source | Synthetic Asset | 2024-01-02 | EUR | USD | " + expectedCell + " | Source currency per base currency | 1.25 |\n"
+	if rendered != expected {
+		t.Fatalf("rendered escaped conversion row = %q, want %q", rendered, expected)
+	}
+	if strings.Contains(rendered, "<label>") || strings.Contains(rendered, "|&:") || strings.Contains(rendered, "<br>|") {
+		t.Fatalf("expected dynamic label delimiters to be escaped before fixed syntax, got %q", rendered)
+	}
+	if strings.Count(rendered, "\n") != 1 || !strings.HasPrefix(rendered, "|") || !strings.HasSuffix(rendered, "|\n") {
+		t.Fatalf("expected a valid one-row pipe table, got %q", rendered)
+	}
+}
+
+// renderT027MarkdownConversionAuditRow renders one synthetic conversion row
+// through the package-local Markdown row seam used by the fail-first tests.
+// Authored by: OpenCode
+func renderT027MarkdownConversionAuditRow(t *testing.T, amounts []reportmodel.ConvertedActivityAmount) string {
+	t.Helper()
+
+	var activityDate = time.Date(2024, time.January, 2, 0, 0, 0, 0, time.UTC)
+	var entry = reportmodel.ConversionAuditEntry{
+		SourceID:           "t027-source",
+		AssetLabel:         "Synthetic Asset",
+		ActivityDate:       activityDate,
+		SourceCurrency:     "EUR",
+		ReportBaseCurrency: reportmodel.ReportBaseCurrencyUSD,
+		RateDate:           activityDate,
+		RateValue:          *apd.New(125, -2),
+		QuoteDirection:     reportmodel.QuoteDirectionSourcePerBase,
+		Amounts:            amounts,
+	}
+	var builder strings.Builder
+	if err := writeConversionAuditRow(&builder, 0, entry); err != nil {
+		t.Fatalf("write conversion audit row: %v", err)
+	}
+	return builder.String()
+}
+
+// t027MarkdownConvertedAmount creates one synthetic converted amount for the
+// Markdown delimiter and escaping tests.
+// Authored by: OpenCode
+func t027MarkdownConvertedAmount(kind reportmodel.ConvertedAmountKind, original apd.Decimal, converted apd.Decimal) reportmodel.ConvertedActivityAmount {
+	return reportmodel.ConvertedActivityAmount{
+		AmountKind:      kind,
+		OriginalAmount:  original,
+		ConvertedAmount: converted,
+	}
+}
+
+// TestSplitConvertedAmountEntryRejectsUnexpectedSyntax verifies malformed
+// presentation entries remain unsplit instead of inventing Markdown fields.
+// Authored by: OpenCode
+func TestSplitConvertedAmountEntryRejectsUnexpectedSyntax(t *testing.T) {
+	for _, testCase := range []struct {
+		name  string
+		input string
+		want  [3]string
+	}{
+		{name: "missing arrow", input: "unit_price: 1.00", want: [3]string{"unit_price: 1.00", "", ""}},
+		{name: "missing label separator", input: "unit_price -> 1.00", want: [3]string{"unit_price -> 1.00", "", ""}},
+	} {
+		var testCase = testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			var gotLabel, gotOriginal, gotConverted = splitConvertedAmountEntry(testCase.input)
+			var got = [3]string{gotLabel, gotOriginal, gotConverted}
+			if got != testCase.want {
+				t.Fatalf("split converted amount entry = %#v, want %#v", got, testCase.want)
+			}
+		})
 	}
 }

@@ -175,7 +175,9 @@ func TestReportGenerationWorkflowContract(t *testing.T) {
 		},
 	})
 	assertContains(t, result, "Report Result")
+	assertContains(t, result, component.ReportCleartextExportDisclosureText)
 	assertContains(t, result, "Saved PDF Path: /tmp/Documents/ghostfolio-capital-gains-2024-fifo.pdf")
+	assertContains(t, result, component.ReportCleartextExportDeletionGuidanceText)
 	assertContains(t, result, "Selected Year: 2024")
 	assertContains(t, result, "Cost Basis Method: FIFO")
 	assertContains(t, result, "Report Base Currency: USD")
@@ -225,6 +227,38 @@ func TestReportGenerationWorkflowContract(t *testing.T) {
 	})
 	assertContains(t, markdownResult, "Saved Markdown Path: /tmp/Documents/ghostfolio-capital-gains-2024-fifo.md")
 	assertContains(t, markdownResult, "Saved Annex 1 Markdown Path: /tmp/Documents/ghostfolio-capital-gains-2024-fifo-annex-1.md")
+	assertContains(t, markdownResult, component.ReportCleartextExportDisclosureText)
+	assertContains(t, markdownResult, component.ReportCleartextExportDeletionGuidanceText)
+
+	var warningFile, warningErr = reportmodel.NewReportOutputFile("/tmp/Documents", "synthetic-warning-report.pdf", "/tmp/Documents/synthetic-warning-report.pdf", reportmodel.ReportDocumentRoleCombined, reportmodel.ReportMediaTypePDF, time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC))
+	if warningErr != nil {
+		t.Fatalf("new warning report output file: %v", warningErr)
+	}
+	var warningBundle, warningBundleErr = reportmodel.NewReportOutputBundle(reportmodel.ReportOutputFormatPDF, []reportmodel.ReportOutputFile{warningFile}, time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC), true, "synthetic opener warning")
+	if warningBundleErr != nil {
+		t.Fatalf("new warning report output bundle: %v", warningBundleErr)
+	}
+	var warningResult = screen.ReportResultScreenView(screen.ReportResultScreenParams{
+		Theme:         component.DefaultTheme(),
+		Width:         100,
+		Height:        32,
+		MethodLabel:   "FIFO",
+		MenuItems:     []component.MenuItem{{Label: "Back To Sync and Reports", Enabled: true}},
+		SelectedIndex: 0,
+		Outcome: runtime.ReportOutcome{
+			Success:       true,
+			FailureReason: runtime.ReportFailureAutomaticOpenFailedAfterSave,
+			Message:       "Saved the synthetic PDF, but automatic opening failed. Open the file manually.",
+			Request:       request,
+			OutputFormat:  reportmodel.ReportOutputFormatPDF,
+			OutputFile:    warningFile,
+			OutputBundle:  warningBundle,
+		},
+	})
+	assertContains(t, warningResult, "Success With Warning: automatic open failed after save")
+	assertContains(t, warningResult, component.ReportCleartextExportDisclosureText)
+	assertContains(t, warningResult, "Saved PDF Path: /tmp/Documents/synthetic-warning-report.pdf")
+	assertContains(t, warningResult, component.ReportCleartextExportDeletionGuidanceText)
 
 	var failure = screen.ReportResultScreenView(screen.ReportResultScreenParams{
 		Theme:         component.DefaultTheme(),

@@ -390,6 +390,148 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 	})
 }
 
+// TestReportServiceRenderFailureLeavesOutputBoundaryAndRetryAvailable verifies
+// render and PDF-finalization failures remain before output persistence and do
+// not prevent a later successful attempt through the same service.
+// Authored by: OpenCode
+func TestReportServiceRenderFailureLeavesOutputBoundaryAndRetryAvailable(t *testing.T) {
+	var failureCases = []struct {
+		name            string
+		failureStage    string
+		semanticContext string
+	}{
+		{
+			name:            "render",
+			failureStage:    "PDF rendering",
+			semanticContext: `Converted Amounts row "synthetic-render-row"`,
+		},
+		{
+			name:            "finalization",
+			failureStage:    "PDF byte finalization",
+			semanticContext: `combined document "synthetic-finalization-document"`,
+		},
+	}
+
+	for _, failureCase := range failureCases {
+		failureCase := failureCase
+		t.Run(failureCase.name, func(t *testing.T) {
+			var request = reportRequestFixture(t, 2024)
+			request.OutputFormat = reportmodel.ReportOutputFormatPDF
+			var fixture = testutil.NewReportIOFixture(t)
+			var savedPath = filepath.Join(fixture.DocumentsDir, "retry-report.pdf")
+			var rawCause = "Bearer synthetic-render-cause"
+			var renderCalls int
+			var calculateCalls int
+			var writeCalls int
+			var requestedFormats []reportmodel.ReportOutputFormat
+			var opener = testutil.NewOpenPathSpy(nil)
+			var service = &reportService{
+				snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
+				calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+					calculateCalls++
+					return capitalGainsReportFixture(t, request), nil
+				},
+				renderBundle: func(outputFormat reportmodel.ReportOutputFormat, report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+					renderCalls++
+					requestedFormats = append(requestedFormats, outputFormat)
+					if renderCalls == 1 {
+						var safeFailure = fmt.Sprintf("%s failed for %s: cause [REDACTED]", failureCase.failureStage, failureCase.semanticContext)
+						return nil, runtimeWrappedError{message: safeFailure, cause: errors.New(rawCause)}
+					}
+
+					var document, err = reportmodel.NewReportDocument(
+						reportmodel.ReportDocumentTypePDF,
+						reportmodel.ReportDocumentRoleCombined,
+						[]byte("%PDF synthetic retry payload\n"),
+						report.Year,
+						report.CostBasisMethod,
+						report.GeneratedAt,
+					)
+					if err != nil {
+						t.Fatalf("new retry PDF document: %v", err)
+					}
+					return []reportmodel.ReportDocument{document}, nil
+				},
+				writeBundle: func(outputFormat reportmodel.ReportOutputFormat, documents []reportmodel.ReportDocument) (reportmodel.ReportOutputBundle, error) {
+					writeCalls++
+					if outputFormat != reportmodel.ReportOutputFormatPDF || len(documents) != 1 {
+						t.Fatalf("unexpected retry output write input: format=%q documents=%#v", outputFormat, documents)
+					}
+					var outputFile, err = reportmodel.NewReportOutputFile(
+						fixture.DocumentsDir,
+						filepath.Base(savedPath),
+						savedPath,
+						reportmodel.ReportDocumentRoleCombined,
+						reportmodel.ReportMediaTypePDF,
+						documents[0].GeneratedAt,
+					)
+					if err != nil {
+						t.Fatalf("new retry output file: %v", err)
+					}
+					var bundle, bundleErr = reportmodel.NewReportOutputBundle(
+						outputFormat,
+						[]reportmodel.ReportOutputFile{outputFile},
+						documents[0].GeneratedAt,
+						false,
+						"",
+					)
+					if bundleErr != nil {
+						t.Fatalf("new retry output bundle: %v", bundleErr)
+					}
+					return bundle, nil
+				},
+				open: opener.Open,
+			}
+
+			var failed = service.Generate(context.Background(), ReportGenerationRequest{
+				Request:      request,
+				AttemptID:    "attempt-failed",
+				ServerOrigin: "https://synthetic.example",
+			})
+			if failed.Success || failed.FailureReason != ReportFailureUnsupportedReportCalculation {
+				t.Fatalf("expected render failure outcome, got %#v", failed)
+			}
+			if failed.OutputFormat != "" || failed.OutputFile.Path != "" || len(failed.OutputBundle.Files) != 0 || !failed.OutputBundle.SavedAt.IsZero() {
+				t.Fatalf("expected no successful document or output path, got %#v", failed)
+			}
+			if writeCalls != 0 || opener.CallCount() != 0 {
+				t.Fatalf("expected failed render to skip writer and opener, writes=%d opens=%d", writeCalls, opener.CallCount())
+			}
+			if len(requestedFormats) != 1 || requestedFormats[0] != reportmodel.ReportOutputFormatPDF {
+				t.Fatalf("expected no alternate renderer after failure, got %#v", requestedFormats)
+			}
+			if !strings.Contains(failed.Message, failureCase.failureStage) || !strings.Contains(failed.Message, failureCase.semanticContext) || !strings.Contains(failed.Message, "[REDACTED]") || strings.Contains(failed.Message, rawCause) {
+				t.Fatalf("expected contextual redacted failure message, got %q", failed.Message)
+			}
+			if !failed.Diagnostic.Eligible {
+				t.Fatalf("expected render failure diagnostics to be eligible, got %#v", failed.Diagnostic)
+			}
+			var causeChain = strings.Join(failed.Diagnostic.Request.Context.FailureCauseChain, " | ")
+			if !strings.Contains(causeChain, failureCase.failureStage) || !strings.Contains(causeChain, failureCase.semanticContext) || !strings.Contains(causeChain, "Bearer [REDACTED]") || strings.Contains(causeChain, rawCause) {
+				t.Fatalf("expected redacted stage/context cause chain, got %#v", failed.Diagnostic.Request.Context.FailureCauseChain)
+			}
+
+			var retried = service.Generate(context.Background(), ReportGenerationRequest{
+				Request:      request,
+				AttemptID:    "attempt-retry",
+				ServerOrigin: "https://synthetic.example",
+			})
+			if !retried.Success || retried.FailureReason != ReportFailureNone {
+				t.Fatalf("expected successful retry through the same service, got %#v", retried)
+			}
+			if calculateCalls != 2 || renderCalls != 2 || writeCalls != 1 || opener.CallCount() != 1 {
+				t.Fatalf("expected one failed and one successful service attempt, calculations=%d renders=%d writes=%d opens=%d", calculateCalls, renderCalls, writeCalls, opener.CallCount())
+			}
+			if len(requestedFormats) != 2 || requestedFormats[1] != reportmodel.ReportOutputFormatPDF || retried.OutputFile.Path != savedPath {
+				t.Fatalf("expected retry to use the selected renderer and save one PDF path, formats=%#v output=%#v", requestedFormats, retried.OutputFile)
+			}
+			if opener.Paths()[0] != savedPath {
+				t.Fatalf("expected retry opener request for %q, got %#v", savedPath, opener.Paths())
+			}
+		})
+	}
+}
+
 // TestReportServiceHelperFunctionsCoverRemainingBranches verifies direct helper
 // formatting and cache-read branches not reached through the full service flow.
 // Authored by: OpenCode

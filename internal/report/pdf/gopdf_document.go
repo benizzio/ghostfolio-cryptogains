@@ -109,6 +109,38 @@ func (document *gopdfDocument) AddParagraph(text string) error {
 	return nil
 }
 
+// AddBoldParagraph emits one sanitized wrapped paragraph using the registered
+// bold font for both measurement and drawing, then advances by its measured
+// height. For example, a renderer can call document.AddBoldParagraph(warning)
+// to keep a multi-line warning fully bold without changing its logical block.
+// Authored by: OpenCode
+func (document *gopdfDocument) AddBoldParagraph(text string) error {
+	if err := document.ensureSpace(0); err != nil {
+		return err
+	}
+	var sanitized = sanitizeText(text)
+	if err := document.pdf.SetFont(fontBold, "", 9); err != nil {
+		return err
+	}
+	var rectangle = &gopdf.Rect{W: contentWide, H: pageBottom - pageMargin}
+	var fits, height, err = fitMultiCellForGopdfDocument(document, rectangle, sanitized)
+	if err != nil {
+		return err
+	}
+	if !fits {
+		return fmt.Errorf("bold paragraph does not fit within the printable page area")
+	}
+	if err := document.ensureSpace(height); err != nil {
+		return err
+	}
+	document.pdf.SetXY(pageMargin, document.y)
+	if err := writeMultiCellForGopdfDocument(document, rectangle, sanitized); err != nil {
+		return err
+	}
+	document.y += height
+	return nil
+}
+
 // AddTable emits one structured table through gopdf table layout primitives.
 // Authored by: OpenCode
 func (document *gopdfDocument) AddTable(table pdfTable) error {
@@ -128,23 +160,35 @@ func (document *gopdfDocument) AddTable(table pdfTable) error {
 	if err != nil {
 		return err
 	}
-	var remainingRows = table.Rows
 	if err = document.prepareTableStart(table.Title, rowHeight); err != nil {
-		return err
+		return fmt.Errorf("table preflight failed for row 1: %w", err)
 	}
+	return document.addTableRows(table, columns, rowHeight)
+}
+
+// addTableRows draws preflighted rows and creates continuation pages only when
+// the remaining rows require them.
+// Authored by: OpenCode
+func (document *gopdfDocument) addTableRows(table pdfTable, columns []pdfColumn, rowHeight float64) error {
+	var rowOffset int
+	var remainingRows = table.Rows
 	for len(remainingRows) > 0 {
 		var capacity = document.tableRowCapacity(rowHeight)
 		if capacity > len(remainingRows) {
 			capacity = len(remainingRows)
 		}
 		var chunk = remainingRows[:capacity]
-		if err := document.drawTableChunk(table, columns, chunk, rowHeight, len(remainingRows) == len(chunk)); err != nil {
+		if err := document.drawTableChunk(table, columns, chunk, rowHeight, rowOffset, len(remainingRows) == len(chunk)); err != nil {
 			return err
 		}
 		remainingRows = remainingRows[capacity:]
+		rowOffset += capacity
 		if len(remainingRows) > 0 {
+			if document.tableRowCapacityAt(document.tableContinuationStartY(), rowHeight) == 0 {
+				return fmt.Errorf("table preflight failed for row %d: row does not fit within a fresh continuation page", rowOffset+1)
+			}
 			if err := document.addTableContinuationPage(table.ContinuationTitle); err != nil {
-				return err
+				return fmt.Errorf("table continuation setup failed before row %d: %w", rowOffset+1, err)
 			}
 			document.y += tableSpacing
 		}
@@ -157,13 +201,13 @@ func (document *gopdfDocument) AddTable(table pdfTable) error {
 // Authored by: OpenCode
 func (document *gopdfDocument) tableRowHeight(columns []pdfColumn, rows [][]string, minimum float64) (float64, error) {
 	if err := document.pdf.SetFont(fontRegular, "", 6.5); err != nil {
-		return 0, err
+		return 0, fmt.Errorf("table measurement failed before row 1: %w", err)
 	}
 	var rowHeight = minimum
-	for _, row := range rows {
+	for rowIndex, row := range rows {
 		var height, err = document.tableRowContentHeight(columns, row)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("table measurement failed for row %d: %w", rowIndex+1, err)
 		}
 		if height > rowHeight {
 			rowHeight = height
@@ -194,7 +238,7 @@ func (document *gopdfDocument) tableCellHeight(columns []pdfColumn, index int, c
 	if cell == "" || index >= len(columns) {
 		return 0, false, nil
 	}
-	var fits, height, err = measureTableCellForGopdfDocument(document, &gopdf.Rect{W: columns[index].Width - 4, H: pageBottom - pageMargin}, sanitizeText(cell))
+	var fits, height, err = measureTableCellForGopdfDocument(document, &gopdf.Rect{W: columns[index].Width - 4, H: pageBottom - pageMargin}, sanitizeTableCell(cell))
 	if err != nil {
 		return 0, false, err
 	}
@@ -261,16 +305,26 @@ func (document *gopdfDocument) ensureSpace(height float64) error {
 // borders fit wholly within the current page's printable area.
 // Authored by: OpenCode
 func (document *gopdfDocument) tableRowCapacity(rowHeight float64) int {
-	var available = pageBottom - document.y - tableSpacing
-	if rowHeight <= 0 || available < rowHeight*2 {
+	return document.tableRowCapacityAt(document.y, rowHeight)
+}
+
+// tableRowCapacityAt returns the row count that fits after reserving the
+// table border allowance and one repeated header row at a page position.
+// Authored by: OpenCode
+func (document *gopdfDocument) tableRowCapacityAt(startY float64, rowHeight float64) int {
+	if rowHeight <= 0 {
 		return 0
 	}
-	return int(available/rowHeight) - 1
+	var available = pageBottom - startY - 12 - rowHeight
+	if available < rowHeight {
+		return 0
+	}
+	return int(available / rowHeight)
 }
 
 // drawTableChunk draws one page-local table chunk and records its text extract.
 // Authored by: OpenCode
-func (document *gopdfDocument) drawTableChunk(table pdfTable, columns []pdfColumn, rows [][]string, rowHeight float64, includeStyledLastRow bool) error {
+func (document *gopdfDocument) drawTableChunk(table pdfTable, columns []pdfColumn, rows [][]string, rowHeight float64, rowOffset int, includeStyledLastRow bool) error {
 	var layout = document.pdf.NewTableLayout(pageMargin, document.y, rowHeight, len(rows))
 	for _, column := range columns {
 		layout.AddColumn(sanitizeText(column.Header), column.Width, column.Align)
@@ -287,7 +341,7 @@ func (document *gopdfDocument) drawTableChunk(table pdfTable, columns []pdfColum
 		}
 	}
 	if err := drawTableForGopdfDocument(layout); err != nil {
-		return err
+		return fmt.Errorf("table drawing failed for row %d: %w", rowOffset+1, err)
 	}
 	document.y += rowHeight*float64(len(rows)+1) + 12
 	return nil
@@ -317,17 +371,32 @@ func (document *gopdfDocument) addTableContinuationPage(context string) error {
 	return nil
 }
 
+// tableContinuationStartY returns the first data-table position after a
+// continuation context and the table's top spacing have been emitted.
+// Authored by: OpenCode
+func (document *gopdfDocument) tableContinuationStartY() float64 {
+	return pageMargin + 16 + tableSpacing
+}
+
 // prepareTableStart reserves enough space for a table title, header, and first
 // row before emitting any part of the table block.
 // Authored by: OpenCode
 func (document *gopdfDocument) prepareTableStart(title string, rowHeight float64) error {
 	var titleHeight float64
 	if title != "" {
-		titleHeight = sectionSpacing + 16
+		titleHeight = 16
+		if document.y > pageMargin {
+			titleHeight += sectionSpacing
+		}
 	}
-	var required = titleHeight + tableSpacing*2 + rowHeight*2
+	var required = titleHeight + tableSpacing + rowHeight*2 + 12
 	if document.y+required > pageBottom {
 		document.addPage()
+		titleHeight = 0
+		if title != "" {
+			titleHeight = 16
+		}
+		required = titleHeight + tableSpacing + rowHeight*2 + 12
 	}
 	if document.y+required > pageBottom {
 		return fmt.Errorf("table row height %.0f does not fit within the printable page area", rowHeight)
@@ -338,11 +407,18 @@ func (document *gopdfDocument) prepareTableStart(title string, rowHeight float64
 		}
 	}
 	document.y += tableSpacing
+	if document.tableRowCapacity(rowHeight) == 0 {
+		return fmt.Errorf("table row height %.0f does not fit within the printable page area", rowHeight)
+	}
 	return nil
 }
 
-// Bytes returns the concrete PDF byte payload.
+// Bytes returns the concrete PDF byte payload or its finalization error.
 // Authored by: OpenCode
-func (document *gopdfDocument) Bytes() []byte {
-	return append([]byte(nil), document.pdf.GetBytesPdf()...)
+func (document *gopdfDocument) Bytes() ([]byte, error) {
+	var payload, err = finalizeGopdfDocument(document)
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte(nil), payload...), nil
 }

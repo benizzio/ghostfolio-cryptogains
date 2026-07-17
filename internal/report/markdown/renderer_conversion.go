@@ -70,9 +70,40 @@ func writeConversionAuditRow(builder *strings.Builder, entryIndex int, entry rep
 
 	fmt.Fprintf(builder,
 		"| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
-		sanitizeInlineText(row.Date), sanitizeInlineText(row.SourceID), sanitizeInlineText(row.Asset), sanitizeInlineText(row.RateDate), sanitizeInlineText(row.SourceCurrency), sanitizeInlineText(row.ReportBaseCurrency), sanitizeInlineText(row.ConvertedAmounts), sanitizeInlineText(row.QuoteDirection), sanitizeInlineText(row.RateValue),
+		sanitizeInlineText(row.Date), sanitizeInlineText(row.SourceID), sanitizeInlineText(row.Asset), sanitizeInlineText(row.RateDate), sanitizeInlineText(row.SourceCurrency), sanitizeInlineText(row.ReportBaseCurrency), renderConvertedAmountEntries(row.ConvertedAmountEntries), sanitizeInlineText(row.QuoteDirection), sanitizeInlineText(row.RateValue),
 	)
 	return nil
+}
+
+// renderConvertedAmountEntries assembles sanitized logical entries with the
+// Markdown-only boundary used inside the conversion-audit table cell.
+// Authored by: OpenCode
+func renderConvertedAmountEntries(entries []string) string {
+	var rendered = make([]string, 0, len(entries))
+	for _, entry := range entries {
+		var label, original, converted = splitConvertedAmountEntry(entry)
+		rendered = append(rendered, fmt.Sprintf("%s: %s -> %s", sanitizeConvertedAmountComponent(label), sanitizeConvertedAmountComponent(original), sanitizeConvertedAmountComponent(converted)))
+	}
+
+	return strings.Join(rendered, ";<br>")
+}
+
+// splitConvertedAmountEntry separates the presentation entry at its generated
+// syntax while allowing dynamic labels to contain the same separator text.
+// Authored by: OpenCode
+func splitConvertedAmountEntry(entry string) (string, string, string) {
+	var arrowIndex = strings.LastIndex(entry, " -> ")
+	if arrowIndex < 0 {
+		return entry, "", ""
+	}
+
+	var prefix = entry[:arrowIndex]
+	var labelSeparatorIndex = strings.LastIndex(prefix, ": ")
+	if labelSeparatorIndex < 0 {
+		return entry, "", ""
+	}
+
+	return prefix[:labelSeparatorIndex], prefix[labelSeparatorIndex+2:], entry[arrowIndex+3:]
 }
 
 // rateAuthorityLabel returns report-facing authority labels for canonical rate

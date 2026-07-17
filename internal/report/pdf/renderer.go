@@ -12,9 +12,11 @@
 package pdf
 
 import (
+	"errors"
 	"fmt"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
 )
 
 const (
@@ -97,6 +99,26 @@ type Renderer struct {
 	options RenderOptions
 }
 
+// redactedPDFFinalizationCause exposes a safe cause message while preserving
+// errors.Is identity checks for the original finalization failure.
+// Authored by: OpenCode
+type redactedPDFFinalizationCause struct {
+	cause error
+}
+
+// Error returns the finalization cause after applying the shared redaction policy.
+// Authored by: OpenCode
+func (cause redactedPDFFinalizationCause) Error() string {
+	return redact.ErrorText(cause.cause)
+}
+
+// Is preserves matching against the original finalization cause without
+// exposing that cause through the unwrap chain.
+// Authored by: OpenCode
+func (cause redactedPDFFinalizationCause) Is(target error) bool {
+	return errors.Is(cause.cause, target)
+}
+
 // NewRenderer creates one validated local PDF renderer.
 //
 // Example:
@@ -160,5 +182,10 @@ func (renderer Renderer) Render(report reportmodel.CapitalGainsReport) ([]byte, 
 		return nil, err
 	}
 
-	return document.Bytes(), nil
+	var payload, err = document.Bytes()
+	if err != nil {
+		return nil, fmt.Errorf("PDF byte finalization failed: %w", redactedPDFFinalizationCause{cause: err})
+	}
+
+	return payload, nil
 }

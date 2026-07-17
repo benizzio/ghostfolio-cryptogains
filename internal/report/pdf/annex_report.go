@@ -136,5 +136,15 @@ func renderConversionAuditRow(index int, entry reportmodel.ConversionAuditEntry)
 	if err != nil {
 		return nil, err
 	}
-	return sanitizeRow([]string{row.Date, row.SourceID, row.Asset, row.RateDate, row.SourceCurrency, row.ReportBaseCurrency, row.ConvertedAmounts, row.QuoteDirection, row.RateValue}), nil
+	return []string{
+		sanitizeText(row.Date),
+		sanitizeText(row.SourceID),
+		sanitizeText(row.Asset),
+		sanitizeText(row.RateDate),
+		sanitizeText(row.SourceCurrency),
+		sanitizeText(row.ReportBaseCurrency),
+		sanitizeConvertedCell(row.ConvertedAmountEntries),
+		sanitizeText(row.QuoteDirection),
+		sanitizeText(row.RateValue),
+	}, nil
 }

@@ -1,3 +1,5 @@
+// Package testutil contains deterministic helpers for local report tests.
+// Authored by: OpenCode
 package testutil
 
 import (
@@ -7,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode"
@@ -26,6 +29,19 @@ import (
 type GeneratedPDF struct {
 	PageBoxes      []PDFPageBox
 	SearchableText string
+	TextRuns       []PDFTextRun
+}
+
+// PDFTextRun describes one ordered text-showing operation recovered from a
+// generated PDF. Coordinates use the PDF bottom-left origin and the font
+// resource omits its leading slash, for example "F1".
+// Authored by: OpenCode
+type PDFTextRun struct {
+	Page         int
+	Text         string
+	FontResource string
+	X            float64
+	Y            float64
 }
 
 // PDFPageBox describes one PDF page MediaBox in PostScript points.
@@ -48,16 +64,28 @@ func (inspection GeneratedPDF) ContainsSearchableText(value string) bool {
 	return strings.Contains(normalizePDFSearchText(inspection.SearchableText), normalizePDFSearchText(value))
 }
 
+// PDF inspection patterns identify local PDF objects, geometry, fonts, and text
+// operators without relying on an external PDF executable.
+// Authored by: OpenCode
 var (
-	pdfObjectPattern   = regexp.MustCompile(`(?s)(\d+)\s+\d+\s+obj\b(.*?)\bendobj\b`)
-	pdfPagePattern     = regexp.MustCompile(`/Type\s*/Page\b`)
-	pdfMediaBoxPattern = regexp.MustCompile(`/MediaBox\s*\[\s*([-+0-9.]+)\s+([-+0-9.]+)\s+([-+0-9.]+)\s+([-+0-9.]+)\s*\]`)
-	pdfHexTextPattern  = regexp.MustCompile(`<([0-9A-Fa-f]+)>\s*Tj\b|<([0-9A-Fa-f]+)>`)
-	pdfLiteralPattern  = regexp.MustCompile(`\((([^\\()]|\\.)*)\)\s*Tj\b`)
-	pdfCMapPattern     = regexp.MustCompile(`<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>`)
-	pdfBFCharPattern   = regexp.MustCompile(`(?s)beginbfchar\s*(.*?)\s*endbfchar`)
-	pdfBFRangePattern  = regexp.MustCompile(`(?s)beginbfrange\s*(.*?)\s*endbfrange`)
-	pdfRangeEntry      = regexp.MustCompile(`<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>`)
+	pdfObjectPattern          = regexp.MustCompile(`(?s)(\d+)\s+\d+\s+obj\b(.*?)\bendobj\b`)
+	pdfPagePattern            = regexp.MustCompile(`/Type\s*/Page\b`)
+	pdfMediaBoxPattern        = regexp.MustCompile(`/MediaBox\s*\[\s*([-+0-9.]+)\s+([-+0-9.]+)\s+([-+0-9.]+)\s+([-+0-9.]+)\s*\]`)
+	pdfHexTextPattern         = regexp.MustCompile(`<([0-9A-Fa-f]+)>\s*Tj\b|<([0-9A-Fa-f]+)>`)
+	pdfLiteralPattern         = regexp.MustCompile(`\((([^\\()]|\\.)*)\)\s*Tj\b`)
+	pdfCMapPattern            = regexp.MustCompile(`<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>`)
+	pdfBFCharPattern          = regexp.MustCompile(`(?s)beginbfchar\s*(.*?)\s*endbfchar`)
+	pdfBFRangePattern         = regexp.MustCompile(`(?s)beginbfrange\s*(.*?)\s*endbfrange`)
+	pdfRangeEntry             = regexp.MustCompile(`<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>`)
+	pdfTextOperandPattern     = regexp.MustCompile(`(?s)(\((?:\\.|[^\\()])*\)|<([0-9A-Fa-f]+)>|\[(.*?)\])\s*(Tj|TJ)\b`)
+	pdfTextArrayItemPattern   = regexp.MustCompile(`(\((?:\\.|[^\\()])*\)|<([0-9A-Fa-f]+)>)`)
+	pdfCoordinatePattern      = regexp.MustCompile(`([-+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))\s+([-+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))\s+(Td|TD)\b|([-+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))\s+([-+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))\s+([-+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))\s+([-+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))\s+([-+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))\s+([-+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+))\s+Tm\b`)
+	pdfFontOperatorPattern    = regexp.MustCompile(`/([^\s/<>()\[\]]+)\s+[-+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)\s+Tf\b`)
+	pdfContentsPattern        = regexp.MustCompile(`(?s)/Contents\s+(\[[^\]]*\]|\d+\s+\d+\s+R)`)
+	pdfObjectReferencePattern = regexp.MustCompile(`(\d+)\s+\d+\s+R`)
+	pdfToUnicodePattern       = regexp.MustCompile(`/ToUnicode\s+(\d+)\s+\d+\s+R`)
+	pdfFontReferencePattern   = regexp.MustCompile(`/([^\s/<>()\[\]]+)\s+(\d+)\s+\d+\s+R`)
+	pdfStreamLengthPattern    = regexp.MustCompile(`/Length\s+(\d+)\b`)
 )
 
 // InspectGeneratedPDF parses the page MediaBoxes and text-showing content of a
@@ -85,6 +113,10 @@ func InspectGeneratedPDF(payload []byte) (GeneratedPDF, error) {
 	if len(inspection.PageBoxes) == 0 {
 		return GeneratedPDF{}, fmt.Errorf("PDF pages are required")
 	}
+	inspection.TextRuns, err = content.resolvedTextRuns()
+	if err != nil {
+		return GeneratedPDF{}, err
+	}
 	inspection.SearchableText = extractPDFText(content.textStreams, content.unicodeMaps, content.glyphMaps)
 	if inspection.SearchableText == "" {
 		return GeneratedPDF{}, fmt.Errorf("searchable PDF text is required")
@@ -96,9 +128,13 @@ func InspectGeneratedPDF(payload []byte) (GeneratedPDF, error) {
 // pdfInspectionContent accumulates the inspectable PDF object content.
 // Authored by: OpenCode
 type pdfInspectionContent struct {
+	objects           map[int][]byte
+	objectIDs         []int
 	unicodeMaps       []map[string]string
+	unicodeMapsByID   map[int]map[string]string
 	glyphMaps         []map[byte]string
 	textStreams       [][]byte
+	textStreamObjects map[int][]byte
 	explicitPageBoxes []PDFPageBox
 	inheritedPageBox  PDFPageBox
 	pageCount         int
@@ -120,10 +156,20 @@ func (content pdfInspectionContent) resolvedPageBoxes() []PDFPageBox {
 // inspectPDFObjects recovers page geometry, text streams, and font maps.
 // Authored by: OpenCode
 func inspectPDFObjects(payload []byte) (pdfInspectionContent, error) {
-	var content pdfInspectionContent
+	var content = pdfInspectionContent{
+		objects:           make(map[int][]byte),
+		unicodeMapsByID:   make(map[int]map[string]string),
+		textStreamObjects: make(map[int][]byte),
+	}
 	for _, match := range pdfObjectPattern.FindAllSubmatch(payload, -1) {
+		var objectID, err = strconv.Atoi(string(match[1]))
+		if err != nil {
+			return pdfInspectionContent{}, fmt.Errorf("parse PDF object number: %w", err)
+		}
 		var object = match[2]
-		if err := content.inspectObject(object); err != nil {
+		content.objects[objectID] = object
+		content.objectIDs = append(content.objectIDs, objectID)
+		if err := content.inspectObject(objectID, object); err != nil {
 			return pdfInspectionContent{}, err
 		}
 	}
@@ -132,13 +178,13 @@ func inspectPDFObjects(payload []byte) (pdfInspectionContent, error) {
 
 // inspectObject recovers inspection data from one indirect PDF object.
 // Authored by: OpenCode
-func (content *pdfInspectionContent) inspectObject(object []byte) error {
+func (content *pdfInspectionContent) inspectObject(objectID int, object []byte) error {
 	content.inspectPageBox(object)
 	var stream, ok, err = pdfObjectStream(object)
 	if err != nil || !ok {
 		return err
 	}
-	content.inspectStream(stream)
+	content.inspectStream(objectID, stream)
 	return nil
 }
 
@@ -163,17 +209,291 @@ func (content *pdfInspectionContent) inspectPageBox(object []byte) {
 
 // inspectStream classifies a decoded object stream for text recovery.
 // Authored by: OpenCode
-func (content *pdfInspectionContent) inspectStream(stream []byte) {
+func (content *pdfInspectionContent) inspectStream(objectID int, stream []byte) {
 	if glyphMap := embeddedFontGlyphMap(stream); len(glyphMap) > 0 {
 		content.glyphMaps = append(content.glyphMaps, glyphMap)
 	}
 	if unicodeMap := pdfUnicodeMap(stream); len(unicodeMap) > 0 {
 		content.unicodeMaps = append(content.unicodeMaps, unicodeMap)
+		content.unicodeMapsByID[objectID] = unicodeMap
 		return
 	}
 	if bytes.Contains(stream, []byte(" Tj")) || bytes.Contains(stream, []byte(" TJ")) {
 		content.textStreams = append(content.textStreams, stream)
+		content.textStreamObjects[objectID] = stream
 	}
+}
+
+// resolvedTextRuns returns text-showing operations in page and stream order.
+// Authored by: OpenCode
+func (content pdfInspectionContent) resolvedTextRuns() ([]PDFTextRun, error) {
+	var runs []PDFTextRun
+	var pageNumber int
+	var fontMaps = content.fontUnicodeMaps()
+	for _, objectID := range content.objectIDs {
+		var page = content.objects[objectID]
+		if !pdfPagePattern.Match(page) {
+			continue
+		}
+		pageNumber++
+		for _, streamID := range pdfPageContentReferences(page) {
+			var stream, ok = content.textStreamObjects[streamID]
+			if !ok {
+				continue
+			}
+			var streamRuns, err = extractPDFTextRuns(stream, pageNumber, fontMaps, content.unicodeMaps, content.glyphMaps)
+			if err != nil {
+				return nil, err
+			}
+			runs = append(runs, streamRuns...)
+		}
+	}
+	return runs, nil
+}
+
+// pdfPageContentReferences returns the content stream object IDs for one page.
+// Authored by: OpenCode
+func pdfPageContentReferences(page []byte) []int {
+	var contents = pdfContentsPattern.FindSubmatch(page)
+	if len(contents) != 2 {
+		return nil
+	}
+	var references []int
+	for _, reference := range pdfObjectReferencePattern.FindAllSubmatch(contents[1], -1) {
+		var objectID, err = strconv.Atoi(string(reference[1]))
+		if err == nil {
+			references = append(references, objectID)
+		}
+	}
+	return references
+}
+
+// fontUnicodeMaps resolves PDF font resource names to their ToUnicode maps.
+// Authored by: OpenCode
+func (content pdfInspectionContent) fontUnicodeMaps() map[string]map[string]string {
+	var fontObjectIDs = make(map[string]int)
+	for _, objectID := range content.objectIDs {
+		for _, reference := range pdfFontReferencePattern.FindAllSubmatch(content.objects[objectID], -1) {
+			var targetID, err = strconv.Atoi(string(reference[2]))
+			if err == nil {
+				fontObjectIDs[string(reference[1])] = targetID
+			}
+		}
+	}
+	var fontMaps = make(map[string]map[string]string)
+	for resource, fontObjectID := range fontObjectIDs {
+		var toUnicode = pdfToUnicodePattern.FindSubmatch(content.objects[fontObjectID])
+		if len(toUnicode) != 2 {
+			continue
+		}
+		var mapObjectID, err = strconv.Atoi(string(toUnicode[1]))
+		if err != nil {
+			continue
+		}
+		if unicodeMap := content.unicodeMapsByID[mapObjectID]; len(unicodeMap) > 0 {
+			fontMaps[resource] = unicodeMap
+		}
+	}
+	return fontMaps
+}
+
+// pdfTextRunEvent holds one ordered text-state or text-showing operation.
+// Authored by: OpenCode
+type pdfTextRunEvent struct {
+	offset    int
+	kind      string
+	values    [6]float64
+	font      string
+	operand   []byte
+	directHex []byte
+	array     []byte
+}
+
+// extractPDFTextRuns parses text state, positioning, and text-showing operators.
+// Authored by: OpenCode
+func extractPDFTextRuns(stream []byte, page int, fontMaps map[string]map[string]string, unicodeMaps []map[string]string, glyphMaps []map[byte]string) ([]PDFTextRun, error) {
+	var events, err = parsePDFTextRunEvents(stream)
+	if err != nil {
+		return nil, err
+	}
+	return materializePDFTextRuns(events, page, fontMaps, unicodeMaps, glyphMaps), nil
+}
+
+// parsePDFTextRunEvents collects text-state and text-showing operators in stream order.
+// Authored by: OpenCode
+func parsePDFTextRunEvents(stream []byte) ([]pdfTextRunEvent, error) {
+	var events []pdfTextRunEvent
+	var coordinateEvents, err = parsePDFCoordinateEvents(stream)
+	if err != nil {
+		return nil, err
+	}
+	events = append(events, coordinateEvents...)
+	for _, match := range pdfFontOperatorPattern.FindAllSubmatchIndex(stream, -1) {
+		events = append(events, pdfTextRunEvent{
+			offset: match[0],
+			kind:   "Tf",
+			font:   string(stream[match[2]:match[3]]),
+		})
+	}
+	for _, match := range pdfTextOperandPattern.FindAllSubmatchIndex(stream, -1) {
+		var operandStart, operandEnd = match[2], match[3]
+		var hexStart, hexEnd = match[4], match[5]
+		var arrayStart, arrayEnd = match[6], match[7]
+		var directHex, array []byte
+		if hexStart >= 0 {
+			directHex = stream[hexStart:hexEnd]
+		}
+		if arrayStart >= 0 {
+			array = stream[arrayStart:arrayEnd]
+		}
+		events = append(events, pdfTextRunEvent{
+			offset:    match[0],
+			kind:      "text",
+			operand:   stream[operandStart:operandEnd],
+			directHex: directHex,
+			array:     array,
+		})
+	}
+	sort.SliceStable(events, func(left, right int) bool { return events[left].offset < events[right].offset })
+	return events, nil
+}
+
+// parsePDFCoordinateEvents parses Td, TD, and Tm positioning operators.
+// Authored by: OpenCode
+func parsePDFCoordinateEvents(stream []byte) ([]pdfTextRunEvent, error) {
+	var events []pdfTextRunEvent
+	for _, match := range pdfCoordinatePattern.FindAllSubmatchIndex(stream, -1) {
+		var event, err = parsePDFCoordinateEvent(stream, match)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+	return events, nil
+}
+
+// parsePDFCoordinateEvent converts one coordinate operator match into an event.
+// Authored by: OpenCode
+func parsePDFCoordinateEvent(stream []byte, match []int) (pdfTextRunEvent, error) {
+	var event = pdfTextRunEvent{offset: match[0]}
+	if match[6] >= 0 {
+		event.kind = string(stream[match[6]:match[7]])
+		var err error
+		event.values[0], err = strconv.ParseFloat(string(stream[match[2]:match[3]]), 64)
+		if err != nil {
+			return pdfTextRunEvent{}, fmt.Errorf("parse PDF text coordinate: %w", err)
+		}
+		event.values[1], err = strconv.ParseFloat(string(stream[match[4]:match[5]]), 64)
+		if err != nil {
+			return pdfTextRunEvent{}, fmt.Errorf("parse PDF text coordinate: %w", err)
+		}
+		return event, nil
+	}
+	event.kind = "Tm"
+	for index := 0; index < 6; index++ {
+		var start = match[8+index*2]
+		var end = match[9+index*2]
+		var err error
+		event.values[index], err = strconv.ParseFloat(string(stream[start:end]), 64)
+		if err != nil {
+			return pdfTextRunEvent{}, fmt.Errorf("parse PDF text matrix: %w", err)
+		}
+	}
+	return event, nil
+}
+
+// materializePDFTextRuns applies ordered text state to decoded text operands.
+// Authored by: OpenCode
+func materializePDFTextRuns(events []pdfTextRunEvent, page int, fontMaps map[string]map[string]string, unicodeMaps []map[string]string, glyphMaps []map[byte]string) []PDFTextRun {
+	var x, y float64
+	var font string
+	var runs []PDFTextRun
+	for _, event := range events {
+		switch event.kind {
+		case "Td", "TD":
+			x, y = event.values[0], event.values[1]
+		case "Tm":
+			x, y = event.values[4], event.values[5]
+		case "Tf":
+			font = event.font
+		case "text":
+			var decoded = decodePDFTextRunOperand(event.operand, event.directHex, event.array, fontMaps[font], unicodeMaps, glyphMaps)
+			if decoded != "" {
+				runs = append(runs, PDFTextRun{Page: page, Text: decoded, FontResource: font, X: x, Y: y})
+			}
+		}
+	}
+	return runs
+}
+
+// decodePDFTextRunOperand decodes one text-showing operand using its font.
+// Authored by: OpenCode
+func decodePDFTextRunOperand(operand, directHex, array []byte, fontMap map[string]string, unicodeMaps []map[string]string, glyphMaps []map[byte]string) string {
+	if len(directHex) > 0 {
+		return decodePDFTextWithMaps(directHex, fontMap, unicodeMaps, glyphMaps)
+	}
+	if len(array) > 0 {
+		var text strings.Builder
+		for _, item := range pdfTextArrayItemPattern.FindAllSubmatch(array, -1) {
+			if len(item[2]) > 0 {
+				text.WriteString(decodePDFTextWithMaps(item[2], fontMap, unicodeMaps, glyphMaps))
+			} else if len(item[0]) >= 2 {
+				text.WriteString(unescapePDFLiteral(item[0][1 : len(item[0])-1]))
+			}
+		}
+		return text.String()
+	}
+	if len(operand) >= 2 && operand[0] == '(' {
+		return unescapePDFLiteral(operand[1 : len(operand)-1])
+	}
+	return decodePDFTextWithMaps(operand, fontMap, unicodeMaps, glyphMaps)
+}
+
+// decodePDFTextWithMaps decodes text through the available PDF font maps.
+// Authored by: OpenCode
+func decodePDFTextWithMaps(raw []byte, fontMap map[string]string, unicodeMaps []map[string]string, glyphMaps []map[byte]string) string {
+	if decoded := decodePDFTextByUnicodeMap(raw, fontMap); decoded != "" {
+		return decoded
+	}
+	if decoded := decodePDFText(raw, fontMap); decoded != "" {
+		return decoded
+	}
+	for _, unicodeMap := range unicodeMaps {
+		if decoded := decodePDFTextByUnicodeMap(raw, unicodeMap); decoded != "" {
+			return decoded
+		}
+		if decoded := decodePDFText(raw, unicodeMap); decoded != "" {
+			return decoded
+		}
+	}
+	for _, glyphMap := range glyphMaps {
+		if decoded := decodePDFGlyphText(raw, glyphMap); decoded != "" {
+			return decoded
+		}
+	}
+	return ""
+}
+
+// decodePDFTextByUnicodeMap decodes two-byte CID text through one ToUnicode map.
+// Authored by: OpenCode
+func decodePDFTextByUnicodeMap(raw []byte, unicodeMap map[string]string) string {
+	if len(unicodeMap) == 0 {
+		return ""
+	}
+	var encoded, err = hex.DecodeString(string(raw))
+	if err != nil || len(encoded) == 0 || len(encoded)%2 != 0 {
+		return ""
+	}
+	var text strings.Builder
+	for index := 0; index < len(encoded); index += 2 {
+		var code = strings.ToUpper(hex.EncodeToString(encoded[index : index+2]))
+		var decoded, ok = unicodeMap[code]
+		if !ok {
+			return ""
+		}
+		text.WriteString(decoded)
+	}
+	return text.String()
 }
 
 // pdfUnicodeMap recovers direct and ranged ToUnicode mappings from one stream.
@@ -231,7 +551,7 @@ func decodePDFTextOperand(match [][]byte, unicodeMaps []map[string]string, glyph
 	}
 	var texts []string
 	for _, unicodeMap := range unicodeMaps {
-		if decoded := decodePDFText(encoded, unicodeMap); decoded != "" {
+		if decoded := decodePDFTextWithMaps(encoded, unicodeMap, nil, nil); decoded != "" {
 			texts = append(texts, decoded)
 		}
 	}
@@ -399,6 +719,12 @@ func pdfObjectStream(object []byte) ([]byte, bool, error) {
 	var raw = bytes.TrimRight(object[start:start+end], "\r\n")
 	if !bytes.Contains(object[:start], []byte("/FlateDecode")) {
 		return raw, true, nil
+	}
+	if lengthMatch := pdfStreamLengthPattern.FindSubmatch(object[:start]); len(lengthMatch) == 2 {
+		var length, lengthErr = strconv.Atoi(string(lengthMatch[1]))
+		if lengthErr == nil && length >= 0 && length <= end {
+			raw = object[start : start+length]
+		}
 	}
 	var reader, err = zlib.NewReader(bytes.NewReader(raw))
 	if err != nil {

@@ -14,6 +14,7 @@ import (
 	reportoutput "github.com/benizzio/ghostfolio-cryptogains/internal/report/output"
 	reportpdf "github.com/benizzio/ghostfolio-cryptogains/internal/report/pdf"
 	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"golang.org/x/image/font/gofont/gobold"
 	"golang.org/x/image/font/gofont/goregular"
@@ -128,7 +129,7 @@ func (s *reportService) Generate(ctx context.Context, request ReportGenerationRe
 				"Could not render the %d %s report: %s. No report file was saved.",
 				request.Request.Year,
 				request.Request.CostBasisMethod.Label(),
-				strings.TrimSpace(err.Error()),
+				strings.TrimSpace(redact.ErrorText(err)),
 			),
 			reportDiagnosticContextFromError(wrappedErr),
 		)
@@ -250,7 +251,7 @@ func (s *reportService) readAvailableCache(request reportmodel.ReportRequest) (
 			ReportFailureUnsupportedReportCalculation,
 			fmt.Sprintf(
 				"Could not generate the report request: %s. Choose one of the available report years: %s.",
-				strings.TrimSpace(err.Error()),
+				strings.TrimSpace(redact.ErrorText(err)),
 				joinAvailableYears(cache.AvailableReportYears),
 			),
 		), false
@@ -302,7 +303,7 @@ func (s *reportService) reportFailureOutcome(
 // reportCalculationFailureMessage formats one actionable calculation failure.
 // Authored by: OpenCode
 func (s *reportService) reportCalculationFailureMessage(request reportmodel.ReportRequest, err error) string {
-	var detail = strings.TrimSpace(err.Error())
+	var detail = strings.TrimSpace(redact.ErrorText(err))
 	var conversionContext = s.reportConversionFailureContext(err)
 	if conversionContext != "" {
 		detail += "\n\n" + conversionContext

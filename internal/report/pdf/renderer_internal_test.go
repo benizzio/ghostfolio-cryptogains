@@ -119,7 +119,11 @@ func TestTableLayoutUsesPrintableWidthSpacingAndRowPreflight(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("add preflighted table: %v", err)
 	}
-	var text = string(preflightDocument.Bytes())
+	var payload, err = preflightDocument.Bytes()
+	if err != nil {
+		t.Fatalf("finalize preflighted PDF: %v", err)
+	}
+	var text = string(payload)
 	if strings.Contains(text, "Audit table (continued)") || strings.Contains(text, "CONTINUED:") {
 		t.Fatalf("table moved before its first row emitted continuation context: %q", text)
 	}
@@ -162,7 +166,10 @@ func TestContinuedTableRepeatsContextAndHeader(t *testing.T) {
 		t.Fatalf("add continued table: %v", err)
 	}
 
-	var payload = document.Bytes()
+	var payload, err = document.Bytes()
+	if err != nil {
+		t.Fatalf("finalize continued PDF: %v", err)
+	}
 	if !bytes.HasPrefix(payload, []byte("%PDF-")) {
 		t.Fatalf("expected valid PDF payload, got %q", payload)
 	}
@@ -185,7 +192,12 @@ func TestTableContinuationAndWrappedCellLayout(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("add wrapped-cell table: %v", err)
 	}
-	var wrappedInspection, err = testutil.InspectGeneratedPDF(wrappedDocument.Bytes())
+	var wrappedPayload, err = wrappedDocument.Bytes()
+	if err != nil {
+		t.Fatalf("finalize wrapped-cell PDF: %v", err)
+	}
+	var wrappedInspection testutil.GeneratedPDF
+	wrappedInspection, err = testutil.InspectGeneratedPDF(wrappedPayload)
 	if err != nil {
 		t.Fatalf("inspect wrapped-cell PDF: %v", err)
 	}
@@ -217,7 +229,12 @@ func TestTableContinuationAndWrappedCellLayout(t *testing.T) {
 		t.Fatalf("add continued table: %v", err)
 	}
 	var continuedInspection testutil.GeneratedPDF
-	continuedInspection, err = testutil.InspectGeneratedPDF(continuedDocument.Bytes())
+	var continuedPayload []byte
+	continuedPayload, err = continuedDocument.Bytes()
+	if err != nil {
+		t.Fatalf("finalize continued-table PDF: %v", err)
+	}
+	continuedInspection, err = testutil.InspectGeneratedPDF(continuedPayload)
 	if err != nil {
 		t.Fatalf("inspect continued-table PDF: %v", err)
 	}
@@ -246,6 +263,375 @@ func TestTableContinuationAndWrappedCellLayout(t *testing.T) {
 	}
 	if continuedDocument.y > pageBottom {
 		t.Fatalf("continued table ended at %.0f, beyond bottom margin %.0f", continuedDocument.y, pageBottom)
+	}
+}
+
+// TestT028PDFTableMeasurementMatchesDrawingWrapAndExplicitNewlines verifies
+// explicit cell boundaries and indicator-sensitive space wrapping use the same
+// measured line count and height as the table drawing path.
+// Authored by: OpenCode
+func TestT028PDFTableMeasurementMatchesDrawingWrapAndExplicitNewlines(t *testing.T) {
+	var document = startedTestDocument(t)
+	var columns = printableWidthColumns([]pdfColumn{
+		{Header: "Entry", Width: 1, Align: "left"},
+		{Header: "Other", Width: 3, Align: "left"},
+	})
+	var width = columns[0].Width - 4
+	var breakOption = &gopdf.BreakOption{Mode: gopdf.BreakModeIndicatorSensitive, BreakIndicator: ' '}
+	var cases = []struct {
+		name string
+		text string
+	}{
+		{name: "explicit newline", text: "first logical line\nsecond logical line"},
+		{name: "long spaces", text: strings.Repeat("long space wrapped content ", 24)},
+	}
+
+	if err := document.pdf.SetFont(fontRegular, "", 6.5); err != nil {
+		t.Fatalf("set table font: %v", err)
+	}
+	for _, testCase := range cases {
+		var testCase = testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			var splitLines, err = document.pdf.SplitTextWithOption(testCase.text, width, breakOption)
+			if err != nil {
+				t.Fatalf("split table text: %v", err)
+			}
+			if len(splitLines) < 2 {
+				t.Fatalf("drawing split lines = %d, want at least 2 for %q", len(splitLines), testCase.text)
+			}
+			var expectedText = strings.Join(splitLines, "\n")
+			var fits bool
+			var expectedHeight float64
+			fits, expectedHeight, err = document.pdf.IsFitMultiCellWithNewline(&gopdf.Rect{W: width, H: pageBottom - pageMargin}, expectedText)
+			if err != nil {
+				t.Fatalf("measure drawing lines: %v", err)
+			}
+			if !fits {
+				t.Fatalf("drawing lines do not fit the test rectangle")
+			}
+
+			var measuredHeight float64
+			var measured bool
+			measuredHeight, measured, err = document.tableCellHeight(columns, 0, testCase.text)
+			if err != nil {
+				t.Fatalf("measure table cell: %v", err)
+			}
+			if !measured {
+				t.Fatal("table cell was not measured")
+			}
+			if measuredHeight != expectedHeight+4 {
+				t.Fatalf("measured row cell height = %.2f, want drawing height %.2f plus padding", measuredHeight, expectedHeight+4)
+			}
+		})
+	}
+}
+
+// TestT028PDFTableDrawnLinesMatchMeasuredRowHeightAndBottomMargin verifies
+// explicit PDF cell lines appear as distinct drawn runs and remain within the
+// printable bottom margin after the row's measured height is applied.
+// Authored by: OpenCode
+func TestT028PDFTableDrawnLinesMatchMeasuredRowHeightAndBottomMargin(t *testing.T) {
+	var document = startedTestDocument(t)
+	if err := document.pdf.SetFont(fontRegular, "", 6.5); err != nil {
+		t.Fatalf("set table font: %v", err)
+	}
+	var cell = "ROW-LINE-ONE\nROW-LINE-TWO\nROW-LINE-THREE"
+	var table = pdfTable{
+		Columns: []pdfColumn{{Header: "Entry", Width: 1, Align: "left"}},
+		Rows:    [][]string{{cell}},
+	}
+	var columns = printableWidthColumns(table.Columns)
+	var splitLines, err = document.pdf.SplitTextWithOption(cell, columns[0].Width-4, &gopdf.BreakOption{Mode: gopdf.BreakModeIndicatorSensitive, BreakIndicator: ' '})
+	if err != nil {
+		t.Fatalf("split table cell: %v", err)
+	}
+	if len(splitLines) != 3 {
+		t.Fatalf("drawn line count = %d, want 3", len(splitLines))
+	}
+	var measuredRowHeight float64
+	measuredRowHeight, err = document.tableRowHeight(columns, table.Rows, 24)
+	if err != nil {
+		t.Fatalf("measure table row: %v", err)
+	}
+	var expectedCellHeight float64
+	_, expectedCellHeight, err = document.pdf.IsFitMultiCellWithNewline(&gopdf.Rect{W: columns[0].Width - 4, H: pageBottom - pageMargin}, strings.Join(splitLines, "\n"))
+	if err != nil {
+		t.Fatalf("measure expected table cell: %v", err)
+	}
+	var expectedRowHeight = expectedCellHeight + 4
+	if expectedRowHeight < 24 {
+		expectedRowHeight = 24
+	}
+	if measuredRowHeight != expectedRowHeight {
+		t.Fatalf("measured row height = %.2f, want %.2f", measuredRowHeight, expectedRowHeight)
+	}
+	if err := document.AddTable(table); err != nil {
+		t.Fatalf("draw multiline table: %v", err)
+	}
+	if document.y > pageBottom {
+		t.Fatalf("multiline table ended at %.2f, beyond bottom margin %.2f", document.y, pageBottom)
+	}
+	var payload []byte
+	payload, err = document.Bytes()
+	if err != nil {
+		t.Fatalf("finalize multiline table: %v", err)
+	}
+	var inspection testutil.GeneratedPDF
+	inspection, err = testutil.InspectGeneratedPDF(payload)
+	if err != nil {
+		t.Fatalf("inspect multiline table: %v", err)
+	}
+	var drawnLines int
+	for _, run := range inspection.TextRuns {
+		if strings.Contains(run.Text, "ROW-LINE-") {
+			drawnLines++
+		}
+	}
+	if drawnLines != len(splitLines) {
+		t.Fatalf("drawn line count = %d, want measured line count %d", drawnLines, len(splitLines))
+	}
+}
+
+// TestT028PDFFreshPagePreflightMovesWholeRowWithoutContinuationLabel verifies
+// a table-start row moves before drawing when only the remaining page is too
+// small, without pretending that the table already continued.
+// Authored by: OpenCode
+func TestT028PDFFreshPagePreflightMovesWholeRowWithoutContinuationLabel(t *testing.T) {
+	var document = startedTestDocument(t)
+	document.y = pageBottom - 90
+	var table = pdfTable{
+		ContinuationTitle: "Fresh relocation (continued)",
+		Columns:           []pdfColumn{{Header: "Entry", Width: 1, Align: "left"}},
+		Rows:              [][]string{{"FRESH-ONE\nFRESH-TWO\nFRESH-THREE\nFRESH-FOUR"}},
+	}
+	if err := document.AddTable(table); err != nil {
+		t.Fatalf("preflight fresh-page row: %v", err)
+	}
+	var payload, err = document.Bytes()
+	if err != nil {
+		t.Fatalf("finalize fresh-page table: %v", err)
+	}
+	var inspection testutil.GeneratedPDF
+	inspection, err = testutil.InspectGeneratedPDF(payload)
+	if err != nil {
+		t.Fatalf("inspect fresh-page table: %v", err)
+	}
+	if len(inspection.PageBoxes) != 2 {
+		t.Fatalf("fresh-page preflight pages = %d, want 2", len(inspection.PageBoxes))
+	}
+	if inspection.ContainsSearchableText(table.ContinuationTitle) {
+		t.Fatalf("table-start relocation emitted continuation label: %q", inspection.SearchableText)
+	}
+	for _, rowLine := range []string{"FRESH-ONE", "FRESH-TWO", "FRESH-THREE", "FRESH-FOUR"} {
+		if !inspection.ContainsSearchableText(rowLine) {
+			t.Fatalf("whole row line %q was not drawn", rowLine)
+		}
+	}
+	if document.y > pageBottom {
+		t.Fatalf("fresh-page table ended at %.2f, beyond bottom margin %.2f", document.y, pageBottom)
+	}
+}
+
+// TestT028PDFContinuationRepeatsContextAndHeaderAfterWholeRows verifies actual
+// continuation pages repeat the context and header while keeping complete rows.
+// Authored by: OpenCode
+func TestT028PDFContinuationRepeatsContextAndHeaderAfterWholeRows(t *testing.T) {
+	var previousTextWriter = writeTextForGopdfDocument
+	var contexts []string
+	writeTextForGopdfDocument = func(document *gopdfDocument, text string) error {
+		contexts = append(contexts, text)
+		return previousTextWriter(document, text)
+	}
+	defer func() { writeTextForGopdfDocument = previousTextWriter }()
+
+	var document = startedTestDocument(t)
+	var table = pdfTable{
+		ContinuationTitle: "Whole-row table (continued)",
+		Columns:           []pdfColumn{{Header: "Entry", Width: 1, Align: "left"}},
+		Rows: [][]string{
+			{"WHOLE-ROW-ONE\nONE-CONTINUATION"},
+			{"WHOLE-ROW-TWO\nTWO-CONTINUATION"},
+			{"WHOLE-ROW-THREE\nTHREE-CONTINUATION"},
+		},
+		RowHeight: 200,
+	}
+	if err := document.AddTable(table); err != nil {
+		t.Fatalf("draw continued whole-row table: %v", err)
+	}
+	var payload, err = document.Bytes()
+	if err != nil {
+		t.Fatalf("finalize continued whole-row table: %v", err)
+	}
+	var inspection testutil.GeneratedPDF
+	inspection, err = testutil.InspectGeneratedPDF(payload)
+	if err != nil {
+		t.Fatalf("inspect continued whole-row table: %v", err)
+	}
+	if len(inspection.PageBoxes) != 3 {
+		t.Fatalf("continued whole-row pages = %d, want 3", len(inspection.PageBoxes))
+	}
+	if len(contexts) != 2 {
+		t.Fatalf("continuation context count = %d, want 2", len(contexts))
+	}
+	for _, context := range contexts {
+		if context != table.ContinuationTitle {
+			t.Fatalf("continuation context = %q, want %q", context, table.ContinuationTitle)
+		}
+	}
+	var headerCount int
+	for _, run := range inspection.TextRuns {
+		if strings.Contains(strings.ToUpper(run.Text), "ENTRY") {
+			headerCount++
+		}
+	}
+	if headerCount < len(inspection.PageBoxes) {
+		t.Fatalf("header run count = %d, want at least %d", headerCount, len(inspection.PageBoxes))
+	}
+	for _, rowLine := range []string{"WHOLE-ROW-ONE", "ONE-CONTINUATION", "WHOLE-ROW-TWO", "TWO-CONTINUATION", "WHOLE-ROW-THREE", "THREE-CONTINUATION"} {
+		if !inspection.ContainsSearchableText(rowLine) {
+			t.Fatalf("continued row line %q was not searchable", rowLine)
+		}
+	}
+}
+
+// TestT028PDFOverheightNewlineRowFailsBeforeFinalization verifies an explicit
+// newline row that cannot fit a fresh page fails before drawing or finalizing.
+// Authored by: OpenCode
+func TestT028PDFOverheightNewlineRowFailsBeforeFinalization(t *testing.T) {
+	var document = startedTestDocument(t)
+	var previousDrawer = drawTableForGopdfDocument
+	var drawCalls int
+	drawTableForGopdfDocument = func(table gopdf.TableLayout) error {
+		drawCalls++
+		return previousDrawer(table)
+	}
+	defer func() { drawTableForGopdfDocument = previousDrawer }()
+	var overheight = strings.TrimSuffix(strings.Repeat("OVERHEIGHT\n", 100), "\n")
+	var err = document.AddTable(pdfTable{
+		Columns: []pdfColumn{{Header: "Entry", Width: 1, Align: "left"}},
+		Rows:    [][]string{{overheight}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "does not fit within the printable page area") {
+		t.Errorf("overheight error = %v, want printable-area failure", err)
+	}
+	if drawCalls != 0 {
+		t.Errorf("overheight draw calls = %d, want zero before finalization", drawCalls)
+	}
+
+	var previousDocument = newPDFDocumentForRenderer
+	defer func() { newPDFDocumentForRenderer = previousDocument }()
+	var finalizationDocument = &failingLayoutDocument{tableErr: errors.New("table row 1 does not fit within the printable page area")}
+	newPDFDocumentForRenderer = func() pdfLayoutDocument { return finalizationDocument }
+	var renderer, rendererErr = NewRenderer(RenderOptions{Fonts: FontData{Regular: []byte("regular"), Bold: []byte("bold")}})
+	if rendererErr != nil {
+		t.Fatalf("new renderer: %v", rendererErr)
+	}
+	var payload []byte
+	payload, rendererErr = renderer.Render(pdfPresentationReportFixture(t))
+	if rendererErr == nil || !strings.Contains(rendererErr.Error(), "does not fit within the printable page area") {
+		t.Fatalf("renderer overheight error = %v, want printable-area failure", rendererErr)
+	}
+	if payload != nil {
+		t.Fatalf("renderer payload = %q, want nil after overheight failure", payload)
+	}
+	if finalizationDocument.bytesCalls != 0 {
+		t.Fatalf("finalization calls = %d, want zero after overheight failure", finalizationDocument.bytesCalls)
+	}
+}
+
+// TestT028PDFTableMeasurementAndDrawingErrorsIncludeStageAndRow verifies table
+// failures identify whether measurement or drawing failed and which row failed.
+// Authored by: OpenCode
+func TestT028PDFTableMeasurementAndDrawingErrorsIncludeStageAndRow(t *testing.T) {
+	var previousMeasurer = measureTableCellForGopdfDocument
+	var previousDrawer = drawTableForGopdfDocument
+	defer func() {
+		measureTableCellForGopdfDocument = previousMeasurer
+		drawTableForGopdfDocument = previousDrawer
+	}()
+
+	measureTableCellForGopdfDocument = func(*gopdfDocument, *gopdf.Rect, string) (bool, float64, error) {
+		return false, 0, errors.New("synthetic measurement failure")
+	}
+	var measurementErr = startedTestDocument(t).AddTable(pdfTable{
+		Title:   "Measurement stage",
+		Columns: []pdfColumn{{Header: "Entry", Width: 1, Align: "left"}},
+		Rows:    [][]string{{"MEASURE-ROW"}},
+	})
+	if measurementErr == nil || !strings.Contains(measurementErr.Error(), "measurement") || !strings.Contains(measurementErr.Error(), "row") {
+		t.Errorf("measurement error = %v, want measurement and row context", measurementErr)
+	}
+
+	measureTableCellForGopdfDocument = previousMeasurer
+	drawTableForGopdfDocument = func(gopdf.TableLayout) error { return errors.New("synthetic drawing failure") }
+	var drawingErr = startedTestDocument(t).AddTable(pdfTable{
+		Title:   "Drawing stage",
+		Columns: []pdfColumn{{Header: "Entry", Width: 1, Align: "left"}},
+		Rows:    [][]string{{"DRAW-ROW"}},
+	})
+	if drawingErr == nil || !strings.Contains(drawingErr.Error(), "drawing") || !strings.Contains(drawingErr.Error(), "row") {
+		t.Errorf("drawing error = %v, want drawing and row context", drawingErr)
+	}
+}
+
+// TestT028PDFControlledNewlinesDoNotWeakenGenericSanitization verifies only
+// renderer-controlled cell boundaries survive while arbitrary PDF text remains
+// single-line and delimiter-safe.
+// Authored by: OpenCode
+func TestT028PDFControlledNewlinesDoNotWeakenGenericSanitization(t *testing.T) {
+	var dynamic = "dynamic\nlabel|delimiter"
+	if got := sanitizeText(dynamic); got != "dynamic label/delimiter" {
+		t.Fatalf("generic sanitized text = %q, want single-line delimiter-safe text", got)
+	}
+
+	var genericDocument = startedTestDocument(t)
+	if err := genericDocument.AddParagraph(dynamic); err != nil {
+		t.Fatalf("draw generic text: %v", err)
+	}
+	var genericPayload, err = genericDocument.Bytes()
+	if err != nil {
+		t.Fatalf("finalize generic text: %v", err)
+	}
+	var genericInspection testutil.GeneratedPDF
+	genericInspection, err = testutil.InspectGeneratedPDF(genericPayload)
+	if err != nil {
+		t.Fatalf("inspect generic text: %v", err)
+	}
+	for _, run := range genericInspection.TextRuns {
+		if strings.Contains(run.Text, "dynamic") && strings.Contains(run.Text, "|") {
+			t.Fatalf("generic text retained delimiter: %q", run.Text)
+		}
+	}
+
+	var controlledDocument = startedTestDocument(t)
+	var controlledCell = "CONTROLLED-ONE|delimiter\nCONTROLLED-TWO"
+	if err := controlledDocument.AddTable(pdfTable{
+		Columns: []pdfColumn{{Header: "Entry", Width: 1, Align: "left"}},
+		Rows:    [][]string{{controlledCell}},
+	}); err != nil {
+		t.Fatalf("draw controlled cell: %v", err)
+	}
+	var controlledPayload []byte
+	controlledPayload, err = controlledDocument.Bytes()
+	if err != nil {
+		t.Fatalf("finalize controlled cell: %v", err)
+	}
+	var controlledInspection testutil.GeneratedPDF
+	controlledInspection, err = testutil.InspectGeneratedPDF(controlledPayload)
+	if err != nil {
+		t.Fatalf("inspect controlled cell: %v", err)
+	}
+	var controlledRuns int
+	for _, run := range controlledInspection.TextRuns {
+		if strings.Contains(run.Text, "CONTROLLED-") {
+			controlledRuns++
+			if strings.Contains(run.Text, "|") {
+				t.Fatalf("controlled cell retained delimiter: %q", run.Text)
+			}
+		}
+	}
+	if controlledRuns != 2 {
+		t.Fatalf("controlled cell line runs = %d, want 2", controlledRuns)
 	}
 }
 
@@ -341,6 +727,248 @@ func TestRenderAnnexUsesStructuredLayoutPrimitives(t *testing.T) {
 	assertNoMarkdownStructuralSyntax(t, recorder.allText())
 }
 
+// TestRenderMainReportRecordsWarningBetweenMetadataAndSummary verifies the PDF
+// main-report operation order around the legal-use warning.
+// Authored by: OpenCode
+func TestRenderMainReportRecordsWarningBetweenMetadataAndSummary(t *testing.T) {
+	var recorder = &layoutRecorder{}
+	if err := renderMainReport(recorder, minimalPDFReportFixture(t)); err != nil {
+		t.Fatalf("render main report: %v", err)
+	}
+
+	var currencyIndex = findLayoutOperation(recorder.operations, "key-value", "Report Calculation Currency", "")
+	var warningIndex = findLayoutOperation(recorder.operations, "bold-wrapped-paragraph", "", testutil.ReportPresentationLegalWarningText)
+	var summaryIndex = findLayoutOperation(recorder.operations, "section-heading", "", "Gains-And-Losses Summary")
+	if currencyIndex < 0 || warningIndex < 0 || summaryIndex < 0 {
+		t.Fatalf("metadata, warning, or summary operation is missing: %#v", recorder.operations)
+	}
+	if warningIndex != currencyIndex+1 {
+		t.Fatalf("warning operation index = %d, want immediately after currency index %d: %#v", warningIndex, currencyIndex, recorder.operations)
+	}
+	if summaryIndex != warningIndex+1 {
+		t.Fatalf("summary operation index = %d, want immediately after warning index %d: %#v", summaryIndex, warningIndex, recorder.operations)
+	}
+}
+
+// TestRenderMainReportUsesDedicatedFullyBoldWrappedWarning verifies the warning
+// is represented by one exact, fully bold, wrapped paragraph operation.
+// Authored by: OpenCode
+func TestRenderMainReportUsesDedicatedFullyBoldWrappedWarning(t *testing.T) {
+	var recorder = &layoutRecorder{}
+	if err := renderMainReport(recorder, minimalPDFReportFixture(t)); err != nil {
+		t.Fatalf("render main report: %v", err)
+	}
+
+	var warningOperations []pdfLayoutOperation
+	for _, operation := range recorder.operations {
+		if operation.kind == "bold-wrapped-paragraph" {
+			warningOperations = append(warningOperations, operation)
+		}
+	}
+	if len(warningOperations) != 1 {
+		t.Fatalf("bold wrapped warning operations = %#v, want one exact operation", warningOperations)
+	}
+	var warning = warningOperations[0]
+	if warning.text != testutil.ReportPresentationLegalWarningText {
+		t.Fatalf("warning text = %q, want %q", warning.text, testutil.ReportPresentationLegalWarningText)
+	}
+	if !warning.fullyBold || !warning.wrapped {
+		t.Fatalf("warning operation style = %#v, want fully bold wrapped operation", warning)
+	}
+}
+
+// TestPDFRecorderRendersDirectFinancialMatrixValues verifies direct summary and
+// position values as exact semantic recorder values rather than flattened text.
+// Authored by: OpenCode
+func TestPDFRecorderRendersDirectFinancialMatrixValues(t *testing.T) {
+	var report = minimalPDFReportFixture(t)
+	report.SummaryEntries = []reportmodel.AssetSummaryEntry{
+		{AssetIdentityKey: "direct-positive", DisplayLabel: "DIRECT POSITIVE", NetGainOrLoss: *apd.New(1005, -3), ReportCalculationCurrency: "USD"},
+		{AssetIdentityKey: "direct-negative", DisplayLabel: "DIRECT NEGATIVE", NetGainOrLoss: *apd.New(-1005, -3), ReportCalculationCurrency: "USD"},
+	}
+	report.YearlyNetTotal = *apd.New(9995, -3)
+	report.DetailSections = []reportmodel.AssetDetailSection{
+		{
+			AssetIdentityKey:    "historical-direct",
+			DisplayLabel:        "HISTORICAL",
+			ClosingQuantity:     *apd.New(1, -1),
+			ClosingCostBasis:    *apd.New(1004, -3),
+			CalculationCurrency: "USD",
+		},
+		{
+			AssetIdentityKey:    "active-direct",
+			DisplayLabel:        "ACTIVE",
+			OpeningQuantity:     *apd.New(1000, -4),
+			OpeningCostBasis:    *apd.New(1005, -3),
+			ClosingQuantity:     *apd.New(1, -8),
+			ClosingCostBasis:    *apd.New(9995, -3),
+			CalculationCurrency: "USD",
+			ActivityRows: []reportmodel.AssetActivityRow{{
+				SourceID:            "direct-activity",
+				OccurredAt:          time.Date(2024, time.January, 2, 10, 0, 0, 0, time.UTC),
+				ActivityType:        reportmodel.ActivityTypeBuy,
+				Quantity:            *apd.New(1, 0),
+				BasisAfterRow:       *apd.New(0, 0),
+				CalculationCurrency: "USD",
+				QuantityAfterRow:    *apd.New(1, 0),
+			}},
+		},
+	}
+
+	var recorder = &layoutRecorder{}
+	if err := renderMainReport(recorder, report); err != nil {
+		t.Fatalf("render main report: %v", err)
+	}
+
+	assertTableCellAt(t, recorder, "Gains-And-Losses Summary Table", 0, "DIRECT POSITIVE", 1, "1.01")
+	assertTableCellAt(t, recorder, "Gains-And-Losses Summary Table", 0, "DIRECT NEGATIVE", 1, "-1.01")
+	assertTableCellAt(t, recorder, "Gains-And-Losses Summary Table", 0, "Overall Yearly Net Total", 1, "10.00")
+	assertKeyValueOperation(t, recorder, "Cost Basis", "1.00")
+	assertKeyValueOperation(t, recorder, "Cost Basis", "1.01")
+	assertKeyValueOperation(t, recorder, "Cost Basis", "10.00")
+	assertKeyValueOperation(t, recorder, "Quantity", "0.1")
+	assertKeyValueOperation(t, recorder, "Quantity", "0.00000001")
+}
+
+// TestPDFRecorderRendersRowBuiltFinancialMatrixValues verifies exact financial
+// cells from activity, liquidation, Annex, and conversion row builders.
+// Authored by: OpenCode
+func TestPDFRecorderRendersRowBuiltFinancialMatrixValues(t *testing.T) {
+	var activity = reportmodel.AssetActivityRow{
+		SourceID:            "matrix-activity",
+		OccurredAt:          time.Date(2024, time.January, 2, 10, 0, 0, 0, time.UTC),
+		ActivityType:        reportmodel.ActivityTypeSell,
+		Quantity:            *apd.New(1000, -4),
+		UnitPrice:           apd.New(1005, -3),
+		GrossValue:          apd.New(1004, -3),
+		FeeAmount:           apd.New(9995, -3),
+		ActivityCurrency:    "USD",
+		BasisAfterRow:       *apd.New(1005, -3),
+		CalculationCurrency: "USD",
+		QuantityAfterRow:    *apd.New(1, -8),
+		ConversionStatus:    reportmodel.ConversionStatusSameCurrency,
+	}
+	var liquidation = reportmodel.LiquidationCalculation{
+		SourceID:               "matrix-liquidation",
+		OccurredAt:             activity.OccurredAt,
+		DisposedQuantity:       *apd.New(1000, -4),
+		AllocatedBasis:         *apd.New(1005, -3),
+		NetLiquidationProceeds: *apd.New(-1005, -3),
+		GainOrLoss:             *apd.New(-4, -3),
+		ActivityCurrency:       "USD",
+		CalculationCurrency:    "USD",
+	}
+
+	var recorder = &layoutRecorder{}
+	var section = reportmodel.AssetDetailSection{ActivityRows: []reportmodel.AssetActivityRow{activity}, LiquidationSummaries: []reportmodel.LiquidationCalculation{liquidation}}
+	if err := renderActivityRows(recorder, section); err != nil {
+		t.Fatalf("render activity rows: %v", err)
+	}
+	if err := renderLiquidationRows(recorder, section, "USD"); err != nil {
+		t.Fatalf("render liquidation rows: %v", err)
+	}
+
+	var annexReport = pdfAnnexReportFixture(t)
+	var annexEntry = annexReport.AuditAnnex.PerAssetAuditSections[0].Entries[0]
+	annexEntry.UnitPrice = apd.New(1005, -3)
+	annexEntry.GrossValue = apd.New(1004, -3)
+	annexEntry.FeeAmount = apd.New(9995, -3)
+	annexEntry.Quantity = *apd.New(1000, -4)
+	annexEntry.QuantityAfterActivity = *apd.New(1, -8)
+	annexEntry.BasisAfterActivity = *apd.New(1005, -3)
+	annexEntry.AllocatedBasis = apd.New(1005, -3)
+	annexEntry.NetLiquidationProceeds = apd.New(-1005, -3)
+	annexEntry.GainOrLoss = apd.New(-4, -3)
+	annexReport.AuditAnnex.PerAssetAuditSections[0].Entries[0] = annexEntry
+
+	var conversion = pdfAnnexConversionEntry()
+	conversion.RateValue = *apd.New(169140, -4)
+	conversion.Amounts[0].AmountKind = reportmodel.ConvertedAmountKindUnitPrice
+	conversion.Amounts[0].OriginalAmount = *apd.New(1005, -3)
+	conversion.Amounts[0].ConvertedAmount = *apd.New(1004, -3)
+	conversion.Amounts[0].ExchangeRateEvidence.RateValue = conversion.RateValue
+	annexReport.AuditAnnex.ConversionAuditEntries = []reportmodel.ConversionAuditEntry{conversion}
+
+	var annexRecorder = &layoutRecorder{}
+	if err := renderAnnex(annexRecorder, annexReport.AuditAnnex); err != nil {
+		t.Fatalf("render annex: %v", err)
+	}
+
+	assertTableCellAt(t, recorder, "In-Year Activity", 1, "matrix-activity", 3, "0.1")
+	assertTableCellAt(t, recorder, "In-Year Activity", 1, "matrix-activity", 4, "1.01")
+	assertTableCellAt(t, recorder, "In-Year Activity", 1, "matrix-activity", 5, "1.00")
+	assertTableCellAt(t, recorder, "In-Year Activity", 1, "matrix-activity", 6, "10.00")
+	assertTableCellAt(t, recorder, "In-Year Activity", 1, "matrix-activity", 7, "0.00000001")
+	assertTableCellAt(t, recorder, "In-Year Activity", 1, "matrix-activity", 8, "1.01")
+	assertTableCellAt(t, recorder, "Liquidation Calculations", 1, "matrix-liquidation", 2, "0.1")
+	assertTableCellAt(t, recorder, "Liquidation Calculations", 1, "matrix-liquidation", 3, "1.01")
+	assertTableCellAt(t, recorder, "Liquidation Calculations", 1, "matrix-liquidation", 4, "-1.01")
+	assertTableCellAt(t, recorder, "Liquidation Calculations", 1, "matrix-liquidation", 5, "0.00")
+
+	assertTableCellAt(t, annexRecorder, "Per-Asset Audit Activity", 1, "pdf-annex-sell", 3, "0.1")
+	assertTableCellAt(t, annexRecorder, "Per-Asset Audit Activity", 1, "pdf-annex-sell", 4, "1.01")
+	assertTableCellAt(t, annexRecorder, "Per-Asset Audit Activity", 1, "pdf-annex-sell", 5, "1.00")
+	assertTableCellAt(t, annexRecorder, "Per-Asset Audit Activity", 1, "pdf-annex-sell", 6, "10.00")
+	assertTableCellAt(t, annexRecorder, "Per-Asset Audit Activity", 1, "pdf-annex-sell", 9, "0.00000001")
+	assertTableCellAt(t, annexRecorder, "Per-Asset Audit Activity", 1, "pdf-annex-sell", 10, "1.01")
+	assertTableCellAt(t, annexRecorder, "Per-Asset Audit Activity", 1, "pdf-annex-sell", 12, "1.01")
+	assertTableCellAt(t, annexRecorder, "Per-Asset Audit Activity", 1, "pdf-annex-sell", 13, "-1.01")
+	assertTableCellAt(t, annexRecorder, "Per-Asset Audit Activity", 1, "pdf-annex-sell", 14, "0.00")
+	assertTableCellAt(t, annexRecorder, "Currency Conversion Audit Table", 1, "pdf-annex-sell", 6, "unit_price: 1.01 -> 1.00")
+	assertTableCellAt(t, annexRecorder, "Currency Conversion Audit Table", 1, "pdf-annex-sell", 8, "16.914")
+}
+
+// TestPDFRecorderPreservesCanonicalQuantitiesAndRates verifies presentation
+// leaves quantity and normalized rate representations outside the money policy.
+// Authored by: OpenCode
+func TestPDFRecorderPreservesCanonicalQuantitiesAndRates(t *testing.T) {
+	var quantity = *apd.New(1000, -4)
+	var quantityBefore = quantity
+	var activity = reportmodel.AssetActivityRow{
+		SourceID:            "canonical-activity",
+		OccurredAt:          time.Date(2024, time.January, 2, 10, 0, 0, 0, time.UTC),
+		ActivityType:        reportmodel.ActivityTypeBuy,
+		Quantity:            quantity,
+		BasisAfterRow:       *apd.New(0, 0),
+		CalculationCurrency: "USD",
+		QuantityAfterRow:    *apd.New(1, -8),
+	}
+	var activityRow, err = renderActivityRow(activity)
+	if err != nil {
+		t.Fatalf("render activity row: %v", err)
+	}
+	if activityRow[3] != "0.1" || activityRow[7] != "0.00000001" {
+		t.Fatalf("activity quantities = %q/%q, want canonical values", activityRow[3], activityRow[7])
+	}
+	if quantity.Cmp(&quantityBefore) != 0 {
+		t.Fatalf("activity quantity changed from %s to %s", quantityBefore.String(), quantity.String())
+	}
+
+	var conversion = pdfAnnexConversionEntry()
+	conversion.RateValue = *apd.New(169140, -4)
+	conversion.Amounts[0].ExchangeRateEvidence.RateValue = conversion.RateValue
+	var rateBefore = conversion.RateValue
+	var conversionRow []string
+	conversionRow, err = renderConversionAuditRow(0, conversion)
+	if err != nil {
+		t.Fatalf("render conversion row: %v", err)
+	}
+	if conversionRow[8] != "16.914" {
+		t.Fatalf("rate value = %q, want canonical 16.914", conversionRow[8])
+	}
+	if conversion.RateValue.Cmp(&rateBefore) != 0 || conversion.Amounts[0].ExchangeRateEvidence.RateValue.Cmp(&rateBefore) != 0 {
+		t.Fatalf("conversion rate changed from %s to %s", rateBefore.String(), conversion.RateValue.String())
+	}
+}
+
+// TestRenderMainReportPropagatesBoldWarningLayoutError verifies the dedicated
+// warning operation does not swallow a layout-seam failure.
+// Authored by: OpenCode
+func TestRenderMainReportPropagatesBoldWarningLayoutError(t *testing.T) {
+	var recorder = &errorLayoutRecorder{failBoldParagraph: true}
+	assertErrorContains(t, func() error { return renderMainReport(recorder, minimalPDFReportFixture(t)) }, "bold warning failed")
+}
+
 // TestRendererRenderValidationAndSuccessBranches verifies the exported render
 // boundary rejects invalid inputs and returns a PDF payload with extracted text.
 // Authored by: OpenCode
@@ -380,6 +1008,69 @@ func TestRendererRenderValidationAndSuccessBranches(t *testing.T) {
 	_, err = renderer.Render(minimalPDFReportFixture(t))
 	if err == nil || !strings.Contains(err.Error(), "load regular font") {
 		t.Fatalf("expected render to wrap concrete font-load failure, got %v", err)
+	}
+}
+
+// TestGopdfDocumentBytesReturnsPayloadAndNoError verifies successful PDF byte
+// finalization through the concrete adapter.
+// Authored by: OpenCode
+func TestGopdfDocumentBytesReturnsPayloadAndNoError(t *testing.T) {
+	var document = startedTestDocument(t)
+
+	var payload, err = document.Bytes()
+	if err != nil {
+		t.Fatalf("finalize PDF: %v", err)
+	}
+	if !bytes.HasPrefix(payload, []byte("%PDF-")) {
+		t.Fatalf("expected valid PDF payload, got %q", payload)
+	}
+
+	var previousFinalize = finalizeGopdfDocument
+	t.Cleanup(func() { finalizeGopdfDocument = previousFinalize })
+	finalizeGopdfDocument = func(*gopdfDocument) ([]byte, error) {
+		return []byte("partial"), errors.New("synthetic byte finalization failure")
+	}
+	if failedPayload, finalizeErr := document.Bytes(); finalizeErr == nil || failedPayload != nil {
+		t.Fatalf("failed finalization returned payload=%q error=%v", failedPayload, finalizeErr)
+	}
+}
+
+// TestRendererFinalizationFailureReturnsNormallyWithoutPartialPayload verifies
+// that injected finalization errors discard partial bytes and return normally.
+// Authored by: OpenCode
+func TestRendererFinalizationFailureReturnsNormallyWithoutPartialPayload(t *testing.T) {
+	var previousDocument = newPDFDocumentForRenderer
+	defer func() { newPDFDocumentForRenderer = previousDocument }()
+
+	var finalizationErr = errors.New("synthetic PDF finalization failure")
+	var document = &failingLayoutDocument{
+		bytesPayload: []byte("%PDF-partial"),
+		bytesErr:     finalizationErr,
+	}
+	newPDFDocumentForRenderer = func() pdfLayoutDocument { return document }
+
+	var renderer, rendererErr = NewRenderer(RenderOptions{Fonts: FontData{Regular: []byte("regular"), Bold: []byte("bold")}})
+	if rendererErr != nil {
+		t.Fatalf("new renderer: %v", rendererErr)
+	}
+
+	var payload []byte
+	payload, rendererErr = renderer.Render(minimalPDFReportFixture(t))
+	if rendererErr == nil {
+		t.Fatal("expected PDF finalization to return an error")
+	}
+	var errorText = strings.ToLower(rendererErr.Error())
+	if !strings.Contains(errorText, "pdf") || !strings.Contains(errorText, "finaliz") {
+		t.Fatalf("finalization error = %v, want PDF finalization context", rendererErr)
+	}
+	if !errors.Is(rendererErr, finalizationErr) {
+		t.Fatalf("finalization error = %v, want injected cause %v", rendererErr, finalizationErr)
+	}
+	if payload != nil {
+		t.Fatalf("payload = %q, want nil after failed finalization", payload)
+	}
+	if document.bytesCalls != 1 {
+		t.Fatalf("finalization calls = %d, want one completed render attempt", document.bytesCalls)
 	}
 }
 
@@ -566,8 +1257,8 @@ func TestPDFFormattingHelperErrorBranches(t *testing.T) {
 	var zeroAmount = pdfAnnexConversionEntry().Amounts[0]
 	zeroAmount.OriginalAmount = *apd.New(0, 0)
 	zeroAmount.ConvertedAmount = *apd.New(0, 0)
-	if rendered, err := presentation.ConvertedAmounts(0, []reportmodel.ConvertedActivityAmount{zeroAmount}); err != nil || rendered != "" {
-		t.Fatalf("zero converted amounts = %q, %v; want empty nil", rendered, err)
+	if rendered, err := presentation.ConvertedAmounts(0, []reportmodel.ConvertedActivityAmount{zeroAmount}); err != nil || len(rendered) != 0 {
+		t.Fatalf("zero converted amounts = %#v, %v; want empty nil", rendered, err)
 	}
 }
 
@@ -784,6 +1475,25 @@ func TestRemainingRendererErrorBranches(t *testing.T) {
 	}, "rate value")
 }
 
+// TestRemainingMainReportErrorBranches verifies empty-state and position
+// currency failures that require the exact downstream layout operation.
+// Authored by: OpenCode
+func TestRemainingMainReportErrorBranches(t *testing.T) {
+	var zeroReport = minimalPDFReportFixture(t)
+	assertErrorContains(t, func() error {
+		return renderSummarySection(&errorLayoutRecorder{failKey: "Overall Yearly Net Total"}, zeroReport, "USD")
+	}, "key failed")
+	assertErrorContains(t, func() error {
+		return renderRateSourceSection(&errorLayoutRecorder{failParagraph: true}, zeroReport)
+	}, "paragraph failed")
+	assertErrorContains(t, func() error {
+		return renderReferenceSection(&errorLayoutRecorder{failParagraph: true}, zeroReport)
+	}, "paragraph failed")
+	assertErrorContains(t, func() error {
+		return renderPositionBlock(&errorLayoutRecorder{failKey: "Calculation Currency"}, "Position", *apd.New(1, 0), *apd.New(1, 0), "USD", "USD")
+	}, "key failed")
+}
+
 // TestGopdfDocumentLayoutBranches verifies concrete adapter guards and layout
 // failure seams that do not require full runtime generation.
 // Authored by: OpenCode
@@ -836,7 +1546,10 @@ func TestGopdfDocumentLayoutBranches(t *testing.T) {
 		t.Fatalf("page break: %v", err)
 	}
 	startedDocument.addPage()
-	var payload = startedDocument.Bytes()
+	var payload, err = startedDocument.Bytes()
+	if err != nil {
+		t.Fatalf("finalize PDF: %v", err)
+	}
 	if !bytes.HasPrefix(payload, []byte("%PDF-")) {
 		t.Fatalf("expected PDF bytes, got %q", payload)
 	}
@@ -973,6 +1686,137 @@ func TestGopdfDocumentTableSizingFailureBranches(t *testing.T) {
 	}, "table cell does not fit within the printable page area")
 }
 
+// TestGopdfDocumentBoldParagraphGuardBranches verifies bold paragraph startup,
+// font, fit, and drawing failures through the concrete adapter seams.
+// Authored by: OpenCode
+func TestGopdfDocumentBoldParagraphGuardBranches(t *testing.T) {
+	assertErrorContains(t, func() error {
+		return newGopdfDocument().AddBoldParagraph("not started")
+	}, "before adding content")
+
+	var noBoldDocument = newGopdfDocument()
+	if err := noBoldDocument.StartPDF(PageSizeA4); err != nil {
+		t.Fatalf("start no-bold document: %v", err)
+	}
+	assertErrorContains(t, func() error { return noBoldDocument.AddBoldParagraph("missing font") }, "font")
+
+	var tooTallDocument = startedTestDocument(t)
+	assertErrorContains(t, func() error {
+		return tooTallDocument.AddBoldParagraph(strings.Repeat("too tall bold paragraph ", 4000))
+	}, "does not fit within the printable page area")
+
+	var previousWriter = writeMultiCellForGopdfDocument
+	var previousFit = fitMultiCellForGopdfDocument
+	defer func() {
+		writeMultiCellForGopdfDocument = previousWriter
+		fitMultiCellForGopdfDocument = previousFit
+	}()
+	writeMultiCellForGopdfDocument = func(*gopdfDocument, *gopdf.Rect, string) error {
+		return errors.New("bold paragraph drawing failed")
+	}
+	assertErrorContains(t, func() error {
+		return startedTestDocument(t).AddBoldParagraph("draw failure")
+	}, "bold paragraph drawing failed")
+
+	fitMultiCellForGopdfDocument = func(*gopdfDocument, *gopdf.Rect, string) (bool, float64, error) {
+		return false, 0, errors.New("bold paragraph measurement failed")
+	}
+	assertErrorContains(t, func() error {
+		return startedTestDocument(t).AddBoldParagraph("measurement failure")
+	}, "bold paragraph measurement failed")
+}
+
+// TestGopdfDocumentBoldParagraphRechecksDocumentState verifies the measured
+// paragraph path still returns a startup error if a font callback invalidates
+// the document between measurement and drawing.
+// Authored by: OpenCode
+func TestGopdfDocumentBoldParagraphRechecksDocumentState(t *testing.T) {
+	var document = newGopdfDocument()
+	if err := document.StartPDF(PageSizeA4); err != nil {
+		t.Fatalf("start callback document: %v", err)
+	}
+	var option = gopdf.TtfOption{
+		OnGlyphNotFound:           func(rune) { document.started = false },
+		OnGlyphNotFoundSubstitute: gopdf.DefaultOnGlyphNotFoundSubstitute,
+	}
+	if err := document.pdf.AddTTFFontByReaderWithOption(fontRegular, bytes.NewReader(goregular.TTF), option); err != nil {
+		t.Fatalf("load callback regular font: %v", err)
+	}
+	if err := document.pdf.AddTTFFontByReaderWithOption(fontBold, bytes.NewReader(gobold.TTF), option); err != nil {
+		t.Fatalf("load callback bold font: %v", err)
+	}
+
+	assertErrorContains(t, func() error {
+		return document.AddBoldParagraph(string(rune(0x10ffff)))
+	}, "before adding content")
+}
+
+// TestGopdfTableMeasurementReturnsSplitErrors verifies the concrete measurement
+// seam returns invalid-width split failures instead of hiding them.
+// Authored by: OpenCode
+func TestGopdfTableMeasurementReturnsSplitErrors(t *testing.T) {
+	var document = startedTestDocument(t)
+	if err := document.pdf.SetFont(fontRegular, "", 6.5); err != nil {
+		t.Fatalf("set table font: %v", err)
+	}
+	var _, _, err = measureTableCellForGopdfDocument(document, &gopdf.Rect{W: contentWide, H: pageBottom - pageMargin}, "")
+	if err == nil {
+		t.Fatal("empty table measurement returned no error")
+	}
+}
+
+// TestGopdfDocumentTablePreflightEdgeBranches verifies fresh-page title
+// placement, relocation without continuation context, and an unfit fresh page.
+// Authored by: OpenCode
+func TestGopdfDocumentTablePreflightEdgeBranches(t *testing.T) {
+	var freshTitleDocument = startedTestDocument(t)
+	if err := freshTitleDocument.AddTable(pdfTable{
+		Title:   "Fresh table",
+		Columns: []pdfColumn{{Header: "Entry", Width: 100, Align: "left"}},
+		Rows:    [][]string{{"fresh"}},
+	}); err != nil {
+		t.Fatalf("add fresh titled table: %v", err)
+	}
+
+	var relocatedDocument = startedTestDocument(t)
+	relocatedDocument.y = pageBottom - 50
+	if err := relocatedDocument.AddTable(pdfTable{
+		Columns: []pdfColumn{{Header: "Entry", Width: 100, Align: "left"}},
+		Rows:    [][]string{{"relocated"}},
+	}); err != nil {
+		t.Fatalf("relocate table to fresh page: %v", err)
+	}
+
+	var continuationDocument = startedTestDocument(t)
+	if capacity := continuationDocument.tableRowCapacityAt(pageMargin, 0); capacity != 0 {
+		t.Fatalf("non-positive row capacity = %d, want zero", capacity)
+	}
+	if capacity := continuationDocument.tableRowCapacityAt(pageBottom, 24); capacity != 0 {
+		t.Fatalf("insufficient row capacity = %d, want zero", capacity)
+	}
+	assertErrorContains(t, func() error {
+		return continuationDocument.AddTable(pdfTable{
+			Columns:   []pdfColumn{{Header: "Entry", Width: 100, Align: "left"}},
+			Rows:      [][]string{{"first"}, {"second"}, {"third"}},
+			RowHeight: 240,
+		})
+	}, "fresh continuation page")
+
+	var previousWriter = writeTextForGopdfDocument
+	defer func() { writeTextForGopdfDocument = previousWriter }()
+	writeTextForGopdfDocument = func(document *gopdfDocument, text string) error {
+		document.y = pageBottom
+		return previousWriter(document, text)
+	}
+	assertErrorContains(t, func() error {
+		return startedTestDocument(t).AddTable(pdfTable{
+			Title:   "Capacity guard",
+			Columns: []pdfColumn{{Header: "Entry", Width: 100, Align: "left"}},
+			Rows:    [][]string{{"row"}},
+		})
+	}, "table row height")
+}
+
 // startedTestDocument creates one concrete document with valid fonts loaded.
 // Authored by: OpenCode
 func startedTestDocument(t *testing.T) *gopdfDocument {
@@ -999,28 +1843,33 @@ type layoutRecorder struct {
 	keyValues   map[string]string
 	paragraphs  []string
 	tables      []pdfTable
+	operations  []pdfLayoutOperation
 }
 
 // AddTitle records one title emitted by a renderer helper. Authored by: OpenCode
 func (recorder *layoutRecorder) AddTitle(text string) error {
+	recorder.operations = append(recorder.operations, pdfLayoutOperation{kind: "title", text: text})
 	recorder.titles = append(recorder.titles, text)
 	return nil
 }
 
 // AddSectionHeading records one section heading. Authored by: OpenCode
 func (recorder *layoutRecorder) AddSectionHeading(text string) error {
+	recorder.operations = append(recorder.operations, pdfLayoutOperation{kind: "section-heading", text: text})
 	recorder.sections = append(recorder.sections, text)
 	return nil
 }
 
 // AddSubsectionHeading records one subsection heading. Authored by: OpenCode
 func (recorder *layoutRecorder) AddSubsectionHeading(text string) error {
+	recorder.operations = append(recorder.operations, pdfLayoutOperation{kind: "subsection-heading", text: text})
 	recorder.subsections = append(recorder.subsections, text)
 	return nil
 }
 
 // AddKeyValue records one label/value presentation fact. Authored by: OpenCode
 func (recorder *layoutRecorder) AddKeyValue(label string, value string) error {
+	recorder.operations = append(recorder.operations, pdfLayoutOperation{kind: "key-value", label: label, text: value})
 	if recorder.keyValues == nil {
 		recorder.keyValues = make(map[string]string)
 	}
@@ -1030,14 +1879,34 @@ func (recorder *layoutRecorder) AddKeyValue(label string, value string) error {
 
 // AddParagraph records one paragraph emitted by a renderer helper. Authored by: OpenCode
 func (recorder *layoutRecorder) AddParagraph(text string) error {
+	recorder.operations = append(recorder.operations, pdfLayoutOperation{kind: "paragraph", text: text})
+	recorder.paragraphs = append(recorder.paragraphs, text)
+	return nil
+}
+
+// AddBoldParagraph records one fully bold wrapped paragraph operation. Authored by: OpenCode
+func (recorder *layoutRecorder) AddBoldParagraph(text string) error {
+	recorder.operations = append(recorder.operations, pdfLayoutOperation{kind: "bold-wrapped-paragraph", text: text, fullyBold: true, wrapped: true})
 	recorder.paragraphs = append(recorder.paragraphs, text)
 	return nil
 }
 
 // AddTable records one structured table emitted by a renderer helper. Authored by: OpenCode
 func (recorder *layoutRecorder) AddTable(table pdfTable) error {
+	recorder.operations = append(recorder.operations, pdfLayoutOperation{kind: "table", text: table.Title})
 	recorder.tables = append(recorder.tables, table)
 	return nil
+}
+
+// pdfLayoutOperation records one ordered renderer operation and its semantic
+// text or key/value payload.
+// Authored by: OpenCode
+type pdfLayoutOperation struct {
+	kind      string
+	label     string
+	text      string
+	fullyBold bool
+	wrapped   bool
 }
 
 // allText flattens recorded content for presentation assertions. Authored by: OpenCode
@@ -1068,6 +1937,10 @@ type failingLayoutDocument struct {
 	fontErr      error
 	titleErr     error
 	pageBreakErr error
+	tableErr     error
+	bytesPayload []byte
+	bytesErr     error
+	bytesCalls   int
 }
 
 func (document *failingLayoutDocument) StartPDF(string) error             { return document.startErr }
@@ -1077,9 +1950,18 @@ func (document *failingLayoutDocument) AddSectionHeading(string) error    { retu
 func (document *failingLayoutDocument) AddSubsectionHeading(string) error { return nil }
 func (document *failingLayoutDocument) AddKeyValue(string, string) error  { return nil }
 func (document *failingLayoutDocument) AddParagraph(string) error         { return nil }
-func (document *failingLayoutDocument) AddTable(pdfTable) error           { return nil }
-func (document *failingLayoutDocument) AddAnnexPageBreak() error          { return document.pageBreakErr }
-func (document *failingLayoutDocument) Bytes() []byte                     { return nil }
+
+// AddBoldParagraph satisfies the future warning layout seam. Authored by: OpenCode
+func (document *failingLayoutDocument) AddBoldParagraph(string) error { return nil }
+
+// AddTable returns an injected table failure for renderer finalization tests.
+// Authored by: OpenCode
+func (document *failingLayoutDocument) AddTable(pdfTable) error  { return document.tableErr }
+func (document *failingLayoutDocument) AddAnnexPageBreak() error { return document.pageBreakErr }
+func (document *failingLayoutDocument) Bytes() ([]byte, error) {
+	document.bytesCalls++
+	return append([]byte(nil), document.bytesPayload...), document.bytesErr
+}
 
 // secondTitleFailDocument fails only when Render starts the Annex title.
 // Authored by: OpenCode
@@ -1100,20 +1982,24 @@ func (document *secondTitleFailDocument) AddSectionHeading(string) error    { re
 func (document *secondTitleFailDocument) AddSubsectionHeading(string) error { return nil }
 func (document *secondTitleFailDocument) AddKeyValue(string, string) error  { return nil }
 func (document *secondTitleFailDocument) AddParagraph(string) error         { return nil }
-func (document *secondTitleFailDocument) AddTable(pdfTable) error           { return nil }
-func (document *secondTitleFailDocument) AddAnnexPageBreak() error          { return nil }
-func (document *secondTitleFailDocument) Bytes() []byte                     { return nil }
+
+// AddBoldParagraph satisfies the future warning layout seam. Authored by: OpenCode
+func (document *secondTitleFailDocument) AddBoldParagraph(string) error { return nil }
+func (document *secondTitleFailDocument) AddTable(pdfTable) error       { return nil }
+func (document *secondTitleFailDocument) AddAnnexPageBreak() error      { return nil }
+func (document *secondTitleFailDocument) Bytes() ([]byte, error)        { return nil, nil }
 
 // errorLayoutRecorder injects layout errors for direct renderer helper tests.
 // Authored by: OpenCode
 type errorLayoutRecorder struct {
 	layoutRecorder
-	failTitle      string
-	failSection    string
-	failSubsection string
-	failKey        string
-	failParagraph  bool
-	failTable      string
+	failTitle         string
+	failSection       string
+	failSubsection    string
+	failKey           string
+	failParagraph     bool
+	failBoldParagraph bool
+	failTable         string
 }
 
 func (recorder *errorLayoutRecorder) AddTitle(text string) error {
@@ -1149,6 +2035,14 @@ func (recorder *errorLayoutRecorder) AddParagraph(text string) error {
 		return errors.New("paragraph failed")
 	}
 	return recorder.layoutRecorder.AddParagraph(text)
+}
+
+// AddBoldParagraph injects the dedicated warning-operation failure. Authored by: OpenCode
+func (recorder *errorLayoutRecorder) AddBoldParagraph(text string) error {
+	if recorder.failBoldParagraph && text == testutil.ReportPresentationLegalWarningText {
+		return errors.New("bold warning failed")
+	}
+	return recorder.layoutRecorder.AddBoldParagraph(text)
 }
 
 func (recorder *errorLayoutRecorder) AddTable(table pdfTable) error {
@@ -1230,6 +2124,62 @@ func assertKeyValue(t *testing.T, recorder *layoutRecorder, key string, want str
 	if recorder.keyValues[key] != want {
 		t.Fatalf("key %q = %q, want %q", key, recorder.keyValues[key], want)
 	}
+}
+
+// findLayoutOperation returns the first operation matching the supplied semantic
+// selectors, or -1 when the operation is absent.
+// Authored by: OpenCode
+func findLayoutOperation(operations []pdfLayoutOperation, kind string, label string, text string) int {
+	for index, operation := range operations {
+		if operation.kind != kind || operation.label != label {
+			continue
+		}
+		if text != "" && operation.text != text {
+			continue
+		}
+		return index
+	}
+	return -1
+}
+
+// assertKeyValueOperation verifies one exact key/value operation without using
+// the recorder's map, which preserves repeated position fields semantically.
+// Authored by: OpenCode
+func assertKeyValueOperation(t *testing.T, recorder *layoutRecorder, label string, want string) {
+	t.Helper()
+	for _, operation := range recorder.operations {
+		if operation.kind == "key-value" && operation.label == label && operation.text == want {
+			return
+		}
+	}
+	t.Errorf("key/value operation %q = %q was not found in %#v", label, want, recorder.operations)
+}
+
+// assertTableCellAt verifies one exact semantic cell in a named table row.
+// Authored by: OpenCode
+func assertTableCellAt(t *testing.T, recorder *layoutRecorder, tableTitle string, sourceCellIndex int, source string, cellIndex int, want string) {
+	t.Helper()
+	for _, table := range recorder.tables {
+		if table.Title != tableTitle {
+			continue
+		}
+		for _, row := range table.Rows {
+			if sourceCellIndex >= len(row) || row[sourceCellIndex] != source {
+				continue
+			}
+			if cellIndex >= len(row) {
+				t.Errorf("table %q source %q has no cell %d in %#v", tableTitle, source, cellIndex, row)
+				return
+			}
+			if row[cellIndex] != want {
+				t.Errorf("table %q source %q cell %d = %q, want %q", tableTitle, source, cellIndex, row[cellIndex], want)
+			}
+			return
+		}
+		t.Errorf("table %q source %q was not found in %#v", tableTitle, source, table.Rows)
+		return
+	}
+	t.Errorf("table %q was not found in %#v", tableTitle, recorder.tables)
 }
 
 func assertTableHeader(t *testing.T, recorder *layoutRecorder, want string) {

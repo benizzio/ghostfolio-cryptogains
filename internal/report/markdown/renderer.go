@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
 )
 
 const notApplicableCalculationCurrency = "NOT APPLICABLE"
@@ -44,6 +45,9 @@ func Render(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, 
 	var calculationCurrency = calculationCurrencyLabel(report.ReportCalculationCurrency)
 
 	writeHeader(&builder, report, calculationCurrency)
+	builder.WriteString("**")
+	builder.WriteString(presentation.LegalWarningText)
+	builder.WriteString("**\n\n")
 	if err := renderWriteSummarySection(&builder, report, calculationCurrency); err != nil {
 		return reportmodel.ReportDocument{}, err
 	}

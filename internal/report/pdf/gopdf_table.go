@@ -1,6 +1,17 @@
 package pdf
 
-import "github.com/signintech/gopdf"
+import (
+	"strings"
+
+	"github.com/signintech/gopdf"
+)
+
+// tableCellBreakOption returns the word-break policy used by gopdf's table
+// layout for cell drawing.
+// Authored by: OpenCode
+func tableCellBreakOption() *gopdf.BreakOption {
+	return &gopdf.BreakOption{Mode: gopdf.BreakModeIndicatorSensitive, BreakIndicator: ' '}
+}
 
 // printableWidthColumns scales source column proportions to the full printable width, leaving page margins as equal outer table margins.
 // Authored by: OpenCode
@@ -69,7 +80,52 @@ func styledRowCells(row []string) []gopdf.RowCell {
 func sanitizeRow(row []string) []string {
 	var sanitized = make([]string, 0, len(row))
 	for _, cell := range row {
-		sanitized = append(sanitized, sanitizeText(cell))
+		sanitized = append(sanitized, sanitizeTableCell(cell))
 	}
 	return sanitized
+}
+
+// sanitizeTableCell preserves renderer-controlled line boundaries while
+// applying the existing single-line sanitization to each table-cell line.
+// Authored by: OpenCode
+func sanitizeTableCell(raw string) string {
+	var lines = strings.Split(raw, "\n")
+	for index := range lines {
+		lines[index] = sanitizeText(lines[index])
+		lines[index] = wrapLongNumericTableCell(lines[index])
+	}
+	return strings.Join(lines, "\n")
+}
+
+// wrapLongNumericTableCell adds explicit PDF line boundaries for long numeric
+// values that otherwise exceed a gopdf table cell's fixed row height.
+// Authored by: OpenCode
+func wrapLongNumericTableCell(line string) string {
+	if len(line) <= 18 || !isNumericTableCell(line) {
+		return line
+	}
+	var parts []string
+	for len(line) > 8 {
+		parts = append(parts, line[:8])
+		line = line[8:]
+	}
+	parts = append(parts, line)
+	return strings.Join(parts, "\n")
+}
+
+// isNumericTableCell reports whether a table cell is one long signed decimal.
+// Authored by: OpenCode
+func isNumericTableCell(line string) bool {
+	var digits int
+	for index, character := range line {
+		if character >= '0' && character <= '9' {
+			digits++
+			continue
+		}
+		if (character == '-' && index == 0) || character == '.' {
+			continue
+		}
+		return false
+	}
+	return digits > 0
 }

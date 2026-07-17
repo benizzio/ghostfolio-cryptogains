@@ -348,10 +348,10 @@ func TestReportGenerationSkipsCurrencylessOrderTier(t *testing.T) {
 		t.Fatalf("read saved report %q: %v", reportPath, err)
 	}
 	var reportText = string(rawReport)
-	if !strings.Contains(reportText, "| sol-buy-2026-asset-tier-001 | BUY | 50 | 80 | 4000 | 0.5 | 50 | 4000.5 | EUR | EUR |") {
+	if !strings.Contains(reportText, "| sol-buy-2026-asset-tier-001 | BUY | 50 | 80.00 | 4000.00 | 0.50 | 50 | 4000.50 | EUR | EUR |") {
 		t.Fatalf("expected saved report to show the later explicit-currency asset tier, got %q", reportText)
 	}
-	if strings.Contains(reportText, "| sol-buy-2026-asset-tier-001 | BUY | 50 | 81 | 4050 | 1 |") {
+	if strings.Contains(reportText, "| sol-buy-2026-asset-tier-001 | BUY | 50 | 81.00 | 4050.00 | 1.00 |") {
 		t.Fatalf("expected saved report to skip the currencyless order-tier monetary values, got %q", reportText)
 	}
 	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
@@ -397,9 +397,9 @@ func TestReportGenerationRoundsSameTierUnitPriceDerivation(t *testing.T) {
 	}
 	var reportText = string(rawReport)
 	for _, expected := range []string{
-		"| unit-buy-2024-001 | BUY | 3 | 0.3333333333333333 | 1 | 0 | 3 | 1 | USD | USD |",
-		"| unit-sell-2024-001 | SELL | 1 | 1 | 1 | 0 | 2 | 0.6666666666666667 | USD | USD |",
-		"| unit-sell-2024-001 | 1 | 0.3333333333333333 | 1 | 0.6666666666666667 | USD |",
+		"| unit-buy-2024-001 | BUY | 3 | 0.33 | 1.00 | 0.00 | 3 | 1.00 | USD | USD |",
+		"| unit-sell-2024-001 | SELL | 1 | 1.00 | 1.00 | 0.00 | 2 | 0.67 | USD | USD |",
+		"| unit-sell-2024-001 | 1 | 0.33 | 1.00 | 0.67 | USD |",
 	} {
 		if !strings.Contains(reportText, expected) {
 			t.Fatalf("expected rounded report to contain %q, got %q", expected, reportText)
@@ -471,9 +471,9 @@ func TestReportGenerationAfterSyncAllowsRepeatingGrossValueOnlyUnitPriceDerivati
 	}
 	var reportText = string(rawReport)
 	for _, expected := range []string{
-		"| repeat-buy-1 | BUY | 3 | 0.3333333333333333 | 1 | 0 | 3 | 1 | USD | USD |",
-		"| repeat-sell-1 | SELL | 1 | 1 | 1 | 0 | 2 | 0.6666666666666667 | USD | USD |",
-		"| repeat-sell-1 | 1 | 0.3333333333333333 | 1 | 0.6666666666666667 | USD |",
+		"| repeat-buy-1 | BUY | 3 | 0.33 | 1.00 | 0.00 | 3 | 1.00 | USD | USD |",
+		"| repeat-sell-1 | SELL | 1 | 1.00 | 1.00 | 0.00 | 2 | 0.67 | USD | USD |",
+		"| repeat-sell-1 | 1 | 0.33 | 1.00 | 0.67 | USD |",
 	} {
 		if !strings.Contains(reportText, expected) {
 			t.Fatalf("expected synced repeating-derivation report to contain %q, got %q", expected, reportText)
@@ -576,9 +576,9 @@ func TestSameCurrencyReportPreservesPriorMonetaryResults(t *testing.T) {
 			var label = reportBaseCurrency.Label()
 			for _, expected := range []string{
 				"- **Report Calculation Currency:** " + label,
-				"| unit-buy-2024-001 | BUY | 3 | 0.3333333333333333 | 1 | 0 | 3 | 1 | " + label + " | " + label + " |",
-				"| unit-sell-2024-001 | SELL | 1 | 1 | 1 | 0 | 2 | 0.6666666666666667 | " + label + " | " + label + " |",
-				"| unit-sell-2024-001 | 1 | 0.3333333333333333 | 1 | 0.6666666666666667 | " + label + " |",
+				"| unit-buy-2024-001 | BUY | 3 | 0.33 | 1.00 | 0.00 | 3 | 1.00 | " + label + " | " + label + " |",
+				"| unit-sell-2024-001 | SELL | 1 | 1.00 | 1.00 | 0.00 | 2 | 0.67 | " + label + " | " + label + " |",
+				"| unit-sell-2024-001 | 1 | 0.33 | 1.00 | 0.67 | " + label + " |",
 			} {
 				if !strings.Contains(reportText, expected) {
 					t.Fatalf("expected same-currency report to contain %q, got %q", expected, reportText)

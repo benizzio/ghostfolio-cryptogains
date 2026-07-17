@@ -9,6 +9,7 @@ import (
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	reportoutput "github.com/benizzio/ghostfolio-cryptogains/internal/report/output"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
 )
 
 // requestAutomaticOpenBundle performs one post-save opener request for the first
@@ -25,7 +26,7 @@ func requestAutomaticOpenBundle(
 			reportFailureOutcome(
 				request,
 				ReportFailureReportFileWriteFailed,
-				fmt.Sprintf("Could not finalize the saved report result: %s. The saved files may still exist.", strings.TrimSpace(err.Error())),
+				fmt.Sprintf("Could not finalize the saved report result: %s. The saved files may still exist.", strings.TrimSpace(redact.ErrorText(err))),
 			),
 		)
 	}
@@ -47,7 +48,7 @@ func requestAutomaticOpenBundle(
 		return openedBundle, nil
 	}
 
-	var detail = strings.TrimSpace(err.Error())
+	var detail = strings.TrimSpace(redact.ErrorText(err))
 	var openedBundle = reportOutputBundleForOpen(request.OutputFormat, outputBundle.Files, detail)
 	return openedBundle, pointerToReportOutcome(ReportOutcome{
 		Success:       true,
@@ -120,7 +121,7 @@ func reportWriteFailureReason(err error) ReportFailureReason {
 // reportWriteFailureMessage formats one actionable save failure.
 // Authored by: OpenCode
 func reportWriteFailureMessage(reason ReportFailureReason, err error) string {
-	var detail = strings.TrimSpace(err.Error())
+	var detail = strings.TrimSpace(redact.ErrorText(err))
 	if reason == ReportFailureDocumentsFolderUnavailable {
 		return fmt.Sprintf(
 			"Could not save the report because the Documents folder is unavailable: %s. Ensure the folder exists and is writable, then try again. No report file was saved.",

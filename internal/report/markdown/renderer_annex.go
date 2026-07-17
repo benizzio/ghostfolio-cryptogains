@@ -84,8 +84,8 @@ func writeAnnexActivityEntry(builder *strings.Builder, entry reportmodel.AuditAc
 	}
 
 	fmt.Fprintf(builder,
-		"| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %t | %s | %s | %s | %s | %s |\n",
-		rendered.Date, sanitizeInlineText(rendered.SourceID), sanitizeInlineText(rendered.ActivityType), rendered.Quantity, rendered.UnitPrice, rendered.GrossValue, rendered.Fee, sanitizeInlineText(rendered.ActivityCurrency), sanitizeInlineText(rendered.CalculationCurrency), rendered.QuantityAfter, rendered.BasisAfter, rendered.FullLiquidationEvent == "true", rendered.AllocatedBasis, rendered.NetProceeds, rendered.GainOrLoss, sanitizeInlineText(rendered.ConversionStatus), sanitizeInlineText(rendered.Note),
+		"| %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
+		rendered.Date, sanitizeInlineText(rendered.SourceID), sanitizeInlineText(rendered.ActivityType), rendered.Quantity, rendered.UnitPrice, rendered.GrossValue, rendered.Fee, sanitizeInlineText(rendered.ActivityCurrency), sanitizeInlineText(rendered.CalculationCurrency), rendered.QuantityAfter, rendered.BasisAfter, rendered.FullLiquidationEvent, rendered.AllocatedBasis, rendered.NetProceeds, rendered.GainOrLoss, sanitizeInlineText(rendered.ConversionStatus), sanitizeInlineText(rendered.Note),
 	)
 	return nil
 }

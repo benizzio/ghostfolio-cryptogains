@@ -268,8 +268,9 @@ func reportResultBaseCurrencyLabel(outcome runtime.ReportOutcome) string {
 // Authored by: OpenCode
 func reportResultSummary(outcome runtime.ReportOutcome) string {
 	if outcome.Success {
-		if len(outcome.OutputBundle.Files) > 0 {
-			return reportOutputBundleSummary(outcome)
+		var files = reportOutputFiles(outcome)
+		if len(files) > 0 {
+			return reportOutputBundleSummary(outcome, files)
 		}
 		return outcome.Message
 	}
@@ -288,12 +289,25 @@ func reportResultSummary(outcome runtime.ReportOutcome) string {
 	return strings.Join(lines, "\n\n")
 }
 
+// reportOutputFiles returns every saved file in the successful outcome without
+// retaining a second path collection in the TUI state.
+// Authored by: OpenCode
+func reportOutputFiles(outcome runtime.ReportOutcome) []reportmodel.ReportOutputFile {
+	if len(outcome.OutputBundle.Files) > 0 {
+		return outcome.OutputBundle.Files
+	}
+	if strings.TrimSpace(outcome.OutputFile.Path) != "" {
+		return []reportmodel.ReportOutputFile{outcome.OutputFile}
+	}
+	return nil
+}
+
 // reportOutputBundleSummary formats every saved path in a successful output
 // bundle.
 // Authored by: OpenCode
-func reportOutputBundleSummary(outcome runtime.ReportOutcome) string {
-	var lines []string
-	for _, file := range outcome.OutputBundle.Files {
+func reportOutputBundleSummary(outcome runtime.ReportOutcome, files []reportmodel.ReportOutputFile) string {
+	var lines = []string{component.ReportCleartextExportDisclosureText}
+	for _, file := range files {
 		var label string
 		switch file.Role {
 		case reportmodel.ReportDocumentRoleAnnex:
@@ -305,6 +319,9 @@ func reportOutputBundleSummary(outcome runtime.ReportOutcome) string {
 		}
 		lines = append(lines, fmt.Sprintf("%s: %s", label, file.Path))
 	}
-	lines = append(lines, outcome.Message)
+	if message := strings.TrimSpace(outcome.Message); message != "" {
+		lines = append(lines, message)
+	}
+	lines = append(lines, component.ReportCleartextExportDeletionGuidanceText)
 	return strings.Join(lines, "\n\n")
 }

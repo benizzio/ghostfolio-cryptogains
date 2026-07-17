@@ -23,6 +23,9 @@ type pdfContentLayout interface {
 	AddSubsectionHeading(text string) error
 	AddKeyValue(label string, value string) error
 	AddParagraph(text string) error
+	// AddBoldParagraph emits one fully bold, wrapped paragraph as a single layout operation.
+	// Authored by: OpenCode
+	AddBoldParagraph(text string) error
 	AddTable(table pdfTable) error
 }
 
@@ -40,7 +43,7 @@ type pdfLayoutDocument interface {
 	pdfDocumentStarter
 	fontLoader
 	pdfAnnexLayout
-	Bytes() []byte
+	Bytes() ([]byte, error)
 }
 
 // pdfColumn describes one PDF table column.

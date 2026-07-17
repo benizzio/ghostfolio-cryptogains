@@ -60,7 +60,7 @@ func writePositionBlock(builder *strings.Builder, heading string, quantity apd.D
 		return fmt.Errorf("render quantity: %w", err)
 	}
 	var basisText string
-	basisText, err = decimalsupport.CanonicalString(basis)
+	basisText, err = presentation.FormatFinancialValue(basis)
 	if err != nil {
 		return fmt.Errorf("render cost basis: %w", err)
 	}

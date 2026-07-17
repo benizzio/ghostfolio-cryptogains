@@ -4,6 +4,7 @@
 package markdown
 
 import (
+	"html"
 	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
@@ -67,4 +68,14 @@ func sanitizeInlineText(raw string) string {
 	var sanitized = textsupport.RedactedSingleLine(raw)
 	sanitized = strings.ReplaceAll(sanitized, "|", "\\|")
 	return sanitized
+}
+
+// sanitizeConvertedAmountComponent protects a dynamic conversion component
+// before the renderer adds fixed Markdown syntax and controlled HTML breaks.
+// Authored by: OpenCode
+func sanitizeConvertedAmountComponent(raw string) string {
+	var sanitized = textsupport.RedactedSingleLine(raw)
+	sanitized = strings.ReplaceAll(sanitized, "\\", "\\\\")
+	sanitized = strings.ReplaceAll(sanitized, "|", "\\|")
+	return html.EscapeString(sanitized)
 }

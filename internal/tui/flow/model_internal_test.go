@@ -998,6 +998,69 @@ func TestUpdateReportCoversSelectionBusyAndResultBranches(t *testing.T) {
 	}
 }
 
+// TestReportResultExitClearsSavedBundlePaths verifies result dismissal removes
+// both single-file and complete-bundle output state from the flow model.
+// Authored by: OpenCode
+func TestReportResultExitClearsSavedBundlePaths(t *testing.T) {
+	t.Parallel()
+
+	var savedAt = time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC)
+	testCases := []struct {
+		name         string
+		outputFormat reportmodel.ReportOutputFormat
+		files        []reportmodel.ReportOutputFile
+		openError    string
+	}{
+		{
+			name:         "normal Markdown success",
+			outputFormat: reportmodel.ReportOutputFormatMarkdown,
+			files: []reportmodel.ReportOutputFile{
+				{DocumentsDirectory: "/tmp/Documents", Filename: "synthetic-report.md", Path: "/tmp/Documents/synthetic-report.md", Role: reportmodel.ReportDocumentRoleMain, MediaType: reportmodel.ReportMediaTypeMarkdown, SavedAt: savedAt},
+				{DocumentsDirectory: "/tmp/Documents", Filename: "synthetic-report-annex-1.md", Path: "/tmp/Documents/synthetic-report-annex-1.md", Role: reportmodel.ReportDocumentRoleAnnex, MediaType: reportmodel.ReportMediaTypeMarkdown, SavedAt: savedAt},
+			},
+		},
+		{
+			name:         "opener-warning PDF success",
+			outputFormat: reportmodel.ReportOutputFormatPDF,
+			openError:    "synthetic opener warning",
+			files: []reportmodel.ReportOutputFile{
+				{DocumentsDirectory: "/tmp/Documents", Filename: "synthetic-report.pdf", Path: "/tmp/Documents/synthetic-report.pdf", Role: reportmodel.ReportDocumentRoleCombined, MediaType: reportmodel.ReportMediaTypePDF, SavedAt: savedAt},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var model = newTestModel(t, nil)
+			model.active = reportResultScreenKey
+			model.syncReports.ReportResult = runtime.ReportOutcome{
+				Success:    true,
+				OutputFile: testCase.files[0],
+				OutputBundle: reportmodel.ReportOutputBundle{
+					OutputFormat:  testCase.outputFormat,
+					Files:         testCase.files,
+					SavedAt:       savedAt,
+					OpenRequested: true,
+					OpenError:     testCase.openError,
+				},
+			}
+
+			var updated, cmd = model.activateReportResultSelection()
+			if cmd != nil {
+				t.Fatalf("expected result dismissal to remain synchronous")
+			}
+			model = assertUpdatedModel(t, updated)
+			if model.active != syncReportsMenuScreenKey {
+				t.Fatalf("expected result dismissal to return to Sync and Reports, got %s", model.active)
+			}
+			var outcome = model.syncReports.ReportResult
+			if outcome.Success || outcome.Message != "" || outcome.OutputFile != (reportmodel.ReportOutputFile{}) || len(outcome.OutputBundle.Files) != 0 || outcome.OutputBundle.OutputFormat != "" || !outcome.OutputBundle.SavedAt.IsZero() || outcome.OutputBundle.OpenRequested || outcome.OutputBundle.OpenError != "" {
+				t.Fatalf("expected result dismissal to clear report and path state, got %#v", outcome)
+			}
+		})
+	}
+}
+
 // TestReportSelectionFocusIncludesBaseCurrencyPane verifies keyboard focus moves
 // through year, method, base currency, output format, and action panes before wrapping.
 // Authored by: OpenCode
