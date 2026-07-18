@@ -3,8 +3,17 @@ package presentation
 import (
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/cockroachdb/apd/v3"
+)
+
+// Financial formatting constants define the report scale and the largest
+// precision supported by apd's signed exponent arithmetic.
+// Authored by: OpenCode
+const (
+	financialDisplayExponent int32 = -2
+	maxFinancialPrecision    int64 = int64(math.MaxInt32) + int64(apd.MinExponent) + 2
 )
 
 // Financial operation seams keep defensive decimal branches testable without
@@ -13,9 +22,7 @@ import (
 var (
 	checkedFinancialAdjustedExponentForFormatting = checkedFinancialAdjustedExponent
 	checkedFinancialPrecisionForFormatting        = checkedFinancialPrecision
-	quantizeFinancialValue                        = func(context *apd.Context, result *apd.Decimal, value *apd.Decimal, exponent int32) (apd.Condition, error) {
-		return context.Quantize(result, value, exponent)
-	}
+	quantizeFinancialValue                        = (*apd.Context).Quantize
 )
 
 // FormatFinancialValue formats one report-visible financial value at scale two
@@ -76,8 +83,8 @@ func formatFinancialValue(value apd.Decimal) (string, error) {
 	}
 
 	var coefficientExpansion int64
-	if value.Exponent > -2 {
-		coefficientExpansion = int64(value.Exponent) + 2
+	if value.Exponent > financialDisplayExponent {
+		coefficientExpansion = int64(value.Exponent) - int64(financialDisplayExponent)
 	}
 	precision, err := checkedFinancialPrecisionForFormatting(sourceDigits, coefficientExpansion)
 	if err != nil {
@@ -97,48 +104,52 @@ func formatFinancialValue(value apd.Decimal) (string, error) {
 	return quantized.Text('f'), nil
 }
 
-// quantizeFinancialValueForFormatting applies the defensive copy, exact
-// quantization, and post-quantization domain checks for one financial value.
+// quantizeFinancialValueForFormatting delegates ordinary scaling and rounding
+// to apd and applies only the pre-expansion needed beyond apd's shift range.
 // Authored by: OpenCode
 func quantizeFinancialValueForFormatting(value apd.Decimal, coefficientExpansion int64, precision uint32) (apd.Decimal, error) {
-	var sourceCopy apd.Decimal
-	sourceCopy.Set(&value)
-	if coefficientExpansion > 0 {
+	var source = &value
+	var expandedSource apd.Decimal
+	if requiresFinancialCoefficientPreExpansion(value.Exponent) {
+		expandedSource.Set(&value)
 		var ten apd.BigInt
 		ten.SetInt64(10)
 		var expansionExponent apd.BigInt
 		expansionExponent.SetInt64(coefficientExpansion)
 		var scaleFactor apd.BigInt
 		scaleFactor.Exp(&ten, &expansionExponent, nil)
-		sourceCopy.Coeff.Mul(&sourceCopy.Coeff, &scaleFactor)
-		sourceCopy.Exponent = -2
+		expandedSource.Coeff.Mul(&expandedSource.Coeff, &scaleFactor)
+		expandedSource.Exponent = financialDisplayExponent
+		source = &expandedSource
 	}
 
 	var quantized apd.Decimal
-	var context = apd.BaseContext.WithPrecision(precision)
-	context.Rounding = apd.RoundHalfUp
-	condition, err := quantizeFinancialValue(context, &quantized, &sourceCopy, -2)
+	var context = apd.Context{
+		Precision:   precision,
+		MaxExponent: apd.MaxExponent,
+		MinExponent: apd.MinExponent,
+		Traps:       apd.DefaultTraps,
+		Rounding:    apd.RoundHalfUp,
+	}
+	condition, err := quantizeFinancialValue(&context, &quantized, source, financialDisplayExponent)
 	if err != nil {
 		return apd.Decimal{}, fmt.Errorf("financial value quantization failed: %w", err)
 	}
 	if err := validateFinancialQuantizeConditions(condition); err != nil {
 		return apd.Decimal{}, err
 	}
-	if quantized.Form != apd.Finite || quantized.Coeff.Sign() < 0 || quantized.Exponent != -2 {
-		return apd.Decimal{}, errors.New("financial value quantization produced an invalid result")
-	}
-
-	resultAdjustedExponent, err := checkedFinancialAdjustedExponentForFormatting(int64(quantized.Exponent), quantized.NumDigits())
-	if err != nil {
-		return apd.Decimal{}, err
-	}
-	if resultAdjustedExponent < int64(apd.MinExponent) || resultAdjustedExponent > int64(apd.MaxExponent) {
-		return apd.Decimal{}, errors.New("financial value rounded result is out of range")
-	}
 	if quantized.IsZero() {
 		quantized.Negative = false
 	}
 	return quantized, nil
+}
+
+// requiresFinancialCoefficientPreExpansion reports whether apd would reject
+// the source-to-display exponent shift before performing quantization.
+// Authored by: OpenCode
+func requiresFinancialCoefficientPreExpansion(sourceExponent int32) bool {
+	var exponentShift = int64(financialDisplayExponent) - int64(sourceExponent)
+	return exponentShift < int64(apd.MinExponent)
 }
 
 // formatOptionalFinancialValue preserves an absent optional financial value as
@@ -151,23 +162,21 @@ func formatOptionalFinancialValue(value *apd.Decimal) (string, error) {
 	return formatFinancialValue(*value)
 }
 
-// checkedFinancialPrecision calculates the quantization precision without
-// narrowing or overflowing the source digit and coefficient expansion counts.
+// checkedFinancialPrecision calculates an apd-compatible quantization precision
+// without overflowing the source digit and coefficient expansion counts.
 // Authored by: OpenCode
 func checkedFinancialPrecision(sourceDigits int64, coefficientExpansion int64) (uint32, error) {
-	const maxUint32 = int64(1<<32 - 1)
-
 	if sourceDigits <= 0 || coefficientExpansion < 0 {
 		return 0, errors.New("financial precision inputs are invalid")
 	}
-	if coefficientExpansion > maxUint32 {
-		return 0, errors.New("financial precision exceeds uint32")
+	if coefficientExpansion > maxFinancialPrecision {
+		return 0, errors.New("financial precision exceeds apd operational limit")
 	}
-	if sourceDigits > maxUint32-coefficientExpansion-1 {
-		return 0, errors.New("financial precision exceeds uint32")
+	if sourceDigits > maxFinancialPrecision-coefficientExpansion-1 {
+		return 0, errors.New("financial precision exceeds apd operational limit")
 	}
 
-	// #nosec G115 -- the bounds above prove the sum is within uint32.
+	// #nosec G115 -- the bounds above prove the sum fits apd's uint32 field.
 	return uint32(sourceDigits + coefficientExpansion + 1), nil
 }
 

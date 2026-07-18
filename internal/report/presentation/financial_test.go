@@ -129,6 +129,37 @@ func TestFormatFinancialValueDoesNotMutateSource(t *testing.T) {
 	}
 }
 
+// TestFormatFinancialValueDelegatesOrdinaryExpansionToAPD verifies ordinary
+// values reach Quantize unchanged through a fully initialized package context.
+// Authored by: OpenCode
+func TestFormatFinancialValueDelegatesOrdinaryExpansionToAPD(t *testing.T) {
+	var previousQuantize = quantizeFinancialValue
+	t.Cleanup(func() { quantizeFinancialValue = previousQuantize })
+	quantizeFinancialValue = func(context *apd.Context, result *apd.Decimal, source *apd.Decimal, exponent int32) (apd.Condition, error) {
+		if context.MaxExponent != apd.MaxExponent || context.MinExponent != apd.MinExponent {
+			t.Fatalf("quantize context exponent bounds = [%d, %d]", context.MinExponent, context.MaxExponent)
+		}
+		if context.Traps != apd.DefaultTraps || context.Rounding != apd.RoundHalfUp {
+			t.Fatalf("quantize context traps = %v, rounding = %q", context.Traps, context.Rounding)
+		}
+		if source.Exponent != 0 {
+			t.Fatalf("ordinary source exponent = %d, want unchanged exponent 0", source.Exponent)
+		}
+		if exponent != financialDisplayExponent {
+			t.Fatalf("quantize exponent = %d, want %d", exponent, financialDisplayExponent)
+		}
+		return previousQuantize(context, result, source, exponent)
+	}
+
+	var got, err = formatFinancialValue(mustFinancialDecimal(t, "1"))
+	if err != nil {
+		t.Fatalf("format ordinary value: %v", err)
+	}
+	if got != "1.00" {
+		t.Fatalf("formatted ordinary value = %q, want %q", got, "1.00")
+	}
+}
+
 // TestFormatFinancialValueAcceptsAdjustedExponentBounds verifies both
 // inclusive adjusted-exponent endpoints and preserves the full upper-bound
 // value without exponent notation.
@@ -192,11 +223,10 @@ func TestFormatFinancialValueRejectsUpperBoundCarry(t *testing.T) {
 	}
 }
 
-// TestFormatFinancialValueChecksUint32PrecisionArithmetic verifies that
-// precision metadata near the signed exponent limit is rejected rather than
-// being narrowed or wrapped before the formatter can validate it.
+// TestFormatFinancialValueRejectsExtremeSourceExponent verifies that source
+// metadata near the signed exponent limit is rejected without arithmetic wrap.
 // Authored by: OpenCode
-func TestFormatFinancialValueChecksUint32PrecisionArithmetic(t *testing.T) {
+func TestFormatFinancialValueRejectsExtremeSourceExponent(t *testing.T) {
 	var value apd.Decimal
 	value.Form = apd.Finite
 	value.Coeff.SetInt64(1)
@@ -205,10 +235,10 @@ func TestFormatFinancialValueChecksUint32PrecisionArithmetic(t *testing.T) {
 	assertFinancialFormattingError(t, "minimum int32 exponent", value)
 }
 
-// TestCheckedFinancialPrecisionAcceptsOnlyUint32RepresentableResults verifies
-// the carry-inclusive precision calculation at its exact uint32 boundary.
+// TestCheckedFinancialPrecisionAcceptsOnlyAPDSupportedResults verifies the
+// carry-inclusive calculation at apd's safe signed exponent-arithmetic limit.
 // Authored by: OpenCode
-func TestCheckedFinancialPrecisionAcceptsOnlyUint32RepresentableResults(t *testing.T) {
+func TestCheckedFinancialPrecisionAcceptsOnlyAPDSupportedResults(t *testing.T) {
 	var testCases = []struct {
 		name         string
 		sourceDigits int64
@@ -217,11 +247,11 @@ func TestCheckedFinancialPrecisionAcceptsOnlyUint32RepresentableResults(t *testi
 		wantError    bool
 	}{
 		{name: "smallest valid precision", sourceDigits: 1, expansion: 0, want: 2},
-		{name: "maximum precision", sourceDigits: 4294967294, expansion: 0, want: 4294967295},
-		{name: "maximum precision with expansion", sourceDigits: 4294967293, expansion: 1, want: 4294967295},
-		{name: "source digit overflow", sourceDigits: 4294967295, expansion: 0, wantError: true},
-		{name: "expansion overflow", sourceDigits: 4294967294, expansion: 1, wantError: true},
-		{name: "expansion exceeds uint32", sourceDigits: 1, expansion: 4294967296, wantError: true},
+		{name: "maximum precision", sourceDigits: 2147383648, expansion: 0, want: 2147383649},
+		{name: "maximum precision with expansion", sourceDigits: 2147383647, expansion: 1, want: 2147383649},
+		{name: "source digit overflow", sourceDigits: 2147383649, expansion: 0, wantError: true},
+		{name: "expansion overflow", sourceDigits: 2147383648, expansion: 1, wantError: true},
+		{name: "expansion exceeds apd limit", sourceDigits: 1, expansion: 2147383650, wantError: true},
 		{name: "zero source digits", sourceDigits: 0, expansion: 0, wantError: true},
 		{name: "negative expansion", sourceDigits: 1, expansion: -1, wantError: true},
 	}
@@ -291,15 +321,16 @@ func TestCheckedFinancialAdjustedExponentRejectsInvalidInputs(t *testing.T) {
 	}
 }
 
-// TestFormatFinancialValueReturnsQuantizationErrors verifies the formatter
-// returns a decimal-context error before exposing a result.
+// TestFormatFinancialValueReturnsQuantizationErrors verifies that a library
+// operation failure is returned before any formatted value is exposed.
 // Authored by: OpenCode
 func TestFormatFinancialValueReturnsQuantizationErrors(t *testing.T) {
 	var value = mustFinancialDecimal(t, "1.23")
-	var previousContext = apd.BaseContext
-	defer func() { apd.BaseContext = previousContext }()
-	apd.BaseContext.MinExponent = apd.MaxExponent
-	apd.BaseContext.Traps = apd.InvalidOperation
+	var previousQuantize = quantizeFinancialValue
+	t.Cleanup(func() { quantizeFinancialValue = previousQuantize })
+	quantizeFinancialValue = func(_ *apd.Context, _ *apd.Decimal, _ *apd.Decimal, _ int32) (apd.Condition, error) {
+		return 0, errors.New("quantize failure")
+	}
 
 	assertFinancialFormattingError(t, "quantization context error", value)
 }
@@ -309,10 +340,11 @@ func TestFormatFinancialValueReturnsQuantizationErrors(t *testing.T) {
 // Authored by: OpenCode
 func TestFormatFinancialValueRejectsUnexpectedQuantizationConditions(t *testing.T) {
 	var value = mustFinancialDecimal(t, "1.23")
-	var previousContext = apd.BaseContext
-	defer func() { apd.BaseContext = previousContext }()
-	apd.BaseContext.MinExponent = apd.MaxExponent
-	apd.BaseContext.Traps = 0
+	var previousQuantize = quantizeFinancialValue
+	t.Cleanup(func() { quantizeFinancialValue = previousQuantize })
+	quantizeFinancialValue = func(_ *apd.Context, _ *apd.Decimal, _ *apd.Decimal, _ int32) (apd.Condition, error) {
+		return apd.Clamped, nil
+	}
 
 	assertFinancialFormattingError(t, "unexpected quantization condition", value)
 }
@@ -330,19 +362,16 @@ func TestFormatFinancialValueRejectsUnexpectedDecimalConditions(t *testing.T) {
 	assertFinancialFormattingError(t, "unexpected exponent condition", value)
 }
 
-// TestFormatFinancialValuePropagatesDefensiveOperationErrors verifies formatter
-// guard propagation for decimal operations that are unreachable with ordinary
-// finite apd values but remain part of the defensive boundary.
+// TestFormatFinancialValuePropagatesCheckedMetadataErrors verifies formatter
+// guard propagation for checked arithmetic failures.
 // Authored by: OpenCode
-func TestFormatFinancialValuePropagatesDefensiveOperationErrors(t *testing.T) {
+func TestFormatFinancialValuePropagatesCheckedMetadataErrors(t *testing.T) {
 	var value = mustFinancialDecimal(t, "1.23")
 	var previousAdjusted = checkedFinancialAdjustedExponentForFormatting
 	var previousPrecision = checkedFinancialPrecisionForFormatting
-	var previousQuantize = quantizeFinancialValue
 	t.Cleanup(func() {
 		checkedFinancialAdjustedExponentForFormatting = previousAdjusted
 		checkedFinancialPrecisionForFormatting = previousPrecision
-		quantizeFinancialValue = previousQuantize
 	})
 
 	checkedFinancialAdjustedExponentForFormatting = func(int64, int64) (int64, error) {
@@ -355,40 +384,30 @@ func TestFormatFinancialValuePropagatesDefensiveOperationErrors(t *testing.T) {
 		return 0, errors.New("precision seam failure")
 	}
 	assertFinancialFormattingError(t, "precision seam", value)
+}
 
-	checkedFinancialPrecisionForFormatting = previousPrecision
-	quantizeFinancialValue = func(_ *apd.Context, _ *apd.Decimal, _ *apd.Decimal, _ int32) (apd.Condition, error) {
-		return 0, errors.New("quantize seam failure")
+// TestRequiresFinancialCoefficientPreExpansion verifies that custom scaling is
+// reserved for shifts that exceed apd's internal exponent range.
+// Authored by: OpenCode
+func TestRequiresFinancialCoefficientPreExpansion(t *testing.T) {
+	for _, testCase := range []struct {
+		name     string
+		exponent int32
+		want     bool
+	}{
+		{name: "ordinary integer", exponent: 0},
+		{name: "largest direct shift", exponent: 99998},
+		{name: "first excessive shift", exponent: 99999, want: true},
+		{name: "upper adjusted exponent", exponent: 100000, want: true},
+	} {
+		var testCase = testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			var got = requiresFinancialCoefficientPreExpansion(testCase.exponent)
+			if got != testCase.want {
+				t.Fatalf("pre-expansion for exponent %d = %t, want %t", testCase.exponent, got, testCase.want)
+			}
+		})
 	}
-	assertFinancialFormattingError(t, "quantize seam", value)
-
-	quantizeFinancialValue = previousQuantize
-	quantizeFinancialValue = func(_ *apd.Context, result *apd.Decimal, _ *apd.Decimal, _ int32) (apd.Condition, error) {
-		result.Form = apd.Infinite
-		return 0, nil
-	}
-	assertFinancialFormattingError(t, "invalid quantized result", value)
-
-	quantizeFinancialValue = previousQuantize
-	var calls int
-	checkedFinancialAdjustedExponentForFormatting = func(exponent int64, digits int64) (int64, error) {
-		calls++
-		if calls == 2 {
-			return 0, errors.New("rounded adjusted exponent seam failure")
-		}
-		return previousAdjusted(exponent, digits)
-	}
-	assertFinancialFormattingError(t, "rounded adjusted exponent seam", value)
-
-	calls = 0
-	checkedFinancialAdjustedExponentForFormatting = func(exponent int64, digits int64) (int64, error) {
-		calls++
-		if calls == 2 {
-			return int64(apd.MaxExponent) + 1, nil
-		}
-		return previousAdjusted(exponent, digits)
-	}
-	assertFinancialFormattingError(t, "rounded result range seam", value)
 }
 
 // TestValidateFinancialQuantizeConditionsRejectsUnexpectedFlags verifies that

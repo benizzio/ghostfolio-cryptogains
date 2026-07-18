@@ -88,7 +88,9 @@ Rules:
   plus coefficient digit count minus one, is from `-100000` through `100000` and
   whose correctly rounded scale-2 result, including a carry, also has adjusted
   exponent no greater than `100000`. Scale-2 quantization precision, including
-  coefficient expansion and one carry digit, must not exceed `4294967295`.
+  coefficient expansion and one carry digit, must not exceed `2147383649`, the
+  maximum precision supported by pinned `apd v3.2.3` without wrapping its signed
+  `MinExponent - precision + 1` arithmetic.
   Successful formatting rules apply only inside that domain. Values outside it,
   including an upper-bound carry to adjusted exponent `100001`, fail under the
   Failure Contract before visible output.

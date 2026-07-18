@@ -151,7 +151,7 @@ After context compaction or parent-session replacement:
 
 - [X] T003 [P] Add failing package tests for PDF byte-finalization success and injected failure, including normal error return, discarded partial bytes, no process termination, and no successful payload in `internal/report/pdf/renderer_internal_test.go`
 - [X] T004 [P] Add runtime-service characterization tests proving a render or finalization error invokes neither the bundle writer, opener, nor alternate-format renderer, reports no successful document or path, identifies the failed stage and applicable semantic context with a redacted cause, and permits a successful second attempt through the same service in `internal/app/runtime/report_service_internal_test.go`
-- [X] T005 [P] Add exhaustive failing tests for scale-2 HALF UP formatting, signed and non-negative vectors, nil preservation, negative-zero normalization, source immutability, accepted adjusted-exponent bounds, upper-bound carry rejection, checked `uint32` precision arithmetic, non-finite values, and unexpected decimal conditions in `internal/report/presentation/financial_test.go`
+- [X] T005 [P] Add exhaustive failing tests for scale-2 HALF UP formatting, signed and non-negative vectors, nil preservation, negative-zero normalization, source immutability, accepted adjusted-exponent bounds, upper-bound carry rejection, checked `apd`-compatible precision arithmetic, non-finite values, and unexpected decimal conditions in `internal/report/presentation/financial_test.go`
 
 ### Implementation for Foundational Behavior
 
@@ -389,7 +389,7 @@ Sources: tasks.md; spec.md FR-004, FR-004a, FR-006, FR-007, FR-010, FR-011, and 
 Verified status: WU05 is complete and parent-verified with intended fail-first failures. WU06 may proceed independently and must not be assumed complete.
 Allowed edits: internal/report/presentation/financial.go only.
 Forbidden edits: calculations, renderers, support decimal behavior, persistence, .specify/templates/, testdata/empirical/, go.mod, and go.sum.
-Required behavior: make WU05 tests pass with defensive copies, apd.RoundHalfUp, checked uint32 precision and adjusted-exponent handling, only expected condition flags, nil preservation, fixed-point output, and unsigned zero. Run go test ./internal/report/presentation -count=1.
+Required behavior: make WU05 tests pass with separate quantization destinations, apd.RoundHalfUp, checked apd-compatible precision and adjusted-exponent handling, only expected condition flags, nil preservation, fixed-point output, and unsigned zero. Run go test ./internal/report/presentation -count=1.
 Final response: files changed; task IDs completed; tests run with results; expected failures; assumptions; parent follow-up.
 ```
 

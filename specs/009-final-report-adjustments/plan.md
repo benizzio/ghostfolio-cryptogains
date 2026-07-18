@@ -138,9 +138,10 @@ Post-analysis remediation gate status against constitution v3.0.0: PASS
 - [x] Precision: Existing finite `apd.Decimal` values and explicit currency
   identities remain authoritative. Present monetary amounts and unit prices are
   cloned and quantized only into final strings at exponent `-2` with
-  `apd.RoundHalfUp`. Formatting uses a copy of `apd.BaseContext`, checked result
-  precision sized for trailing zeros and carry, and accepts only expected
-  `Rounded` and `Inexact` conditions. Quantities use the objective FR-009
+  `apd.RoundHalfUp`. Formatting uses a package-owned context matching the pinned
+  `apd` exponent limits and default traps, checked `apd`-compatible result
+  precision sized for trailing zeros and carry, and accepts only expected `Rounded` and
+  `Inexact` conditions. Quantities use the objective FR-009
   canonical representation. Rates preserve every significant digit of the
   normalized evidence while discarding provider lexical scale. Each existing
   pre-format activity currency value remains unchanged before rendering. No
