@@ -2,7 +2,7 @@
 
 **Purpose**: Record concrete deviations between the current implementation and the repository test-coverage baseline for the active feature slice.
 **Created**: 2026-07-18
-**Updated**: 2026-07-18
+**Updated**: 2026-07-19
 **Feature**: [spec.md](./spec.md)
 **Correction Tracking**: Coverage drift remediation tasks are added to [tasks.md](./tasks.md) by `/speckit.test-coverage-drift-control.remediation-plan`.
 
@@ -31,7 +31,7 @@
 
 ### COV-DRIFT-001: Acceptance Accounting Credits Unverified Semantic Occurrences
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: High
 **Diverges from**:
 
@@ -61,7 +61,7 @@ Replace attempt-wide occurrence crediting with test-owned Markdown and PDF obser
 
 ### COV-DRIFT-002: Deterministic Scale-Content Coverage Is Missing
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: High
 **Diverges from**:
 
@@ -87,7 +87,7 @@ Move the exact named 10,000-activity fixture into shared runtime-flow test suppo
 
 ### COV-DRIFT-003: FR-004a Failure Boundaries Stop Before Runtime Output
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: High
 **Diverges from**:
 
@@ -112,7 +112,7 @@ Add immutable, constructor-injected report-pipeline and renderer-scoped financia
 
 ### COV-DRIFT-004: Export Disclosure Is Not Covered by a Runtime-Backed Journey
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: Medium
 **Diverges from**:
 
@@ -138,7 +138,7 @@ Keep production copy ownership unchanged and extend the existing runtime-backed 
 
 ### COV-DRIFT-005: Concrete PDF Finalization Failure Lacks Integration Coverage
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: Medium
 **Diverges from**:
 
@@ -162,7 +162,7 @@ Replace the process-global finalization fault hook with an immutable renderer-sc
 
 ### COV-DRIFT-006: Markdown Unit Tests Substantially Duplicate Broader Coverage
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: Medium
 **Diverges from**:
 
@@ -189,7 +189,7 @@ After COV-DRIFT-001 supplies passing per-occurrence contract evidence, remove on
 
 ### COV-DRIFT-007: Regression Population Is Miscounted and Re-Executed Across Suites
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: Medium
 **Diverges from**:
 
@@ -218,7 +218,7 @@ Correct the pinned baseline without rebasing by removing only the invalid `TestE
 
 ### COV-DRIFT-008: Successful-Document Financial Confidentiality Check Is Vacuous
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: High
 **Diverges from**:
 
@@ -242,7 +242,7 @@ Make the successful-document check non-vacuous with a test-local synthetic probe
 
 ### COV-DRIFT-009: Stale Performance Coverage Profile Survives Canonical Validation
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: Low
 **Diverges from**:
 
@@ -261,6 +261,18 @@ The workspace contains an atomic performance coverage profile even though reposi
 **Remediation plan**:
 
 Extend the canonical `coverage` target's exact generated-artifact cleanup to remove only `dist/coverage/performance.out` in addition to the canonical outputs. Preserve permitted diagnostic leaf profiles, deterministic package instrumentation, independent CI jobs, and the rule that no performance coverage target, profile, merge, job, or context exists. Validate that `make coverage` removes the stale file and that a separate `make test-performance` run does not recreate it. Do not change `.cov.json`, coverage-gate tooling, workflows, or performance suite membership.
+
+## Resolution Evidence
+
+- **COV-DRIFT-001**: Acceptance accounting now records exact Markdown and PDF semantic occurrences, including nullable, historical, quantity, rate-metadata, parity, and negative-accounting controls. The focused testutil, contract, and integration owners pass with `A=148/148`, `W=296/296`, `V=688/688`, `M=296/296`, `Q=80/80`, `B=16/16`, `Z=2/2`, `N=4/4`, `C=16/16`, `P=601/601`, and `E=24/24`.
+- **COV-DRIFT-002**: The exact 10,000-activity fixture is shared through `tests/testutil/runtimeflow`; deterministic scale-content integration verifies 6,666 conversion rows, three entries per row, Markdown boundaries, and PDF continuation content. `TestReportScaleContentFlow` and the isolated performance suite pass.
+- **COV-DRIFT-003**: Renderer-scoped financial-formatting options exercise all FR-004a rejection classes through both selected renderers and runtime retry without unsafe allocations or output side effects. Formatter, renderer, contract, and integration tests pass.
+- **COV-DRIFT-004**: Runtime-backed Markdown and PDF success journeys now verify exact-once cleartext disclosure, deletion guidance, saved paths, bundle shape, opener-warning retention, and post-exit transient-state clearing. The integration, TUI, and workflow owners pass.
+- **COV-DRIFT-005**: PDF finalization uses an immutable renderer-scoped byte finalizer with the production error-returning default. The runtime-backed fault journey proves redacted failure, discarded partial bytes, no output boundary calls, process survival, and successful retry.
+- **COV-DRIFT-006**: Duplicated Feature 009 black-box Markdown tests and exclusive helpers were removed while contract, package, and runtime-backed ownership remains green. `make coverage` passes the canonical 100% gates.
+- **COV-DRIFT-007**: The frozen regression population excludes the invalid empirical parent, reports `R=101/101`, validates identities and artifacts statically, and leaves direct basis, calculation, and empirical packages as execution owners.
+- **COV-DRIFT-008**: Successful-document confidentiality coverage now injects and verifies a synthetic non-contracted provenance sentinel before proving its absence from Markdown and PDF, while retaining the contracted export amount and all other redaction controls.
+- **COV-DRIFT-009**: Canonical coverage cleanup removes `dist/coverage/performance.out`; repeated `make coverage` and separate `make test-performance` runs leave the artifact absent.
 
 ## Notes
 

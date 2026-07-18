@@ -25,7 +25,7 @@ func TestReportPerformanceFlowLargeHistoryFixture(t *testing.T) {
 	const threshold = 2 * time.Minute
 	var requestedAt = time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC)
 	logPerformanceEnvironment(t)
-	var fixture = largeReportFixture(t)
+	var fixture = runtimeflow.LargeReportFixture(t)
 	var reportIO = testutil.NewReportIOFixture(t)
 	var openLogPath = runtimeflow.InstallOpenCommandRecorder(t, 0)
 	var harness = runtimeflow.NewRuntimeBackedFlowHarnessWithCurrencyRateService(t, t.TempDir(), runtimeflow.MustCloudSetupConfig(t), false, runtimeflow.DeterministicCurrencyRates{})

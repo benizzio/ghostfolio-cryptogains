@@ -81,7 +81,7 @@ func newReportService(
 ) ReportService {
 	var calculator = reportcalculate.NewCalculator(currencyRates)
 
-	return &reportService{
+	var service = &reportService{
 		snapshots:         snapshots,
 		allowDevHTTP:      allowDevHTTP,
 		diagnosticReports: newDiagnosticReportService(baseConfigDir),
@@ -90,9 +90,10 @@ func newReportService(
 		renderBundle: func(outputFormat reportmodel.ReportOutputFormat, report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
 			return renderReportOutputBundleWithOptions(outputFormat, report, pipelineOptions)
 		},
-		writeBundle: reportoutput.WriteReportOutputBundle,
-		open:        reportoutput.OpenPath,
 	}
+	service.writeBundle = reportoutput.WriteReportOutputBundle
+	service.open = reportoutput.OpenPath
+	return service
 }
 
 // Generate validates report availability, calculates the report, renders

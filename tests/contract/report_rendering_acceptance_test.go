@@ -402,7 +402,7 @@ func validateRenderingAcceptanceMarkdownControls(acceptanceCase testutil.ReportP
 		return observed, err
 	}
 	for _, occurrence := range acceptanceCase.OccurrenceKeys {
-		if (occurrence.Format != testutil.ReportPresentationFormatMarkdown && !(occurrence.Population == testutil.ReportPresentationPopulationParity && isRenderingAcceptanceRateMetadataField(occurrence.FieldName))) || occurrence.Population == testutil.ReportPresentationPopulationWarning || occurrence.Population == testutil.ReportPresentationPopulationModelIntegrity || (occurrence.Population == testutil.ReportPresentationPopulationParity && !isRenderingAcceptanceRateMetadataField(occurrence.FieldName)) {
+		if (occurrence.Format != testutil.ReportPresentationFormatMarkdown && (occurrence.Population != testutil.ReportPresentationPopulationParity || !isRenderingAcceptanceRateMetadataField(occurrence.FieldName))) || occurrence.Population == testutil.ReportPresentationPopulationWarning || occurrence.Population == testutil.ReportPresentationPopulationModelIntegrity || (occurrence.Population == testutil.ReportPresentationPopulationParity && !isRenderingAcceptanceRateMetadataField(occurrence.FieldName)) {
 			continue
 		}
 		var expected, err = renderingAcceptanceExpectedValue(acceptanceCase, report, occurrence)
@@ -422,7 +422,7 @@ func validateRenderingAcceptanceMarkdownControls(acceptanceCase testutil.ReportP
 			return observed, err
 		}
 	}
-	addRenderingAcceptanceFormatParityObservations(observed, acceptanceCase, testutil.ReportPresentationFormatMarkdown, report)
+	addRenderingAcceptanceFormatParityObservations(observed, acceptanceCase, testutil.ReportPresentationFormatMarkdown)
 	return observed, nil
 }
 
@@ -439,7 +439,7 @@ func validateRenderingAcceptancePDFControls(acceptanceCase testutil.ReportPresen
 		return observed, err
 	}
 	for _, occurrence := range acceptanceCase.OccurrenceKeys {
-		if (occurrence.Format != testutil.ReportPresentationFormatPDF && !(occurrence.Population == testutil.ReportPresentationPopulationParity && isRenderingAcceptanceRateMetadataField(occurrence.FieldName))) || occurrence.Population == testutil.ReportPresentationPopulationWarning || occurrence.Population == testutil.ReportPresentationPopulationModelIntegrity || (occurrence.Population == testutil.ReportPresentationPopulationParity && !isRenderingAcceptanceRateMetadataField(occurrence.FieldName)) {
+		if (occurrence.Format != testutil.ReportPresentationFormatPDF && (occurrence.Population != testutil.ReportPresentationPopulationParity || !isRenderingAcceptanceRateMetadataField(occurrence.FieldName))) || occurrence.Population == testutil.ReportPresentationPopulationWarning || occurrence.Population == testutil.ReportPresentationPopulationModelIntegrity || (occurrence.Population == testutil.ReportPresentationPopulationParity && !isRenderingAcceptanceRateMetadataField(occurrence.FieldName)) {
 			continue
 		}
 		var expected, err = renderingAcceptanceExpectedValue(acceptanceCase, report, occurrence)
@@ -459,7 +459,7 @@ func validateRenderingAcceptancePDFControls(acceptanceCase testutil.ReportPresen
 			return observed, err
 		}
 	}
-	addRenderingAcceptanceFormatParityObservations(observed, acceptanceCase, testutil.ReportPresentationFormatPDF, report)
+	addRenderingAcceptanceFormatParityObservations(observed, acceptanceCase, testutil.ReportPresentationFormatPDF)
 	return observed, nil
 }
 
@@ -492,7 +492,7 @@ func recordRenderingAcceptanceObservation(observed map[string]string, acceptance
 // addRenderingAcceptanceFormatParityObservations records format-local evidence
 // for parity-only rate metadata and exact omission controls.
 // Authored by: OpenCode
-func addRenderingAcceptanceFormatParityObservations(observed map[string]string, acceptanceCase testutil.ReportPresentationAcceptanceCase, format testutil.ReportPresentationFormat, report reportmodel.CapitalGainsReport) {
+func addRenderingAcceptanceFormatParityObservations(observed map[string]string, acceptanceCase testutil.ReportPresentationAcceptanceCase, format testutil.ReportPresentationFormat) {
 	for _, occurrence := range acceptanceCase.OccurrenceKeys {
 		if occurrence.Population != testutil.ReportPresentationPopulationParity {
 			continue
@@ -1948,18 +1948,6 @@ func renderingAcceptanceConvertedSequence(acceptanceCase testutil.ReportPresenta
 		}
 	}
 	return contractConvertedSequence{}, false
-}
-
-// renderingAcceptanceConvertedSequenceIndex returns the deterministic source-ID
-// suffix used by the existing conversion fixture.
-// Authored by: OpenCode
-func renderingAcceptanceConvertedSequenceIndex(sequenceID string) string {
-	for index, sequence := range contractConvertedAuditSequences() {
-		if sequence.ID == sequenceID {
-			return fmt.Sprintf("%d", index)
-		}
-	}
-	return "-1"
 }
 
 // renderingAcceptanceCurrencySourceID resolves the source row for one closed

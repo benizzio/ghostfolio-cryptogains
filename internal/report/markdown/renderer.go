@@ -130,8 +130,8 @@ func (renderer Renderer) Render(report reportmodel.CapitalGainsReport) (reportmo
 	if err := writeSummarySectionWithFinancialFormatting(&builder, report, calculationCurrency, options); err != nil {
 		return reportmodel.ReportDocument{}, err
 	}
-	writeRateSourceSummary(&builder, report)
-	writeReferenceSection(&builder, report)
+	_ = writeRateSourceSummary(&builder, report)
+	_ = writeReferenceSection(&builder, report)
 	if err := writeDetailSectionsWithFinancialFormatting(&builder, report, calculationCurrency, options); err != nil {
 		return reportmodel.ReportDocument{}, err
 	}
