@@ -47,6 +47,10 @@
 
 🚩 [DIVERGENT] The audit and converted-amount scenarios each implement a separate PDF artifact-processing stack for locating source identifiers, grouping text runs into rows, interpreting coordinates, and selecting semantic cells. The audit scenario additionally mirrors renderer table geometry and column widths. New scenarios also consume fixture, request, path, and output-discovery helpers declared inside the unrelated `report_generation_flow_test.go` scenario file. This creates duplicated maintenance-sensitive infrastructure and hidden package-global coupling instead of using the repository's designated shared runtime-flow and artifact-support boundary.
 
+**Remediation plan**:
+
+Move the integration-neutral mixed-currency fixture, report-request, output-discovery, and PDF row/cell inspection helpers into cohesive files under `tests/testutil/runtimeflow`, and make the integration scenarios consume those shared APIs. Consolidate the duplicated audit and converted-amount text-run grouping there while keeping scenario-specific Markdown parsing, semantic expectations, and AUD-001 assertions in `tests/integration`; preserve fixture values, row geometry, coordinate tolerances, text-run order, and blank-cell handling exactly. Validate the shared package and all affected integration scenarios with `go test ./tests/testutil/runtimeflow ./tests/integration -count=1`.
+
 ### CODE-STAND-DRIFT-002: Converted Amounts Use a Stringly Typed Renderer Boundary
 
 **Status**: Pending
@@ -65,6 +69,10 @@
 **Description**:
 
 🚩 [DIVERGENT] The format-neutral presentation API describes converted amounts as delimiter-free logical entries but returns strings that already contain the `: ` and ` -> ` syntax. The Markdown renderer then parses each string with `LastIndex` and reconstructs the same syntax after escaping its components. The logical entry's label and values are therefore hidden in a string protocol, and delimiter knowledge is duplicated across presentation and rendering instead of being represented explicitly at the package boundary.
+
+**Remediation plan**:
+
+Introduce an explicit `ConvertedAmountEntry` presentation type with separate label, original-amount, and converted-amount fields; return and store that type through `ConvertedAmounts` and `ConversionAuditRow`, then let Markdown and PDF assemble their existing fixed delimiters directly. Remove the Markdown string parser while preserving exact zero omission, received order, financial formatting, contextual errors, Markdown component escaping, whole-entry PDF sanitization, PDF reverse iteration, and generated output bytes. Validate presentation, Markdown, PDF, converted-amount contracts, and converted-amount integration flows.
 
 ### CODE-STAND-DRIFT-003: Successful Report Copy Has Competing Runtime and TUI Owners
 
@@ -86,6 +94,10 @@
 
 🚩 [DIVERGENT] Runtime success and opener-warning messages contain saved-path and cleartext deletion guidance, while the report-result screen separately owns cleartext disclosure, path labels, and deletion guidance. The screen appends the runtime message between its own disclosure and deletion strings, so normal runtime outcomes repeat deletion guidance. User-visible success copy consequently has competing owners across orchestration and presentation layers.
 
+**Remediation plan**:
+
+Reduce runtime success and opener-warning messages to operational save/open status and redacted opener detail only, removing path, cleartext, and deletion text from `internal/app/runtime`. Keep cleartext disclosure, role-specific path rendering, and deletion guidance owned by the TUI component/screen, including the legacy single-output fallback; preserve success classification, `OpenError`, saved files, cleanup, and retry behavior. Add focused runtime, screen, workflow-contract, and integration assertions that every path plus disclosure and deletion guidance appears exactly once for normal and opener-warning success.
+
 ### CODE-STAND-DRIFT-004: Report PDF Rendering Exceeds the Complexity Threshold
 
 **Status**: Pending
@@ -98,10 +110,15 @@
 **Evidence**:
 
 - `internal/report/pdf/main_report.go:104-141`
+- `.golangci.yml:31-37`
 
 **Description**:
 
 🚩 [DIVERGENT] `gocognit v1.2.0 -over 15 internal/report/pdf/main_report.go` reports cognitive complexity 16 for `renderRateSourceSection`. The same function on `origin/main` reports 14; the Feature 009 empty-state branch moved it above the written repository threshold. The configured golangci-lint gate does not report this exact score because its `min-complexity: 16` comparison is exclusive, but the implementation still diverges from the explicit `AGENTS.md` rule.
+
+**Remediation plan**:
+
+Extract only the empty-rate-source paragraph branch into a private helper and return that helper directly from `renderRateSourceSection`, reducing the parent function to cognitive complexity 14 without changing non-empty provider traversal. Change `.golangci.yml` from `min-complexity: 16` to `min-complexity: 14` because the adapter reports only scores greater than the configured value, thereby rejecting production complexity 15 and above while retaining the existing test-file exclusion. Preserve operation order, paragraph and error text, duplicate suppression, and source order; validate the lint configuration, existing main-report tests, the standalone `gocognit v1.2.0 -test=false -over 14 internal/report/pdf/main_report.go` result, and the changed-source quality gate.
 
 ### CODE-STAND-DRIFT-005: Acceptance Fixture Combines Independent Responsibilities
 
@@ -123,6 +140,10 @@
 
 🚩 [DIVERGENT] One test-support file owns the exported acceptance schema and taxonomy, case-catalog construction, semantic occurrence generation and accounting, and the financial matrices and numeric vectors. These sections change for different reasons and serve separate consumers. Their colocation broadens every review and couples catalog, accounting, and model evolution beyond a cohesive fixture responsibility.
 
+**Remediation plan**:
+
+Split `report_presentation_fixtures.go` within package `testutil` into cohesive schema/taxonomy, catalog construction, occurrence accounting, financial matrix/vector, and scalar-case files after the related key and counter APIs are simplified. Move declarations without changing visibility, names, case ordering, occurrence ordering, vector values, fresh allocation behavior, or type/method/builder cohesion. Validate the testutil package and the closed-manifest, acceptance-accounting, Annex, and converted-amount contracts.
+
 ### CODE-STAND-DRIFT-006: PDF Inspection Support Spans Multiple Parser Layers
 
 **Status**: Pending
@@ -143,6 +164,10 @@
 
 🚩 [DIVERGENT] Feature 009 expanded the same test-support file across PDF object and page resolution, text-state and operator parsing, CMap and TrueType decoding, stream decompression, literal decoding, and search normalization. Ordered text-run extraction now changes in the same declaration unit as lower-level font and object parsing, creating multiple independent parser responsibilities in one file.
 
+**Remediation plan**:
+
+Split `pdf_inspection.go` within package `testutil` into the public inspection/search API, object and page resolution, text-run/operator parsing, literal decoding, CMap decoding, TrueType decoding, and stream decompression files. Keep each stateful type with its methods and move code without changing exported APIs, object/page/event ordering, coordinate interpretation, decoder fallback order, stream close behavior, normalization, or error strings. Validate all PDF inspector tests plus contract and integration consumers.
+
 ### CODE-STAND-DRIFT-007: Acceptance Keys Use Error-Prone Positional String APIs
 
 **Status**: Pending
@@ -161,6 +186,10 @@
 **Description**:
 
 🚩 [DIVERGENT] `newPresentationCase` accepts nine positional arguments and `formatOccurrenceKeys` accepts ten, including several adjacent strings that are commonly supplied as repeated empty placeholders. Argument transposition is not type-checked, and call sites are difficult to interpret without repeatedly consulting the declaration. `formatOccurrenceKeys` also has two branches that construct the same one-element result, adding duplication without a distinct abstraction.
+
+**Remediation plan**:
+
+Change `newPresentationCase` to accept a named `ReportPresentationAcceptanceCase` value and retain only its cloning, attempt initialization, and base-key behavior. Delete `formatOccurrenceKeys` and append named `ReportPresentationOccurrenceKey` literals at its callers because both existing branches return one identical-shape key; preserve all empty identity fields, amount ordinals, append order, slice cloning, and occurrence cardinality. Validate the closed manifest and aggregate population contracts before the fixture files are split.
 
 ### CODE-STAND-DRIFT-008: Population Counters Duplicate Their Domain Mapping
 
@@ -182,6 +211,10 @@
 
 🚩 [DIVERGENT] Descriptive population constants are reduced to eleven single-letter counter fields, then mapped once while counting and mapped independently in a contract helper. The reverse mapping's default silently returns zero. Adding or renaming a population therefore requires synchronized switch changes that the type system cannot enforce, despite the descriptive population type already representing the domain concept.
 
+**Remediation plan**:
+
+Replace the letter-named counter fields with `CaseCount` plus a freshly allocated `map[ReportPresentationPopulation]int`, count occurrences directly by their typed population, and remove the duplicate contract switch. Require explicit comma-ok lookups where a population must exist and exact map equality where extra populations must fail; preserve every population's current string value and numerator/denominator. Validate acceptance accounting and the closed-manifest, Annex, and converted-amount population contracts.
+
 ### CODE-STAND-DRIFT-009: Performance Tests Duplicate Deterministic Document Contracts
 
 **Status**: Pending
@@ -201,6 +234,10 @@
 **Description**:
 
 🚩 [DIVERGENT] The isolated performance scenario now verifies exact warning and currency text, converted-entry labels and delimiters, exact rate occurrences, output cardinality, and repeated table headings. These are deterministic document-contract checks already owned by contract and integration suites rather than timing, responsiveness, bounded lookup, or resource evidence. The performance suite consequently has a second behavioral-contract responsibility.
+
+**Remediation plan**:
+
+Remove exact document text, delimiter, row-count, heading, rate-occurrence, and bundle-cardinality assertions from the performance scenario while retaining the exact 10,000-activity workload, local deterministic inputs, separate Markdown/PDF generation timers, strict duration limits, successful non-empty output, opener invocation, environment logging, and performance-coverage isolation. Update the feature spec, plan, research, rendering contract, quickstart, and existing performance-task wording so deterministic content evidence remains assigned to package, contract, and integration tests. Validate those deterministic owners and run `make test-performance` separately.
 
 ### CODE-STAND-DRIFT-010: Agent-Touched Declarations Have Incomplete Documentation and Attribution
 
@@ -230,6 +267,10 @@
 
 🚩 [DIVERGENT] The presentation package description still covers only table values although Feature 009 added financial formatting, converted-entry processing, and legal-warning policy. Branch-touched exported row builders, workflow-copy constants, and public test-support models have summaries but not the required detailed cross-package usage and invariant documentation. The feature-touched PDF `Bytes` seam declarations and `largeReportFixture` function omit declaration-level purpose or author/co-author information entirely. The drift is systematic across production and test support rather than one isolated missing comment.
 
+**Remediation plan**:
+
+After the structural and ownership remediations settle declaration locations, update the presentation package comment and the cited exported row builders, workflow-copy constants, and test-support models with accurate responsibilities, invariants, and public usage examples where required. Add purpose documentation and OpenCode author/co-author attribution to the cited PDF finalization seams, test doubles, and performance fixture helper, preserving existing authorship and changing no signatures, strings, or behavior. Run `gofmt` and focused tests for presentation, PDF, TUI components, testutil, and the performance package.
+
 ### CODE-STAND-DRIFT-011: PDF Renderer Tests Mix Unrelated Production Responsibilities
 
 **Status**: Pending
@@ -250,6 +291,10 @@
 **Description**:
 
 🚩 [DIVERGENT] Feature 009 added separate test groups for table measurement and pagination, warning and financial presentation, byte finalization, main-report failures, and bold-paragraph layout to the same package-local file. These groups follow distinct production responsibilities owned by different PDF source files. The finding concerns the responsibility spread introduced by the feature, not a numeric file-length limit.
+
+**Remediation plan**:
+
+Move the cited test functions, unchanged and still in package `pdf`, into responsibility-specific files for table layout/pagination, main-report composition, PDF presentation, byte finalization, and bold-paragraph layout. Keep shared package-local recorders, fixtures, and test doubles single-sourced unless moving them is required for type/method cohesion; preserve test names, seam restoration, ordering, and package-private access, and do not add parallel execution. Compare discovered tests before and after the move and run the full `internal/report/pdf` suite.
 
 ### CODE-STAND-DRIFT-012: Report Tests Duplicate Shared Setup and Fixed Presentation Text
 
@@ -276,6 +321,10 @@
 
 🚩 [DIVERGENT] Contract files repeatedly construct the same font-backed PDF renderer, render a fixture, and inspect the resulting bytes rather than using one shared helper. The exact legal-warning sentence is also redeclared or embedded in integration, unit, and performance suites even though the feature already exposes a shared test fixture constant. These duplicated setup and literal copies can drift independently as renderer construction or presentation text changes.
 
+**Remediation plan**:
+
+Add a dedicated `tests/testutil/reportpdf` helper package that constructs the standard font-backed renderer and optionally renders then inspects a successful report, avoiding an import cycle with package-local PDF tests. Replace duplicated contract setup where renderer lifetime and failure assertions permit, retain renderer reuse in the 148-case acceptance test, and replace surviving test-owned warning copies with the independent `testutil.ReportPresentationLegalWarningText` fixture constant; do not source expected text from production. Validate contract, integration, unit, Markdown, and performance compilation paths affected by the shared support.
+
 ### CODE-STAND-DRIFT-013: Names and Comments Lag the Current Behavior
 
 **Status**: Pending
@@ -294,6 +343,10 @@
 **Description**:
 
 🚩 [DIVERGENT] `reportOutputBundleSummary` can receive the legacy single `OutputFile` fallback returned by `reportOutputFiles`, so its name asserts bundle-only semantics that its accepted input no longer guarantees. Two Feature 009 test-double comments describe `AddBoldParagraph` as a “future” warning seam even though the seam exists and is used in the same implementation revision.
+
+**Remediation plan**:
+
+Rename `reportOutputBundleSummary` to `reportSuccessfulOutputSummary` and update its documentation to cover both bundle files and the legacy single `OutputFile` fallback, without changing bundle precedence, path labels, disclosure, deletion guidance, or no-file fallback behavior. Correct the two `AddBoldParagraph` test-double comments to describe their current legal-warning operation and injected-failure roles, coordinating with the PDF test-file split. Validate TUI fallback/success rendering and the affected PDF seam tests.
 
 ### CODE-STAND-DRIFT-014: Feature-Added Declarations Bypass the `var` Preference
 
@@ -316,10 +369,14 @@
 
 🚩 [DIVERGENT] Branch-added tests and one production screen path repeatedly use standalone short declarations or `if` initializers where no later redeclaration or reuse satisfies the documented exception. The pattern is limited in structural impact but is inconsistent with the repository's explicit declaration-style preference.
 
+**Remediation plan**:
+
+After the overlapping structural, typed-entry, and TUI changes, convert the report-cited standalone short declarations and `if` initializers to explicit `var` declarations while retaining one evaluation, scope-safe descriptive names, subtest capture, assertion order, and existing error handling. Do not rewrite range clauses or legitimate multi-assignment/reuse sites covered by the documented exception. Run `gofmt` and focused presentation, runtime, screen, and converted-amount integration tests.
+
 ## Notes
 
 - No earlier `coding-standards-drift-report.md` existed, so all identifiers were allocated sequentially as new pending findings.
 - All normal Feature 009 checklist tasks `T001` through `T049` were checked before this review. References to “unchecked tasks” in `tasks.md` are orchestration instructions, not open tasks.
 - No additional proprietary agent-instruction files were discovered in repository or feature scope beyond `AGENTS.md`; `.specify/memory/constitution.md` was also loaded as required.
 - Test code was not evaluated against the production cognitive-complexity threshold because `AGENTS.md:188` explicitly exempts it.
-- No finding status was set to `Resolved`, and no remediation plan or remediation task was added by this report command.
+- Focused remediation plans and Phase 7 tasks T050-T065 were added after the normal implementation completed; all finding statuses remain `Pending` until the final successful-remediation update in T065.
