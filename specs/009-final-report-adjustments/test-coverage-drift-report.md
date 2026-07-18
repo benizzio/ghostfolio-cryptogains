@@ -55,6 +55,10 @@
 
 The manifest declares distinct semantic occurrence keys, but a successful format attempt records every key for that case after only a document-wide expected-string check. The financial fixture declares opening, closing, and historical cost-basis occurrences, while the case control changes only opening and closing values. Nullable cases remove complete rows instead of proving blank values at present semantic fields, and exact-zero summary omission skips the generic visible-text assertion. Quantity cases change and count only `OpeningQuantity`, although `Q` is defined to include every opening, closing, historical, activity, post-activity, and disposed quantity. Rate cases assign the same value to all rate fields, and parity compares only the warning plus one expected value before crediting all `P` keys. The reported `V=664`, `Q=10`, and `P=491` completion therefore does not demonstrate the semantic-field coverage required by the feature.
 
+**Remediation plan**:
+
+Replace attempt-wide occurrence crediting with test-owned Markdown and PDF observations keyed by the full semantic occurrence identity. Extend the closed fixture only as needed to keep nullable rows present with blank fields, exercise historical positions, cover every required quantity and rate-metadata field, and distinguish omitted from visible values; then credit each `V`, `Q`, `B`, `Z`, `N`, `C`, `P`, and `E` item only after its own exact assertion and compare parity from the observed maps. Add negative harness cases proving a missing, misplaced, blank, or mismatched field cannot receive credit. Preserve warning, converted-entry, failed-attempt denominator, AUD-001 model-integrity, exact-value inclusion, and empirical-fixture behavior, and validate the focused testutil, contract, and integration owners before `make coverage`.
+
 ### COV-DRIFT-002: Deterministic Scale-Content Coverage Is Missing
 
 **Status**: Pending
@@ -77,6 +81,10 @@ The manifest declares distinct semantic occurrence keys, but a successful format
 
 The only Feature 009 fixture with exactly 10,000 activities is build-tagged performance support. Its performance test checks workload composition, timing, non-empty files, and opener invocation, but intentionally performs no document-content inspection. Deterministic integration coverage uses six-activity and 54-activity fixtures. No deterministic package, contract, or integration owner verifies that the named 10,000-activity report produces exactly 6,666 conversion rows with three entries each, controlled Markdown boundaries, a multi-page PDF Annex, repeated headers and continuation context, and no clipping or omission as required by SC-011. The required content evidence is absent rather than isolated from performance evidence.
 
+**Remediation plan**:
+
+Move the exact named 10,000-activity fixture into shared runtime-flow test support and reuse it from the isolated performance suite without restoring document assertions there. Add one deterministic runtime-backed integration owner that generates both formats and verifies all 6,666 source rows and three entries per row, controlled Markdown boundaries, multi-page PDF Annex headers and continuation context, searchable content within printable bounds, and no duplicates, clipping, or omission. Correct the stale performance work-unit wording while preserving the existing workload, request, timers, opener evidence, suite isolation, and absence of performance coverage artifacts. Validate focused PDF and converted-amount contracts, the new deterministic integration case, `make test`, `make coverage`, and separate `make test-performance`.
+
 ### COV-DRIFT-003: FR-004a Failure Boundaries Stop Before Runtime Output
 
 **Status**: Pending
@@ -97,6 +105,10 @@ The only Feature 009 fixture with exactly 10,000 activities is build-tagged perf
 **Description**:
 
 Formatter tests cover adjusted exponents immediately below and above the accepted range, upper-bound carry, and checked precision limits. Generated-document coverage exercises only adjusted exponent `100001` through Markdown and PDF. The runtime service test injects a preconstructed generic render error, while the runtime-backed integration test exercises a concrete PDF layout failure. There is no selected-format runtime journey for the lower exponent boundary, upper-bound carry, or precision overflow proving renderer rejection, no saved path, no opener request, no alternate renderer, and a usable retry. The feature therefore cannot demonstrate its explicitly required end-to-end failure coverage for every FR-004a rejection class.
+
+**Remediation plan**:
+
+Add immutable, constructor-injected report-pipeline and renderer-scoped financial-formatting test options that retain the current concrete production defaults and make the precision-overflow path resource-safe without constructing a multi-gigabyte coefficient or using process-global fault mutation. Extend both-format generated-document and runtime-backed integration coverage for adjusted exponents `-100001` and `100001`, upper-bound carry to `100001`, and required precision above `2147383649`, invoking only the actual selected renderer. Each case must prove contextual redacted failure, no alternate renderer, writer, opener, document, bundle, path, or file, followed by a successful same-format retry through the same service. Preserve calculation, protected snapshots, exact inclusion, output transactions, and TUI disclosure ownership, and validate the formatter, renderer, runtime, contract, and integration paths before canonical coverage.
 
 ### COV-DRIFT-004: Export Disclosure Is Not Covered by a Runtime-Backed Journey
 
@@ -120,6 +132,10 @@ Formatter tests cover adjusted exponents immediately below and above the accepte
 
 Package and contract tests construct successful outcomes or screen parameters directly and verify cleartext disclosure, all saved paths, and deletion guidance. The runtime-backed normal-success journey checks saved paths and request metadata but not the disclosure or deletion copy. The opener-warning journey checks only its operational warning and manual-open instruction. No integration journey proves that real generation, output bundling, and flow routing produce every SC-012 disclosure for normal and opener-warning outcomes, which diverges from the repository's integration-first user-journey baseline.
 
+**Remediation plan**:
+
+Keep production copy ownership unchanged and extend the existing runtime-backed normal-success and opener-warning journeys with shared flow assertions. Verify the TUI-owned cleartext disclosure and deletion guidance exactly once, every saved Markdown or PDF path exactly once, the expected two-file and one-file bundle shapes, and absence of prior paths and disclosure after result-flow exit. Preserve opener failure as success-with-warning, retained user-owned files, runtime operational-only messages, and non-retention. Validate the focused runtimeflow and integration journeys plus the existing component, screen, flow, and workflow-contract tests.
+
 ### COV-DRIFT-005: Concrete PDF Finalization Failure Lacks Integration Coverage
 
 **Status**: Pending
@@ -139,6 +155,10 @@ Package and contract tests construct successful outcomes or screen parameters di
 **Description**:
 
 The PDF package injects a concrete finalization failure and proves that the renderer returns no partial payload. Runtime package tests separately inject a generic `renderBundle` error labeled as finalization and prove no writer or opener call plus retry. The integration suite covers the same runtime consequences only for a concrete PDF layout failure. No runtime-backed integration journey carries the actual PDF finalization seam through process survival, no output reservation, no opener request, redacted failure context, and successful retry. The behavior is split across isolated seams instead of satisfying the required integration-first recovery evidence.
+
+**Remediation plan**:
+
+Replace the process-global finalization fault hook with an immutable renderer-scoped byte-finalizer option whose production default remains `GetBytesPdfReturnErr`, and expose only the narrow default-preserving runtime pipeline injection needed by shared integration support. Add a PDF-only runtime-backed journey that fails at the concrete document finalization boundary with partial bytes and a synthetic secret-bearing cause, then proves partial-byte discard, process survival, redacted finalization context, no alternate renderer, writer, opener, reservation, output metadata, path, or file, and one successful retry through the same service. Preserve layout and font completion order, `errors.Is` behavior, local `0600` export behavior on retry, and TUI ownership of disclosure copy. Validate focused PDF and runtime tests, shared test support, and the new integration journey.
 
 ### COV-DRIFT-006: Markdown Unit Tests Substantially Duplicate Broader Coverage
 
@@ -162,6 +182,10 @@ The PDF package injects a concrete finalization failure and proves that the rend
 **Description**:
 
 The Feature 009 black-box Markdown unit tests repeat warning occurrence and placement, financial formatting, nil handling, canonical quantities and rates, source immutability, and classified Annex currency behavior that are also asserted through contract and runtime-backed integration boundaries. These tests call the exported renderers rather than isolating a seam that broader tests cannot reach. This is substantial behavioral duplication under the constitution's unit-test rule. The current acceptance-accounting gap in COV-DRIFT-001 must not be hidden by treating duplicate unit coverage as a substitute for correct contract or integration evidence.
+
+**Remediation plan**:
+
+After COV-DRIFT-001 supplies passing per-occurrence contract evidence, remove only the cited Feature 009 black-box Markdown tests and helpers used exclusively by them. Retain inherited Markdown behavior, unique invalid-render failure coverage, package-local syntax and error seams, corrected generated-document contracts, and runtime-backed integration journeys. If canonical production coverage drops, add the missing execution to the broader owning contract or integration layer rather than restoring duplicate assertions or changing the coverage denominator. Validate focused unit, contract, and integration owners followed by `make coverage`.
 
 ### COV-DRIFT-007: Regression Population Is Miscounted and Re-Executed Across Suites
 
@@ -188,6 +212,10 @@ The Feature 009 black-box Markdown unit tests repeat warning occurrence and plac
 
 The frozen `R` baseline includes `TestEmpiricalCalculationFixtures` even though that test creates child subtests. The discovery code marks only the path before the final slash as a parent, so slash-bearing subtest names do not mark the top-level test as non-leaf. This contradicts the feature's explicit exclusion of parents containing child subtests. The contract suite also launches the basis, calculation, and empirical owner suites once to discover `R` and a second time from aggregate acceptance, while `make test` already runs their designated package and empirical targets. The result is an incorrect denominator plus recursive duplicate execution across suite ownership boundaries.
 
+**Remediation plan**:
+
+Correct the pinned baseline without rebasing by removing only the invalid `TestEmpiricalCalculationFixtures` parent, changing `R` from 102 to 101, and retaining all leaf identities, source fingerprints, artifact hashes, and the baseline commit. Add a baseline invariant rejecting any recorded parent identity that is a proper ancestor of another case, remove both nested `go test` executions and synthetic `baseline/NNN` acceptance crediting, and make the contract layer statically validate identities, fingerprints, and empirical artifact hashes while maintained package and empirical targets remain the sole execution owners. Preserve `Makefile`, coverage instrumentation, calculation expectations, and read-only empirical data. Validate the focused regression and acceptance contracts, direct owner packages, and aggregate `make test` and `make coverage` paths.
+
 ### COV-DRIFT-008: Successful-Document Financial Confidentiality Check Is Vacuous
 
 **Status**: Pending
@@ -208,6 +236,10 @@ The frozen `R` baseline includes `TestEmpiricalCalculationFixtures` even though 
 
 The successful Markdown/PDF test injects credential and protected-payload sentinels into a note and injects an allowed numeric amount into contracted financial fields. Its shared absence helper also checks `syntheticFinancialSentinel`, but that sentinel is never supplied to the successful report; it appears only in error and diagnostic tests. Its absence from successful documents is therefore guaranteed regardless of renderer behavior and does not prove the required suppression of unrelated financial material from a successful export. A required security-sensitive coverage claim remains unexercised.
 
+**Remediation plan**:
+
+Make the successful-document check non-vacuous with a test-local synthetic probe in valid non-contracted financial provenance, such as `BasisMatch.AcquisitionSourceID`, and assert the probe exists in the pre-render model before proving it is absent from both Markdown documents and PDF searchable text. Keep the separate synthetic export amount present in contracted financial fields, and retain every credential, protected-payload, error, diagnostic, and fixture assertion. Change no production renderer or redaction behavior and introduce no real user data or reusable secret. Validate the focused confidentiality contract tests.
+
 ### COV-DRIFT-009: Stale Performance Coverage Profile Survives Canonical Validation
 
 **Status**: Pending
@@ -225,6 +257,10 @@ The successful Markdown/PDF test injects credential and protected-payload sentin
 **Description**:
 
 The workspace contains an atomic performance coverage profile even though repository policy states that no performance profile or artifact exists. `make test-performance` does not create a profile, and `make coverage` excludes performance tests, so canonical coverage is not contaminated. However, canonical cleanup removes only `coverage.out` and `coverage.xml`, allowing the forbidden stale `performance.out` artifact to survive a successful gate. Its timestamp predates Feature 009, so this finding records current validation and cleanup drift rather than claiming that the feature generated the file.
+
+**Remediation plan**:
+
+Extend the canonical `coverage` target's exact generated-artifact cleanup to remove only `dist/coverage/performance.out` in addition to the canonical outputs. Preserve permitted diagnostic leaf profiles, deterministic package instrumentation, independent CI jobs, and the rule that no performance coverage target, profile, merge, job, or context exists. Validate that `make coverage` removes the stale file and that a separate `make test-performance` run does not recreate it. Do not change `.cov.json`, coverage-gate tooling, workflows, or performance suite membership.
 
 ## Notes
 
