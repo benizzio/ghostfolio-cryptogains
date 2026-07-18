@@ -71,6 +71,44 @@ func SelectReportBaseCurrency(t *testing.T, model *flow.Model, reportBaseCurrenc
 	return model
 }
 
+// SelectReportOutputFormat moves focus to the output-format list and selects the
+// requested supported format. For example, call it after SelectReportBaseCurrency
+// and before StartReportGeneration when a journey must exercise PDF instead of
+// the default Markdown output.
+// Authored by: OpenCode
+func SelectReportOutputFormat(t *testing.T, model *flow.Model, outputFormat reportmodel.ReportOutputFormat) *flow.Model {
+	t.Helper()
+
+	var supportedFormats = reportmodel.SupportedReportOutputFormats()
+	var targetFound bool
+	for _, supportedFormat := range supportedFormats {
+		if supportedFormat == outputFormat {
+			targetFound = true
+			break
+		}
+	}
+	if !targetFound {
+		t.Fatalf("unsupported report output format %q", outputFormat)
+	}
+
+	var updated tea.Model
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = AssertFlowModel(t, updated)
+	var marker = "> " + outputFormat.Label()
+	for attempt := 0; attempt < len(supportedFormats); attempt++ {
+		var content = NormalizeRenderedText(model.View().Content)
+		if strings.Contains(content, "Output Format") && strings.Contains(content, marker) {
+			return model
+		}
+
+		updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+		model = AssertFlowModel(t, updated)
+	}
+
+	t.Fatalf("expected report output format %q to be selected, got %q", outputFormat, NormalizeRenderedText(model.View().Content))
+	return model
+}
+
 // OpenReportSelection opens report selection from an unlocked context.
 // Authored by: OpenCode
 func OpenReportSelection(t *testing.T, model *flow.Model) *flow.Model {

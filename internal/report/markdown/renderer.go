@@ -24,6 +24,31 @@ var (
 	renderAnnexForDocuments      = RenderAnnex
 )
 
+// RenderOptions stores immutable Markdown renderer configuration.
+// Authored by: OpenCode
+type RenderOptions struct {
+	FinancialFormatting presentation.FinancialFormattingOptions
+}
+
+// Renderer renders Markdown documents with one renderer-scoped formatting
+// policy. A zero-valued policy retains the concrete production defaults.
+// Authored by: OpenCode
+type Renderer struct {
+	options RenderOptions
+}
+
+// NewRenderer creates one Markdown renderer with immutable local options.
+//
+// Example:
+//
+//	renderer := markdown.NewRenderer(markdown.RenderOptions{})
+//	_ = renderer
+//
+// Authored by: OpenCode
+func NewRenderer(options RenderOptions) Renderer {
+	return Renderer{options: options}
+}
+
 // Render converts one calculated yearly capital-gains report into the Markdown
 // document contract used by later output-file writers.
 //
@@ -86,6 +111,46 @@ func RenderDocuments(report reportmodel.CapitalGainsReport) ([]reportmodel.Repor
 		return nil, err
 	}
 
+	return []reportmodel.ReportDocument{mainDocument, annexDocument}, nil
+}
+
+// Render renders one report through this renderer's scoped formatting policy.
+// Authored by: OpenCode
+func (renderer Renderer) Render(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, error) {
+	if err := report.Validate(); err != nil {
+		return reportmodel.ReportDocument{}, err
+	}
+	var options = renderer.options.FinancialFormatting
+	var builder strings.Builder
+	var calculationCurrency = calculationCurrencyLabel(report.ReportCalculationCurrency)
+	writeHeader(&builder, report, calculationCurrency)
+	builder.WriteString("**")
+	builder.WriteString(presentation.LegalWarningText)
+	builder.WriteString("**\n\n")
+	if err := writeSummarySectionWithFinancialFormatting(&builder, report, calculationCurrency, options); err != nil {
+		return reportmodel.ReportDocument{}, err
+	}
+	writeRateSourceSummary(&builder, report)
+	writeReferenceSection(&builder, report)
+	if err := writeDetailSectionsWithFinancialFormatting(&builder, report, calculationCurrency, options); err != nil {
+		return reportmodel.ReportDocument{}, err
+	}
+	return reportmodel.NewReportDocument(reportmodel.ReportDocumentTypeMarkdown, reportmodel.ReportDocumentRoleMain, []byte(builder.String()), report.Year, report.CostBasisMethod, report.GeneratedAt)
+}
+
+// RenderDocuments renders the Markdown main document and Annex with one
+// renderer-scoped formatting policy.
+// Authored by: OpenCode
+func (renderer Renderer) RenderDocuments(report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+	var mainDocument, err = renderer.Render(report)
+	if err != nil {
+		return nil, err
+	}
+	var annexDocument reportmodel.ReportDocument
+	annexDocument, err = RenderAnnexWithFinancialFormatting(report, renderer.options.FinancialFormatting)
+	if err != nil {
+		return nil, err
+	}
 	return []reportmodel.ReportDocument{mainDocument, annexDocument}, nil
 }
 

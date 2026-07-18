@@ -25,6 +25,94 @@ var (
 	quantizeFinancialValue                        = (*apd.Context).Quantize
 )
 
+// RequiredPrecisionChecker verifies the precision needed for one financial
+// value before apd quantization. It exists to let renderer-scoped tests model
+// the pinned library's precision ceiling without allocating an unsafe
+// coefficient.
+// Authored by: OpenCode
+type RequiredPrecisionChecker func(sourceDigits int64, coefficientExpansion int64) (uint32, error)
+
+// FinancialFormattingOptions is an immutable financial-formatting policy for
+// one renderer instance. A zero value uses the concrete production precision
+// checker; use NewFinancialFormattingTestOptions only for scoped failure tests.
+// Authored by: OpenCode
+type FinancialFormattingOptions struct {
+	precisionChecker RequiredPrecisionChecker
+	quantizer        func(*apd.Context, *apd.Decimal, *apd.Decimal, int32) (apd.Condition, error)
+}
+
+// DefaultFinancialFormattingOptions returns the concrete production financial
+// formatting policy. The returned value is safe to copy into separate renderer
+// instances and uses HALF UP quantization with the pinned apd limits.
+//
+// Example:
+//
+//	options := presentation.DefaultFinancialFormattingOptions()
+//	formatted, err := options.Format(value)
+//	_ = formatted
+//	_ = err
+//
+// Authored by: OpenCode
+func DefaultFinancialFormattingOptions() FinancialFormattingOptions {
+	return FinancialFormattingOptions{precisionChecker: checkedFinancialPrecision}
+}
+
+// NewFinancialFormattingTestOptions creates a renderer-scoped policy for
+// deterministic formatting-failure tests. The supplied failure hook is called
+// with the exact source metadata calculated by the production formatter; when
+// it does not fail, the concrete production precision checker is used.
+//
+// Example:
+//
+//	options := presentation.NewFinancialFormattingTestOptions(func(int64, int64) error {
+//		return errors.New("required precision exceeds apd operational limit")
+//	})
+//	_ = options
+//
+// Authored by: OpenCode
+func NewFinancialFormattingTestOptions(failureHook func(sourceDigits int64, coefficientExpansion int64) error) FinancialFormattingOptions {
+	if failureHook == nil {
+		return DefaultFinancialFormattingOptions()
+	}
+	return FinancialFormattingOptions{
+		precisionChecker: func(sourceDigits int64, coefficientExpansion int64) (uint32, error) {
+			if err := failureHook(sourceDigits, coefficientExpansion); err != nil {
+				return 0, err
+			}
+			return checkedFinancialPrecision(sourceDigits, coefficientExpansion)
+		},
+	}
+}
+
+// Format applies this renderer-scoped policy to one report-visible financial
+// value without mutating the supplied decimal.
+//
+// Example:
+//
+//	formatted, err := options.Format(value)
+//	if err != nil {
+//		return err
+//	}
+//	_ = formatted
+//
+// Authored by: OpenCode
+func (options FinancialFormattingOptions) Format(value apd.Decimal) (string, error) {
+	if options.precisionChecker == nil {
+		options = DefaultFinancialFormattingOptions()
+	}
+	return formatFinancialValueWithOptions(value, options)
+}
+
+// FormatOptional applies this renderer-scoped policy while preserving an
+// absent optional amount as a blank string.
+// Authored by: OpenCode
+func (options FinancialFormattingOptions) FormatOptional(value *apd.Decimal) (string, error) {
+	if value == nil {
+		return "", nil
+	}
+	return options.Format(*value)
+}
+
 // FormatFinancialValue formats one report-visible financial value at scale two
 // using HALF UP rounding. It protects the supplied decimal from mutation and
 // returns fixed-point ASCII text suitable for report output.
@@ -66,6 +154,16 @@ func FormatOptionalFinancialValue(value *apd.Decimal) (string, error) {
 // text without changing the supplied decimal.
 // Authored by: OpenCode
 func formatFinancialValue(value apd.Decimal) (string, error) {
+	return formatFinancialValueWithOptions(value, FinancialFormattingOptions{
+		precisionChecker: checkedFinancialPrecisionForFormatting,
+		quantizer:        quantizeFinancialValue,
+	})
+}
+
+// formatFinancialValueWithOptions formats one value with a renderer-owned
+// precision policy while keeping the apd quantization path concrete.
+// Authored by: OpenCode
+func formatFinancialValueWithOptions(value apd.Decimal, options FinancialFormattingOptions) (string, error) {
 	if value.Form != apd.Finite {
 		return "", errors.New("financial value is not finite")
 	}
@@ -86,7 +184,11 @@ func formatFinancialValue(value apd.Decimal) (string, error) {
 	if value.Exponent > financialDisplayExponent {
 		coefficientExpansion = int64(value.Exponent) - int64(financialDisplayExponent)
 	}
-	precision, err := checkedFinancialPrecisionForFormatting(sourceDigits, coefficientExpansion)
+	var precisionChecker = options.precisionChecker
+	if precisionChecker == nil {
+		precisionChecker = checkedFinancialPrecision
+	}
+	precision, err := precisionChecker(sourceDigits, coefficientExpansion)
 	if err != nil {
 		return "", err
 	}
@@ -96,18 +198,25 @@ func formatFinancialValue(value apd.Decimal) (string, error) {
 	}
 
 	var quantized apd.Decimal
-	quantized, err = quantizeFinancialValueForFormatting(value, coefficientExpansion, precision)
+	var quantizer = options.quantizer
+	if quantizer == nil {
+		quantizer = (*apd.Context).Quantize
+	}
+	quantized, err = quantizeFinancialValueForFormattingWithOptions(value, coefficientExpansion, precision, quantizer)
 	if err != nil {
+		if adjustedExponent == int64(apd.MaxExponent) {
+			return "", errors.New("financial value adjusted exponent exceeds range after rounding")
+		}
 		return "", err
 	}
 
 	return quantized.Text('f'), nil
 }
 
-// quantizeFinancialValueForFormatting delegates ordinary scaling and rounding
-// to apd and applies only the pre-expansion needed beyond apd's shift range.
+// quantizeFinancialValueForFormattingWithOptions performs the defensive
+// coefficient handling and concrete apd quantization used by each renderer.
 // Authored by: OpenCode
-func quantizeFinancialValueForFormatting(value apd.Decimal, coefficientExpansion int64, precision uint32) (apd.Decimal, error) {
+func quantizeFinancialValueForFormattingWithOptions(value apd.Decimal, coefficientExpansion int64, precision uint32, quantize func(*apd.Context, *apd.Decimal, *apd.Decimal, int32) (apd.Condition, error)) (apd.Decimal, error) {
 	var source = &value
 	var expandedSource apd.Decimal
 	if requiresFinancialCoefficientPreExpansion(value.Exponent) {
@@ -131,7 +240,7 @@ func quantizeFinancialValueForFormatting(value apd.Decimal, coefficientExpansion
 		Traps:       apd.DefaultTraps,
 		Rounding:    apd.RoundHalfUp,
 	}
-	condition, err := quantizeFinancialValue(&context, &quantized, source, financialDisplayExponent)
+	condition, err := quantize(&context, &quantized, source, financialDisplayExponent)
 	if err != nil {
 		return apd.Decimal{}, fmt.Errorf("financial value quantization failed: %w", err)
 	}

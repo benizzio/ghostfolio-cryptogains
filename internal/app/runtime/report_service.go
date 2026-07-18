@@ -77,6 +77,7 @@ func newReportService(
 	baseConfigDir string,
 	allowDevHTTP bool,
 	currencyRates reportcalculate.CurrencyRateService,
+	pipelineOptions ReportPipelineOptions,
 ) ReportService {
 	var calculator = reportcalculate.NewCalculator(currencyRates)
 
@@ -86,9 +87,11 @@ func newReportService(
 		diagnosticReports: newDiagnosticReportService(baseConfigDir),
 		currencyRates:     currencyRates,
 		calculate:         calculator.Calculate,
-		renderBundle:      renderReportOutputBundle,
-		writeBundle:       reportoutput.WriteReportOutputBundle,
-		open:              reportoutput.OpenPath,
+		renderBundle: func(outputFormat reportmodel.ReportOutputFormat, report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+			return renderReportOutputBundleWithOptions(outputFormat, report, pipelineOptions)
+		},
+		writeBundle: reportoutput.WriteReportOutputBundle,
+		open:        reportoutput.OpenPath,
 	}
 }
 
@@ -190,11 +193,26 @@ func (s *reportService) writeReportDocuments(outputFormat reportmodel.ReportOutp
 // format and returns the rendered documents to save.
 // Authored by: OpenCode
 func renderReportOutputBundle(outputFormat reportmodel.ReportOutputFormat, report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+	return renderReportOutputBundleWithOptions(outputFormat, report, ReportPipelineOptions{})
+}
+
+// renderReportOutputBundleWithOptions selects the local renderer with one
+// immutable report-pipeline option set.
+// Authored by: OpenCode
+func renderReportOutputBundleWithOptions(
+	outputFormat reportmodel.ReportOutputFormat,
+	report reportmodel.CapitalGainsReport,
+	pipelineOptions ReportPipelineOptions,
+) ([]reportmodel.ReportDocument, error) {
 	switch outputFormat {
 	case reportmodel.ReportOutputFormatMarkdown:
-		return reportmarkdown.RenderDocuments(report)
+		var renderer = reportmarkdown.NewRenderer(reportmarkdown.RenderOptions{FinancialFormatting: pipelineOptions.MarkdownFinancialFormatting})
+		return renderer.RenderDocuments(report)
 	case reportmodel.ReportOutputFormatPDF:
-		var renderer, err = reportpdf.NewRenderer(reportPDFRenderOptions())
+		var renderOptions = reportPDFRenderOptions()
+		renderOptions.FinancialFormatting = pipelineOptions.PDFFinancialFormatting
+		renderOptions.ByteFinalizer = pipelineOptions.PDFByteFinalizer
+		var renderer, err = reportpdf.NewRenderer(renderOptions)
 		if err != nil {
 			return nil, err
 		}

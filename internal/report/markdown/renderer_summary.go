@@ -15,13 +15,20 @@ import (
 // yearly summary table.
 // Authored by: OpenCode
 func writeSummarySection(builder *strings.Builder, report reportmodel.CapitalGainsReport, calculationCurrency string) error {
+	return writeSummarySectionWithFinancialFormatting(builder, report, calculationCurrency, presentation.DefaultFinancialFormattingOptions())
+}
+
+// writeSummarySectionWithFinancialFormatting renders summary monetary values
+// with one renderer-scoped immutable policy.
+// Authored by: OpenCode
+func writeSummarySectionWithFinancialFormatting(builder *strings.Builder, report reportmodel.CapitalGainsReport, calculationCurrency string, options presentation.FinancialFormattingOptions) error {
 	builder.WriteString("## Gains-And-Losses Summary\n\n")
 	var renderedEntries []struct {
 		entry         reportmodel.AssetSummaryEntry
 		netGainOrLoss string
 	}
 	for _, entry := range report.SummaryEntries {
-		var netGainOrLoss, err = presentation.FormatFinancialValue(entry.NetGainOrLoss)
+		var netGainOrLoss, err = options.Format(entry.NetGainOrLoss)
 		if err != nil {
 			return fmt.Errorf("render summary entry %q net gain or loss: %w", entry.AssetIdentityKey, err)
 		}
@@ -49,7 +56,7 @@ func writeSummarySection(builder *strings.Builder, report reportmodel.CapitalGai
 		)
 	}
 
-	var yearlyNetTotal, err = presentation.FormatFinancialValue(report.YearlyNetTotal)
+	var yearlyNetTotal, err = options.Format(report.YearlyNetTotal)
 	if err != nil {
 		return fmt.Errorf("render yearly net total: %w", err)
 	}

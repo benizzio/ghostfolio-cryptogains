@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/component"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 )
 
@@ -76,6 +77,31 @@ func PDFFiles(t *testing.T, dir string) []string {
 	return files
 }
 
+// ReportOutputPaths returns the complete saved-file set for one selected format
+// and enforces its production bundle shape. For example, pass Markdown to get
+// the main and Annex paths, or PDF to get the one combined-document path.
+// Authored by: OpenCode
+func ReportOutputPaths(t *testing.T, dir string, outputFormat reportmodel.ReportOutputFormat) []string {
+	t.Helper()
+
+	var files []string
+	var expectedCount int
+	switch outputFormat {
+	case reportmodel.ReportOutputFormatMarkdown:
+		files = AllMarkdownFiles(t, dir)
+		expectedCount = 2
+	case reportmodel.ReportOutputFormatPDF:
+		files = PDFFiles(t, dir)
+		expectedCount = 1
+	default:
+		t.Fatalf("unsupported report output format %q", outputFormat)
+	}
+	if len(files) != expectedCount {
+		t.Fatalf("expected %d saved %s output file(s), got %#v", expectedCount, outputFormat, files)
+	}
+	return files
+}
+
 // AssertSavedMarkdownBundlePaths verifies that a result view reports both
 // generated Markdown paths. For example, pass the normalized result-screen
 // content and the paths returned by MarkdownBundlePaths.
@@ -88,6 +114,98 @@ func AssertSavedMarkdownBundlePaths(t *testing.T, content string, mainPath strin
 	var compactContent = strings.Join(strings.Fields(content), "")
 	if !strings.Contains(compactContent, mainPath) || !strings.Contains(compactContent, annexPath) {
 		t.Fatalf("expected saved Markdown paths %q and %q, got %q", mainPath, annexPath, content)
+	}
+}
+
+// AssertReportResultDisclosure verifies the TUI-owned cleartext disclosure,
+// deletion guidance, format-specific bundle labels, and every saved path in a
+// successful report result. For example, pass normalized result content and
+// the two Markdown or one PDF paths returned by ReportOutputPaths.
+// Authored by: OpenCode
+func AssertReportResultDisclosure(t *testing.T, content string, outputFormat reportmodel.ReportOutputFormat, paths []string) {
+	t.Helper()
+
+	if strings.Count(content, component.ReportCleartextExportDisclosureText) != 1 {
+		t.Fatalf("expected cleartext export disclosure exactly once, got %q", content)
+	}
+	if strings.Count(content, component.ReportCleartextExportDeletionGuidanceText) != 1 {
+		t.Fatalf("expected export deletion guidance exactly once, got %q", content)
+	}
+
+	var expectedLabels = reportResultPathLabels(t, outputFormat, len(paths))
+	assertReportResultLabels(t, content, expectedLabels)
+	assertReportResultPathsOnce(t, content, paths)
+}
+
+// reportResultPathLabels returns the required path labels for one output bundle.
+// Authored by: OpenCode
+func reportResultPathLabels(t *testing.T, outputFormat reportmodel.ReportOutputFormat, pathCount int) []string {
+	t.Helper()
+	switch outputFormat {
+	case reportmodel.ReportOutputFormatMarkdown:
+		if pathCount != 2 {
+			t.Fatalf("expected two Markdown paths, got %d", pathCount)
+		}
+		return []string{"Saved Markdown Path:", "Saved Annex 1 Markdown Path:"}
+	case reportmodel.ReportOutputFormatPDF:
+		if pathCount != 1 {
+			t.Fatalf("expected one PDF path, got %d", pathCount)
+		}
+		return []string{"Saved PDF Path:"}
+	default:
+		t.Fatalf("unsupported report output format %q", outputFormat)
+		return nil
+	}
+}
+
+// assertReportResultLabels checks each format-specific saved-path label once.
+// Authored by: OpenCode
+func assertReportResultLabels(t *testing.T, content string, labels []string) {
+	t.Helper()
+	for _, label := range labels {
+		if strings.Count(content, label) != 1 {
+			t.Fatalf("expected result label %q exactly once, got %q", label, content)
+		}
+	}
+}
+
+// assertReportResultPathsOnce checks unique saved paths despite TUI wrapping.
+// Authored by: OpenCode
+func assertReportResultPathsOnce(t *testing.T, content string, paths []string) {
+	t.Helper()
+	var seen = make(map[string]struct{}, len(paths))
+	var compactContent = strings.Join(strings.Fields(content), "")
+	for _, path := range paths {
+		if path == "" {
+			t.Fatal("expected saved report path to be non-empty")
+		}
+		if _, ok := seen[path]; ok {
+			t.Fatalf("expected saved report paths to be unique, got %#v", paths)
+		}
+		seen[path] = struct{}{}
+		if strings.Count(compactContent, path) != 1 {
+			t.Fatalf("expected saved report path %q exactly once, got %q", path, content)
+		}
+	}
+}
+
+// AssertReportResultCleared verifies that leaving a report result clears its
+// prior paths and TUI-owned export copy. For example, pass the next screen's
+// normalized content and the paths from the dismissed result.
+// Authored by: OpenCode
+func AssertReportResultCleared(t *testing.T, content string, paths []string) {
+	t.Helper()
+
+	if strings.Contains(content, component.ReportCleartextExportDisclosureText) {
+		t.Fatalf("expected cleartext export disclosure to be cleared, got %q", content)
+	}
+	if strings.Contains(content, component.ReportCleartextExportDeletionGuidanceText) {
+		t.Fatalf("expected export deletion guidance to be cleared, got %q", content)
+	}
+	for _, path := range paths {
+		if strings.Contains(content, path) {
+			t.Fatalf("expected prior saved path %q to be cleared, got %q", path, content)
+		}
 	}
 }
 

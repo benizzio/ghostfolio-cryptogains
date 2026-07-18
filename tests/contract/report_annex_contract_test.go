@@ -56,7 +56,7 @@ func TestReportAnnexUS2PopulationContract(t *testing.T) {
 
 	var manifest = testutil.DeterministicReportPresentationAcceptanceFixture()
 	var expected = map[testutil.ReportPresentationPopulation]int{
-		testutil.ReportPresentationPopulationBoolean:            4,
+		testutil.ReportPresentationPopulationBoolean:            16,
 		testutil.ReportPresentationPopulationClassifiedCurrency: 2,
 		testutil.ReportPresentationPopulationUnclassified:       4,
 	}

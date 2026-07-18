@@ -16,6 +16,7 @@ import (
 	"fmt"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
 )
 
@@ -69,10 +70,27 @@ func (fonts FontData) Validate() error {
 	return nil
 }
 
+// ByteFinalizer can replace one renderer's PDF byte-finalization behavior while
+// retaining access to the concrete production finalizer for fallback or retry.
+// The callback must return a nil payload when it returns an error.
+//
+// Example:
+//
+//	finalizer := pdf.ByteFinalizer(func(defaultFinalize func() ([]byte, error)) ([]byte, error) {
+//		return defaultFinalize()
+//	})
+//	_ = finalizer
+//
+// Authored by: OpenCode
+type ByteFinalizer func(func() ([]byte, error)) ([]byte, error)
+
 // RenderOptions stores local PDF renderer configuration.
 // Authored by: OpenCode
 type RenderOptions struct {
-	Fonts FontData
+	Fonts               FontData
+	FinancialFormatting presentation.FinancialFormattingOptions
+	// ByteFinalizer is scoped to the renderer created from these options.
+	ByteFinalizer ByteFinalizer
 }
 
 // Validate verifies local PDF renderer options before a render attempt.
@@ -119,7 +137,8 @@ func (cause redactedPDFFinalizationCause) Is(target error) bool {
 	return errors.Is(cause.cause, target)
 }
 
-// NewRenderer creates one validated local PDF renderer.
+// NewRenderer creates one validated local PDF renderer. A nil ByteFinalizer
+// preserves the production GetBytesPdfReturnErr finalization path.
 //
 // Example:
 //
@@ -165,20 +184,20 @@ func (renderer Renderer) Render(report reportmodel.CapitalGainsReport) ([]byte, 
 		return nil, err
 	}
 
-	var document = newPDFDocumentForRenderer()
+	var document = newPDFDocumentForRenderer(renderer.options.ByteFinalizer)
 	if err := startPDFDocument(document); err != nil {
 		return nil, err
 	}
 	if err := loadApplicationFonts(document, renderer.options.Fonts); err != nil {
 		return nil, err
 	}
-	if err := renderMainReport(document, report); err != nil {
+	if err := renderMainReportWithFinancialFormatting(document, report, renderer.options.FinancialFormatting); err != nil {
 		return nil, err
 	}
 	if err := document.AddAnnexPageBreak(); err != nil {
 		return nil, err
 	}
-	if err := renderAnnex(document, report.AuditAnnex); err != nil {
+	if err := renderAnnexWithFinancialFormatting(document, report.AuditAnnex, renderer.options.FinancialFormatting); err != nil {
 		return nil, err
 	}
 

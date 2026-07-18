@@ -3,20 +3,20 @@
 package contract
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/exec"
-	"path/filepath"
 	"reflect"
-	"runtime"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
 	reportmarkdown "github.com/benizzio/ghostfolio-cryptogains/internal/report/markdown"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	reportpdf "github.com/benizzio/ghostfolio-cryptogains/internal/report/pdf"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeflow"
 	"github.com/cockroachdb/apd/v3"
 	"golang.org/x/image/font/gofont/gobold"
 	"golang.org/x/image/font/gofont/goregular"
@@ -26,22 +26,16 @@ const (
 	// renderingAcceptancePopulationA identifies closed renderer acceptance cases.
 	// Authored by: OpenCode
 	renderingAcceptancePopulationA = "A"
-	// renderingAcceptancePopulationR identifies the fixed calculation regression population.
-	// Authored by: OpenCode
-	renderingAcceptancePopulationR = "R"
-	// renderingAcceptanceRegressionCases is the expected fixed regression-case count.
-	// Authored by: OpenCode
-	renderingAcceptanceRegressionCases = 102
 )
 
-// renderingAcceptanceAttemptResult records whether one listed format attempt
-// passed rendering, output-shape, semantic-control, and model-integrity checks.
+// renderingAcceptanceAttemptResult records independently asserted semantic
+// observations for one listed format attempt.
 // Authored by: OpenCode
 type renderingAcceptanceAttemptResult struct {
 	format   testutil.ReportPresentationFormat
 	passed   bool
 	message  string
-	semantic string
+	observed map[string]string
 }
 
 // TestRenderingAcceptanceAccounting executes both format attempts for every
@@ -51,15 +45,9 @@ type renderingAcceptanceAttemptResult struct {
 func TestRenderingAcceptanceAccounting(t *testing.T) {
 	var manifest = testutil.DeterministicReportPresentationAcceptanceFixture()
 	assertRenderingAcceptanceManifest(t, manifest)
+	assertStaticCalculationRegressionBaseline(t)
 
 	var accounting = newRenderingAcceptanceAccounting(manifest)
-	var regressionPassed = runRenderingAcceptanceRegressionPopulation(t)
-	if regressionPassed {
-		accounting.add(renderingAcceptancePopulationR, renderingAcceptanceRegressionKey(0))
-		for index := 1; index < renderingAcceptanceRegressionCases; index++ {
-			accounting.add(renderingAcceptancePopulationR, renderingAcceptanceRegressionKey(index))
-		}
-	}
 
 	var pdfRenderer, err = reportpdf.NewRenderer(reportpdf.RenderOptions{
 		Fonts: reportpdf.FontData{Regular: goregular.TTF, Bold: gobold.TTF},
@@ -77,12 +65,8 @@ func TestRenderingAcceptanceAccounting(t *testing.T) {
 
 		var markdownAttempt = runRenderingAcceptanceMarkdownAttempt(acceptanceCase, report)
 		var pdfAttempt = runRenderingAcceptancePDFAttempt(acceptanceCase, report, pdfRenderer)
-		if markdownAttempt.passed {
-			accounting.addFormatOccurrences(acceptanceCase, markdownAttempt.format)
-		}
-		if pdfAttempt.passed {
-			accounting.addFormatOccurrences(acceptanceCase, pdfAttempt.format)
-		}
+		accounting.addObservedOccurrences(markdownAttempt.observed)
+		accounting.addObservedOccurrences(pdfAttempt.observed)
 		if !markdownAttempt.passed {
 			t.Errorf("case %q Markdown attempt failed: %s", acceptanceCase.ID, markdownAttempt.message)
 		}
@@ -91,15 +75,53 @@ func TestRenderingAcceptanceAccounting(t *testing.T) {
 		}
 		if markdownAttempt.passed && pdfAttempt.passed {
 			accounting.add(renderingAcceptancePopulationA, acceptanceCase.ID)
-			if renderingAcceptanceParityPasses(acceptanceCase, markdownAttempt.semantic, pdfAttempt.semantic) {
-				accounting.addParityOccurrences(acceptanceCase)
-			} else {
-				t.Errorf("case %q cross-format parity failed", acceptanceCase.ID)
+			if err = accounting.addParityOccurrences(acceptanceCase, markdownAttempt.observed, pdfAttempt.observed); err != nil {
+				t.Errorf("case %q cross-format parity failed: %v", acceptanceCase.ID, err)
 			}
 		}
 	}
 
 	accounting.assertComplete(t)
+}
+
+// TestRenderingAcceptanceAccountingRejectsUnverifiedOccurrences proves that
+// accounting cannot be satisfied by a missing, misplaced, blank, or mismatched
+// semantic field observation.
+// Authored by: OpenCode
+func TestRenderingAcceptanceAccountingRejectsUnverifiedOccurrences(t *testing.T) {
+	var manifest = testutil.DeterministicReportPresentationAcceptanceFixture()
+	var acceptanceCase = manifest.Cases[1]
+	var expectedOccurrence testutil.ReportPresentationOccurrenceKey
+	for _, occurrence := range acceptanceCase.OccurrenceKeys {
+		if occurrence.Population == testutil.ReportPresentationPopulationVisibleFinancial && occurrence.Format == testutil.ReportPresentationFormatMarkdown {
+			expectedOccurrence = occurrence
+			break
+		}
+	}
+	if expectedOccurrence.CaseID == "" {
+		t.Fatal("test fixture has no financial occurrence")
+	}
+	var accounting = newRenderingAcceptanceAccounting(manifest)
+	accounting.addObservedOccurrences(map[string]string{})
+	if len(accounting.observed[string(testutil.ReportPresentationPopulationVisibleFinancial)]) != 0 {
+		t.Fatal("missing occurrence received credit")
+	}
+	var misplaced = expectedOccurrence
+	misplaced.SourceOrRowIdentity = "wrong-row"
+	accounting.addObservedOccurrences(map[string]string{renderingAcceptanceOccurrenceKey(misplaced): "1.00"})
+	if len(accounting.observed[string(testutil.ReportPresentationPopulationVisibleFinancial)]) != 0 {
+		t.Fatal("misplaced occurrence received credit")
+	}
+	var observed = make(map[string]string)
+	if err := recordRenderingAcceptanceObservation(observed, acceptanceCase, expectedOccurrence, "", "1.00"); err == nil {
+		t.Fatal("blank occurrence was accepted")
+	}
+	if err := recordRenderingAcceptanceObservation(observed, acceptanceCase, expectedOccurrence, "2.00", "1.00"); err == nil {
+		t.Fatal("mismatched occurrence was accepted")
+	}
+	if len(observed) != 0 {
+		t.Fatal("rejected occurrence received observation credit")
+	}
 }
 
 // newRenderingAcceptanceAccounting creates independent expected and observed
@@ -112,11 +134,6 @@ func newRenderingAcceptanceAccounting(manifest testutil.ReportPresentationAccept
 	}
 	accounting.expected[renderingAcceptancePopulationA] = make(map[string]struct{}, len(manifest.Cases))
 	accounting.observed[renderingAcceptancePopulationA] = make(map[string]struct{})
-	accounting.expected[renderingAcceptancePopulationR] = make(map[string]struct{}, renderingAcceptanceRegressionCases)
-	accounting.observed[renderingAcceptancePopulationR] = make(map[string]struct{})
-	for index := 0; index < renderingAcceptanceRegressionCases; index++ {
-		accounting.expected[renderingAcceptancePopulationR][renderingAcceptanceRegressionKey(index)] = struct{}{}
-	}
 	for _, acceptanceCase := range manifest.Cases {
 		accounting.expected[renderingAcceptancePopulationA][acceptanceCase.ID] = struct{}{}
 		for _, occurrence := range acceptanceCase.OccurrenceKeys {
@@ -154,23 +171,78 @@ func (accounting *renderingAcceptanceAccounting) add(population string, identity
 	accounting.observed[population][identity] = struct{}{}
 }
 
-// addFormatOccurrences records all semantic keys belonging to a successful
-// Markdown or PDF attempt while excluding cross-format parity keys.
+// addObservedOccurrences credits only observations whose complete semantic key
+// was independently asserted by a renderer owner.
 // Authored by: OpenCode
-func (accounting *renderingAcceptanceAccounting) addFormatOccurrences(acceptanceCase testutil.ReportPresentationAcceptanceCase, format testutil.ReportPresentationFormat) {
-	for _, occurrence := range acceptanceCase.OccurrenceKeys {
-		if occurrence.Format == format {
-			accounting.add(string(occurrence.Population), renderingAcceptanceOccurrenceKey(occurrence))
+func (accounting *renderingAcceptanceAccounting) addObservedOccurrences(observed map[string]string) {
+	for identity := range observed {
+		var occurrence, ok = parseRenderingAcceptanceOccurrenceKey(identity)
+		if !ok || occurrence.Format == "cross-format" {
+			continue
+		}
+		var population = string(occurrence.Population)
+		if _, expected := accounting.expected[population][identity]; expected {
+			accounting.add(population, identity)
 		}
 	}
 }
 
-// addParityOccurrences records parity keys only after both format attempts pass.
+// addParityOccurrences records a parity key only after both independently
+// observed semantic values exist and compare equal.
 // Authored by: OpenCode
-func (accounting *renderingAcceptanceAccounting) addParityOccurrences(acceptanceCase testutil.ReportPresentationAcceptanceCase) {
+func (accounting *renderingAcceptanceAccounting) addParityOccurrences(acceptanceCase testutil.ReportPresentationAcceptanceCase, markdown map[string]string, pdf map[string]string) error {
 	for _, occurrence := range acceptanceCase.OccurrenceKeys {
-		if occurrence.Population == testutil.ReportPresentationPopulationParity {
+		if occurrence.Population != testutil.ReportPresentationPopulationParity {
+			continue
+		}
+		var markdownValue, markdownOK = renderingAcceptanceParityValue(occurrence, testutil.ReportPresentationFormatMarkdown, markdown)
+		var pdfValue, pdfOK = renderingAcceptanceParityValue(occurrence, testutil.ReportPresentationFormatPDF, pdf)
+		if markdownOK && pdfOK && markdownValue == pdfValue {
 			accounting.add(string(occurrence.Population), renderingAcceptanceOccurrenceKey(occurrence))
+			continue
+		}
+		return fmt.Errorf("missing or mismatched observation %q: Markdown=%q PDF=%q", renderingAcceptanceOccurrenceKey(occurrence), markdownValue, pdfValue)
+	}
+	return nil
+}
+
+// renderingAcceptanceParityValue finds an observed format-specific value for a
+// cross-format key, preserving population-independent semantic identity.
+// Authored by: OpenCode
+func renderingAcceptanceParityValue(parity testutil.ReportPresentationOccurrenceKey, format testutil.ReportPresentationFormat, observed map[string]string) (string, bool) {
+	for identity, value := range observed {
+		var occurrence, ok = parseRenderingAcceptanceOccurrenceKey(identity)
+		var expectedRole = reportPresentationDocumentRoleForParity(parity.DocumentRole, format)
+		if !ok || occurrence.Format != format || occurrence.CaseID != parity.CaseID || occurrence.DocumentRole != expectedRole || occurrence.Section != parity.Section || occurrence.AssetIdentity != parity.AssetIdentity || occurrence.SourceOrRowIdentity != parity.SourceOrRowIdentity || occurrence.FieldName != parity.FieldName || occurrence.AmountKind != parity.AmountKind || occurrence.AmountOrdinal != parity.AmountOrdinal {
+			continue
+		}
+		return value, true
+	}
+	return "", false
+}
+
+// parseRenderingAcceptanceOccurrenceKey reverses the closed identity encoding
+// used by acceptance accounting.
+// Authored by: OpenCode
+func parseRenderingAcceptanceOccurrenceKey(identity string) (testutil.ReportPresentationOccurrenceKey, bool) {
+	var parts = strings.Split(identity, "|")
+	if len(parts) != 10 {
+		return testutil.ReportPresentationOccurrenceKey{}, false
+	}
+	var ordinal, err = strconv.Atoi(parts[9])
+	if err != nil {
+		return testutil.ReportPresentationOccurrenceKey{}, false
+	}
+	return testutil.ReportPresentationOccurrenceKey{Population: testutil.ReportPresentationPopulation(parts[0]), CaseID: parts[1], Format: testutil.ReportPresentationFormat(parts[2]), DocumentRole: testutil.ReportPresentationDocumentRole(parts[3]), Section: parts[4], AssetIdentity: parts[5], SourceOrRowIdentity: parts[6], FieldName: parts[7], AmountKind: parts[8], AmountOrdinal: ordinal}, true
+}
+
+// addRenderingAcceptanceModelObservation credits the AUD-001 comparison only
+// after the exact pre/post model assertion succeeds.
+// Authored by: OpenCode
+func addRenderingAcceptanceModelObservation(observed map[string]string, acceptanceCase testutil.ReportPresentationAcceptanceCase, format testutil.ReportPresentationFormat) {
+	for _, occurrence := range acceptanceCase.OccurrenceKeys {
+		if occurrence.Population == testutil.ReportPresentationPopulationModelIntegrity && occurrence.Format == format {
+			observed[renderingAcceptanceOccurrenceKey(occurrence)] = "equal"
 		}
 	}
 }
@@ -184,7 +256,6 @@ func (accounting *renderingAcceptanceAccounting) assertComplete(t *testing.T) {
 		renderingAcceptancePopulationA,
 		testutilPopulationName(testutil.ReportPresentationPopulationWarning),
 		testutilPopulationName(testutil.ReportPresentationPopulationVisibleFinancial),
-		renderingAcceptancePopulationR,
 		testutilPopulationName(testutil.ReportPresentationPopulationModelIntegrity),
 		testutilPopulationName(testutil.ReportPresentationPopulationQuantity),
 		testutilPopulationName(testutil.ReportPresentationPopulationBoolean),
@@ -244,7 +315,7 @@ func runRenderingAcceptanceMarkdownAttempt(acceptanceCase testutil.ReportPresent
 		result.message = fmt.Sprintf("validate bundle: %v", err)
 		return result
 	}
-	result.semantic, err = validateRenderingAcceptanceMarkdownControls(acceptanceCase, documents)
+	result.observed, err = validateRenderingAcceptanceMarkdownControls(acceptanceCase, report, documents)
 	if err != nil {
 		result.message = err.Error()
 		return result
@@ -253,6 +324,7 @@ func runRenderingAcceptanceMarkdownAttempt(acceptanceCase testutil.ReportPresent
 		result.message = "AUD-001 model changed after Markdown rendering"
 		return result
 	}
+	addRenderingAcceptanceModelObservation(result.observed, acceptanceCase, testutil.ReportPresentationFormatMarkdown)
 	result.passed = true
 	return result
 }
@@ -299,7 +371,7 @@ func runRenderingAcceptancePDFAttempt(acceptanceCase testutil.ReportPresentation
 		result.message = fmt.Sprintf("inspect PDF: %v", inspectionErr)
 		return result
 	}
-	result.semantic, err = validateRenderingAcceptancePDFControls(acceptanceCase, inspection)
+	result.observed, err = validateRenderingAcceptancePDFControls(acceptanceCase, report, inspection)
 	if err != nil {
 		result.message = err.Error()
 		return result
@@ -308,162 +380,1105 @@ func runRenderingAcceptancePDFAttempt(acceptanceCase testutil.ReportPresentation
 		result.message = "AUD-001 model changed after PDF rendering"
 		return result
 	}
+	addRenderingAcceptanceModelObservation(result.observed, acceptanceCase, testutil.ReportPresentationFormatPDF)
 	result.passed = true
 	return result
 }
 
-// validateRenderingAcceptanceMarkdownControls validates the common warning and
-// the closed case's concrete synthetic control in Markdown documents.
+// validateRenderingAcceptanceMarkdownControls validates each Markdown semantic
+// occurrence and returns only values that passed their own field assertion.
 // Authored by: OpenCode
-func validateRenderingAcceptanceMarkdownControls(acceptanceCase testutil.ReportPresentationAcceptanceCase, documents []reportmodel.ReportDocument) (string, error) {
+func validateRenderingAcceptanceMarkdownControls(acceptanceCase testutil.ReportPresentationAcceptanceCase, report reportmodel.CapitalGainsReport, documents []reportmodel.ReportDocument) (map[string]string, error) {
+	var observed = make(map[string]string)
 	if len(documents) != 2 {
-		return "", fmt.Errorf("Markdown document count = %d, want 2", len(documents))
+		return observed, fmt.Errorf("Markdown document count = %d, want 2", len(documents))
 	}
 	var main = string(documents[0].Content)
 	var annex = string(documents[1].Content)
 	if strings.Count(main, testutil.ReportPresentationLegalWarningText) != 1 || strings.Contains(annex, testutil.ReportPresentationLegalWarningText) {
-		return "", fmt.Errorf("warning occurrence or Annex exclusion is invalid")
+		return observed, fmt.Errorf("warning occurrence or Annex exclusion is invalid")
 	}
-	if err := validateRenderingAcceptanceControlText(acceptanceCase, main+"\n"+annex); err != nil {
-		return "", err
+	if err := recordRenderingAcceptanceObservation(observed, acceptanceCase, reportPresentationOccurrenceForFormat(acceptanceCase, testutil.ReportPresentationFormatMarkdown, testutil.ReportPresentationPopulationWarning), testutil.ReportPresentationLegalWarningText, testutil.ReportPresentationLegalWarningText); err != nil {
+		return observed, err
 	}
-	var semantic = testutil.ReportPresentationLegalWarningText + "\x00" + acceptanceCase.ExpectedVisibleValue
-	if acceptanceCase.Kind == testutil.ReportPresentationCaseKindConverted {
-		var sequence, ok = renderingAcceptanceConvertedSequence(acceptanceCase)
-		if !ok {
-			return "", fmt.Errorf("converted case %q has no synthetic sequence", acceptanceCase.ID)
-		}
-		var sourceID = "cv" + renderingAcceptanceConvertedSequenceIndex(sequence.ID)
-		var cell, found = contractMarkdownConvertedAmountsCell(annex, sourceID)
-		if !found || cell != sequence.ExpectedMarkdownCell {
-			return "", fmt.Errorf("converted case %q cell = %q, want %q", acceptanceCase.ID, cell, sequence.ExpectedMarkdownCell)
-		}
-		semantic += "\x00" + normalizeReportRenderingText(strings.ReplaceAll(strings.ReplaceAll(cell, "<br>", " "), ";", ""))
-	}
-	return semantic, nil
-}
-
-// validateRenderingAcceptancePDFControls validates searchable combined-PDF text
-// for one synthetic acceptance case.
-// Authored by: OpenCode
-func validateRenderingAcceptancePDFControls(acceptanceCase testutil.ReportPresentationAcceptanceCase, inspection testutil.GeneratedPDF) (string, error) {
-	if !inspection.ContainsSearchableText(testutil.ReportPresentationLegalWarningText) {
-		return "", fmt.Errorf("PDF warning is not searchable")
-	}
-	if err := validateRenderingAcceptancePDFControlText(acceptanceCase, inspection); err != nil {
-		return "", err
-	}
-	var semantic = testutil.ReportPresentationLegalWarningText + "\x00" + acceptanceCase.ExpectedVisibleValue
-	if acceptanceCase.Kind == testutil.ReportPresentationCaseKindConverted {
-		var sequence, ok = renderingAcceptanceConvertedSequence(acceptanceCase)
-		if !ok {
-			return "", fmt.Errorf("converted case %q has no synthetic sequence", acceptanceCase.ID)
-		}
-		var sourceID = "cv" + renderingAcceptanceConvertedSequenceIndex(sequence.ID)
-		var rowRuns = contractPDFConversionRowRuns(inspection, sourceID, []string{sourceID})
-		var cellRuns = contractPDFConvertedCellRuns(rowRuns)
-		var rowText = normalizeReportRenderingText(strings.ReplaceAll(strings.Join(contractPDFRunTexts(cellRuns), " "), ";", ""))
-		var expectedText = normalizeReportRenderingText(strings.ReplaceAll(strings.ReplaceAll(sequence.ExpectedMarkdownCell, "<br>", " "), ";", ""))
-		if expectedText != "" && !strings.Contains(rowText, expectedText) {
-			return "", fmt.Errorf("PDF converted case %q cell = %q, want %q", acceptanceCase.ID, rowText, expectedText)
-		}
-		if expectedText == "" && strings.Contains(rowText, "unit_price:") {
-			return "", fmt.Errorf("PDF converted case %q contains an entry in its empty cell", acceptanceCase.ID)
-		}
-		semantic += "\x00" + expectedText
-	}
-	return semantic, nil
-}
-
-// validateRenderingAcceptancePDFControlText checks a visible control through
-// the PDF inspector's whitespace-normalized searchable-text boundary.
-// Authored by: OpenCode
-func validateRenderingAcceptancePDFControlText(acceptanceCase testutil.ReportPresentationAcceptanceCase, inspection testutil.GeneratedPDF) error {
-	if acceptanceCase.ExpectedVisibleValue != "" && !acceptanceCase.Absent && !acceptanceCase.Omitted && !containsRenderingAcceptancePDFControl(inspection.SearchableText, acceptanceCase.ExpectedVisibleValue) {
-		if !containsRenderingAcceptancePDFWrappedControl(inspection.TextRuns, acceptanceCase.ExpectedVisibleValue) {
-			return fmt.Errorf("case %q is missing expected visible value %q", acceptanceCase.ID, acceptanceCase.ExpectedVisibleValue)
-		}
-	}
-	if acceptanceCase.Kind == testutil.ReportPresentationCaseKindBoolean && !containsRenderingAcceptancePDFControl(inspection.SearchableText, acceptanceCase.ExpectedVisibleValue) {
-		return fmt.Errorf("case %q is missing boolean label %q", acceptanceCase.ID, acceptanceCase.ExpectedVisibleValue)
-	}
-	return nil
-}
-
-// containsRenderingAcceptancePDFControl tolerates renderer whitespace inserted
-// between long numeric glyph runs while preserving the exact visible sequence.
-// Authored by: OpenCode
-func containsRenderingAcceptancePDFControl(content string, expected string) bool {
-	if strings.Contains(normalizeReportRenderingText(content), normalizeReportRenderingText(expected)) {
-		return true
-	}
-	var compactContent = strings.ReplaceAll(normalizeReportRenderingText(content), " ", "")
-	var compactExpected = strings.ReplaceAll(normalizeReportRenderingText(expected), " ", "")
-	return strings.Contains(compactContent, compactExpected)
-}
-
-// containsRenderingAcceptancePDFWrappedControl reconstructs a long numeric
-// control when the PDF renderer splits it across adjacent text-showing runs.
-// Authored by: OpenCode
-func containsRenderingAcceptancePDFWrappedControl(runs []testutil.PDFTextRun, expected string) bool {
-	if len(expected) < 8 {
-		return false
-	}
-	for startIndex, startRun := range runs {
-		var consumed = commonRenderingAcceptancePrefix(startRun.Text, expected)
-		if consumed == 0 {
+	for _, occurrence := range acceptanceCase.OccurrenceKeys {
+		if (occurrence.Format != testutil.ReportPresentationFormatMarkdown && !(occurrence.Population == testutil.ReportPresentationPopulationParity && isRenderingAcceptanceRateMetadataField(occurrence.FieldName))) || occurrence.Population == testutil.ReportPresentationPopulationWarning || occurrence.Population == testutil.ReportPresentationPopulationModelIntegrity || (occurrence.Population == testutil.ReportPresentationPopulationParity && !isRenderingAcceptanceRateMetadataField(occurrence.FieldName)) {
 			continue
 		}
-		var remaining = expected[consumed:]
-		for _, run := range runs[startIndex+1:] {
-			var matched = commonRenderingAcceptancePrefix(run.Text, remaining)
-			if matched == 0 {
-				continue
+		var expected, err = renderingAcceptanceExpectedValue(acceptanceCase, report, occurrence)
+		if err != nil {
+			return observed, err
+		}
+		var actual, found = renderingAcceptanceMarkdownValue(acceptanceCase, report, occurrence, main, annex)
+		if !found {
+			return observed, fmt.Errorf("Markdown occurrence %q is missing", renderingAcceptanceOccurrenceKey(occurrence))
+		}
+		var concrete = occurrence
+		if occurrence.Population == testutil.ReportPresentationPopulationParity && isRenderingAcceptanceRateMetadataField(occurrence.FieldName) {
+			concrete.Format = testutil.ReportPresentationFormatMarkdown
+			concrete.DocumentRole = reportPresentationDocumentRoleForParity(occurrence.DocumentRole, testutil.ReportPresentationFormatMarkdown)
+		}
+		if err = recordRenderingAcceptanceObservation(observed, acceptanceCase, concrete, actual, expected); err != nil {
+			return observed, err
+		}
+	}
+	addRenderingAcceptanceFormatParityObservations(observed, acceptanceCase, testutil.ReportPresentationFormatMarkdown, report)
+	return observed, nil
+}
+
+// validateRenderingAcceptancePDFControls validates each PDF semantic occurrence
+// through row-local text runs and returns only asserted observations.
+// Authored by: OpenCode
+func validateRenderingAcceptancePDFControls(acceptanceCase testutil.ReportPresentationAcceptanceCase, report reportmodel.CapitalGainsReport, inspection testutil.GeneratedPDF) (map[string]string, error) {
+	var observed = make(map[string]string)
+	if !inspection.ContainsSearchableText(testutil.ReportPresentationLegalWarningText) {
+		return observed, fmt.Errorf("PDF warning is not searchable")
+	}
+	var warning = reportPresentationOccurrenceForFormat(acceptanceCase, testutil.ReportPresentationFormatPDF, testutil.ReportPresentationPopulationWarning)
+	if err := recordRenderingAcceptanceObservation(observed, acceptanceCase, warning, testutil.ReportPresentationLegalWarningText, testutil.ReportPresentationLegalWarningText); err != nil {
+		return observed, err
+	}
+	for _, occurrence := range acceptanceCase.OccurrenceKeys {
+		if (occurrence.Format != testutil.ReportPresentationFormatPDF && !(occurrence.Population == testutil.ReportPresentationPopulationParity && isRenderingAcceptanceRateMetadataField(occurrence.FieldName))) || occurrence.Population == testutil.ReportPresentationPopulationWarning || occurrence.Population == testutil.ReportPresentationPopulationModelIntegrity || (occurrence.Population == testutil.ReportPresentationPopulationParity && !isRenderingAcceptanceRateMetadataField(occurrence.FieldName)) {
+			continue
+		}
+		var expected, err = renderingAcceptanceExpectedValue(acceptanceCase, report, occurrence)
+		if err != nil {
+			return observed, err
+		}
+		var actual, found = renderingAcceptancePDFValue(acceptanceCase, report, occurrence, inspection)
+		if !found {
+			return observed, fmt.Errorf("PDF occurrence %q is missing", renderingAcceptanceOccurrenceKey(occurrence))
+		}
+		var concrete = occurrence
+		if occurrence.Population == testutil.ReportPresentationPopulationParity && isRenderingAcceptanceRateMetadataField(occurrence.FieldName) {
+			concrete.Format = testutil.ReportPresentationFormatPDF
+			concrete.DocumentRole = reportPresentationDocumentRoleForParity(occurrence.DocumentRole, testutil.ReportPresentationFormatPDF)
+		}
+		if err = recordRenderingAcceptanceObservation(observed, acceptanceCase, concrete, actual, expected); err != nil {
+			return observed, err
+		}
+	}
+	addRenderingAcceptanceFormatParityObservations(observed, acceptanceCase, testutil.ReportPresentationFormatPDF, report)
+	return observed, nil
+}
+
+// reportPresentationOccurrenceForFormat finds the single warning or model key
+// for a case and format.
+// Authored by: OpenCode
+func reportPresentationOccurrenceForFormat(acceptanceCase testutil.ReportPresentationAcceptanceCase, format testutil.ReportPresentationFormat, population testutil.ReportPresentationPopulation) testutil.ReportPresentationOccurrenceKey {
+	for _, occurrence := range acceptanceCase.OccurrenceKeys {
+		if occurrence.Format == format && occurrence.Population == population {
+			return occurrence
+		}
+	}
+	return testutil.ReportPresentationOccurrenceKey{Population: population, CaseID: acceptanceCase.ID, Format: format}
+}
+
+// recordRenderingAcceptanceObservation records a value only after its complete
+// semantic identity and exact expected text have both passed.
+// Authored by: OpenCode
+func recordRenderingAcceptanceObservation(observed map[string]string, acceptanceCase testutil.ReportPresentationAcceptanceCase, occurrence testutil.ReportPresentationOccurrenceKey, actual string, expected string) error {
+	if occurrence.CaseID != acceptanceCase.ID {
+		return fmt.Errorf("observation case mismatch for %q", renderingAcceptanceOccurrenceKey(occurrence))
+	}
+	if actual != expected {
+		return fmt.Errorf("occurrence %q = %q, want %q", renderingAcceptanceOccurrenceKey(occurrence), actual, expected)
+	}
+	observed[renderingAcceptanceOccurrenceKey(occurrence)] = actual
+	return nil
+}
+
+// addRenderingAcceptanceFormatParityObservations records format-local evidence
+// for parity-only rate metadata and exact omission controls.
+// Authored by: OpenCode
+func addRenderingAcceptanceFormatParityObservations(observed map[string]string, acceptanceCase testutil.ReportPresentationAcceptanceCase, format testutil.ReportPresentationFormat, report reportmodel.CapitalGainsReport) {
+	for _, occurrence := range acceptanceCase.OccurrenceKeys {
+		if occurrence.Population != testutil.ReportPresentationPopulationParity {
+			continue
+		}
+		if (acceptanceCase.Omitted || (acceptanceCase.FinancialFieldClass == "summary-net-gain-or-loss" && (acceptanceCase.ExactValue == "0" || acceptanceCase.ExactValue == "-0"))) && occurrence.FieldName == "per_asset_net_gain_or_loss" {
+			var formatOccurrence = occurrence
+			formatOccurrence.Format = format
+			formatOccurrence.DocumentRole = reportPresentationDocumentRoleForParity(occurrence.DocumentRole, format)
+			observed[renderingAcceptanceOccurrenceKey(formatOccurrence)] = "<omitted>"
+		}
+	}
+}
+
+// reportPresentationDocumentRoleForParity converts a logical section role to
+// the concrete combined-PDF role used by format-local observations.
+// Authored by: OpenCode
+func reportPresentationDocumentRoleForParity(role testutil.ReportPresentationDocumentRole, format testutil.ReportPresentationFormat) testutil.ReportPresentationDocumentRole {
+	if format == testutil.ReportPresentationFormatPDF && role != "model" {
+		return testutil.ReportPresentationDocumentRoleCombined
+	}
+	return role
+}
+
+// renderingAcceptanceExpectedValue derives the exact expected value for one
+// occurrence from the unformatted synthetic report model.
+// Authored by: OpenCode
+func renderingAcceptanceExpectedValue(acceptanceCase testutil.ReportPresentationAcceptanceCase, report reportmodel.CapitalGainsReport, occurrence testutil.ReportPresentationOccurrenceKey) (string, error) {
+	if occurrence.Population == testutil.ReportPresentationPopulationParity {
+		if isRenderingAcceptanceRateMetadataField(occurrence.FieldName) {
+			return renderingAcceptanceRateMetadataValue(report, occurrence.FieldName)
+		}
+		if acceptanceCase.Omitted && occurrence.FieldName == "per_asset_net_gain_or_loss" {
+			return "<omitted>", nil
+		}
+	}
+	switch occurrence.Population {
+	case testutil.ReportPresentationPopulationWarning:
+		return testutil.ReportPresentationLegalWarningText, nil
+	case testutil.ReportPresentationPopulationQuantity:
+		return renderingAcceptanceQuantityExpectedValue(report, occurrence), nil
+	case testutil.ReportPresentationPopulationBoolean:
+		return acceptanceCase.ExpectedVisibleValue, nil
+	case testutil.ReportPresentationPopulationClassifiedCurrency, testutil.ReportPresentationPopulationUnclassified:
+		return renderingAcceptanceCurrencyValue(report, occurrence.SourceOrRowIdentity), nil
+	case testutil.ReportPresentationPopulationConversionRow:
+		var sequence, ok = renderingAcceptanceConvertedSequence(acceptanceCase)
+		if !ok {
+			return "", fmt.Errorf("converted sequence is not closed for %q", acceptanceCase.ID)
+		}
+		return normalizeAcceptanceConvertedCell(sequence.ExpectedMarkdownCell), nil
+	case testutil.ReportPresentationPopulationConvertedEntry:
+		var amount, ok = renderingAcceptanceConversionAmount(report, occurrence.SourceOrRowIdentity, occurrence.AmountKind)
+		if !ok {
+			return "", fmt.Errorf("conversion amount %q is missing", occurrence.AmountKind)
+		}
+		return renderingAcceptanceConvertedEntryText(amount), nil
+	case testutil.ReportPresentationPopulationVisibleFinancial:
+		if acceptanceCase.Absent && presentationFinancialFieldIsNullableForAcceptance(acceptanceCase, occurrence.FieldName) {
+			return "", nil
+		}
+		var value, ok = renderingAcceptanceFinancialValue(report, occurrence)
+		if !ok {
+			return "", fmt.Errorf("financial occurrence %q has no model value", renderingAcceptanceOccurrenceKey(occurrence))
+		}
+		return presentation.FormatFinancialValue(value)
+	}
+	return "", nil
+}
+
+// isRenderingAcceptanceRateMetadataField identifies parity-only conversion-row
+// metadata controls.
+// Authored by: OpenCode
+func isRenderingAcceptanceRateMetadataField(fieldName string) bool {
+	switch fieldName {
+	case "source_id", "asset", "rate_date", "source_currency", "report_base_currency", "quote_direction", "rate_value":
+		return true
+	default:
+		return false
+	}
+}
+
+// renderingAcceptanceRateMetadataValue returns one canonical visible rate-row
+// metadata value from the validated conversion evidence.
+// Authored by: OpenCode
+func renderingAcceptanceRateMetadataValue(report reportmodel.CapitalGainsReport, fieldName string) (string, error) {
+	if len(report.AuditAnnex.ConversionAuditEntries) == 0 {
+		return "", fmt.Errorf("rate metadata has no conversion row")
+	}
+	var entry = report.AuditAnnex.ConversionAuditEntries[0]
+	switch fieldName {
+	case "source_id":
+		return entry.SourceID, nil
+	case "asset":
+		return entry.AssetLabel, nil
+	case "rate_date":
+		return entry.RateDate.Format("2006-01-02"), nil
+	case "source_currency":
+		return entry.SourceCurrency, nil
+	case "report_base_currency":
+		return entry.ReportBaseCurrency.Label(), nil
+	case "quote_direction":
+		return reportmodel.RenderQuoteDirectionLabel(entry.QuoteDirection)
+	case "rate_value":
+		return canonicalAcceptanceDecimal(entry.RateValue), nil
+	default:
+		return "", fmt.Errorf("unknown rate metadata field %q", fieldName)
+	}
+}
+
+// canonicalAcceptanceDecimal returns the report's canonical fixed-point text.
+// Authored by: OpenCode
+func canonicalAcceptanceDecimal(value apd.Decimal) string {
+	var rendered, err = decimalsupport.CanonicalString(value)
+	if err != nil {
+		return ""
+	}
+	return rendered
+}
+
+// presentationFinancialFieldIsNullableForAcceptance limits blank controls to
+// optional model fields while retaining required decimal fields in their rows.
+// Authored by: OpenCode
+func presentationFinancialFieldIsNullableForAcceptance(acceptanceCase testutil.ReportPresentationAcceptanceCase, fieldName string) bool {
+	if acceptanceCase.FinancialFieldClass == "liquidation-allocated-basis" || acceptanceCase.FinancialFieldClass == "liquidation-net-proceeds-gain-or-loss" {
+		return false
+	}
+	return fieldName == "unit_price" || fieldName == "gross_value" || fieldName == "fee_amount" || fieldName == "allocated_basis" || fieldName == "net_proceeds" || fieldName == "gain_or_loss"
+}
+
+// renderingAcceptanceFinancialValue returns one exact model amount for a
+// field-local financial occurrence.
+// Authored by: OpenCode
+func renderingAcceptanceFinancialValue(report reportmodel.CapitalGainsReport, occurrence testutil.ReportPresentationOccurrenceKey) (apd.Decimal, bool) {
+	if occurrence.Section == "detailed_per_asset_audit" {
+		for _, section := range report.AuditAnnex.PerAssetAuditSections {
+			for _, entry := range section.Entries {
+				if entry.SourceID != occurrence.SourceOrRowIdentity {
+					continue
+				}
+				switch occurrence.FieldName {
+				case "unit_price":
+					if entry.UnitPrice == nil {
+						return apd.Decimal{}, false
+					}
+					return *entry.UnitPrice, true
+				case "gross_value":
+					if entry.GrossValue == nil {
+						return apd.Decimal{}, false
+					}
+					return *entry.GrossValue, true
+				case "fee_amount":
+					if entry.FeeAmount == nil {
+						return apd.Decimal{}, false
+					}
+					return *entry.FeeAmount, true
+				case "basis_after_activity":
+					return entry.BasisAfterActivity, true
+				case "allocated_basis":
+					if entry.AllocatedBasis == nil {
+						return apd.Decimal{}, false
+					}
+					return *entry.AllocatedBasis, true
+				case "net_proceeds":
+					if entry.NetLiquidationProceeds == nil {
+						return apd.Decimal{}, false
+					}
+					return *entry.NetLiquidationProceeds, true
+				case "gain_or_loss":
+					if entry.GainOrLoss == nil {
+						return apd.Decimal{}, false
+					}
+					return *entry.GainOrLoss, true
+				}
 			}
-			remaining = remaining[matched:]
-			if remaining == "" {
-				return true
+		}
+		return apd.Decimal{}, false
+	}
+	switch occurrence.FieldName {
+	case "per_asset_net_gain_or_loss":
+		if len(report.SummaryEntries) == 0 {
+			return apd.Decimal{}, false
+		}
+		return report.SummaryEntries[0].NetGainOrLoss, true
+	case "overall_yearly_net_total":
+		return report.YearlyNetTotal, true
+	case "opening_cost_basis":
+		if len(report.DetailSections) == 0 {
+			return apd.Decimal{}, false
+		}
+		return report.DetailSections[0].OpeningCostBasis, true
+	case "closing_cost_basis":
+		if len(report.DetailSections) == 0 {
+			return apd.Decimal{}, false
+		}
+		return report.DetailSections[0].ClosingCostBasis, true
+	case "historical_cost_basis":
+		for _, section := range report.DetailSections {
+			if section.AssetIdentityKey == occurrence.AssetIdentity {
+				return section.ClosingCostBasis, true
+			}
+		}
+	case "unit_price", "gross_value", "fee_amount", "basis_after_row":
+		for _, section := range report.DetailSections {
+			for _, row := range section.ActivityRows {
+				if row.SourceID != occurrence.SourceOrRowIdentity {
+					continue
+				}
+				switch occurrence.FieldName {
+				case "unit_price":
+					if row.UnitPrice == nil {
+						return apd.Decimal{}, false
+					}
+					return *row.UnitPrice, true
+				case "gross_value":
+					if row.GrossValue == nil {
+						return apd.Decimal{}, false
+					}
+					return *row.GrossValue, true
+				case "fee_amount":
+					if row.FeeAmount == nil {
+						return apd.Decimal{}, false
+					}
+					return *row.FeeAmount, true
+				default:
+					return row.BasisAfterRow, true
+				}
+			}
+		}
+	case "allocated_basis", "net_proceeds", "gain_or_loss":
+		for _, section := range report.DetailSections {
+			for _, liquidation := range section.LiquidationSummaries {
+				if liquidation.SourceID != occurrence.SourceOrRowIdentity {
+					continue
+				}
+				switch occurrence.FieldName {
+				case "allocated_basis":
+					return liquidation.AllocatedBasis, true
+				case "net_proceeds":
+					return liquidation.NetLiquidationProceeds, true
+				default:
+					return liquidation.GainOrLoss, true
+				}
+			}
+			for _, section := range report.AuditAnnex.PerAssetAuditSections {
+				for _, entry := range section.Entries {
+					if entry.SourceID != occurrence.SourceOrRowIdentity {
+						continue
+					}
+					switch occurrence.FieldName {
+					case "allocated_basis":
+						if entry.AllocatedBasis == nil {
+							return apd.Decimal{}, false
+						}
+						return *entry.AllocatedBasis, true
+					case "net_proceeds":
+						if entry.NetLiquidationProceeds == nil {
+							return apd.Decimal{}, false
+						}
+						return *entry.NetLiquidationProceeds, true
+					default:
+						if entry.GainOrLoss == nil {
+							return apd.Decimal{}, false
+						}
+						return *entry.GainOrLoss, true
+					}
+				}
+			}
+		}
+	case "original_unit_price", "converted_unit_price", "original_gross_value", "converted_gross_value", "original_fee_amount", "converted_fee_amount":
+		var amountKind = strings.TrimPrefix(strings.TrimPrefix(occurrence.FieldName, "original_"), "converted_")
+		var amount, ok = renderingAcceptanceConversionAmount(report, occurrence.SourceOrRowIdentity, amountKind)
+		if !ok {
+			return apd.Decimal{}, false
+		}
+		if strings.HasPrefix(occurrence.FieldName, "original_") {
+			return amount.OriginalAmount, true
+		}
+		return amount.ConvertedAmount, true
+	}
+	return apd.Decimal{}, false
+}
+
+// renderingAcceptanceConversionAmount returns one received conversion amount
+// without changing its order or exact values.
+// Authored by: OpenCode
+func renderingAcceptanceConversionAmount(report reportmodel.CapitalGainsReport, sourceID string, amountKind string) (reportmodel.ConvertedActivityAmount, bool) {
+	for _, entry := range report.AuditAnnex.ConversionAuditEntries {
+		if entry.SourceID != sourceID {
+			continue
+		}
+		for _, amount := range entry.Amounts {
+			if string(amount.AmountKind) == amountKind {
+				return amount, true
 			}
 		}
 	}
-	return false
+	return reportmodel.ConvertedActivityAmount{}, false
 }
 
-// commonRenderingAcceptancePrefix returns the matching prefix length for one
-// PDF text run and one expected value.
+// renderingAcceptanceConvertedEntryText creates the exact logical conversion
+// entry expected in either renderer's local cell.
 // Authored by: OpenCode
-func commonRenderingAcceptancePrefix(run string, expected string) int {
-	var limit = len(run)
-	if len(expected) < limit {
-		limit = len(expected)
+func renderingAcceptanceConvertedEntryText(amount reportmodel.ConvertedActivityAmount) string {
+	var original, originalErr = presentation.FormatFinancialValue(amount.OriginalAmount)
+	if originalErr != nil {
+		original = canonicalAcceptanceDecimal(amount.OriginalAmount)
 	}
-	for index := 0; index < limit; index++ {
-		if run[index] != expected[index] {
-			return index
+	var converted, convertedErr = presentation.FormatFinancialValue(amount.ConvertedAmount)
+	if convertedErr != nil {
+		converted = canonicalAcceptanceDecimal(amount.ConvertedAmount)
+	}
+	return string(amount.AmountKind) + ": " + original + " -> " + converted
+}
+
+// renderingAcceptanceCurrencyValue returns the visible original currency for a
+// concrete Annex source row.
+// Authored by: OpenCode
+func renderingAcceptanceCurrencyValue(report reportmodel.CapitalGainsReport, sourceID string) string {
+	for _, section := range report.AuditAnnex.PerAssetAuditSections {
+		for _, entry := range section.Entries {
+			if entry.SourceID == sourceID && entry.IsZeroPricedHoldingReduction {
+				return ""
+			}
+			if entry.SourceID == sourceID {
+				return entry.ActivityCurrency
+			}
 		}
 	}
-	return limit
+	return ""
 }
 
-// validateRenderingAcceptanceControlText checks the scalar control expected in
-// the concrete synthetic report selected for one case.
+// renderingAcceptanceQuantityExpectedValue returns the exact visible quantity
+// for one occurrence. Positive-only activity quantities retain valid positive
+// controls when the scalar case is the zero quantity boundary.
 // Authored by: OpenCode
-func validateRenderingAcceptanceControlText(acceptanceCase testutil.ReportPresentationAcceptanceCase, content string) error {
-	if acceptanceCase.ExpectedVisibleValue != "" && !acceptanceCase.Absent && !acceptanceCase.Omitted && !strings.Contains(content, acceptanceCase.ExpectedVisibleValue) {
-		return fmt.Errorf("case %q is missing expected visible value %q", acceptanceCase.ID, acceptanceCase.ExpectedVisibleValue)
+func renderingAcceptanceQuantityExpectedValue(report reportmodel.CapitalGainsReport, occurrence testutil.ReportPresentationOccurrenceKey) string {
+	if occurrence.SourceOrRowIdentity == "opening-position" {
+		return canonicalAcceptanceDecimal(report.DetailSections[0].OpeningQuantity)
 	}
-	if acceptanceCase.Kind == testutil.ReportPresentationCaseKindBoolean && !strings.Contains(content, acceptanceCase.ExpectedVisibleValue) {
-		return fmt.Errorf("case %q is missing boolean label %q", acceptanceCase.ID, acceptanceCase.ExpectedVisibleValue)
+	if occurrence.SourceOrRowIdentity == "closing-position" {
+		return canonicalAcceptanceDecimal(report.DetailSections[0].ClosingQuantity)
+	}
+	if occurrence.SourceOrRowIdentity == "historical-position" {
+		for _, section := range report.DetailSections {
+			if section.AssetIdentityKey == "asset-historical" {
+				return canonicalAcceptanceDecimal(section.ClosingQuantity)
+			}
+		}
+	}
+	for _, section := range report.DetailSections {
+		for _, row := range section.ActivityRows {
+			if row.SourceID == occurrence.SourceOrRowIdentity {
+				if occurrence.FieldName == "activity_quantity" {
+					return canonicalAcceptanceDecimal(row.Quantity)
+				}
+				if occurrence.FieldName == "quantity_after_row" {
+					return canonicalAcceptanceDecimal(row.QuantityAfterRow)
+				}
+			}
+		}
+		for _, liquidation := range section.LiquidationSummaries {
+			if liquidation.SourceID == occurrence.SourceOrRowIdentity && occurrence.FieldName == "disposed_quantity" {
+				return canonicalAcceptanceDecimal(liquidation.DisposedQuantity)
+			}
+		}
+	}
+	for _, section := range report.AuditAnnex.PerAssetAuditSections {
+		for _, entry := range section.Entries {
+			if entry.SourceID == occurrence.SourceOrRowIdentity {
+				if occurrence.FieldName == "audit_quantity" {
+					return canonicalAcceptanceDecimal(entry.Quantity)
+				}
+				if occurrence.FieldName == "quantity_after_activity" {
+					return canonicalAcceptanceDecimal(entry.QuantityAfterActivity)
+				}
+			}
+		}
+	}
+	return ""
+}
+
+// renderingAcceptanceMarkdownValue extracts one field from its owning Markdown
+// row or position block, preserving blank table cells as empty strings.
+// Authored by: OpenCode
+func renderingAcceptanceMarkdownValue(acceptanceCase testutil.ReportPresentationAcceptanceCase, report reportmodel.CapitalGainsReport, occurrence testutil.ReportPresentationOccurrenceKey, main string, annex string) (string, bool) {
+	if occurrence.Population == testutil.ReportPresentationPopulationParity && isRenderingAcceptanceRateMetadataField(occurrence.FieldName) {
+		var row, found = markdownAcceptanceRow(annex, occurrence.SourceOrRowIdentity, 9)
+		if !found {
+			return "", false
+		}
+		var columns = map[string]int{"source_id": 1, "asset": 2, "rate_date": 3, "source_currency": 4, "report_base_currency": 5, "quote_direction": 7, "rate_value": 8}
+		column, ok := columns[occurrence.FieldName]
+		if !ok {
+			return "", false
+		}
+		return row[column], true
+	}
+	switch occurrence.Population {
+	case testutil.ReportPresentationPopulationConversionRow:
+		var row, found = markdownAcceptanceRow(annex, occurrence.SourceOrRowIdentity, 9)
+		if !found {
+			return "", false
+		}
+		return normalizeAcceptanceConvertedCell(row[6]), true
+	case testutil.ReportPresentationPopulationConvertedEntry:
+		var row, found = markdownAcceptanceRow(annex, occurrence.SourceOrRowIdentity, 9)
+		if !found {
+			return "", false
+		}
+		var expected, err = renderingAcceptanceExpectedValue(acceptanceCase, report, occurrence)
+		if err != nil {
+			return "", false
+		}
+		if strings.Contains(row[6], expected) {
+			return expected, true
+		}
+		return "", false
+	case testutil.ReportPresentationPopulationClassifiedCurrency, testutil.ReportPresentationPopulationUnclassified:
+		var row, found = markdownAcceptanceRow(annex, occurrence.SourceOrRowIdentity, 17)
+		if !found {
+			return "", false
+		}
+		return row[7], true
+	case testutil.ReportPresentationPopulationBoolean:
+		var row, found = markdownAcceptanceRow(annex, occurrence.SourceOrRowIdentity, 17)
+		if !found {
+			return "", false
+		}
+		return row[11], true
+	case testutil.ReportPresentationPopulationQuantity:
+		return markdownAcceptanceQuantityValue(main, annex, occurrence)
+	case testutil.ReportPresentationPopulationVisibleFinancial:
+		if strings.HasPrefix(occurrence.FieldName, "original_") || strings.HasPrefix(occurrence.FieldName, "converted_") {
+			var row, found = markdownAcceptanceRow(annex, occurrence.SourceOrRowIdentity, 9)
+			if !found {
+				return "", false
+			}
+			var amount, ok = renderingAcceptanceConversionAmount(report, occurrence.SourceOrRowIdentity, occurrence.AmountKind)
+			if !ok {
+				return "", false
+			}
+			var expectedEntry = renderingAcceptanceConvertedEntryText(amount)
+			if !strings.Contains(row[6], expectedEntry) {
+				return "", false
+			}
+			if strings.HasPrefix(occurrence.FieldName, "original_") {
+				var value, err = presentation.FormatFinancialValue(amount.OriginalAmount)
+				if err != nil {
+					return canonicalAcceptanceDecimal(amount.OriginalAmount), true
+				}
+				return value, true
+			}
+			var value, err = presentation.FormatFinancialValue(amount.ConvertedAmount)
+			if err != nil {
+				return canonicalAcceptanceDecimal(amount.ConvertedAmount), true
+			}
+			return value, true
+		}
+		if occurrence.Section == "gains_and_losses_summary" {
+			var label = "Overall Yearly Net Total"
+			if occurrence.FieldName == "per_asset_net_gain_or_loss" {
+				label = "BTC"
+			}
+			var row, found = markdownAcceptanceRowByFirstCell(main, label)
+			if !found {
+				return "", false
+			}
+			return row[1], true
+		}
+		if occurrence.Section == "position" {
+			var heading = "Opening Position"
+			if occurrence.SourceOrRowIdentity == "closing-position" {
+				heading = "Closing Position"
+			}
+			if occurrence.SourceOrRowIdentity == "historical-position" {
+				heading = "Historical Position"
+			}
+			var label = "Cost Basis"
+			return markdownAcceptancePositionValue(main, occurrence.AssetIdentity, heading, label)
+		}
+		if occurrence.Section == "in_year_activity" {
+			var row, found = markdownAcceptanceRow(main, occurrence.SourceOrRowIdentity, 13)
+			if !found {
+				return "", false
+			}
+			var columns = map[string]int{"unit_price": 4, "gross_value": 5, "fee_amount": 6, "basis_after_row": 8}
+			column, ok := columns[occurrence.FieldName]
+			if !ok {
+				return "", false
+			}
+			return row[column], true
+		}
+		if occurrence.Section == "liquidation_calculations" {
+			var row, found = markdownAcceptanceRow(main, occurrence.SourceOrRowIdentity, 7)
+			if !found {
+				return "", false
+			}
+			var columns = map[string]int{"allocated_basis": 3, "net_proceeds": 4, "gain_or_loss": 5}
+			column, ok := columns[occurrence.FieldName]
+			if !ok {
+				return "", false
+			}
+			return row[column], true
+		}
+		if occurrence.Section == "detailed_per_asset_audit" {
+			var row, found = markdownAcceptanceRow(annex, occurrence.SourceOrRowIdentity, 17)
+			if !found {
+				return "", false
+			}
+			var columns = map[string]int{"unit_price": 4, "gross_value": 5, "fee_amount": 6, "basis_after_activity": 10, "allocated_basis": 12, "net_proceeds": 13, "gain_or_loss": 14}
+			column, ok := columns[occurrence.FieldName]
+			if !ok {
+				return "", false
+			}
+			return row[column], true
+		}
+	}
+	return "", false
+}
+
+// markdownAcceptanceRow returns one pipe-table row with leading/trailing pipes
+// removed and blank cells retained.
+// Authored by: OpenCode
+func markdownAcceptanceRow(content string, sourceID string, width int) ([]string, bool) {
+	for _, line := range strings.Split(content, "\n") {
+		if !strings.HasPrefix(line, "|") || !strings.HasSuffix(line, "|") {
+			continue
+		}
+		var cells = splitMarkdownAcceptanceCells(line)
+		if len(cells) == width && len(cells) > 1 && cells[1] == sourceID {
+			return cells, true
+		}
+	}
+	return nil, false
+}
+
+// markdownAcceptanceRowByFirstCell locates summary rows by their unique first
+// semantic cell.
+// Authored by: OpenCode
+func markdownAcceptanceRowByFirstCell(content string, firstCell string) ([]string, bool) {
+	for _, line := range strings.Split(content, "\n") {
+		if !strings.HasPrefix(line, "|") || !strings.HasSuffix(line, "|") {
+			continue
+		}
+		var cells = splitMarkdownAcceptanceCells(line)
+		if len(cells) >= 2 && cells[0] == firstCell {
+			return cells, true
+		}
+	}
+	return nil, false
+}
+
+// splitMarkdownAcceptanceCells parses a pipe-table row without losing blank
+// semantic cells.
+// Authored by: OpenCode
+func splitMarkdownAcceptanceCells(line string) []string {
+	var raw = strings.Split(line[1:len(line)-1], "|")
+	for index := range raw {
+		raw[index] = strings.TrimSpace(raw[index])
+	}
+	return raw
+}
+
+// markdownAcceptancePositionValue locates a labeled position value inside one
+// asset detail block.
+// Authored by: OpenCode
+func markdownAcceptancePositionValue(content string, asset string, heading string, label string) (string, bool) {
+	var inAsset, inHeading bool
+	for _, line := range strings.Split(content, "\n") {
+		if strings.HasPrefix(line, "## Asset Detail: ") {
+			inAsset = strings.TrimSpace(strings.TrimPrefix(line, "## Asset Detail: ")) == renderingAcceptanceAssetLabel(asset)
+			inHeading = false
+		}
+		if !inAsset {
+			continue
+		}
+		if strings.TrimSpace(line) == "### "+heading {
+			inHeading = true
+			continue
+		}
+		if inHeading && strings.HasPrefix(line, "### ") {
+			inHeading = false
+		}
+		if inHeading {
+			var prefix = "- **" + label + ":** "
+			if strings.HasPrefix(line, prefix) {
+				return strings.TrimSpace(strings.TrimPrefix(line, prefix)), true
+			}
+		}
+	}
+	return "", false
+}
+
+// renderingAcceptanceAssetLabel maps a fixture asset identity to its visible
+// report label.
+// Authored by: OpenCode
+func renderingAcceptanceAssetLabel(asset string) string {
+	if asset == "asset-historical" {
+		return "HIST"
+	}
+	return strings.ToUpper(strings.TrimPrefix(asset, "asset-"))
+}
+
+// markdownAcceptanceQuantityValue maps each quantity occurrence to its exact
+// visible Markdown field.
+// Authored by: OpenCode
+func markdownAcceptanceQuantityValue(main string, annex string, occurrence testutil.ReportPresentationOccurrenceKey) (string, bool) {
+	switch occurrence.FieldName {
+	case "opening_quantity":
+		return markdownAcceptancePositionValue(main, occurrence.AssetIdentity, "Opening Position", "Quantity")
+	case "closing_quantity":
+		return markdownAcceptancePositionValue(main, occurrence.AssetIdentity, "Closing Position", "Quantity")
+	case "historical_position_quantity":
+		return markdownAcceptancePositionValue(main, occurrence.AssetIdentity, "Historical Position", "Quantity")
+	case "activity_quantity", "quantity_after_row":
+		var row, found = markdownAcceptanceRow(main, occurrence.SourceOrRowIdentity, 13)
+		if !found {
+			return "", false
+		}
+		if occurrence.FieldName == "activity_quantity" {
+			return row[3], true
+		}
+		return row[7], true
+	case "disposed_quantity":
+		var row, found = markdownAcceptanceRow(main, occurrence.SourceOrRowIdentity, 7)
+		if !found {
+			return "", false
+		}
+		return row[2], true
+	case "audit_quantity", "quantity_after_activity":
+		var row, found = markdownAcceptanceRow(annex, occurrence.SourceOrRowIdentity, 17)
+		if !found {
+			return "", false
+		}
+		if occurrence.FieldName == "audit_quantity" {
+			return row[3], true
+		}
+		return row[9], true
+	}
+	return "", false
+}
+
+// renderingAcceptancePDFValue extracts one field from a row-local PDF text-run
+// set. Searchable document text is used only for the warning; all other values
+// are constrained to their semantic column and source row.
+// Authored by: OpenCode
+func renderingAcceptancePDFValue(acceptanceCase testutil.ReportPresentationAcceptanceCase, report reportmodel.CapitalGainsReport, occurrence testutil.ReportPresentationOccurrenceKey, inspection testutil.GeneratedPDF) (string, bool) {
+	if occurrence.Population == testutil.ReportPresentationPopulationParity && isRenderingAcceptanceRateMetadataField(occurrence.FieldName) {
+		var rowRuns = contractPDFConversionRowRuns(inspection, occurrence.SourceOrRowIdentity, []string{occurrence.SourceOrRowIdentity})
+		if len(rowRuns) == 0 {
+			return "", false
+		}
+		var bounds = map[string][2]float64{"source_id": {100, 175}, "asset": {175, 235}, "rate_date": {235, 305}, "source_currency": {305, 380}, "report_base_currency": {380, 465}, "quote_direction": {610, 745}, "rate_value": {745, 830}}
+		column, ok := bounds[occurrence.FieldName]
+		if !ok {
+			return "", false
+		}
+		return renderingAcceptancePDFCell(rowRuns, column[0], column[1], false), true
+	}
+	switch occurrence.Population {
+	case testutil.ReportPresentationPopulationConversionRow:
+		var rowRuns = renderingAcceptancePDFConversionRow(inspection, occurrence.SourceOrRowIdentity)
+		if len(rowRuns) == 0 {
+			return "", false
+		}
+		var cellRuns = contractPDFConvertedCellRuns(rowRuns)
+		if len(cellRuns) == 0 {
+			return "", true
+		}
+		return normalizeAcceptanceConvertedCell(strings.Join(contractPDFRunTexts(cellRuns), " ")), true
+	case testutil.ReportPresentationPopulationConvertedEntry:
+		var rowRuns = renderingAcceptancePDFConversionRow(inspection, occurrence.SourceOrRowIdentity)
+		if len(rowRuns) == 0 {
+			return "", false
+		}
+		var expected, err = renderingAcceptanceExpectedValue(acceptanceCase, report, occurrence)
+		if err != nil {
+			return "", false
+		}
+		var cellText = normalizeAcceptanceConvertedCell(strings.Join(contractPDFRunTexts(contractPDFConvertedCellRuns(rowRuns)), " "))
+		if strings.Contains(cellText, expected) {
+			return expected, true
+		}
+		return "", false
+	case testutil.ReportPresentationPopulationClassifiedCurrency, testutil.ReportPresentationPopulationUnclassified, testutil.ReportPresentationPopulationBoolean:
+		var cells, found = renderingAcceptancePDFAuditCells(inspection, occurrence.SourceOrRowIdentity)
+		if !found {
+			return "", false
+		}
+		if occurrence.Population == testutil.ReportPresentationPopulationBoolean {
+			return cells[11], true
+		}
+		return cells[7], true
+	case testutil.ReportPresentationPopulationQuantity:
+		return renderingAcceptancePDFQuantityValue(inspection, occurrence)
+	case testutil.ReportPresentationPopulationVisibleFinancial:
+		if strings.HasPrefix(occurrence.FieldName, "original_") || strings.HasPrefix(occurrence.FieldName, "converted_") {
+			var rowRuns = renderingAcceptancePDFConversionRow(inspection, occurrence.SourceOrRowIdentity)
+			if len(rowRuns) == 0 {
+				return "", false
+			}
+			var amount, ok = renderingAcceptanceConversionAmount(report, occurrence.SourceOrRowIdentity, occurrence.AmountKind)
+			if !ok {
+				return "", false
+			}
+			if !strings.Contains(normalizeAcceptanceConvertedCell(renderingAcceptancePDFCell(rowRuns, 465, 610, false)), renderingAcceptanceConvertedEntryText(amount)) {
+				return "", false
+			}
+			if strings.HasPrefix(occurrence.FieldName, "original_") {
+				var value, err = presentation.FormatFinancialValue(amount.OriginalAmount)
+				if err != nil {
+					return canonicalAcceptanceDecimal(amount.OriginalAmount), true
+				}
+				return value, true
+			}
+			var value, err = presentation.FormatFinancialValue(amount.ConvertedAmount)
+			if err != nil {
+				return canonicalAcceptanceDecimal(amount.ConvertedAmount), true
+			}
+			return value, true
+		}
+		if occurrence.Section == "gains_and_losses_summary" {
+			var rowRuns, found = renderingAcceptancePDFSummaryRowRuns(inspection, occurrence.FieldName == "per_asset_net_gain_or_loss")
+			if !found {
+				return "", false
+			}
+			return renderingAcceptancePDFCell(rowRuns, 500, 585, true), true
+		}
+		if occurrence.Section == "position" {
+			var heading = "Opening Position"
+			if occurrence.SourceOrRowIdentity == "closing-position" {
+				heading = "Closing Position"
+			}
+			if occurrence.SourceOrRowIdentity == "historical-position" {
+				heading = "Historical Position"
+			}
+			return renderingAcceptancePDFPositionValue(inspection, occurrence.AssetIdentity, heading, "Cost Basis")
+		}
+		if occurrence.Section == "in_year_activity" {
+			var rowRuns, found = renderingAcceptancePDFMainSourceRowInRange(inspection, occurrence.SourceOrRowIdentity, 100, 170)
+			if !found {
+				return "", false
+			}
+			var columns = map[string][2]float64{"unit_price": {290, 345}, "gross_value": {345, 400}, "fee_amount": {400, 450}, "basis_after_row": {500, 550}}
+			bounds, ok := columns[occurrence.FieldName]
+			if !ok {
+				return "", false
+			}
+			return renderingAcceptancePDFCell(rowRuns, bounds[0], bounds[1], true), true
+		}
+		if occurrence.Section == "liquidation_calculations" {
+			var rowRuns, found = renderingAcceptancePDFMainSourceRowInRange(inspection, occurrence.SourceOrRowIdentity, 140, 260)
+			if !found {
+				return "", false
+			}
+			var columns = map[string][2]float64{"allocated_basis": {380, 490}, "net_proceeds": {490, 600}, "gain_or_loss": {600, 675}}
+			bounds, ok := columns[occurrence.FieldName]
+			if !ok {
+				return "", false
+			}
+			return renderingAcceptancePDFCell(rowRuns, bounds[0], bounds[1], true), true
+		}
+		if occurrence.Section == "detailed_per_asset_audit" {
+			var cells, found = renderingAcceptancePDFAuditCells(inspection, occurrence.SourceOrRowIdentity)
+			if !found {
+				return "", false
+			}
+			var columns = map[string]int{"unit_price": 4, "gross_value": 5, "fee_amount": 6, "basis_after_activity": 10, "allocated_basis": 12, "net_proceeds": 13, "gain_or_loss": 14}
+			column, ok := columns[occurrence.FieldName]
+			if !ok {
+				return "", false
+			}
+			return strings.ReplaceAll(cells[column], " ", ""), true
+		}
+	}
+	return "", false
+}
+
+// normalizeAcceptanceConvertedCell makes Markdown and PDF controlled line
+// boundaries comparable without removing semantic punctuation.
+// Authored by: OpenCode
+func normalizeAcceptanceConvertedCell(value string) string {
+	return strings.Join(strings.Fields(strings.ReplaceAll(strings.ReplaceAll(value, "<br>", " "), ";", "")), " ")
+}
+
+// renderingAcceptancePDFAuditCells returns all fixed Annex columns for one
+// detailed source row, including blank cells.
+// Authored by: OpenCode
+func renderingAcceptancePDFAuditCells(inspection testutil.GeneratedPDF, sourceID string) ([]string, bool) {
+	var firstPage int
+	for _, run := range inspection.TextRuns {
+		if run.Text == "Annex 1 - Audit" {
+			firstPage = run.Page
+			break
+		}
+	}
+	var sourceRuns, found = runtimeflow.FindAnnexPDFSourceRuns(inspection.TextRuns, firstPage, sourceID)
+	if !found {
+		return nil, false
+	}
+	var cells = runtimeflow.AnnexPDFSemanticCells(runtimeflow.AnnexPDFRowRuns(inspection.TextRuns, sourceRuns))
+	return cells, len(cells) == runtimeflow.AnnexPDFColumnCount
+}
+
+// renderingAcceptancePDFQuantityValue maps every quantity occurrence to its
+// field-local PDF value.
+// Authored by: OpenCode
+func renderingAcceptancePDFQuantityValue(inspection testutil.GeneratedPDF, occurrence testutil.ReportPresentationOccurrenceKey) (string, bool) {
+	switch occurrence.FieldName {
+	case "opening_quantity":
+		return renderingAcceptancePDFPositionValue(inspection, occurrence.AssetIdentity, "Opening Position", "Quantity")
+	case "closing_quantity":
+		return renderingAcceptancePDFPositionValue(inspection, occurrence.AssetIdentity, "Closing Position", "Quantity")
+	case "historical_position_quantity":
+		return renderingAcceptancePDFPositionValue(inspection, occurrence.AssetIdentity, "Historical Position", "Quantity")
+	case "activity_quantity", "quantity_after_row", "disposed_quantity":
+		var rowRuns, found = renderingAcceptancePDFMainSourceRow(inspection, occurrence.SourceOrRowIdentity)
+		if occurrence.FieldName == "disposed_quantity" {
+			rowRuns, found = renderingAcceptancePDFMainSourceRowInRange(inspection, occurrence.SourceOrRowIdentity, 140, 260)
+		}
+		if !found {
+			return "", false
+		}
+		var bounds = map[string][2]float64{"activity_quantity": {230, 290}, "quantity_after_row": {450, 500}, "disposed_quantity": {260, 380}}[occurrence.FieldName]
+		return renderingAcceptancePDFCell(rowRuns, bounds[0], bounds[1], true), true
+	case "audit_quantity", "quantity_after_activity":
+		var cells, found = renderingAcceptancePDFAuditCells(inspection, occurrence.SourceOrRowIdentity)
+		if !found {
+			return "", false
+		}
+		if occurrence.FieldName == "audit_quantity" {
+			return strings.ReplaceAll(cells[3], " ", ""), true
+		}
+		return strings.ReplaceAll(cells[9], " ", ""), true
+	}
+	return "", false
+}
+
+// renderingAcceptancePDFPositionValue locates a key/value within the selected
+// asset detail block by heading and label coordinates.
+// Authored by: OpenCode
+func renderingAcceptancePDFPositionValue(inspection testutil.GeneratedPDF, asset string, heading string, label string) (string, bool) {
+	var inAsset, inHeading bool
+	for _, run := range inspection.TextRuns {
+		if run.Text == "Asset Detail: "+renderingAcceptanceAssetLabel(asset) {
+			inAsset = true
+			inHeading = false
+		}
+		if !inAsset {
+			continue
+		}
+		if run.Text == heading {
+			inHeading = true
+			continue
+		}
+		if strings.HasPrefix(run.Text, "Asset Detail: ") && run.Text != "Asset Detail: "+renderingAcceptanceAssetLabel(asset) {
+			inAsset = false
+			inHeading = false
+		}
+		if inHeading && run.Text == label+":" {
+			for _, value := range inspection.TextRuns {
+				if value.Page == run.Page && value.X >= 150 && value.X <= 260 && value.Y > run.Y-1 && value.Y < run.Y+12 {
+					return strings.TrimSpace(value.Text), true
+				}
+			}
+		}
+	}
+	return "", false
+}
+
+// renderingAcceptancePDFConversionRow expands the local conversion row enough
+// to include width-wrapped fragments of large financial entries.
+// Authored by: OpenCode
+func renderingAcceptancePDFConversionRow(inspection testutil.GeneratedPDF, sourceID string) []testutil.PDFTextRun {
+	var normalizedSource = strings.ReplaceAll(strings.ToLower(sourceID), " ", "")
+	var conversionPage int
+	var conversionY float64
+	for _, run := range inspection.TextRuns {
+		if run.Text == "Currency Conversion Audit" {
+			conversionPage = run.Page
+			conversionY = run.Y
+			break
+		}
+	}
+	for _, sourceRun := range inspection.TextRuns {
+		if sourceRun.Page < conversionPage || (sourceRun.Page == conversionPage && sourceRun.Y >= conversionY) || sourceRun.X < 95 || sourceRun.X > 180 || strings.ReplaceAll(strings.ToLower(sourceRun.Text), " ", "") != normalizedSource {
+			continue
+		}
+		var row []testutil.PDFTextRun
+		for _, run := range inspection.TextRuns {
+			if run.Page == sourceRun.Page && run.Y >= sourceRun.Y-35 && run.Y <= sourceRun.Y+35 {
+				row = append(row, run)
+			}
+		}
+		return row
 	}
 	return nil
 }
 
-// renderingAcceptanceParityPasses uses the shared warning and case-control
-// validation results carried by both attempt messages.
+// renderingAcceptancePDFSummaryRowRuns isolates one summary row by its first
+// semantic cell and keeps the amount column local.
 // Authored by: OpenCode
-func renderingAcceptanceParityPasses(acceptanceCase testutil.ReportPresentationAcceptanceCase, markdownSemantic string, pdfSemantic string) bool {
-	_ = acceptanceCase
-	return markdownSemantic != "" && markdownSemantic == pdfSemantic
+func renderingAcceptancePDFSummaryRowRuns(inspection testutil.GeneratedPDF, assetRow bool) ([]testutil.PDFTextRun, bool) {
+	var target = "Overall Yearly Net Total"
+	if assetRow {
+		target = "BTC"
+	}
+	var summaryPage, summaryHeaderY float64
+	var foundSummary bool
+	for _, run := range inspection.TextRuns {
+		if run.Text == "Gains-And-Losses Summary Table" {
+			summaryPage = float64(run.Page)
+			summaryHeaderY = run.Y
+			foundSummary = true
+			break
+		}
+	}
+	if !foundSummary {
+		return nil, false
+	}
+	for _, run := range inspection.TextRuns {
+		if run.Text != target || run.X > 200 || float64(run.Page) != summaryPage || run.Y >= summaryHeaderY {
+			continue
+		}
+		var row []testutil.PDFTextRun
+		for _, candidate := range inspection.TextRuns {
+			if candidate.Page == run.Page && candidate.Y >= run.Y-17 && candidate.Y <= run.Y+17 {
+				row = append(row, candidate)
+			}
+		}
+		return row, true
+	}
+	return nil, false
+}
+
+// renderingAcceptancePDFMainSourceRow isolates one main-report table row by
+// its Source ID column, including wrapped source fragments.
+// Authored by: OpenCode
+func renderingAcceptancePDFMainSourceRow(inspection testutil.GeneratedPDF, sourceID string) ([]testutil.PDFTextRun, bool) {
+	return renderingAcceptancePDFMainSourceRowInRange(inspection, sourceID, 100, 170)
+}
+
+// renderingAcceptancePDFMainSourceRowInRange isolates one repeated main table
+// row using the source-ID column bounds of its owning table.
+// Authored by: OpenCode
+func renderingAcceptancePDFMainSourceRowInRange(inspection testutil.GeneratedPDF, sourceID string, minimumX float64, maximumX float64) ([]testutil.PDFTextRun, bool) {
+	var normalizedSource = strings.ReplaceAll(strings.ToLower(sourceID), " ", "")
+	for _, run := range inspection.TextRuns {
+		if run.X < minimumX || run.X > maximumX || strings.ReplaceAll(strings.ToLower(run.Text), " ", "") == "" {
+			continue
+		}
+		var sourceText string
+		for _, candidate := range inspection.TextRuns {
+			if candidate.Page == run.Page && candidate.X >= minimumX && candidate.X <= maximumX && candidate.Y >= run.Y-1 && candidate.Y <= run.Y+1 {
+				sourceText += strings.ReplaceAll(candidate.Text, " ", "")
+			}
+		}
+		if !strings.Contains(strings.ToLower(sourceText), normalizedSource) {
+			continue
+		}
+		var row []testutil.PDFTextRun
+		for _, candidate := range inspection.TextRuns {
+			if candidate.Page == run.Page && candidate.Y >= run.Y-17 && candidate.Y <= run.Y+17 {
+				row = append(row, candidate)
+			}
+		}
+		return row, true
+	}
+	return nil, false
+}
+
+// renderingAcceptancePDFCell joins one row-local column. Numeric columns may
+// be right-aligned or split across physical PDF runs.
+// Authored by: OpenCode
+func renderingAcceptancePDFCell(runs []testutil.PDFTextRun, minimumX float64, maximumX float64, compact bool) string {
+	var values []string
+	for _, run := range runs {
+		if run.X >= minimumX && run.X < maximumX {
+			values = append(values, run.Text)
+		}
+	}
+	var value = strings.Join(values, " ")
+	if compact {
+		return strings.Join(strings.Fields(value), "")
+	}
+	return strings.Join(strings.Fields(value), " ")
 }
 
 // renderingAcceptanceReport creates the deterministic synthetic model used by
@@ -485,14 +1500,47 @@ func renderingAcceptanceReport(acceptanceCase testutil.ReportPresentationAccepta
 		report = contractMarkdownReportFixture(reportmodel.ReportBaseCurrencyEUR.Label())
 		report.AuditAnnex = contractDetailedAuditAnnex()
 	}
+	report.DetailSections = append(report.DetailSections, reportmodel.AssetDetailSection{
+		AssetIdentityKey:    "asset-historical",
+		DisplayLabel:        "HIST",
+		ClosingQuantity:     mustContractDecimal("7"),
+		ClosingCostBasis:    mustContractDecimal("70"),
+		CalculationCurrency: report.ReportCalculationCurrency,
+	})
 
 	switch acceptanceCase.Kind {
 	case testutil.ReportPresentationCaseKindFinancial:
 		applyRenderingAcceptanceFinancialControl(&report, acceptanceCase)
 	case testutil.ReportPresentationCaseKindQuantity:
 		var value = mustContractDecimal(acceptanceCase.ExactValue)
-		if len(report.DetailSections) > 0 {
-			report.DetailSections[0].OpeningQuantity = value
+		for sectionIndex := range report.DetailSections {
+			section := &report.DetailSections[sectionIndex]
+			if section.AssetIdentityKey == "asset-historical" {
+				section.ClosingQuantity = value
+				continue
+			}
+			section.OpeningQuantity = value
+			section.ClosingQuantity = value
+			for rowIndex := range section.ActivityRows {
+				if value.Sign() > 0 {
+					section.ActivityRows[rowIndex].Quantity = value
+				}
+				section.ActivityRows[rowIndex].QuantityAfterRow = value
+			}
+			for liquidationIndex := range section.LiquidationSummaries {
+				if value.Sign() > 0 {
+					section.LiquidationSummaries[liquidationIndex].DisposedQuantity = value
+				}
+			}
+		}
+		for sectionIndex := range report.AuditAnnex.PerAssetAuditSections {
+			for entryIndex := range report.AuditAnnex.PerAssetAuditSections[sectionIndex].Entries {
+				entry := &report.AuditAnnex.PerAssetAuditSections[sectionIndex].Entries[entryIndex]
+				if value.Sign() > 0 {
+					entry.Quantity = value
+				}
+				entry.QuantityAfterActivity = value
+			}
 		}
 	case testutil.ReportPresentationCaseKindRate:
 		var value = mustContractDecimal(acceptanceCase.ExactValue)
@@ -562,6 +1610,11 @@ func applyRenderingAcceptanceFinancialControl(report *reportmodel.CapitalGainsRe
 		if len(report.DetailSections) > 0 {
 			report.DetailSections[0].OpeningCostBasis = exact
 			report.DetailSections[0].ClosingCostBasis = exact
+		}
+		for index := range report.DetailSections {
+			if report.DetailSections[index].AssetIdentityKey == "asset-historical" {
+				report.DetailSections[index].ClosingCostBasis = exact
+			}
 		}
 	case "in-year-activity":
 		for sectionIndex := range report.DetailSections {
@@ -682,15 +1735,25 @@ func clearRenderingAcceptanceFinancialControl(report *reportmodel.CapitalGainsRe
 	switch fieldClass {
 	case "in-year-activity":
 		for index := range report.DetailSections {
-			report.DetailSections[index].ActivityRows = nil
+			for rowIndex := range report.DetailSections[index].ActivityRows {
+				report.DetailSections[index].ActivityRows[rowIndex].UnitPrice = nil
+				report.DetailSections[index].ActivityRows[rowIndex].GrossValue = nil
+				report.DetailSections[index].ActivityRows[rowIndex].FeeAmount = nil
+			}
 		}
 	case "liquidation-allocated-basis", "liquidation-net-proceeds-gain-or-loss":
-		for index := range report.DetailSections {
-			report.DetailSections[index].LiquidationSummaries = nil
-		}
+		return
 	case "audit-activity", "audit-allocated-basis", "audit-net-proceeds-gain-or-loss":
 		for index := range report.AuditAnnex.PerAssetAuditSections {
-			report.AuditAnnex.PerAssetAuditSections[index].Entries = nil
+			for entryIndex := range report.AuditAnnex.PerAssetAuditSections[index].Entries {
+				var entry = &report.AuditAnnex.PerAssetAuditSections[index].Entries[entryIndex]
+				entry.UnitPrice = nil
+				entry.GrossValue = nil
+				entry.FeeAmount = nil
+				entry.AllocatedBasis = nil
+				entry.NetLiquidationProceeds = nil
+				entry.GainOrLoss = nil
+			}
 		}
 	}
 }
@@ -776,14 +1839,14 @@ func assertRenderingAcceptanceManifest(t *testing.T, manifest testutil.ReportPre
 		CaseCount: 148,
 		Populations: map[testutil.ReportPresentationPopulation]int{
 			testutil.ReportPresentationPopulationWarning:            296,
-			testutil.ReportPresentationPopulationVisibleFinancial:   664,
+			testutil.ReportPresentationPopulationVisibleFinancial:   688,
 			testutil.ReportPresentationPopulationModelIntegrity:     296,
-			testutil.ReportPresentationPopulationQuantity:           10,
-			testutil.ReportPresentationPopulationBoolean:            4,
+			testutil.ReportPresentationPopulationQuantity:           80,
+			testutil.ReportPresentationPopulationBoolean:            16,
 			testutil.ReportPresentationPopulationClassifiedCurrency: 2,
 			testutil.ReportPresentationPopulationUnclassified:       4,
 			testutil.ReportPresentationPopulationConversionRow:      16,
-			testutil.ReportPresentationPopulationParity:             491,
+			testutil.ReportPresentationPopulationParity:             601,
 			testutil.ReportPresentationPopulationConvertedEntry:     24,
 		},
 	}
@@ -843,45 +1906,21 @@ func renderingAcceptanceClosedCaseIDs() map[string]struct{} {
 	return IDs
 }
 
-// runRenderingAcceptanceRegressionPopulation runs the fixed calculation test
-// packages; R is intentionally separate from renderer-attempt accounting.
+// assertStaticCalculationRegressionBaseline validates R without executing its
+// direct owner packages from the acceptance contract.
 // Authored by: OpenCode
-func runRenderingAcceptanceRegressionPopulation(t *testing.T) bool {
+func assertStaticCalculationRegressionBaseline(t *testing.T) {
 	t.Helper()
-	var root, err = renderingAcceptanceModuleRoot()
+	var root = calculationRegressionRepositoryRoot(t)
+	var baseline, err = loadCalculationRegressionBaseline(root)
 	if err != nil {
-		t.Errorf("locate module root for R: %v", err)
-		return false
+		t.Fatal(err)
 	}
-	// #nosec G204 -- the command and package paths are fixed by the acceptance contract.
-	var command = exec.CommandContext(context.Background(), "go", "test", "./internal/report/basis", "./internal/report/calculate", "./tests/empirical", "-count=1")
-	command.Dir = root
-	command.Env = append(os.Environ(), "GOPROXY=off", "GOSUMDB=off", "GOTOOLCHAIN=local")
-	if err = command.Run(); err != nil {
-		t.Errorf("fixed calculation regression population R failed: %v", err)
-		return false
-	}
-	return true
-}
-
-// renderingAcceptanceModuleRoot locates the repository root from this source
-// file so the nested fixed-regression command is independent of test cwd.
-// Authored by: OpenCode
-func renderingAcceptanceModuleRoot() (string, error) {
-	var _, filename, _, ok = runtime.Caller(0)
-	if !ok {
-		return "", fmt.Errorf("runtime caller path is unavailable")
-	}
-	var directory = filepath.Dir(filename)
-	for {
-		if _, err := os.Stat(filepath.Join(directory, "go.mod")); err == nil {
-			return directory, nil
-		}
-		var parent = filepath.Dir(directory)
-		if parent == directory {
-			return "", fmt.Errorf("go.mod was not found")
-		}
-		directory = parent
+	var numerator, mismatches = validateCalculationRegressionBaseline(root, baseline)
+	t.Logf("R=%d/%d", numerator, len(baseline.cases))
+	if len(mismatches) != 0 {
+		sort.Strings(mismatches)
+		t.Fatalf("static calculation regression validation failed (R=%d/%d):\n- %s", numerator, len(baseline.cases), strings.Join(mismatches, "\n- "))
 	}
 }
 
@@ -889,14 +1928,7 @@ func renderingAcceptanceModuleRoot() (string, error) {
 // preventing repeated field text from becoming an occurrence denominator.
 // Authored by: OpenCode
 func renderingAcceptanceOccurrenceKey(occurrence testutil.ReportPresentationOccurrenceKey) string {
-	return fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%s|%d", occurrence.Population, occurrence.CaseID, occurrence.Format, occurrence.DocumentRole, occurrence.Section, occurrence.SourceOrRowIdentity, occurrence.FieldName, occurrence.AmountKind, occurrence.AmountOrdinal)
-}
-
-// renderingAcceptanceRegressionKey identifies one fixed baseline regression
-// identity without importing it into renderer-attempt populations.
-// Authored by: OpenCode
-func renderingAcceptanceRegressionKey(index int) string {
-	return fmt.Sprintf("baseline/%03d", index)
+	return fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%s|%s|%d", occurrence.Population, occurrence.CaseID, occurrence.Format, occurrence.DocumentRole, occurrence.Section, occurrence.AssetIdentity, occurrence.SourceOrRowIdentity, occurrence.FieldName, occurrence.AmountKind, occurrence.AmountOrdinal)
 }
 
 // testutilPopulationName converts a closed manifest population to its report

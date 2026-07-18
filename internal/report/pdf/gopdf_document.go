@@ -15,12 +15,17 @@ type gopdfDocument struct {
 	pageWidth  float64
 	pageHeight float64
 	started    bool
+	finalize   ByteFinalizer
 }
 
 // newGopdfDocument creates one local PDF document adapter.
 // Authored by: OpenCode
-func newGopdfDocument() *gopdfDocument {
-	return &gopdfDocument{y: pageMargin}
+func newGopdfDocument(finalizers ...ByteFinalizer) *gopdfDocument {
+	var document = &gopdfDocument{y: pageMargin}
+	if len(finalizers) > 0 {
+		document.finalize = finalizers[0]
+	}
+	return document
 }
 
 // StartPDF starts one A4 PDF document.
@@ -416,7 +421,16 @@ func (document *gopdfDocument) prepareTableStart(title string, rowHeight float64
 // Bytes returns the concrete PDF byte payload or its finalization error.
 // Authored by: OpenCode
 func (document *gopdfDocument) Bytes() ([]byte, error) {
-	var payload, err = finalizeGopdfDocument(document)
+	var defaultFinalize = func() ([]byte, error) {
+		return document.pdf.GetBytesPdfReturnErr()
+	}
+	var payload []byte
+	var err error
+	if document.finalize == nil {
+		payload, err = defaultFinalize()
+	} else {
+		payload, err = document.finalize(defaultFinalize)
+	}
 	if err != nil {
 		return nil, err
 	}

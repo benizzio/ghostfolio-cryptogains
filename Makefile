@@ -54,7 +54,7 @@ regenerate-empirical-fixtures:
 
 coverage:
 	mkdir -p dist/coverage
-	rm -f dist/coverage/coverage.out dist/coverage/coverage.xml
+	rm -f dist/coverage/coverage.out dist/coverage/coverage.xml dist/coverage/performance.out
 	$(GO) test $(TEST_DETERMINISTIC_PACKAGES) -count=1 -covermode=atomic -coverpkg=$(PRODUCTION_PACKAGES) -coverprofile=dist/coverage/coverage.out
 	$(GOCOVERAGEPLUS) -i dist/coverage/coverage.out -o dist/coverage/coverage.xml
 	$(GO) run ./tools/coveragegate -profile dist/coverage/coverage.out -cobertura dist/coverage/coverage.xml

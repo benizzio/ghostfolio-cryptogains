@@ -471,7 +471,7 @@ func TestT028PDFOverheightNewlineRowFailsBeforeFinalization(t *testing.T) {
 	var previousDocument = newPDFDocumentForRenderer
 	defer func() { newPDFDocumentForRenderer = previousDocument }()
 	var finalizationDocument = &failingLayoutDocument{tableErr: errors.New("table row 1 does not fit within the printable page area")}
-	newPDFDocumentForRenderer = func() pdfLayoutDocument { return finalizationDocument }
+	newPDFDocumentForRenderer = func(ByteFinalizer) pdfLayoutDocument { return finalizationDocument }
 	var renderer, rendererErr = NewRenderer(RenderOptions{Fonts: FontData{Regular: []byte("regular"), Bold: []byte("bold")}})
 	if rendererErr != nil {
 		t.Fatalf("new renderer: %v", rendererErr)

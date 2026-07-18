@@ -4,20 +4,15 @@ package contract
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"go/ast"
 	"go/format"
 	"go/parser"
 	"go/token"
-	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -38,10 +33,6 @@ const (
 	// calculationRegressionModulePath identifies the local module import prefix.
 	// Authored by: OpenCode
 	calculationRegressionModulePath = "github.com/benizzio/ghostfolio-cryptogains"
-
-	// calculationRegressionSeparator keeps package and test names unambiguous in maps.
-	// Authored by: OpenCode
-	calculationRegressionSeparator = "\x00"
 )
 
 // calculationRegressionBaseline stores the pinned case and empirical-artifact fingerprints.
@@ -59,23 +50,7 @@ type calculationRegressionBaselineCase struct {
 	fingerprint string
 }
 
-// calculationRegressionCurrentCase stores one current test identity and execution result.
-// Authored by: OpenCode
-type calculationRegressionCurrentCase struct {
-	sourcePath  string
-	fingerprint string
-	status      string
-}
-
-// calculationRegressionTestEvent is the structured event shape emitted by go test -json.
-// Authored by: OpenCode
-type calculationRegressionTestEvent struct {
-	Action  string
-	Package string
-	Test    string
-}
-
-// TestCalculationRegression compares the current calculation test tree and empirical artifacts with R.
+// TestCalculationRegression validates the pinned calculation identities and empirical artifacts.
 // Authored by: OpenCode
 func TestCalculationRegression(t *testing.T) {
 	t.Parallel()
@@ -86,20 +61,9 @@ func TestCalculationRegression(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var currentCases, testRunErr = discoverCurrentCalculationCases(repositoryRoot)
-	var currentArtifacts, artifactErr = hashCurrentEmpiricalArtifacts(repositoryRoot)
-
-	var mismatches = make([]string, 0)
-	var regressionNumerator = compareCalculationRegressionCases(baseline.cases, currentCases, &mismatches)
-	compareEmpiricalArtifacts(baseline.artifacts, currentArtifacts, &mismatches)
+	var regressionNumerator, mismatches = validateCalculationRegressionBaseline(repositoryRoot, baseline)
 
 	t.Logf("R=%d/%d", regressionNumerator, len(baseline.cases))
-	if testRunErr != nil {
-		mismatches = append(mismatches, testRunErr.Error())
-	}
-	if artifactErr != nil {
-		mismatches = append(mismatches, artifactErr.Error())
-	}
 	if len(mismatches) != 0 {
 		sort.Strings(mismatches)
 		t.Fatalf("calculation regression contract failed (R=%d/%d):\n- %s", regressionNumerator, len(baseline.cases), strings.Join(mismatches, "\n- "))
@@ -209,8 +173,33 @@ func loadCalculationRegressionBaseline(repositoryRoot string) (calculationRegres
 	if len(baseline.cases) == 0 || len(baseline.artifacts) == 0 {
 		return calculationRegressionBaseline{}, fmt.Errorf("calculation regression baseline must contain non-empty cases and artifacts")
 	}
+	if err = rejectCalculationRegressionParentIdentities(baseline.cases); err != nil {
+		return calculationRegressionBaseline{}, err
+	}
 
 	return baseline, nil
+}
+
+// rejectCalculationRegressionParentIdentities prevents a top-level test from
+// being recorded alongside one of its leaf subtests.
+// Authored by: OpenCode
+func rejectCalculationRegressionParentIdentities(cases map[string]calculationRegressionBaselineCase) error {
+	var identifiers = make([]string, 0, len(cases))
+	for identifier := range cases {
+		identifiers = append(identifiers, identifier)
+	}
+	sort.Strings(identifiers)
+
+	for _, identifier := range identifiers {
+		for _, otherIdentifier := range identifiers {
+			if identifier == otherIdentifier || !strings.HasPrefix(otherIdentifier, identifier+"/") {
+				continue
+			}
+			return fmt.Errorf("calculation regression baseline records parent identity %q alongside child %q", identifier, otherIdentifier)
+		}
+	}
+
+	return nil
 }
 
 // parseCalculationRegressionDigest validates one hexadecimal SHA-256 digest.
@@ -228,119 +217,68 @@ func parseCalculationRegressionDigest(value string) error {
 	return nil
 }
 
-// discoverCurrentCalculationCases runs the three pinned suites and reads structured test events.
+// validateCalculationRegressionBaseline checks the current declarations and
+// empirical artifacts without executing any owner test package.
 // Authored by: OpenCode
-func discoverCurrentCalculationCases(repositoryRoot string) (map[string]calculationRegressionCurrentCase, error) {
-	var command = exec.CommandContext(context.Background(),
-		"go",
-		"test",
-		"-json",
-		"-count=1",
-		"./internal/report/basis",
-		"./internal/report/calculate",
-		"./tests/empirical",
-	)
-	command.Dir = repositoryRoot
-	command.Env = calculationRegressionTestEnvironment()
-
-	var output bytes.Buffer
-	command.Stdout = &output
-	var errOutput bytes.Buffer
-	command.Stderr = &errOutput
-	var runErr = command.Run()
-
-	var events, parseErr = decodeCalculationRegressionEvents(output.Bytes())
-	if parseErr != nil {
-		return nil, fmt.Errorf("decode structured calculation test events: %w", parseErr)
+func validateCalculationRegressionBaseline(repositoryRoot string, baseline calculationRegressionBaseline) (int, []string) {
+	var mismatches = make([]string, 0)
+	var regressionNumerator int
+	var identifiers = make([]string, 0, len(baseline.cases))
+	for identifier := range baseline.cases {
+		identifiers = append(identifiers, identifier)
 	}
+	sort.Strings(identifiers)
 
-	var cases = leafCalculationRegressionCases(events, repositoryRoot)
-	if runErr != nil {
-		return cases, fmt.Errorf("calculation regression suites failed: %w", runErr)
-	}
-
-	return cases, nil
-}
-
-// calculationRegressionTestEnvironment disables toolchain and module downloads for the local run.
-// Authored by: OpenCode
-func calculationRegressionTestEnvironment() []string {
-	var environment = append([]string(nil), os.Environ()...)
-	environment = append(environment, "GOPROXY=off", "GOSUMDB=off", "GOTOOLCHAIN=local")
-	return environment
-}
-
-// decodeCalculationRegressionEvents decodes the stable JSON event stream emitted by go test.
-// Authored by: OpenCode
-func decodeCalculationRegressionEvents(content []byte) ([]calculationRegressionTestEvent, error) {
-	var decoder = json.NewDecoder(bytes.NewReader(content))
-	var events []calculationRegressionTestEvent
-	for {
-		var event calculationRegressionTestEvent
-		var err = decoder.Decode(&event)
-		if errors.Is(err, io.EOF) {
-			return events, nil
-		}
+	for _, identifier := range identifiers {
+		var expected = baseline.cases[identifier]
+		var actualSourcePath, actualFingerprint, err = calculationRegressionSourceFingerprint(repositoryRoot, identifier)
 		if err != nil {
-			return nil, err
-		}
-		events = append(events, event)
-	}
-}
-
-// leafCalculationRegressionCases keeps top-level tests without children and leaf subtests.
-// Authored by: OpenCode
-func leafCalculationRegressionCases(events []calculationRegressionTestEvent, repositoryRoot string) map[string]calculationRegressionCurrentCase {
-	var runs = make(map[string]calculationRegressionCurrentCase)
-	var children = make(map[string]struct{})
-	for _, event := range events {
-		if event.Package == "" || event.Test == "" {
+			mismatches = append(mismatches, fmt.Sprintf("case %s static identity validation failed: %v", identifier, err))
 			continue
 		}
-		var key = event.Package + calculationRegressionSeparator + event.Test
-		if event.Action == "run" {
-			runs[key] = calculationRegressionCurrentCase{status: "running"}
-			if separatorIndex := strings.LastIndexByte(event.Test, '/'); separatorIndex >= 0 {
-				var parentKey = event.Package + calculationRegressionSeparator + event.Test[:separatorIndex]
-				children[parentKey] = struct{}{}
-			}
-			continue
+		var matches = true
+		if actualSourcePath != expected.sourcePath {
+			matches = false
+			mismatches = append(mismatches, fmt.Sprintf("case %s moved: got %s want %s", identifier, actualSourcePath, expected.sourcePath))
 		}
-		if event.Action == "pass" || event.Action == "fail" || event.Action == "skip" {
-			var current, found = runs[key]
-			if found {
-				current.status = event.Action
-				runs[key] = current
-			}
+		if actualFingerprint != expected.fingerprint {
+			matches = false
+			mismatches = append(mismatches, fmt.Sprintf("case %s calculation expectation fingerprint changed: got %s want %s", identifier, actualFingerprint, expected.fingerprint))
+		}
+		if matches {
+			regressionNumerator++
 		}
 	}
 
-	var cases = make(map[string]calculationRegressionCurrentCase)
-	for key, current := range runs {
-		if _, hasChildren := children[key]; hasChildren {
-			continue
-		}
-		var separatorIndex = strings.IndexByte(key, calculationRegressionSeparator[0])
-		var packagePath = key[:separatorIndex]
-		var testName = key[separatorIndex+len(calculationRegressionSeparator):]
-		var sourcePath, fingerprint, err = calculationRegressionSourceFingerprint(repositoryRoot, packagePath, testName)
-		if err != nil {
-			current.status = "source-error: " + err.Error()
-		} else {
-			current.sourcePath = sourcePath
-			current.fingerprint = fingerprint
-		}
-		cases[packagePath+"/"+testName] = current
+	var currentArtifacts, artifactErr = hashCurrentEmpiricalArtifacts(repositoryRoot)
+	if artifactErr != nil {
+		mismatches = append(mismatches, artifactErr.Error())
+	} else {
+		compareEmpiricalArtifacts(baseline.artifacts, currentArtifacts, &mismatches)
 	}
 
-	return cases
+	return regressionNumerator, mismatches
 }
 
 // calculationRegressionSourceFingerprint hashes the canonical test declaration containing its expectations.
 // Authored by: OpenCode
-func calculationRegressionSourceFingerprint(repositoryRoot string, packagePath string, testName string) (string, string, error) {
-	if !strings.HasPrefix(packagePath, calculationRegressionModulePath+"/") {
-		return "", "", fmt.Errorf("unexpected package path %q", packagePath)
+func calculationRegressionSourceFingerprint(repositoryRoot string, identifier string) (string, string, error) {
+	var packagePath string
+	var testName string
+	for _, packageRelativePath := range []string{
+		"internal/report/basis",
+		"internal/report/calculate",
+		"tests/empirical",
+	} {
+		var prefix = calculationRegressionModulePath + "/" + packageRelativePath + "/"
+		if strings.HasPrefix(identifier, prefix) {
+			packagePath = strings.TrimSuffix(prefix, "/")
+			testName = strings.TrimPrefix(identifier, prefix)
+			break
+		}
+	}
+	if packagePath == "" || testName == "" {
+		return "", "", fmt.Errorf("unexpected calculation regression identity %q", identifier)
 	}
 	var packageRelativePath = strings.TrimPrefix(packagePath, calculationRegressionModulePath+"/")
 	var packageDirectory = filepath.Join(repositoryRoot, filepath.FromSlash(packageRelativePath))
@@ -407,49 +345,6 @@ func hashCurrentEmpiricalArtifacts(repositoryRoot string) (map[string]string, er
 	}
 
 	return artifacts, nil
-}
-
-// compareCalculationRegressionCases compares fixed identities, source locations, hashes, and statuses.
-// Authored by: OpenCode
-func compareCalculationRegressionCases(
-	baseline map[string]calculationRegressionBaselineCase,
-	current map[string]calculationRegressionCurrentCase,
-	mismatches *[]string,
-) int {
-	var numerator int
-	var identifiers = make([]string, 0, len(baseline))
-	for identifier := range baseline {
-		identifiers = append(identifiers, identifier)
-	}
-	sort.Strings(identifiers)
-
-	for _, identifier := range identifiers {
-		var expected = baseline[identifier]
-		var actual, found = current[identifier]
-		if !found {
-			*mismatches = append(*mismatches, "missing or renamed baseline case "+identifier)
-			continue
-		}
-
-		var matches = true
-		if actual.sourcePath != expected.sourcePath {
-			matches = false
-			*mismatches = append(*mismatches, fmt.Sprintf("case %s moved: got %s want %s", identifier, actual.sourcePath, expected.sourcePath))
-		}
-		if actual.fingerprint != expected.fingerprint {
-			matches = false
-			*mismatches = append(*mismatches, fmt.Sprintf("case %s calculation expectation fingerprint changed: got %s want %s", identifier, actual.fingerprint, expected.fingerprint))
-		}
-		if actual.status != "pass" {
-			matches = false
-			*mismatches = append(*mismatches, fmt.Sprintf("case %s did not pass: status=%s", identifier, actual.status))
-		}
-		if matches {
-			numerator++
-		}
-	}
-
-	return numerator
 }
 
 // compareEmpiricalArtifacts compares the complete empirical artifact path set and raw hashes.

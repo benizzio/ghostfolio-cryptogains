@@ -120,23 +120,30 @@ type ConversionAuditRow struct {
 //
 // Authored by: OpenCode
 func BuildActivityRow(row reportmodel.AssetActivityRow) (ActivityRow, error) {
+	return BuildActivityRowWithFinancialFormatting(row, DefaultFinancialFormattingOptions())
+}
+
+// BuildActivityRowWithFinancialFormatting builds one activity row with the
+// supplied immutable renderer-scoped financial policy.
+// Authored by: OpenCode
+func BuildActivityRowWithFinancialFormatting(row reportmodel.AssetActivityRow, options FinancialFormattingOptions) (ActivityRow, error) {
 	quantity, err := decimalsupport.CanonicalString(row.Quantity)
 	if err != nil {
 		return ActivityRow{}, fmt.Errorf("render activity row %q quantity: %w", row.SourceID, err)
 	}
-	unitPrice, err := formatOptionalFinancialValue(row.UnitPrice)
+	unitPrice, err := options.FormatOptional(row.UnitPrice)
 	if err != nil {
 		return ActivityRow{}, fmt.Errorf("render activity row %q unit price: %w", row.SourceID, err)
 	}
-	grossValue, err := formatOptionalFinancialValue(row.GrossValue)
+	grossValue, err := options.FormatOptional(row.GrossValue)
 	if err != nil {
 		return ActivityRow{}, fmt.Errorf("render activity row %q gross value: %w", row.SourceID, err)
 	}
-	fee, err := formatOptionalFinancialValue(row.FeeAmount)
+	fee, err := options.FormatOptional(row.FeeAmount)
 	if err != nil {
 		return ActivityRow{}, fmt.Errorf("render activity row %q fee: %w", row.SourceID, err)
 	}
-	basisAfterRow, err := formatFinancialValue(row.BasisAfterRow)
+	basisAfterRow, err := options.Format(row.BasisAfterRow)
 	if err != nil {
 		return ActivityRow{}, fmt.Errorf("render activity row %q basis after row: %w", row.SourceID, err)
 	}
@@ -205,19 +212,26 @@ func ActivityConversionStatus(row reportmodel.AssetActivityRow) (string, error) 
 //
 // Authored by: OpenCode
 func BuildLiquidationRow(liquidation reportmodel.LiquidationCalculation, fallbackCurrency string) (LiquidationRow, error) {
+	return BuildLiquidationRowWithFinancialFormatting(liquidation, fallbackCurrency, DefaultFinancialFormattingOptions())
+}
+
+// BuildLiquidationRowWithFinancialFormatting builds one liquidation row with a
+// renderer-scoped financial policy and unchanged quantity handling.
+// Authored by: OpenCode
+func BuildLiquidationRowWithFinancialFormatting(liquidation reportmodel.LiquidationCalculation, fallbackCurrency string, options FinancialFormattingOptions) (LiquidationRow, error) {
 	disposedQuantity, err := decimalsupport.CanonicalString(liquidation.DisposedQuantity)
 	if err != nil {
 		return LiquidationRow{}, fmt.Errorf("render liquidation %q disposed quantity: %w", liquidation.SourceID, err)
 	}
-	allocatedBasis, err := formatFinancialValue(liquidation.AllocatedBasis)
+	allocatedBasis, err := options.Format(liquidation.AllocatedBasis)
 	if err != nil {
 		return LiquidationRow{}, fmt.Errorf("render liquidation %q allocated basis: %w", liquidation.SourceID, err)
 	}
-	netProceeds, err := formatFinancialValue(liquidation.NetLiquidationProceeds)
+	netProceeds, err := options.Format(liquidation.NetLiquidationProceeds)
 	if err != nil {
 		return LiquidationRow{}, fmt.Errorf("render liquidation %q net proceeds: %w", liquidation.SourceID, err)
 	}
-	gainOrLoss, err := formatFinancialValue(liquidation.GainOrLoss)
+	gainOrLoss, err := options.Format(liquidation.GainOrLoss)
 	if err != nil {
 		return LiquidationRow{}, fmt.Errorf("render liquidation %q gain or loss: %w", liquidation.SourceID, err)
 	}
@@ -242,19 +256,26 @@ func BuildLiquidationRow(liquidation reportmodel.LiquidationCalculation, fallbac
 //
 // Authored by: OpenCode
 func BuildAnnexActivityRow(entry reportmodel.AuditActivityEntry) (AnnexActivityRow, error) {
+	return BuildAnnexActivityRowWithFinancialFormatting(entry, DefaultFinancialFormattingOptions())
+}
+
+// BuildAnnexActivityRowWithFinancialFormatting builds one Annex row with a
+// renderer-scoped financial policy while preserving all audit source values.
+// Authored by: OpenCode
+func BuildAnnexActivityRowWithFinancialFormatting(entry reportmodel.AuditActivityEntry, options FinancialFormattingOptions) (AnnexActivityRow, error) {
 	quantity, err := decimalsupport.CanonicalString(entry.Quantity)
 	if err != nil {
 		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q quantity: %w", entry.SourceID, err)
 	}
-	unitPrice, err := formatOptionalFinancialValue(entry.UnitPrice)
+	unitPrice, err := options.FormatOptional(entry.UnitPrice)
 	if err != nil {
 		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q unit price: %w", entry.SourceID, err)
 	}
-	grossValue, err := formatOptionalFinancialValue(entry.GrossValue)
+	grossValue, err := options.FormatOptional(entry.GrossValue)
 	if err != nil {
 		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q gross value: %w", entry.SourceID, err)
 	}
-	fee, err := formatOptionalFinancialValue(entry.FeeAmount)
+	fee, err := options.FormatOptional(entry.FeeAmount)
 	if err != nil {
 		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q fee: %w", entry.SourceID, err)
 	}
@@ -262,19 +283,19 @@ func BuildAnnexActivityRow(entry reportmodel.AuditActivityEntry) (AnnexActivityR
 	if err != nil {
 		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q quantity after activity: %w", entry.SourceID, err)
 	}
-	basisAfter, err := formatFinancialValue(entry.BasisAfterActivity)
+	basisAfter, err := options.Format(entry.BasisAfterActivity)
 	if err != nil {
 		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q basis after activity: %w", entry.SourceID, err)
 	}
-	allocatedBasis, err := formatOptionalFinancialValue(entry.AllocatedBasis)
+	allocatedBasis, err := options.FormatOptional(entry.AllocatedBasis)
 	if err != nil {
 		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q allocated basis: %w", entry.SourceID, err)
 	}
-	netProceeds, err := formatOptionalFinancialValue(entry.NetLiquidationProceeds)
+	netProceeds, err := options.FormatOptional(entry.NetLiquidationProceeds)
 	if err != nil {
 		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q net liquidation proceeds: %w", entry.SourceID, err)
 	}
-	gainOrLoss, err := formatOptionalFinancialValue(entry.GainOrLoss)
+	gainOrLoss, err := options.FormatOptional(entry.GainOrLoss)
 	if err != nil {
 		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q gain or loss: %w", entry.SourceID, err)
 	}
@@ -312,11 +333,18 @@ func BuildAnnexActivityRow(entry reportmodel.AuditActivityEntry) (AnnexActivityR
 //
 // Authored by: OpenCode
 func BuildConversionAuditRow(index int, entry reportmodel.ConversionAuditEntry) (ConversionAuditRow, error) {
+	return BuildConversionAuditRowWithFinancialFormatting(index, entry, DefaultFinancialFormattingOptions())
+}
+
+// BuildConversionAuditRowWithFinancialFormatting builds one conversion audit row
+// with renderer-scoped financial formatting and inherited exact-zero decisions.
+// Authored by: OpenCode
+func BuildConversionAuditRowWithFinancialFormatting(index int, entry reportmodel.ConversionAuditEntry, options FinancialFormattingOptions) (ConversionAuditRow, error) {
 	rateValue, err := decimalsupport.CanonicalString(entry.RateValue)
 	if err != nil {
 		return ConversionAuditRow{}, fmt.Errorf("render conversion audit entry %d rate value: %w", index, err)
 	}
-	amountEntries, err := ConvertedAmounts(index, entry.Amounts)
+	amountEntries, err := ConvertedAmountsWithFinancialFormatting(index, entry.Amounts, options)
 	if err != nil {
 		return ConversionAuditRow{}, err
 	}

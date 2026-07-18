@@ -30,17 +30,24 @@ type ConvertedAmountEntry struct {
 //
 // Authored by: OpenCode
 func ConvertedAmounts(entryIndex int, amounts []reportmodel.ConvertedActivityAmount) ([]ConvertedAmountEntry, error) {
+	return ConvertedAmountsWithFinancialFormatting(entryIndex, amounts, DefaultFinancialFormattingOptions())
+}
+
+// ConvertedAmountsWithFinancialFormatting formats conversion components with a
+// renderer-scoped policy after applying exact zero-to-zero omission.
+// Authored by: OpenCode
+func ConvertedAmountsWithFinancialFormatting(entryIndex int, amounts []reportmodel.ConvertedActivityAmount, options FinancialFormattingOptions) ([]ConvertedAmountEntry, error) {
 	var entries []ConvertedAmountEntry
 	for amountIndex, amount := range amounts {
 		if amount.OriginalAmount.Sign() == 0 && amount.ConvertedAmount.Sign() == 0 {
 			continue
 		}
 
-		original, err := formatFinancialValue(amount.OriginalAmount)
+		original, err := options.Format(amount.OriginalAmount)
 		if err != nil {
 			return nil, fmt.Errorf("render conversion audit entry %d amount %d original amount: %w", entryIndex, amountIndex, err)
 		}
-		converted, err := formatFinancialValue(amount.ConvertedAmount)
+		converted, err := options.Format(amount.ConvertedAmount)
 		if err != nil {
 			return nil, fmt.Errorf("render conversion audit entry %d amount %d converted amount: %w", entryIndex, amountIndex, err)
 		}

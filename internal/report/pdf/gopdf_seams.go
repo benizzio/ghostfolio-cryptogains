@@ -46,9 +46,3 @@ var measureTableCellForGopdfDocument = func(document *gopdfDocument, rectangle *
 	}
 	return document.pdf.IsFitMultiCellWithNewline(rectangle, strings.Join(splitLines, "\n"))
 }
-
-// finalizeGopdfDocument keeps concrete PDF finalization failures testable.
-// Authored by: OpenCode
-var finalizeGopdfDocument = func(document *gopdfDocument) ([]byte, error) {
-	return document.pdf.GetBytesPdfReturnErr()
-}

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -1211,6 +1212,70 @@ func TestRendererEmptyAndUnsupportedLabelBranches(t *testing.T) {
 	badQuote.Amounts[0].ConvertedAmount = reportInvalidDecimalForRenderer()
 	if err := writeConversionAuditRow(&builder, 10, badQuote); err == nil || !strings.Contains(err.Error(), "entry 10 amount 0 converted amount") {
 		t.Fatalf("expected annex grouped amount error, got %v", err)
+	}
+}
+
+// TestRendererScopedFormattingFailureBranches verifies the renderer object's
+// validation, main-document, detail, and Annex failure paths.
+// Authored by: OpenCode
+func TestRendererScopedFormattingFailureBranches(t *testing.T) {
+	var renderer = NewRenderer(RenderOptions{})
+	if _, err := renderer.Render(reportmodel.CapitalGainsReport{}); err == nil {
+		t.Fatal("expected scoped Markdown renderer to reject an invalid report")
+	}
+
+	var invalidTotal = minimalMarkdownReportFixture(t)
+	invalidTotal.YearlyNetTotal.Form = apd.Infinite
+	if _, err := renderer.Render(invalidTotal); err == nil || !strings.Contains(err.Error(), "yearly net total") {
+		t.Fatalf("expected scoped Markdown yearly-total failure, got %v", err)
+	}
+
+	var detailReport = minimalMarkdownReportFixture(t)
+	detailReport.DetailSections = []reportmodel.AssetDetailSection{{
+		AssetIdentityKey:    "scoped-asset",
+		DisplayLabel:        "Scoped Asset",
+		OpeningQuantity:     *apd.New(1, 0),
+		OpeningCostBasis:    *apd.New(1, 0),
+		ClosingQuantity:     *apd.New(1, 0),
+		ClosingCostBasis:    *apd.New(1, 0),
+		CalculationCurrency: "USD",
+	}}
+	var detailCalls int
+	var detailOptions = presentation.NewFinancialFormattingTestOptions(func(int64, int64) error {
+		detailCalls++
+		if detailCalls == 2 {
+			return errors.New("scoped detail precision failure")
+		}
+		return nil
+	})
+	var detailRenderer = NewRenderer(RenderOptions{FinancialFormatting: detailOptions})
+	if _, err := detailRenderer.Render(detailReport); err == nil || !strings.Contains(err.Error(), "cost basis") {
+		t.Fatalf("expected scoped Markdown detail failure, got %v", err)
+	}
+
+	var annexCalls int
+	var annexOptions = presentation.NewFinancialFormattingTestOptions(func(int64, int64) error {
+		annexCalls++
+		if annexCalls == 2 {
+			return errors.New("scoped Annex precision failure")
+		}
+		return nil
+	})
+	var documentsRenderer = NewRenderer(RenderOptions{FinancialFormatting: annexOptions})
+	if _, err := documentsRenderer.RenderDocuments(markdownAnnexReportFixture(t)); err == nil || !strings.Contains(err.Error(), "Annex") {
+		t.Fatalf("expected scoped Markdown Annex failure, got %v", err)
+	}
+	if _, err := RenderAnnexWithFinancialFormatting(reportmodel.CapitalGainsReport{}, presentation.DefaultFinancialFormattingOptions()); err == nil {
+		t.Fatal("expected scoped Annex renderer to reject an invalid report")
+	}
+
+	var conversionOnlyReport = markdownAnnexReportFixture(t)
+	conversionOnlyReport.AuditAnnex.PerAssetAuditSections = nil
+	var conversionOptions = presentation.NewFinancialFormattingTestOptions(func(int64, int64) error {
+		return errors.New("scoped conversion precision failure")
+	})
+	if _, err := RenderAnnexWithFinancialFormatting(conversionOnlyReport, conversionOptions); err == nil || !strings.Contains(err.Error(), "conversion") {
+		t.Fatalf("expected scoped conversion Annex failure, got %v", err)
 	}
 }
 

@@ -100,14 +100,22 @@ func TestRendererSeamErrorBranches(t *testing.T) {
 		t.Fatalf("new renderer: %v", rendererErr)
 	}
 
-	newPDFDocumentForRenderer = func() pdfLayoutDocument { return &failingLayoutDocument{startErr: errors.New("start failed")} }
+	newPDFDocumentForRenderer = func(ByteFinalizer) pdfLayoutDocument {
+		return &failingLayoutDocument{startErr: errors.New("start failed")}
+	}
 	assertErrorContains(t, func() error { _, err := renderer.Render(minimalPDFReportFixture(t)); return err }, "start failed")
-	newPDFDocumentForRenderer = func() pdfLayoutDocument { return &failingLayoutDocument{fontErr: errors.New("font failed")} }
+	newPDFDocumentForRenderer = func(ByteFinalizer) pdfLayoutDocument {
+		return &failingLayoutDocument{fontErr: errors.New("font failed")}
+	}
 	assertErrorContains(t, func() error { _, err := renderer.Render(minimalPDFReportFixture(t)); return err }, "font failed")
-	newPDFDocumentForRenderer = func() pdfLayoutDocument { return &failingLayoutDocument{titleErr: errors.New("title failed")} }
+	newPDFDocumentForRenderer = func(ByteFinalizer) pdfLayoutDocument {
+		return &failingLayoutDocument{titleErr: errors.New("title failed")}
+	}
 	assertErrorContains(t, func() error { _, err := renderer.Render(minimalPDFReportFixture(t)); return err }, "title failed")
-	newPDFDocumentForRenderer = func() pdfLayoutDocument { return &failingLayoutDocument{pageBreakErr: errors.New("page break failed")} }
+	newPDFDocumentForRenderer = func(ByteFinalizer) pdfLayoutDocument {
+		return &failingLayoutDocument{pageBreakErr: errors.New("page break failed")}
+	}
 	assertErrorContains(t, func() error { _, err := renderer.Render(minimalPDFReportFixture(t)); return err }, "page break failed")
-	newPDFDocumentForRenderer = func() pdfLayoutDocument { return &secondTitleFailDocument{} }
+	newPDFDocumentForRenderer = func(ByteFinalizer) pdfLayoutDocument { return &secondTitleFailDocument{} }
 	assertErrorContains(t, func() error { _, err := renderer.Render(minimalPDFReportFixture(t)); return err }, "annex title failed")
 }

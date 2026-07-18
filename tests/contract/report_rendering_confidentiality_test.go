@@ -49,7 +49,15 @@ func TestReportRenderingConfidentialityContract(t *testing.T) {
 	report.YearlyNetTotal = exportAmount
 	report.AuditAnnex.ConversionAuditEntries[0].Amounts[0].OriginalAmount = exportAmount
 	report.AuditAnnex.ConversionAuditEntries[0].Amounts[0].ConvertedAmount = exportAmount
+	report.DetailSections[0].LiquidationSummaries[0].Matches = []reportmodel.BasisMatch{{
+		AcquisitionSourceID: syntheticFinancialSentinel,
+		MatchedQuantity:     mustContractDecimal("1"),
+		MatchedBasis:        mustContractDecimal("22009"),
+	}}
 	report.AuditAnnex.PerAssetAuditSections[0].Entries[0].Note = fmt.Sprintf("token=%s payload=%s", syntheticCredentialSentinel, syntheticProtectedPayloadSentinel)
+	if report.DetailSections[0].LiquidationSummaries[0].Matches[0].AcquisitionSourceID != syntheticFinancialSentinel {
+		t.Fatalf("confidentiality probe is missing from pre-render basis provenance: %#v", report.DetailSections[0].LiquidationSummaries[0].Matches[0])
+	}
 
 	var documents, err = reportmarkdown.RenderDocuments(report)
 	if err != nil {

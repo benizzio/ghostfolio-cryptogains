@@ -71,6 +71,23 @@ func TestFormatOptionalFinancialValuePreservesNil(t *testing.T) {
 	}
 }
 
+// TestFinancialFormattingOptionsRetainConcreteDefaults verifies nil test hooks
+// and zero-valued internal options both use the production formatter path.
+// Authored by: OpenCode
+func TestFinancialFormattingOptionsRetainConcreteDefaults(t *testing.T) {
+	var value = mustFinancialDecimal(t, "1.005")
+	var options = NewFinancialFormattingTestOptions(nil)
+	var got, err = options.Format(value)
+	if err != nil || got != "1.01" {
+		t.Fatalf("nil-hook formatting = %q, %v; want 1.01", got, err)
+	}
+
+	got, err = formatFinancialValueWithOptions(value, FinancialFormattingOptions{})
+	if err != nil || got != "1.01" {
+		t.Fatalf("zero-option formatting = %q, %v; want 1.01", got, err)
+	}
+}
+
 // TestFormatOptionalFinancialValueUsesTheExportedBoundary verifies the public
 // optional-value wrapper preserves nil and delegates present values exactly.
 // Authored by: OpenCode

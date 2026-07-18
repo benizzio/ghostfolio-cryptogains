@@ -18,8 +18,15 @@ import (
 // startedTestDocument creates one concrete document with valid fonts loaded.
 // Authored by: OpenCode
 func startedTestDocument(t *testing.T) *gopdfDocument {
+	return startedTestDocumentWithFinalizer(t, nil)
+}
+
+// startedTestDocumentWithFinalizer creates one concrete document with valid
+// fonts and a renderer-scoped byte finalizer.
+// Authored by: OpenCode
+func startedTestDocumentWithFinalizer(t *testing.T, finalizer ByteFinalizer) *gopdfDocument {
 	t.Helper()
-	var document = newGopdfDocument()
+	var document = newGopdfDocument(finalizer)
 	if err := document.StartPDF(PageSizeA4); err != nil {
 		t.Fatalf("start PDF document: %v", err)
 	}

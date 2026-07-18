@@ -12,6 +12,7 @@ import (
 	ghostfolioclient "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/client"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
 	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
+	reportpdf "github.com/benizzio/ghostfolio-cryptogains/internal/report/pdf"
 	snapshotenvelope "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/envelope"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
@@ -77,6 +78,58 @@ func New(options bootstrap.Options) (*App, error) {
 //
 // Authored by: OpenCode
 func NewWithReportCurrencyRateService(options bootstrap.Options, reportCurrencyRates reportcalculate.CurrencyRateService) (*App, error) {
+	return newWithReportPipeline(options, reportCurrencyRates, ReportPipelineOptions{})
+}
+
+// NewWithReportCurrencyRateServiceAndPDFByteFinalizer assembles runtime
+// dependencies with one renderer-scoped PDF byte-finalization option. Passing a
+// nil finalizer preserves the production GetBytesPdfReturnErr path.
+//
+// Example:
+//
+//	app, err := runtime.NewWithReportCurrencyRateServiceAndPDFByteFinalizer(options, currencyRates, nil)
+//	if err != nil {
+//		panic(err)
+//	}
+//	_ = app.ReportService
+//
+// Authored by: OpenCode
+func NewWithReportCurrencyRateServiceAndPDFByteFinalizer(
+	options bootstrap.Options,
+	reportCurrencyRates reportcalculate.CurrencyRateService,
+	finalizer reportpdf.ByteFinalizer,
+) (*App, error) {
+	return NewWithReportCurrencyRateServiceAndReportPipelineOptions(options, reportCurrencyRates, ReportPipelineOptions{PDFByteFinalizer: finalizer})
+}
+
+// NewWithReportCurrencyRateServiceAndReportPipelineOptions assembles runtime
+// dependencies with immutable renderer-scoped report options. A zero-valued
+// options value retains all concrete production defaults.
+//
+// Example:
+//
+//	app, err := runtime.NewWithReportCurrencyRateServiceAndReportPipelineOptions(options, rates, runtime.ReportPipelineOptions{})
+//	if err != nil {
+//		return err
+//	}
+//	_ = app.ReportService
+//
+// Authored by: OpenCode
+func NewWithReportCurrencyRateServiceAndReportPipelineOptions(
+	options bootstrap.Options,
+	reportCurrencyRates reportcalculate.CurrencyRateService,
+	pipelineOptions ReportPipelineOptions,
+) (*App, error) {
+	return newWithReportPipeline(options, reportCurrencyRates, pipelineOptions)
+}
+
+// newWithReportPipeline assembles runtime dependencies with report pipeline options.
+// Authored by: OpenCode
+func newWithReportPipeline(
+	options bootstrap.Options,
+	reportCurrencyRates reportcalculate.CurrencyRateService,
+	pipelineOptions ReportPipelineOptions,
+) (*App, error) {
 	var baseConfigDir = options.ConfigDir
 	if baseConfigDir == "" {
 		var userConfigDir, err = os.UserConfigDir()
@@ -104,7 +157,7 @@ func NewWithReportCurrencyRateService(options bootstrap.Options, reportCurrencyR
 		syncValidator,
 		sharedSnapshots,
 	)
-	var reportService = newReportService(sharedSnapshots, baseConfigDir, options.AllowDevHTTP, reportCurrencyRates)
+	var reportService = newReportService(sharedSnapshots, baseConfigDir, options.AllowDevHTTP, reportCurrencyRates, pipelineOptions)
 
 	return &App{
 		Options:        options,

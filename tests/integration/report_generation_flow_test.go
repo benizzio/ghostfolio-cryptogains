@@ -28,91 +28,111 @@ import (
 )
 
 // TestReportGenerationSuccessWritesMarkdownAndReturnsToUnlockedContext verifies
-// one end-to-end report save through the real runtime-backed workflow.
+// normal end-to-end Markdown and PDF saves through the real runtime-backed workflow.
 // Authored by: OpenCode
 func TestReportGenerationSuccessWritesMarkdownAndReturnsToUnlockedContext(t *testing.T) {
-	var reportIO = testutil.NewReportIOFixture(t)
-	var openLogPath = runtimeflow.InstallOpenCommandRecorder(t, 0)
-	var fixture = testutil.DeterministicReportLedgerFixture()
-	var harness = runtimeflow.NewRuntimeBackedFlowHarness(t, t.TempDir(), runtimeflow.MustCloudSetupConfig(t), false)
+	for _, selectedFormat := range reportmodel.SupportedReportOutputFormats() {
+		var selectedFormat = selectedFormat
+		t.Run(selectedFormat.Label(), func(t *testing.T) {
+			var reportIO = testutil.NewReportIOFixture(t)
+			var openLogPath = runtimeflow.InstallOpenCommandRecorder(t, 0)
+			var fixture = testutil.DeterministicReportLedgerFixture()
+			var harness = runtimeflow.NewRuntimeBackedFlowHarness(t, t.TempDir(), runtimeflow.MustCloudSetupConfig(t), false)
 
-	runtimeflow.SeedProtectedSnapshot(t, harness, "token-123", fixture.ProtectedActivityCache)
+			runtimeflow.SeedProtectedSnapshot(t, harness, "token-123", fixture.ProtectedActivityCache)
 
-	var model = runtimeflow.UnlockSyncReportsContext(t, harness.Model, "token-123")
-	model = runtimeflow.OpenReportSelection(t, model)
-	model = runtimeflow.SelectReportYear(t, model, fixture.PrimaryReportYear)
-	model = runtimeflow.SelectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
-	model, cmd := runtimeflow.StartReportGeneration(t, model)
-	model = runtimeflow.ApplyBatchCmd(t, model, cmd)
+			var model = runtimeflow.UnlockSyncReportsContext(t, harness.Model, "token-123")
+			model = runtimeflow.OpenReportSelection(t, model)
+			model = runtimeflow.SelectReportYear(t, model, fixture.PrimaryReportYear)
+			model = runtimeflow.SelectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
+			model = runtimeflow.SelectReportOutputFormat(t, model, selectedFormat)
+			model, cmd := runtimeflow.StartReportGeneration(t, model)
+			model = runtimeflow.ApplyBatchCmd(t, model, cmd)
 
-	if model.ActiveScreen() != "report_result" {
-		t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
-	}
+			if model.ActiveScreen() != "report_result" {
+				t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
+			}
 
-	var files = runtimeflow.AllMarkdownFiles(t, reportIO.DocumentsDir)
-	if len(files) != 2 {
-		t.Fatalf("expected main-plus-annex Markdown output, got %#v", files)
-	}
+			var files = runtimeflow.ReportOutputPaths(t, reportIO.DocumentsDir, selectedFormat)
+			for _, path := range files {
+				testutil.AssertPathWithin(t, path, reportIO.DocumentsDir)
+				testutil.AssertRegularFile(t, path)
+			}
+			var reportPath = files[0]
+			if selectedFormat == reportmodel.ReportOutputFormatMarkdown {
+				var annexPath string
+				reportPath, annexPath = runtimeflow.MarkdownBundlePaths(t, files)
+				if !strings.HasPrefix(filepath.Base(reportPath), "ghostfolio-capital-gains-2024-fifo-") {
+					t.Fatalf("expected FIFO report filename slug, got %q", filepath.Base(reportPath))
+				}
+				if !strings.HasPrefix(filepath.Base(annexPath), "ghostfolio-capital-gains-2024-fifo-annex-1-") {
+					t.Fatalf("expected FIFO annex filename slug, got %q", filepath.Base(annexPath))
+				}
 
-	var reportPath, annexPath = runtimeflow.MarkdownBundlePaths(t, files)
-	testutil.AssertPathWithin(t, reportPath, reportIO.DocumentsDir)
-	testutil.AssertRegularFile(t, reportPath)
-	testutil.AssertPathWithin(t, annexPath, reportIO.DocumentsDir)
-	testutil.AssertRegularFile(t, annexPath)
-	if !strings.HasPrefix(filepath.Base(reportPath), "ghostfolio-capital-gains-2024-fifo-") {
-		t.Fatalf("expected FIFO report filename slug, got %q", filepath.Base(reportPath))
-	}
-	if !strings.HasPrefix(filepath.Base(annexPath), "ghostfolio-capital-gains-2024-fifo-annex-1-") {
-		t.Fatalf("expected FIFO annex filename slug, got %q", filepath.Base(annexPath))
-	}
+				// #nosec G304 -- reportPath is created in the test-owned Documents fixture.
+				var rawReport, err = os.ReadFile(reportPath)
+				if err != nil {
+					t.Fatalf("read saved report %q: %v", reportPath, err)
+				}
+				var reportText = string(rawReport)
+				for _, expected := range []string{
+					"# Ghostfolio Capital Gains And Losses Report",
+					"- **Year:** 2024",
+					"- **Cost Basis Method:** FIFO",
+					"- **Report Calculation Currency:** USD",
+					"## Gains-And-Losses Summary",
+					"## Reference Section",
+					"| Overall Yearly Net Total |",
+				} {
+					if !strings.Contains(reportText, expected) {
+						t.Fatalf("expected saved report to contain %q, got %q", expected, reportText)
+					}
+				}
+				assertTextOmitted(t, reportText, "token-123", reportPath)
+			} else {
+				// #nosec G304 -- reportPath is created in the test-owned Documents fixture.
+				var rawPDF, err = os.ReadFile(reportPath)
+				if err != nil {
+					t.Fatalf("read saved PDF %q: %v", reportPath, err)
+				}
+				var inspection, inspectErr = testutil.InspectGeneratedPDF(rawPDF)
+				if inspectErr != nil {
+					t.Fatalf("inspect generated PDF: %v", inspectErr)
+				}
+				runtimeflow.AssertLandscapeA4PDF(t, inspection)
+				if !inspection.ContainsSearchableText("Gains-And-Losses Summary") {
+					t.Fatalf("expected generated PDF to contain the report summary")
+				}
+			}
 
-	var content = runtimeflow.NormalizeRenderedText(model.View().Content)
-	runtimeflow.AssertSavedMarkdownBundlePaths(t, content, reportPath, annexPath)
-	if !strings.Contains(content, "Selected Year: 2024") || !strings.Contains(content, "Cost Basis Method: FIFO") || !strings.Contains(content, "Report Base Currency: USD") {
-		t.Fatalf("expected selected year, method, and report base currency in result view, got %q", content)
-	}
+			var content = runtimeflow.NormalizeRenderedText(model.View().Content)
+			runtimeflow.AssertReportResultDisclosure(t, content, selectedFormat, files)
+			if !strings.Contains(content, "Selected Year: 2024") || !strings.Contains(content, "Cost Basis Method: FIFO") || !strings.Contains(content, "Report Base Currency: USD") || !strings.Contains(content, "Output Format: "+selectedFormat.Label()) {
+				t.Fatalf("expected selected report settings in result view, got %q", content)
+			}
+			if strings.Count(content, "Report saved successfully and automatic opening was requested.") != 1 {
+				t.Fatalf("expected one runtime operational success message, got %q", content)
+			}
 
-	var openerRequests = runtimeflow.ReadOpenCommandRequests(t, openLogPath)
-	if len(openerRequests) != 1 || openerRequests[0] != reportPath {
-		t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
-	}
+			var openerRequests = runtimeflow.ReadOpenCommandRequests(t, openLogPath)
+			if len(openerRequests) != 1 || openerRequests[0] != reportPath {
+				t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
+			}
+			runtimeflow.AssertNoCleartextReportInAppStorage(t, harness.BaseDir)
 
-	// #nosec G304 -- reportPath is created in the test-owned Documents fixture.
-	var rawReport, err = os.ReadFile(reportPath)
-	if err != nil {
-		t.Fatalf("read saved report %q: %v", reportPath, err)
-	}
-	var reportText = string(rawReport)
-	for _, expected := range []string{
-		"# Ghostfolio Capital Gains And Losses Report",
-		"- **Year:** 2024",
-		"- **Cost Basis Method:** FIFO",
-		"- **Report Calculation Currency:** USD",
-		"## Gains-And-Losses Summary",
-		"## Reference Section",
-		"| Overall Yearly Net Total |",
-	} {
-		if !strings.Contains(reportText, expected) {
-			t.Fatalf("expected saved report to contain %q, got %q", expected, reportText)
-		}
-	}
-	assertTextOmitted(t, reportText, "token-123", reportPath)
-	runtimeflow.AssertNoCleartextReportInAppStorage(t, harness.BaseDir)
+			var updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+			model = runtimeflow.AssertFlowModel(t, updated)
+			if model.ActiveScreen() != "sync_reports_menu" {
+				t.Fatalf("expected result dismissal to return to sync and reports menu, got %s", model.ActiveScreen())
+			}
+			runtimeflow.AssertReportResultCleared(t, runtimeflow.NormalizeRenderedText(model.View().Content), files)
 
-	var updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	model = runtimeflow.AssertFlowModel(t, updated)
-	if model.ActiveScreen() != "sync_reports_menu" {
-		t.Fatalf("expected result dismissal to return to sync and reports menu, got %s", model.ActiveScreen())
-	}
-	var syncReportsContent = runtimeflow.NormalizeRenderedText(model.View().Content)
-	if strings.Contains(syncReportsContent, reportPath) {
-		t.Fatalf("expected no report history after result dismissal, got %q", syncReportsContent)
-	}
-
-	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	model = assertFlowModel(t, updated)
-	if model.ActiveScreen() != "report_selection" {
-		t.Fatalf("expected unlocked context to reopen report selection without another token prompt, got %s", model.ActiveScreen())
+			updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+			model = runtimeflow.AssertFlowModel(t, updated)
+			if model.ActiveScreen() != "report_selection" {
+				t.Fatalf("expected unlocked context to reopen report selection without another token prompt, got %s", model.ActiveScreen())
+			}
+		})
 	}
 }
 
@@ -185,54 +205,71 @@ func TestReportGenerationWritesSelectedMarkdownAndPDFBundles(t *testing.T) {
 }
 
 // TestReportGenerationOpenWarningPreservesSavedReportAndAllowsAnotherRun
-// verifies that an opener failure stays non-fatal and keeps the workflow in the
-// unlocked report context.
+// verifies that Markdown and PDF opener failures stay non-fatal, retain files,
+// and keep the workflow in the unlocked report context.
 // Authored by: OpenCode
 func TestReportGenerationOpenWarningPreservesSavedReportAndAllowsAnotherRun(t *testing.T) {
-	var reportIO = testutil.NewReportIOFixture(t)
-	var openLogPath = installOpenCommandRecorder(t, 7)
-	var fixture = testutil.DeterministicReportLedgerFixture()
-	var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
+	for _, selectedFormat := range reportmodel.SupportedReportOutputFormats() {
+		var selectedFormat = selectedFormat
+		t.Run(selectedFormat.Label(), func(t *testing.T) {
+			var reportIO = testutil.NewReportIOFixture(t)
+			var openLogPath = runtimeflow.InstallOpenCommandRecorder(t, 7)
+			var fixture = testutil.DeterministicReportLedgerFixture()
+			var harness = runtimeflow.NewRuntimeBackedFlowHarness(t, t.TempDir(), runtimeflow.MustCloudSetupConfig(t), false)
 
-	seedProtectedSnapshot(t, harness, "token-123", fixture.ProtectedActivityCache)
+			runtimeflow.SeedProtectedSnapshot(t, harness, "token-123", fixture.ProtectedActivityCache)
 
-	var model = unlockSyncReportsContext(t, harness.Model, "token-123")
-	model = openReportSelectionFromContext(t, model)
-	model = selectReportYear(t, model, fixture.PrimaryReportYear)
-	model = selectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
-	model, cmd := runtimeflow.StartReportGeneration(t, model)
-	model = applyBatchCmd(t, model, cmd)
+			var model = runtimeflow.UnlockSyncReportsContext(t, harness.Model, "token-123")
+			model = runtimeflow.OpenReportSelection(t, model)
+			model = runtimeflow.SelectReportYear(t, model, fixture.PrimaryReportYear)
+			model = runtimeflow.SelectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
+			model = runtimeflow.SelectReportOutputFormat(t, model, selectedFormat)
+			model, cmd := runtimeflow.StartReportGeneration(t, model)
+			model = runtimeflow.ApplyBatchCmd(t, model, cmd)
 
-	if model.ActiveScreen() != "report_result" {
-		t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
-	}
+			if model.ActiveScreen() != "report_result" {
+				t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
+			}
 
-	var files = mustMarkdownFiles(t, reportIO.DocumentsDir)
-	if len(files) != 1 {
-		t.Fatalf("expected one saved Markdown file after opener warning, got %#v", files)
-	}
-	var reportPath = files[0]
-	testutil.AssertRegularFile(t, reportPath)
+			var files = runtimeflow.ReportOutputPaths(t, reportIO.DocumentsDir, selectedFormat)
+			for _, path := range files {
+				testutil.AssertRegularFile(t, path)
+			}
+			var reportPath = files[0]
+			if selectedFormat == reportmodel.ReportOutputFormatMarkdown {
+				reportPath, _ = runtimeflow.MarkdownBundlePaths(t, files)
+			}
 
-	var openerRequests = readOpenCommandRequests(t, openLogPath)
-	if len(openerRequests) != 1 || openerRequests[0] != reportPath {
-		t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
-	}
+			var content = runtimeflow.NormalizeRenderedText(model.View().Content)
+			runtimeflow.AssertReportResultDisclosure(t, content, selectedFormat, files)
+			if !strings.Contains(content, "Output Format: "+selectedFormat.Label()) {
+				t.Fatalf("expected selected output format in result view, got %q", content)
+			}
+			if !strings.Contains(content, "Success With Warning: automatic open failed after save") || !strings.Contains(content, "automatic opening failed") || !strings.Contains(content, "Open the file manually") {
+				t.Fatalf("expected actionable opener warning, got %q", content)
+			}
+			if strings.Count(content, "Report saved successfully, but automatic opening failed:") != 1 {
+				t.Fatalf("expected one runtime operational opener warning, got %q", content)
+			}
 
-	var content = normalizeRenderedText(model.View().Content)
-	if !strings.Contains(content, "Success With Warning: automatic open failed after save") {
-		t.Fatalf("expected opener warning headline, got %q", content)
-	}
-	if !strings.Contains(content, "automatic opening failed") || !strings.Contains(content, "Open the file manually") {
-		t.Fatalf("expected actionable opener warning, got %q", content)
-	}
+			var openerRequests = runtimeflow.ReadOpenCommandRequests(t, openLogPath)
+			if len(openerRequests) != 1 || openerRequests[0] != reportPath {
+				t.Fatalf("expected one opener request for %q, got %#v", reportPath, openerRequests)
+			}
 
-	var updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
-	model = assertFlowModel(t, updated)
-	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
-	model = assertFlowModel(t, updated)
-	if model.ActiveScreen() != "report_selection" {
-		t.Fatalf("expected Generate Another Report to return to report selection, got %s", model.ActiveScreen())
+			var updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+			model = runtimeflow.AssertFlowModel(t, updated)
+			updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+			model = runtimeflow.AssertFlowModel(t, updated)
+			if model.ActiveScreen() != "report_selection" {
+				t.Fatalf("expected Generate Another Report to return to report selection, got %s", model.ActiveScreen())
+			}
+			runtimeflow.AssertReportResultCleared(t, runtimeflow.NormalizeRenderedText(model.View().Content), files)
+			for _, path := range files {
+				testutil.AssertRegularFile(t, path)
+			}
+			runtimeflow.AssertNoCleartextReportInAppStorage(t, harness.BaseDir)
+		})
 	}
 }
 

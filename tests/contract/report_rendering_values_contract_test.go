@@ -11,6 +11,7 @@ import (
 	reportmarkdown "github.com/benizzio/ghostfolio-cryptogains/internal/report/markdown"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	reportpdf "github.com/benizzio/ghostfolio-cryptogains/internal/report/pdf"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 	"github.com/cockroachdb/apd/v3"
 	"golang.org/x/image/font/gofont/gobold"
@@ -62,14 +63,14 @@ func TestReportRenderingClosedManifestContract(t *testing.T) {
 		CaseCount: 148,
 		Populations: map[testutil.ReportPresentationPopulation]int{
 			testutil.ReportPresentationPopulationWarning:            296,
-			testutil.ReportPresentationPopulationVisibleFinancial:   664,
+			testutil.ReportPresentationPopulationVisibleFinancial:   688,
 			testutil.ReportPresentationPopulationModelIntegrity:     296,
-			testutil.ReportPresentationPopulationQuantity:           10,
-			testutil.ReportPresentationPopulationBoolean:            4,
+			testutil.ReportPresentationPopulationQuantity:           80,
+			testutil.ReportPresentationPopulationBoolean:            16,
 			testutil.ReportPresentationPopulationClassifiedCurrency: 2,
 			testutil.ReportPresentationPopulationUnclassified:       4,
 			testutil.ReportPresentationPopulationConversionRow:      16,
-			testutil.ReportPresentationPopulationParity:             491,
+			testutil.ReportPresentationPopulationParity:             601,
 			testutil.ReportPresentationPopulationConvertedEntry:     24,
 		},
 	}
@@ -177,42 +178,62 @@ func TestReportRenderingUS1PDFWarningTextRunsAndSearchability(t *testing.T) {
 	}
 }
 
-// TestReportRenderingRejectsFR004aOutOfDomainInBothFormats verifies that an
-// accepted report model carrying an immediately out-of-domain finite value
-// cannot produce either a Markdown document or a PDF payload.
+// TestReportRenderingRejectsFR004aOutOfDomainInBothFormats verifies every
+// FR-004a rejection class through the actual Markdown and PDF renderer objects.
 // Authored by: OpenCode
 func TestReportRenderingRejectsFR004aOutOfDomainInBothFormats(t *testing.T) {
 	t.Parallel()
 
-	var report = contractMarkdownReportFixture(reportmodel.ReportBaseCurrencyEUR.Label())
-	report.YearlyNetTotal = reportRenderingDecimalWithExponent(100001)
-	var markdownDocument reportmodel.ReportDocument
-	var markdownErr error
-	markdownDocument, markdownErr = reportmarkdown.Render(report)
-	if markdownErr == nil {
-		t.Errorf("Markdown accepted a financial value outside the FR-004a exponent domain")
-	} else if !strings.Contains(strings.ToLower(markdownErr.Error()), "financial") {
-		t.Errorf("Markdown FR-004a rejection lacks financial-formatting context: %v", markdownErr)
-	}
-	if len(markdownDocument.Content) != 0 {
-		t.Errorf("Markdown returned visible content after FR-004a rejection: %d bytes", len(markdownDocument.Content))
+	var failureCases = []struct {
+		name       string
+		value      apd.Decimal
+		formatOpts presentation.FinancialFormattingOptions
+		want       string
+	}{
+		{name: "adjusted exponent below lower bound", value: reportRenderingDecimalWithExponent(-100001), want: "adjusted exponent"},
+		{name: "adjusted exponent above upper bound", value: reportRenderingDecimalWithExponent(100001), want: "adjusted exponent"},
+		{name: "upper bound carry", value: reportRenderingUpperBoundCarry(), want: "adjusted exponent"},
+		{name: "required precision above apd limit", value: reportRenderingDecimal("1.23"), formatOpts: presentation.NewFinancialFormattingTestOptions(func(int64, int64) error {
+			return fmt.Errorf("required precision %d exceeds apd operational limit", int64(2147383650))
+		}), want: "required precision"},
 	}
 
-	var renderer reportpdf.Renderer
-	var err error
-	renderer, err = reportpdf.NewRenderer(reportpdf.RenderOptions{Fonts: reportpdf.FontData{Regular: goregular.TTF, Bold: gobold.TTF}})
-	if err != nil {
-		t.Fatalf("create PDF renderer: %v", err)
+	for _, failureCase := range failureCases {
+		var failureCase = failureCase
+		t.Run(failureCase.name, func(t *testing.T) {
+			var report = contractMarkdownReportFixture(reportmodel.ReportBaseCurrencyEUR.Label())
+			report.YearlyNetTotal = failureCase.value
+			var markdownRenderer = reportmarkdown.NewRenderer(reportmarkdown.RenderOptions{FinancialFormatting: failureCase.formatOpts})
+			var err error
+			var markdownDocument reportmodel.ReportDocument
+			markdownDocument, err = markdownRenderer.Render(report)
+			assertFR004aRendererFailure(t, "Markdown", markdownDocument.Content, err, failureCase.want)
+
+			var pdfRenderer reportpdf.Renderer
+			pdfRenderer, err = reportpdf.NewRenderer(reportpdf.RenderOptions{
+				Fonts:               reportpdf.FontData{Regular: goregular.TTF, Bold: gobold.TTF},
+				FinancialFormatting: failureCase.formatOpts,
+			})
+			if err != nil {
+				t.Fatalf("create PDF renderer: %v", err)
+			}
+			var payload []byte
+			payload, err = pdfRenderer.Render(report)
+			assertFR004aRendererFailure(t, "PDF", payload, err, failureCase.want)
+		})
 	}
-	var payload []byte
-	payload, err = renderer.Render(report)
-	if err == nil {
-		t.Errorf("PDF accepted a financial value outside the FR-004a exponent domain")
-	} else if !strings.Contains(strings.ToLower(err.Error()), "financial") {
-		t.Errorf("PDF FR-004a rejection lacks financial-formatting context: %v", err)
+}
+
+// assertFR004aRendererFailure verifies that a selected renderer returns no
+// visible document after a contextual financial-formatting rejection.
+// Authored by: OpenCode
+func assertFR004aRendererFailure(t *testing.T, format string, payload []byte, err error, want string) {
+	t.Helper()
+	if err == nil || !strings.Contains(strings.ToLower(err.Error()), want) {
+		t.Fatalf("%s FR-004a rejection = %v, want context %q", format, err, want)
 	}
-	if payload != nil {
-		t.Errorf("PDF returned visible payload after FR-004a rejection: %d bytes", len(payload))
+	if len(payload) != 0 {
+		t.Fatalf("%s returned visible output after FR-004a rejection: %d bytes", format, len(payload))
 	}
 }
 
@@ -356,7 +377,15 @@ func assertReportPresentationPairedPopulation(t *testing.T, manifest testutil.Re
 			if occurrence.Population != population {
 				continue
 			}
-			var identity = fmt.Sprintf("%s|%s|%s|%s|%d", occurrence.CaseID, occurrence.DocumentRole, occurrence.FieldName, occurrence.AmountKind, occurrence.AmountOrdinal)
+			var role = occurrence.DocumentRole
+			if occurrence.Format == testutil.ReportPresentationFormatPDF && role == testutil.ReportPresentationDocumentRoleCombined {
+				if occurrence.Section == "detailed_per_asset_audit" || occurrence.Section == "currency_conversion_audit" {
+					role = testutil.ReportPresentationDocumentRoleAnnex
+				} else {
+					role = testutil.ReportPresentationDocumentRoleMain
+				}
+			}
+			var identity = fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%d", occurrence.CaseID, role, occurrence.Section, occurrence.AssetIdentity, occurrence.SourceOrRowIdentity, occurrence.FieldName, occurrence.AmountKind, occurrence.AmountOrdinal)
 			if pairs[identity] == nil {
 				pairs[identity] = make(map[testutil.ReportPresentationFormat]bool)
 			}
@@ -384,7 +413,7 @@ func assertReportPresentationParityPopulation(t *testing.T, manifest testutil.Re
 			if occurrence.Format != "cross-format" || occurrence.CaseID != acceptanceCase.ID {
 				t.Fatalf("invalid cross-format parity occurrence: %#v", occurrence)
 			}
-			var identity = fmt.Sprintf("%s|%s|%s|%s|%s|%d", occurrence.CaseID, occurrence.DocumentRole, occurrence.Section, occurrence.FieldName, occurrence.AmountKind, occurrence.AmountOrdinal)
+			var identity = fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%d", occurrence.CaseID, occurrence.DocumentRole, occurrence.Section, occurrence.AssetIdentity, occurrence.SourceOrRowIdentity, occurrence.FieldName, occurrence.AmountKind, occurrence.AmountOrdinal)
 			if identities[identity] {
 				t.Fatalf("duplicate parity identity %q", identity)
 			}
@@ -460,4 +489,21 @@ func reportRenderingDecimalWithExponent(exponent int32) apd.Decimal {
 	value.Coeff.SetInt64(1)
 	value.Exponent = exponent
 	return value
+}
+
+// reportRenderingDecimal parses one small synthetic value for renderer tests.
+// Authored by: OpenCode
+func reportRenderingDecimal(raw string) apd.Decimal {
+	var value apd.Decimal
+	if _, _, err := value.SetString(raw); err != nil {
+		panic(err)
+	}
+	return value
+}
+
+// reportRenderingUpperBoundCarry builds the accepted adjusted-exponent upper
+// boundary whose HALF UP result would carry into adjusted exponent 100001.
+// Authored by: OpenCode
+func reportRenderingUpperBoundCarry() apd.Decimal {
+	return reportRenderingDecimal(strings.Repeat("9", 100001) + ".995")
 }

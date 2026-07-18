@@ -72,8 +72,8 @@ type pdfTable struct {
 // newPDFDocumentForRenderer keeps concrete PDF adapter startup failures
 // testable without involving external files or platform fonts.
 // Authored by: OpenCode
-var newPDFDocumentForRenderer = func() pdfLayoutDocument {
-	return newGopdfDocument()
+var newPDFDocumentForRenderer = func(finalizer ByteFinalizer) pdfLayoutDocument {
+	return newGopdfDocument(finalizer)
 }
 
 // startPDFDocument starts one A4 PDF document through the renderer seam.

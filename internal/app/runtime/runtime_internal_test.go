@@ -325,6 +325,19 @@ func TestClearSessionSecrets(t *testing.T) {
 	}
 }
 
+// TestNewReportServiceUsesConcreteOutputDefaults verifies the production
+// writer and opener remain installed when renderer options are supplied.
+// Authored by: OpenCode
+func TestNewReportServiceUsesConcreteOutputDefaults(t *testing.T) {
+	var service, ok = newReportService(nil, "", false, nil, ReportPipelineOptions{}).(*reportService)
+	if !ok {
+		t.Fatal("expected concrete report service")
+	}
+	if service.writeBundle == nil || service.open == nil {
+		t.Fatal("expected concrete report output writer and opener defaults")
+	}
+}
+
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {

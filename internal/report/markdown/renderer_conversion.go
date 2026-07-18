@@ -63,7 +63,14 @@ func writeConversionAuditSection(builder *strings.Builder, report reportmodel.Ca
 // writeConversionAuditRow renders one grouped activity-level conversion audit row.
 // Authored by: OpenCode
 func writeConversionAuditRow(builder *strings.Builder, entryIndex int, entry reportmodel.ConversionAuditEntry) error {
-	var row, err = presentation.BuildConversionAuditRow(entryIndex, entry)
+	return writeConversionAuditRowWithFinancialFormatting(builder, entryIndex, entry, presentation.DefaultFinancialFormattingOptions())
+}
+
+// writeConversionAuditRowWithFinancialFormatting renders one conversion row
+// with a renderer-scoped immutable financial policy.
+// Authored by: OpenCode
+func writeConversionAuditRowWithFinancialFormatting(builder *strings.Builder, entryIndex int, entry reportmodel.ConversionAuditEntry, options presentation.FinancialFormattingOptions) error {
+	var row, err = presentation.BuildConversionAuditRowWithFinancialFormatting(entryIndex, entry, options)
 	if err != nil {
 		return err
 	}

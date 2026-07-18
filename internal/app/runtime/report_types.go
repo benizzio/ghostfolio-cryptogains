@@ -7,8 +7,24 @@ import (
 	"context"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	reportpdf "github.com/benizzio/ghostfolio-cryptogains/internal/report/pdf"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
+
+// ReportPipelineOptions stores the optional renderer-scoped controls used while
+// assembling the report pipeline. A zero value preserves production behavior.
+// Authored by: OpenCode
+type ReportPipelineOptions struct {
+	// MarkdownFinancialFormatting scopes financial formatting to Markdown
+	// renderers assembled by this pipeline.
+	MarkdownFinancialFormatting presentation.FinancialFormattingOptions
+	// PDFFinancialFormatting scopes financial formatting to PDF renderers
+	// assembled by this pipeline.
+	PDFFinancialFormatting presentation.FinancialFormattingOptions
+	// PDFByteFinalizer is scoped to PDF renderers assembled by this pipeline.
+	PDFByteFinalizer reportpdf.ByteFinalizer
+}
 
 // SyncReportsUnlockState identifies how one Sync and Reports unlock attempt
 // completed before the context menu can be exposed.

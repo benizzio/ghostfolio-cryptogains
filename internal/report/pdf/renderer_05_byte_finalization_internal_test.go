@@ -5,6 +5,9 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"golang.org/x/image/font/gofont/gobold"
+	"golang.org/x/image/font/gofont/goregular"
 )
 
 // TestGopdfDocumentBytesReturnsPayloadAndNoError verifies successful PDF byte
@@ -21,12 +24,10 @@ func TestGopdfDocumentBytesReturnsPayloadAndNoError(t *testing.T) {
 		t.Fatalf("expected valid PDF payload, got %q", payload)
 	}
 
-	var previousFinalize = finalizeGopdfDocument
-	t.Cleanup(func() { finalizeGopdfDocument = previousFinalize })
-	finalizeGopdfDocument = func(*gopdfDocument) ([]byte, error) {
+	var failedDocument = startedTestDocumentWithFinalizer(t, func(func() ([]byte, error)) ([]byte, error) {
 		return []byte("partial"), errors.New("synthetic byte finalization failure")
-	}
-	if failedPayload, finalizeErr := document.Bytes(); finalizeErr == nil || failedPayload != nil {
+	})
+	if failedPayload, finalizeErr := failedDocument.Bytes(); finalizeErr == nil || failedPayload != nil {
 		t.Fatalf("failed finalization returned payload=%q error=%v", failedPayload, finalizeErr)
 	}
 }
@@ -43,7 +44,7 @@ func TestRendererFinalizationFailureReturnsNormallyWithoutPartialPayload(t *test
 		bytesPayload: []byte("%PDF-partial"),
 		bytesErr:     finalizationErr,
 	}
-	newPDFDocumentForRenderer = func() pdfLayoutDocument { return document }
+	newPDFDocumentForRenderer = func(ByteFinalizer) pdfLayoutDocument { return document }
 
 	var renderer, rendererErr = NewRenderer(RenderOptions{Fonts: FontData{Regular: []byte("regular"), Bold: []byte("bold")}})
 	if rendererErr != nil {
@@ -67,5 +68,33 @@ func TestRendererFinalizationFailureReturnsNormallyWithoutPartialPayload(t *test
 	}
 	if document.bytesCalls != 1 {
 		t.Fatalf("finalization calls = %d, want one completed render attempt", document.bytesCalls)
+	}
+}
+
+// TestRendererByteFinalizerOptionPreservesCauseIdentity verifies the concrete
+// renderer-scoped option redacts the displayed cause while preserving errors.Is.
+// Authored by: OpenCode
+func TestRendererByteFinalizerOptionPreservesCauseIdentity(t *testing.T) {
+	var finalizationErr = errors.New("Bearer synthetic-renderer-finalization-secret")
+	var renderer, err = NewRenderer(RenderOptions{
+		Fonts: FontData{Regular: goregular.TTF, Bold: gobold.TTF},
+		ByteFinalizer: func(func() ([]byte, error)) ([]byte, error) {
+			return []byte("%PDF-partial"), finalizationErr
+		},
+	})
+	if err != nil {
+		t.Fatalf("new renderer: %v", err)
+	}
+
+	var payload []byte
+	payload, err = renderer.Render(minimalPDFReportFixture(t))
+	if err == nil || payload != nil {
+		t.Fatalf("expected nil payload and finalization error, payload=%q error=%v", payload, err)
+	}
+	if !errors.Is(err, finalizationErr) {
+		t.Fatalf("finalization error = %v, want injected cause %v", err, finalizationErr)
+	}
+	if !strings.Contains(err.Error(), "Bearer [REDACTED]") || strings.Contains(err.Error(), finalizationErr.Error()) {
+		t.Fatalf("expected redacted finalization error, got %v", err)
 	}
 }
