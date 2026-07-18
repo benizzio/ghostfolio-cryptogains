@@ -4,6 +4,7 @@ package contract
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -58,19 +59,21 @@ func TestReportRenderingClosedManifestContract(t *testing.T) {
 	}
 
 	var expectedCounters = testutil.ReportPresentationAcceptanceCounters{
-		A: 148,
-		W: 296,
-		V: 664,
-		M: 296,
-		Q: 10,
-		B: 4,
-		Z: 2,
-		N: 4,
-		C: 16,
-		P: 491,
-		E: 24,
+		CaseCount: 148,
+		Populations: map[testutil.ReportPresentationPopulation]int{
+			testutil.ReportPresentationPopulationWarning:            296,
+			testutil.ReportPresentationPopulationVisibleFinancial:   664,
+			testutil.ReportPresentationPopulationModelIntegrity:     296,
+			testutil.ReportPresentationPopulationQuantity:           10,
+			testutil.ReportPresentationPopulationBoolean:            4,
+			testutil.ReportPresentationPopulationClassifiedCurrency: 2,
+			testutil.ReportPresentationPopulationUnclassified:       4,
+			testutil.ReportPresentationPopulationConversionRow:      16,
+			testutil.ReportPresentationPopulationParity:             491,
+			testutil.ReportPresentationPopulationConvertedEntry:     24,
+		},
 	}
-	if manifest.Counters != expectedCounters {
+	if manifest.Counters.CaseCount != expectedCounters.CaseCount || !reflect.DeepEqual(manifest.Counters.Populations, expectedCounters.Populations) {
 		t.Fatalf("closed acceptance counters = %#v, want %#v", manifest.Counters, expectedCounters)
 	}
 	reportRenderingPopulationEvidence(t, manifest)
@@ -307,13 +310,13 @@ func reportRenderingPopulationEvidence(t *testing.T, manifest testutil.ReportPre
 	}
 	for _, population := range populations {
 		var numerator = reportRenderingPopulationCount(manifest.Cases, population)
-		var denominator = reportRenderingPopulationCounter(manifest.Counters, population)
+		var denominator = reportRenderingPopulationCounter(t, manifest.Counters, population)
 		t.Logf("population %s numerator/denominator: %d/%d", population, numerator, denominator)
 		if denominator == 0 || numerator != denominator {
 			t.Fatalf("population %s numerator/denominator = %d/%d", population, numerator, denominator)
 		}
 	}
-	t.Logf("population A numerator/denominator: %d/%d", len(manifest.Cases), manifest.Counters.A)
+	t.Logf("population A numerator/denominator: %d/%d", len(manifest.Cases), manifest.Counters.CaseCount)
 }
 
 // reportRenderingPopulationCount counts occurrence keys for one closed
@@ -333,31 +336,13 @@ func reportRenderingPopulationCount(cases []testutil.ReportPresentationAcceptanc
 
 // reportRenderingPopulationCounter selects one manifest denominator.
 // Authored by: OpenCode
-func reportRenderingPopulationCounter(counters testutil.ReportPresentationAcceptanceCounters, population testutil.ReportPresentationPopulation) int {
-	switch population {
-	case testutil.ReportPresentationPopulationWarning:
-		return counters.W
-	case testutil.ReportPresentationPopulationVisibleFinancial:
-		return counters.V
-	case testutil.ReportPresentationPopulationModelIntegrity:
-		return counters.M
-	case testutil.ReportPresentationPopulationQuantity:
-		return counters.Q
-	case testutil.ReportPresentationPopulationBoolean:
-		return counters.B
-	case testutil.ReportPresentationPopulationClassifiedCurrency:
-		return counters.Z
-	case testutil.ReportPresentationPopulationUnclassified:
-		return counters.N
-	case testutil.ReportPresentationPopulationConversionRow:
-		return counters.C
-	case testutil.ReportPresentationPopulationParity:
-		return counters.P
-	case testutil.ReportPresentationPopulationConvertedEntry:
-		return counters.E
-	default:
-		return 0
+func reportRenderingPopulationCounter(t *testing.T, counters testutil.ReportPresentationAcceptanceCounters, population testutil.ReportPresentationPopulation) int {
+	t.Helper()
+	var count, ok = counters.Populations[population]
+	if !ok {
+		t.Fatalf("population %s is missing from acceptance counters", population)
 	}
+	return count
 }
 
 // assertReportPresentationPairedPopulation verifies Markdown/PDF parity keys

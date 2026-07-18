@@ -43,6 +43,10 @@ type pdfLayoutDocument interface {
 	pdfDocumentStarter
 	fontLoader
 	pdfAnnexLayout
+	// Bytes finalizes the document and returns its complete PDF payload. A
+	// finalization failure must return a nil payload and an error so callers do
+	// not treat partial bytes as a successful report.
+	// Authored by: OpenCode
 	Bytes() ([]byte, error)
 }
 

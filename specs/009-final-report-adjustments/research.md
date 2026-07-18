@@ -252,7 +252,8 @@ Decision: Combine the closed acceptance manifest and field/vector/output matrix,
 pure shared-presentation tests, exact Markdown contracts, PDF layout recorder
 tests, extended concrete generated-PDF inspection, runtime parity and AUD-001
 model-equality tests, confidentiality sentinels, unchanged empirical calculation
-tests, and the isolated named performance scenario.
+tests, and an isolated named performance scenario limited to resource-sensitive
+evidence.
 
 Rationale: The current project PDF inspector proves landscape page geometry and
 searchable normalized text, but its normalization removes punctuation,
@@ -266,18 +267,22 @@ complete-row preflight, and safe finalization error propagation. Runtime and
 empirical tests protect the boundary before formatting. Searchable/selectable
 text and readable non-overlapping layout remain the accessibility boundary;
 tagged-PDF, PDF/UA, semantic reading-order, and screen-reader claims are excluded
-and cannot be inferred from text-run inspection. Performance remains outside
-deterministic coverage.
+and cannot be inferred from text-run inspection. Deterministic document-content
+and pagination assertions remain with package, contract, and integration tests.
+Performance remains outside deterministic coverage and does not duplicate those
+assertions.
 
 Failure and recovery evidence also forces unrenderable decimal, PDF layout,
 finalization, Markdown second-file, PDF save, and post-save opener failures.
 Sentinel colliding files prove that cleanup is limited to current-attempt paths.
 The performance fixture keeps its exact 10,000-activity, two-asset,
-three-currency composition and 6,666 three-entry conversion rows. Separate
-Markdown and PDF timers include generation, multiline PDF pagination and
-finalization, save, bundle validation, and opener invocation. Fixture setup and
-post-generation row, entry, page, header, and continuation inspection stay
-outside the measured intervals.
+three-currency composition, including the 6,666 non-USD conversion workload.
+Separate Markdown and PDF timers include generation, multiline PDF pagination
+and finalization, save, bundle validation, and opener invocation. Fixture setup
+and non-empty output checks stay outside the measured intervals. Generated
+warning, currency, rate, conversion-entry, cardinality, heading, and
+continuation-content assertions belong to deterministic package, contract, and
+integration owners rather than this resource-sensitive scenario.
 
 Alternatives considered: Depend only on normalized extracted text, but it cannot
 prove the new requirements. Add a second PDF parser, but the existing

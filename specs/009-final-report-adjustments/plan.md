@@ -328,10 +328,12 @@ not a general decimal rule.
   proves complete searchable/selectable text and non-overlapping layout without
   claiming ACC-002-excluded conformance.
 - Existing empirical fixtures remain unchanged. The named performance fixture
-  independently times both formats, verifies exactly 6,666 three-entry
-  conversion rows, and proves the PDF conversion audit spans continuation pages
-  with every row, entry, repeated header, and continuation context retained.
-  Inspection occurs outside the measured intervals.
+  retains its exact 10,000-activity composition and independently times both
+  formats, requiring successful non-empty local outputs and opener invocation
+  under the strict two-minute limit. Deterministic package, contract, and
+  integration tests verify the 6,666 three-entry conversion rows and PDF
+  continuation content; the performance suite does not duplicate those
+  document-contract assertions.
 
 ## Constitution Prerequisite
 

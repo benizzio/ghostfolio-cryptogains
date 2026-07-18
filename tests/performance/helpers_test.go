@@ -29,6 +29,11 @@ func largeCrossCurrencyCache(t *testing.T, activityCount int) syncmodel.Protecte
 	return syncmodel.ProtectedActivityCache{SyncedAt: time.Date(2026, time.May, 20, 15, 4, 5, 0, time.UTC), RetrievedCount: len(activities), ActivityCount: len(activities), AvailableReportYears: []int{2025}, Activities: activities}
 }
 
+// largeReportPerformanceFixture contains the deterministic workload and
+// metadata used by the isolated report-generation performance scenarios. Its
+// cache contains the exact 10,000-activity, two-asset, three-currency workload
+// and its metadata describes the selected 2025 report and six-year span.
+// Authored by: OpenCode
 type largeReportPerformanceFixture struct {
 	ProtectedActivityCache syncmodel.ProtectedActivityCache
 	ReportYear             int
@@ -36,6 +41,11 @@ type largeReportPerformanceFixture struct {
 	CalendarYearSpan       int
 }
 
+// largeReportFixture builds the fixed 10,000-activity workload used to measure
+// report generation without asserting document content. It preserves the
+// deterministic two-asset, three-currency distribution, scope fallback mix,
+// selected report year, and activity count expected by performance tests.
+// Authored by: OpenCode
 func largeReportFixture(t *testing.T) largeReportPerformanceFixture {
 	t.Helper()
 	const activityCount = 10000

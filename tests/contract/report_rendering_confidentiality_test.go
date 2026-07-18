@@ -13,11 +13,9 @@ import (
 	runtimeapp "github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 	reportmarkdown "github.com/benizzio/ghostfolio-cryptogains/internal/report/markdown"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
-	reportpdf "github.com/benizzio/ghostfolio-cryptogains/internal/report/pdf"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
-	"golang.org/x/image/font/gofont/gobold"
-	"golang.org/x/image/font/gofont/goregular"
+	testreportpdf "github.com/benizzio/ghostfolio-cryptogains/tests/testutil/reportpdf"
 )
 
 const (
@@ -68,20 +66,10 @@ func TestReportRenderingConfidentialityContract(t *testing.T) {
 		}
 	}
 
-	var renderer reportpdf.Renderer
-	renderer, err = reportpdf.NewRenderer(reportpdf.RenderOptions{Fonts: reportpdf.FontData{Regular: goregular.TTF, Bold: gobold.TTF}})
-	if err != nil {
-		t.Fatalf("create confidential PDF renderer: %v", err)
-	}
-	var payload []byte
-	payload, err = renderer.Render(report)
+	var inspection testutil.GeneratedPDF
+	inspection, err = testreportpdf.RenderAndInspect(report)
 	if err != nil {
 		t.Fatalf("render confidential PDF: %v", err)
-	}
-	var inspection testutil.GeneratedPDF
-	inspection, err = testutil.InspectGeneratedPDF(payload)
-	if err != nil {
-		t.Fatalf("inspect confidential PDF: %v", err)
 	}
 	assertConfidentialitySentinelsAbsent(t, inspection.SearchableText, "PDF document")
 	if !inspection.ContainsSearchableText(syntheticExportFinancialAmount) {
@@ -109,9 +97,7 @@ func TestReportRenderingConfidentialityErrors(t *testing.T) {
 	assertConfidentialitySentinelsAbsent(t, markdownErr.Error(), "returned Markdown render error")
 	assertConfidentialitySentinelsAbsent(t, fmt.Errorf("wrapped Markdown render error: %w", markdownErr).Error(), "wrapped Markdown render error")
 
-	var renderer reportpdf.Renderer
-	var err error
-	renderer, err = reportpdf.NewRenderer(reportpdf.RenderOptions{Fonts: reportpdf.FontData{Regular: goregular.TTF, Bold: gobold.TTF}})
+	var renderer, err = testreportpdf.NewRenderer()
 	if err != nil {
 		t.Fatalf("create PDF renderer: %v", err)
 	}
@@ -212,20 +198,10 @@ func TestReportRenderingDelimiterInjectionContract(t *testing.T) {
 		t.Fatalf("Markdown conversion content was not preserved: cell=%q", convertedCell)
 	}
 
-	var renderer reportpdf.Renderer
-	renderer, err = reportpdf.NewRenderer(reportpdf.RenderOptions{Fonts: reportpdf.FontData{Regular: goregular.TTF, Bold: gobold.TTF}})
-	if err != nil {
-		t.Fatalf("create delimiter PDF renderer: %v", err)
-	}
-	var payload []byte
-	payload, err = renderer.Render(report)
+	var inspection testutil.GeneratedPDF
+	inspection, err = testreportpdf.RenderAndInspect(report)
 	if err != nil {
 		t.Fatalf("render delimiter PDF: %v", err)
-	}
-	var inspection testutil.GeneratedPDF
-	inspection, err = testutil.InspectGeneratedPDF(payload)
-	if err != nil {
-		t.Fatalf("inspect delimiter PDF: %v", err)
 	}
 	var pdfText = strings.Join(pdfTextRunStrings(inspection), " ")
 	var expectedPDFDynamic = strings.ReplaceAll(syntheticDelimiterValue, "|", "/")

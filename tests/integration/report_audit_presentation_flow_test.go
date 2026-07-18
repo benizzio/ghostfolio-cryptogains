@@ -5,13 +5,10 @@ package integration
 
 import (
 	"context"
-	"math"
 	"os"
 	"reflect"
-	"sort"
 	"strings"
 	"testing"
-	"unicode"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
@@ -63,7 +60,7 @@ func TestReportAuditPresentationPreservesAUD001AndMatchesFormats(t *testing.T) {
 	}
 
 	var calculator = reportcalculate.NewCalculator(runtimeflow.DeterministicCurrencyRates{})
-	var baseline, err = calculator.Calculate(context.Background(), mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportOutputFormatMarkdown), fixture.ProtectedActivityCache)
+	var baseline, err = calculator.Calculate(context.Background(), runtimeflow.MustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportOutputFormatMarkdown), fixture.ProtectedActivityCache)
 	if err != nil {
 		t.Fatalf("calculate AUD-001 Annex baseline: %v", err)
 	}
@@ -78,7 +75,7 @@ func TestReportAuditPresentationPreservesAUD001AndMatchesFormats(t *testing.T) {
 		reportmodel.ReportOutputFormatMarkdown,
 		reportmodel.ReportOutputFormatPDF,
 	} {
-		var request = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, outputFormat)
+		var request = runtimeflow.MustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, outputFormat)
 		var outcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: request})
 		if !outcome.Success {
 			t.Fatalf("expected %s Annex report generation success, got %#v", outputFormat, outcome)
@@ -195,7 +192,7 @@ func readAuditPresentationOutput(t *testing.T, documentsDir string, outcome runt
 	switch outcome.OutputFormat {
 	case reportmodel.ReportOutputFormatMarkdown:
 		var files = runtimeflow.AllMarkdownFiles(t, documentsDir)
-		var _, annexPath = markdownBundlePaths(t, files)
+		var _, annexPath = runtimeflow.MarkdownBundlePaths(t, files)
 		// #nosec G304 -- the report path is created in the test-owned Documents fixture.
 		var raw, err = os.ReadFile(annexPath)
 		if err != nil {
@@ -238,7 +235,7 @@ func parseMarkdownAuditPresentationRow(content string, sourceID string) (auditPr
 			OriginalCurrency:    cells[8],
 			CalculationCurrency: cells[9],
 			FullLiquidation:     cells[12],
-			NonEmptyCells:       nonEmptyAuditCells(cells[1 : len(cells)-1]),
+			NonEmptyCells:       runtimeflow.NonEmptyPDFCells(cells[1 : len(cells)-1]),
 		}, nil
 	}
 	return auditPresentationRow{}, os.ErrNotExist
@@ -259,227 +256,21 @@ func parsePDFAuditPresentationRow(inspection testutil.GeneratedPDF, sourceID str
 		return auditPresentationRow{}, os.ErrNotExist
 	}
 
-	var sourceRuns, found = auditPDFSourceRuns(inspection.TextRuns, annexPage, sourceID)
+	var sourceRuns, found = runtimeflow.FindAnnexPDFSourceRuns(inspection.TextRuns, annexPage, sourceID)
 	if !found {
 		return auditPresentationRow{}, os.ErrNotExist
 	}
 
-	var rowRuns = auditPDFRowRuns(inspection.TextRuns, sourceRuns)
-	var cells = auditPDFSemanticCells(rowRuns)
-	if len(cells) != auditPDFAnnexColumnCount || normalizeAuditSourceID(cells[1]) != normalizeAuditSourceID(sourceID) {
+	var rowRuns = runtimeflow.AnnexPDFRowRuns(inspection.TextRuns, sourceRuns)
+	var cells = runtimeflow.AnnexPDFSemanticCells(rowRuns)
+	if len(cells) != runtimeflow.AnnexPDFColumnCount || runtimeflow.NormalizePDFSourceID(cells[1]) != runtimeflow.NormalizePDFSourceID(sourceID) {
 		return auditPresentationRow{}, os.ErrNotExist
 	}
 	var row = auditPresentationRow{
 		OriginalCurrency:    cells[7],
 		CalculationCurrency: cells[8],
 		FullLiquidation:     cells[11],
-		NonEmptyCells:       nonEmptyAuditCells(cells),
+		NonEmptyCells:       runtimeflow.NonEmptyPDFCells(cells),
 	}
 	return row, nil
-}
-
-const (
-	// auditPDFSourceColumnTolerance bounds source-column coordinate matching.
-	// Authored by: OpenCode
-	auditPDFSourceColumnTolerance = 0.1
-	// auditPDFLineGap bounds adjacent wrapped PDF row baselines.
-	// Authored by: OpenCode
-	auditPDFLineGap = 16.0
-	// auditPDFTableStartX is the PDF Annex table's left coordinate.
-	// Authored by: OpenCode
-	auditPDFTableStartX = 36.0
-	// auditPDFTableWidth is the PDF Annex table's printable width.
-	// Authored by: OpenCode
-	auditPDFTableWidth = 770.0
-	// auditPDFAnnexColumnCount is the fixed number of Annex table columns.
-	// Authored by: OpenCode
-	auditPDFAnnexColumnCount = 17
-)
-
-// auditPDFAnnexColumnWidths mirrors the source Annex table proportions used by
-// the PDF renderer after scaling them to the printable page width.
-// Authored by: OpenCode
-var auditPDFAnnexColumnWidths = [...]float64{42, 38, 38, 34, 34, 32, 30, 34, 34, 38, 40, 34, 34, 34, 32, 38, 38}
-
-// auditPDFSourceRuns locates a source identifier even when gopdf wraps it into
-// multiple same-column text runs.
-// Authored by: OpenCode
-func auditPDFSourceRuns(runs []testutil.PDFTextRun, firstPage int, sourceID string) ([]testutil.PDFTextRun, bool) {
-	var normalizedSourceID = normalizeAuditSourceID(sourceID)
-	if normalizedSourceID == "" {
-		return nil, false
-	}
-	for index, run := range runs {
-		if run.Page < firstPage || normalizeAuditSourceID(run.Text) == "" {
-			continue
-		}
-		var candidate []testutil.PDFTextRun
-		var normalized strings.Builder
-		for next := index; next < len(runs); next++ {
-			var fragment = runs[next]
-			if fragment.Page != run.Page || math.Abs(fragment.X-run.X) > auditPDFSourceColumnTolerance {
-				break
-			}
-			if len(candidate) > 0 && math.Abs(fragment.Y-candidate[len(candidate)-1].Y) > auditPDFLineGap {
-				break
-			}
-			candidate = append(candidate, fragment)
-			normalized.WriteString(normalizeAuditSourceID(fragment.Text))
-			if strings.Contains(normalized.String(), normalizedSourceID) {
-				return candidate, true
-			}
-		}
-	}
-	return nil, false
-}
-
-// auditPDFRowRuns expands the source cell's vertical span to the complete
-// physical row while excluding neighboring rows and headings.
-// Authored by: OpenCode
-func auditPDFRowRuns(runs []testutil.PDFTextRun, sourceRuns []testutil.PDFTextRun) []testutil.PDFTextRun {
-	if len(sourceRuns) == 0 {
-		return nil
-	}
-	var minimumY = sourceRuns[0].Y
-	var maximumY = sourceRuns[0].Y
-	for _, run := range sourceRuns[1:] {
-		minimumY = math.Min(minimumY, run.Y)
-		maximumY = math.Max(maximumY, run.Y)
-	}
-
-	// Include every adjacent wrapped baseline. The iteration is repeated because
-	// a multiline note can extend the row beyond the source cell's own span.
-	for {
-		var expanded bool
-		for _, run := range runs {
-			if run.Page != sourceRuns[0].Page {
-				continue
-			}
-			if run.Y > maximumY && run.Y-maximumY <= auditPDFLineGap {
-				maximumY = run.Y
-				expanded = true
-			}
-			if run.Y < minimumY && minimumY-run.Y <= auditPDFLineGap {
-				minimumY = run.Y
-				expanded = true
-			}
-		}
-		if !expanded {
-			break
-		}
-	}
-
-	var rowRuns []testutil.PDFTextRun
-	for _, run := range runs {
-		if run.Page == sourceRuns[0].Page && run.Y >= minimumY-0.01 && run.Y <= maximumY+0.01 {
-			rowRuns = append(rowRuns, run)
-		}
-	}
-	return rowRuns
-}
-
-// auditPDFSemanticCells maps row runs to their fixed Annex columns and joins
-// wrapped fragments without losing the blank classified currency cell.
-// Authored by: OpenCode
-func auditPDFSemanticCells(runs []testutil.PDFTextRun) []string {
-	var fragments = make([][]testutil.PDFTextRun, auditPDFAnnexColumnCount)
-	for _, run := range runs {
-		var column, ok = auditPDFColumnIndex(run.X)
-		if ok {
-			fragments[column] = append(fragments[column], run)
-		}
-	}
-
-	var cells = make([]string, auditPDFAnnexColumnCount)
-	for column, columnRuns := range fragments {
-		if column == 1 {
-			cells[column] = joinAuditSourceRuns(columnRuns)
-		} else {
-			cells[column] = joinAuditCellRuns(columnRuns)
-		}
-	}
-	return cells
-}
-
-// auditPDFColumnIndex resolves a text run's X coordinate to the scaled Annex
-// column that produced it, including right-aligned values.
-// Authored by: OpenCode
-func auditPDFColumnIndex(x float64) (int, bool) {
-	var totalWidth float64
-	for _, width := range auditPDFAnnexColumnWidths {
-		totalWidth += width
-	}
-	var sourcePosition = (x - auditPDFTableStartX) * totalWidth / auditPDFTableWidth
-	if sourcePosition < 0 || sourcePosition >= totalWidth {
-		return 0, false
-	}
-	var columnStart float64
-	for column, width := range auditPDFAnnexColumnWidths {
-		if sourcePosition < columnStart+width {
-			return column, true
-		}
-		columnStart += width
-	}
-	return 0, false
-}
-
-// joinAuditSourceRuns joins identifier fragments across gopdf line splits.
-// Authored by: OpenCode
-func joinAuditSourceRuns(runs []testutil.PDFTextRun) string {
-	var value strings.Builder
-	for _, run := range runs {
-		value.WriteString(strings.Join(strings.Fields(run.Text), ""))
-	}
-	return value.String()
-}
-
-// joinAuditCellRuns joins same-line fragments directly and wrapped lines with
-// spaces so PDF semantic cells match the single-line Markdown cell values.
-// Authored by: OpenCode
-func joinAuditCellRuns(runs []testutil.PDFTextRun) string {
-	if len(runs) == 0 {
-		return ""
-	}
-	var ordered = append([]testutil.PDFTextRun(nil), runs...)
-	sort.SliceStable(ordered, func(left, right int) bool {
-		return ordered[left].Y > ordered[right].Y
-	})
-	var value strings.Builder
-	for index, run := range ordered {
-		var fragment = strings.Join(strings.Fields(run.Text), " ")
-		if fragment == "" {
-			continue
-		}
-		if index > 0 && value.Len() > 0 && math.Abs(run.Y-ordered[index-1].Y) > 0.01 {
-			value.WriteByte(' ')
-		}
-		value.WriteString(fragment)
-	}
-	return value.String()
-}
-
-// normalizeAuditSourceID compares source IDs independently of case, whitespace,
-// and non-semantic CID artifacts in extracted PDF text.
-// Authored by: OpenCode
-func normalizeAuditSourceID(value string) string {
-	var normalized strings.Builder
-	for _, character := range strings.ToUpper(value) {
-		if unicode.IsLetter(character) || unicode.IsDigit(character) || character == '-' {
-			normalized.WriteRune(character)
-		}
-	}
-	return normalized.String()
-}
-
-// nonEmptyAuditCells removes empty Markdown table cells for comparison with PDF
-// text runs, where empty cells do not create a text-showing operation.
-// Authored by: OpenCode
-func nonEmptyAuditCells(cells []string) []string {
-	var nonEmpty []string
-	for _, cell := range cells {
-		if cell != "" {
-			nonEmpty = append(nonEmpty, cell)
-		}
-	}
-	return nonEmpty
 }

@@ -416,11 +416,14 @@ Automated tests must cover both formats and prove:
 - warning and converted-entry content remains complete searchable/selectable
   text with preserved order and non-overlapping layout, without claiming the
   assistive capabilities excluded by ACC-002
-- the named 10,000-activity fixture produces exactly 6,666 three-entry
-  conversion rows in both formats; the PDF audit spans multiple pages with every
-  row and entry present, searchable, inside printable bounds, and accompanied by
-  repeated header and continuation context where applicable
-- separate Markdown and PDF duration records use the specified CI environment
-  and timing boundary, including PDF multiline measurement, pagination,
-  finalization, save, and opener invocation while excluding fixture setup and
-  post-generation inspection
+- deterministic package, contract, and integration tests prove that the named
+  10,000-activity fixture produces exactly 6,666 three-entry conversion rows in
+  both formats; the PDF audit spans multiple pages with every row and entry
+  present, searchable, inside printable bounds, and accompanied by repeated
+  header and continuation context where applicable
+- the isolated performance suite proves the exact local workload composition,
+  separate Markdown and PDF duration records under the specified CI environment
+  and timing boundary, successful non-empty outputs, opener invocation, and
+  performance-coverage isolation. It does not inspect document content or
+  duplicate deterministic warning, rate, conversion-entry, cardinality,
+  heading, or pagination assertions.

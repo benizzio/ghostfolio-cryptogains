@@ -6,9 +6,19 @@ import (
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 )
 
-// ConvertedAmounts formats included converted amount evidence as ordered,
-// delimiter-free logical entries. Exact zero-to-zero pairs are omitted before
-// formatting, while every other received entry is retained in sequence.
+// ConvertedAmountEntry contains the format-neutral fields of one visible
+// original-to-converted amount pair. Renderers own the fixed syntax and
+// format-specific escaping for these fields.
+// Authored by: OpenCode
+type ConvertedAmountEntry struct {
+	Label           string
+	OriginalAmount  string
+	ConvertedAmount string
+}
+
+// ConvertedAmounts formats included converted amount evidence as ordered
+// logical entries. Exact zero-to-zero pairs are omitted before formatting,
+// while every other received entry is retained in sequence.
 //
 // Example:
 //
@@ -19,8 +29,8 @@ import (
 //	_ = entries
 //
 // Authored by: OpenCode
-func ConvertedAmounts(entryIndex int, amounts []reportmodel.ConvertedActivityAmount) ([]string, error) {
-	var entries []string
+func ConvertedAmounts(entryIndex int, amounts []reportmodel.ConvertedActivityAmount) ([]ConvertedAmountEntry, error) {
+	var entries []ConvertedAmountEntry
 	for amountIndex, amount := range amounts {
 		if amount.OriginalAmount.Sign() == 0 && amount.ConvertedAmount.Sign() == 0 {
 			continue
@@ -35,7 +45,11 @@ func ConvertedAmounts(entryIndex int, amounts []reportmodel.ConvertedActivityAmo
 			return nil, fmt.Errorf("render conversion audit entry %d amount %d converted amount: %w", entryIndex, amountIndex, err)
 		}
 
-		entries = append(entries, fmt.Sprintf("%s: %s -> %s", sanitize(string(amount.AmountKind)), original, converted))
+		entries = append(entries, ConvertedAmountEntry{
+			Label:           sanitize(string(amount.AmountKind)),
+			OriginalAmount:  original,
+			ConvertedAmount: converted,
+		})
 	}
 	return entries, nil
 }

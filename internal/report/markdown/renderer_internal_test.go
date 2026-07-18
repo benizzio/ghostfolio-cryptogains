@@ -1866,26 +1866,3 @@ func t027MarkdownConvertedAmount(kind reportmodel.ConvertedAmountKind, original 
 		ConvertedAmount: converted,
 	}
 }
-
-// TestSplitConvertedAmountEntryRejectsUnexpectedSyntax verifies malformed
-// presentation entries remain unsplit instead of inventing Markdown fields.
-// Authored by: OpenCode
-func TestSplitConvertedAmountEntryRejectsUnexpectedSyntax(t *testing.T) {
-	for _, testCase := range []struct {
-		name  string
-		input string
-		want  [3]string
-	}{
-		{name: "missing arrow", input: "unit_price: 1.00", want: [3]string{"unit_price: 1.00", "", ""}},
-		{name: "missing label separator", input: "unit_price -> 1.00", want: [3]string{"unit_price -> 1.00", "", ""}},
-	} {
-		var testCase = testCase
-		t.Run(testCase.name, func(t *testing.T) {
-			var gotLabel, gotOriginal, gotConverted = splitConvertedAmountEntry(testCase.input)
-			var got = [3]string{gotLabel, gotOriginal, gotConverted}
-			if got != testCase.want {
-				t.Fatalf("split converted amount entry = %#v, want %#v", got, testCase.want)
-			}
-		})
-	}
-}

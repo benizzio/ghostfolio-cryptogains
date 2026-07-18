@@ -7,7 +7,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -21,13 +20,11 @@ import (
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
-	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	syncnormalize "github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
 	syncvalidate "github.com/benizzio/ghostfolio-cryptogains/internal/sync/validate"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeflow"
-	"github.com/cockroachdb/apd/v3"
 )
 
 // TestReportGenerationSuccessWritesMarkdownAndReturnsToUnlockedContext verifies
@@ -57,7 +54,7 @@ func TestReportGenerationSuccessWritesMarkdownAndReturnsToUnlockedContext(t *tes
 		t.Fatalf("expected main-plus-annex Markdown output, got %#v", files)
 	}
 
-	var reportPath, annexPath = markdownBundlePaths(t, files)
+	var reportPath, annexPath = runtimeflow.MarkdownBundlePaths(t, files)
 	testutil.AssertPathWithin(t, reportPath, reportIO.DocumentsDir)
 	testutil.AssertRegularFile(t, reportPath)
 	testutil.AssertPathWithin(t, annexPath, reportIO.DocumentsDir)
@@ -70,7 +67,7 @@ func TestReportGenerationSuccessWritesMarkdownAndReturnsToUnlockedContext(t *tes
 	}
 
 	var content = runtimeflow.NormalizeRenderedText(model.View().Content)
-	assertSavedMarkdownBundlePaths(t, content, reportPath, annexPath)
+	runtimeflow.AssertSavedMarkdownBundlePaths(t, content, reportPath, annexPath)
 	if !strings.Contains(content, "Selected Year: 2024") || !strings.Contains(content, "Cost Basis Method: FIFO") || !strings.Contains(content, "Report Base Currency: USD") {
 		t.Fatalf("expected selected year, method, and report base currency in result view, got %q", content)
 	}
@@ -136,7 +133,7 @@ func TestReportGenerationWritesSelectedMarkdownAndPDFBundles(t *testing.T) {
 		t.Fatalf("expected readable snapshot after unlock, got %#v", contextResult)
 	}
 
-	var markdownRequest = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportOutputFormatMarkdown)
+	var markdownRequest = runtimeflow.MustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportOutputFormatMarkdown)
 	var markdownOutcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: markdownRequest})
 	if !markdownOutcome.Success {
 		t.Fatalf("expected Markdown report generation success, got %#v", markdownOutcome)
@@ -145,19 +142,19 @@ func TestReportGenerationWritesSelectedMarkdownAndPDFBundles(t *testing.T) {
 	if len(markdownFiles) != 2 {
 		t.Fatalf("expected main-plus-annex Markdown output, got %#v", markdownFiles)
 	}
-	var markdownMainPath = selectedMainReportPath(t, markdownFiles, nil, reportmodel.ReportOutputFormatMarkdown)
+	var markdownMainPath = runtimeflow.SelectedMainReportPath(t, markdownFiles, nil, reportmodel.ReportOutputFormatMarkdown)
 	//nolint:gosec // Test reads the report path returned by the controlled output fixture.
 	var rawMarkdown, readErr = os.ReadFile(markdownMainPath)
 	if readErr != nil {
 		t.Fatalf("read generated Markdown report %q: %v", markdownMainPath, readErr)
 	}
 
-	var pdfRequest = mustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportOutputFormatPDF)
+	var pdfRequest = runtimeflow.MustIntegrationReportRequestForFormat(t, fixture.PrimaryReportYear, reportmodel.ReportOutputFormatPDF)
 	var pdfOutcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: pdfRequest})
 	if !pdfOutcome.Success {
 		t.Fatalf("expected PDF report generation success, got %#v", pdfOutcome)
 	}
-	var pdfFiles = mustPDFFiles(t, reportIO.DocumentsDir)
+	var pdfFiles = runtimeflow.PDFFiles(t, reportIO.DocumentsDir)
 	if len(pdfFiles) != 1 {
 		t.Fatalf("expected one combined PDF output, got %#v", pdfFiles)
 	}
@@ -169,7 +166,7 @@ func TestReportGenerationWritesSelectedMarkdownAndPDFBundles(t *testing.T) {
 	if inspectErr != nil {
 		t.Fatalf("inspect generated PDF: %v", inspectErr)
 	}
-	assertIntegrationLandscapeA4PDF(t, inspection)
+	runtimeflow.AssertLandscapeA4PDF(t, inspection)
 
 	var markdownText = string(rawMarkdown)
 	for _, sharedValue := range []string{"Ghostfolio Capital Gains And Losses Report", "Gains-And-Losses Summary", "Overall Yearly Net Total", "ADA", "Same currency"} {
@@ -185,59 +182,6 @@ func TestReportGenerationWritesSelectedMarkdownAndPDFBundles(t *testing.T) {
 		t.Fatalf("expected one opener request for each successful output, got %#v", openerRequests)
 	}
 	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
-}
-
-// markdownBundlePaths returns the main and Annex 1 paths from one complete
-// Markdown output bundle.
-// Authored by: OpenCode
-func markdownBundlePaths(t *testing.T, files []string) (string, string) {
-	t.Helper()
-	if len(files) != 2 {
-		t.Fatalf("expected exactly two Markdown output files, got %#v", files)
-	}
-	var mainPath string
-	var annexPath string
-	for _, file := range files {
-		if strings.Contains(filepath.Base(file), "-annex-1-") {
-			annexPath = file
-		} else {
-			mainPath = file
-		}
-	}
-	if mainPath == "" || annexPath == "" {
-		t.Fatalf("expected one main and one Annex 1 Markdown path, got %#v", files)
-	}
-	return mainPath, annexPath
-}
-
-// assertSavedMarkdownBundlePaths verifies the result screen reports both
-// generated Markdown paths.
-// Authored by: OpenCode
-func assertSavedMarkdownBundlePaths(t *testing.T, content string, mainPath string, annexPath string) {
-	t.Helper()
-	if !strings.Contains(content, "Saved Markdown Path") || !strings.Contains(content, "Saved Annex 1 Markdown Path") {
-		t.Fatalf("expected saved main and Annex 1 Markdown labels, got %q", content)
-	}
-	var compactContent = strings.Join(strings.Fields(content), "")
-	if !strings.Contains(compactContent, mainPath) || !strings.Contains(compactContent, annexPath) {
-		t.Fatalf("expected saved Markdown paths %q and %q, got %q", mainPath, annexPath, content)
-	}
-}
-
-// assertIntegrationLandscapeA4PDF verifies every generated integration PDF page
-// has the production landscape A4 dimensions.
-// Authored by: OpenCode
-func assertIntegrationLandscapeA4PDF(t *testing.T, inspection testutil.GeneratedPDF) {
-	t.Helper()
-
-	if len(inspection.PageBoxes) == 0 {
-		t.Fatal("expected generated PDF to contain page boxes")
-	}
-	for index, page := range inspection.PageBoxes {
-		if page.Width != 842 || page.Height != 595 {
-			t.Fatalf("page %d dimensions = %.0fx%.0f, want landscape A4 842x595", index+1, page.Width, page.Height)
-		}
-	}
 }
 
 // TestReportGenerationOpenWarningPreservesSavedReportAndAllowsAnotherRun
@@ -365,7 +309,7 @@ func TestReportGenerationRoundsSameTierUnitPriceDerivation(t *testing.T) {
 	var reportIO = testutil.NewReportIOFixture(t)
 	var openLogPath = installOpenCommandRecorder(t, 0)
 	var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
-	var cache = roundedUnitPriceProtectedActivityCache(t)
+	var cache = runtimeflow.RoundedUnitPriceProtectedActivityCache(t)
 
 	seedProtectedSnapshot(t, harness, "token-123", cache)
 
@@ -426,7 +370,7 @@ func TestReportGenerationAfterSyncAllowsRepeatingGrossValueOnlyUnitPriceDerivati
 		]`,
 	}})
 
-	var syncConfig = mustReportGenerationSyncConfig(t, server.URL())
+	var syncConfig = runtimeflow.MustReportGenerationSyncConfig(t, server.URL())
 	var syncService = runtime.NewSyncService(
 		ghostfolioclient.New(server.Client()),
 		time.Second,
@@ -497,7 +441,7 @@ func TestReportGenerationFlowSendsSelectedBaseCurrencyToRuntime(t *testing.T) {
 			var capture = &capturingReportService{}
 			var harness = newReportCaptureFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false, capture)
 
-			seedProtectedSnapshot(t, harness, "token-123", sameCurrencyRoundedUnitPriceProtectedActivityCache(t, reportBaseCurrency))
+			seedProtectedSnapshot(t, harness, "token-123", runtimeflow.SameCurrencyRoundedUnitPriceProtectedActivityCache(t, reportBaseCurrency))
 
 			var model = unlockSyncReportsContext(t, harness.Model, "token-123")
 			model = openReportSelectionFromContext(t, model)
@@ -541,7 +485,7 @@ func TestSameCurrencyReportPreservesPriorMonetaryResults(t *testing.T) {
 			var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
 			var token = "token-123"
 
-			seedProtectedSnapshot(t, harness, token, sameCurrencyRoundedUnitPriceProtectedActivityCache(t, reportBaseCurrency))
+			seedProtectedSnapshot(t, harness, token, runtimeflow.SameCurrencyRoundedUnitPriceProtectedActivityCache(t, reportBaseCurrency))
 			var contextResult = harness.App.SyncService.UnlockSelectedServerSnapshot(context.Background(), harness.Config, token)
 			if !contextResult.ProtectedData.HasReadableSnapshot {
 				t.Fatalf("expected readable snapshot after unlock, got %#v", contextResult)
@@ -598,7 +542,7 @@ func TestReportGenerationConvertsDeterministicMixedCurrencyFixture(t *testing.T)
 	var openLogPath = installOpenCommandRecorder(t, 0)
 	var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
 	var token = "mixed-currency-token"
-	var cache = mixedCurrencyConversionProtectedActivityCache(t, 54)
+	var cache = runtimeflow.MixedCurrencyConversionProtectedActivityCache(t, 54)
 
 	if cache.ActivityCount < 50 {
 		t.Fatalf("expected at least 50 priced activities, got %d", cache.ActivityCount)
@@ -610,13 +554,13 @@ func TestReportGenerationConvertsDeterministicMixedCurrencyFixture(t *testing.T)
 		t.Fatalf("expected readable snapshot after unlock, got %#v", contextResult)
 	}
 
-	var eurRequest = mustIntegrationReportRequest(t, 2024, reportmodel.ReportBaseCurrencyEUR)
+	var eurRequest = runtimeflow.MustIntegrationReportRequest(t, 2024, reportmodel.ReportBaseCurrencyEUR)
 	var eurOutcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: eurRequest})
 	if !eurOutcome.Success {
 		t.Fatalf("expected EUR report conversion success for ECB division fixture, got %#v", eurOutcome)
 	}
 
-	var usdRequest = mustIntegrationReportRequest(t, 2025, reportmodel.ReportBaseCurrencyUSD)
+	var usdRequest = runtimeflow.MustIntegrationReportRequest(t, 2025, reportmodel.ReportBaseCurrencyUSD)
 	var usdOutcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: usdRequest})
 	if !usdOutcome.Success {
 		t.Fatalf("expected USD report conversion success for H.10 division and multiplication fixture, got %#v", usdOutcome)
@@ -674,14 +618,14 @@ func TestReportGenerationUsesPreservedOffsetSourceCalendarDateForRateSelection(t
 	var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
 	var token = "offset-calendar-token"
 
-	seedProtectedSnapshot(t, harness, token, offsetSensitiveCurrencyProtectedActivityCache(t))
+	seedProtectedSnapshot(t, harness, token, runtimeflow.OffsetSensitiveCurrencyProtectedActivityCache(t))
 
 	var contextResult = harness.App.SyncService.UnlockSelectedServerSnapshot(context.Background(), harness.Config, token)
 	if !contextResult.ProtectedData.HasReadableSnapshot {
 		t.Fatalf("expected readable snapshot after unlock, got %#v", contextResult)
 	}
 
-	var request = mustIntegrationReportRequest(t, 2024, reportmodel.ReportBaseCurrencyUSD)
+	var request = runtimeflow.MustIntegrationReportRequest(t, 2024, reportmodel.ReportBaseCurrencyUSD)
 	var outcome = harness.App.ReportService.Generate(context.Background(), runtime.ReportGenerationRequest{Request: request})
 	if !outcome.Success {
 		t.Fatalf("expected offset-calendar report conversion success, got %#v", outcome)
@@ -713,251 +657,6 @@ func TestReportGenerationUsesPreservedOffsetSourceCalendarDateForRateSelection(t
 		}
 	}
 	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
-}
-
-// roundedUnitPriceProtectedActivityCache builds one deterministic cache where a
-// same-tier unit-price derivation requires repeating decimal rounding.
-// Authored by: OpenCode
-func roundedUnitPriceProtectedActivityCache(t *testing.T) syncmodel.ProtectedActivityCache {
-	t.Helper()
-
-	return syncmodel.ProtectedActivityCache{
-		SyncedAt:             mustReportFixtureTime(t),
-		RetrievedCount:       2,
-		ActivityCount:        2,
-		AvailableReportYears: []int{2024},
-		Activities: []syncmodel.ActivityRecord{
-			roundedReportActivity(t, roundedReportActivityInput{
-				SourceID:         "unit-buy-2024-001",
-				OccurredAt:       "2024-01-01T10:00:00Z",
-				ActivityType:     syncmodel.ActivityTypeBuy,
-				AssetIdentityKey: "asset-unit-001",
-				AssetSymbol:      "UNIT",
-				AssetName:        "Unit Asset",
-				Quantity:         "3",
-				OrderCurrency:    "USD",
-				OrderGrossValue:  "1",
-				OrderFeeAmount:   "0",
-			}),
-			roundedReportActivity(t, roundedReportActivityInput{
-				SourceID:         "unit-sell-2024-001",
-				OccurredAt:       "2024-03-01T10:00:00Z",
-				ActivityType:     syncmodel.ActivityTypeSell,
-				AssetIdentityKey: "asset-unit-001",
-				AssetSymbol:      "UNIT",
-				AssetName:        "Unit Asset",
-				Quantity:         "1",
-				OrderCurrency:    "USD",
-				OrderGrossValue:  "1",
-				OrderFeeAmount:   "0",
-				OrderUnitPrice:   "1",
-			}),
-		},
-	}
-}
-
-// sameCurrencyRoundedUnitPriceProtectedActivityCache returns the rounded
-// regression fixture denominated entirely in the selected report base currency.
-// Authored by: OpenCode
-func sameCurrencyRoundedUnitPriceProtectedActivityCache(t *testing.T, reportBaseCurrency reportmodel.ReportBaseCurrency) syncmodel.ProtectedActivityCache {
-	t.Helper()
-
-	var cache = roundedUnitPriceProtectedActivityCache(t)
-	for index := range cache.Activities {
-		cache.Activities[index].OrderCurrency = reportBaseCurrency.Label()
-	}
-
-	return cache
-}
-
-// mixedCurrencyConversionProtectedActivityCache builds a deterministic priced
-// activity fixture with USD, EUR, and GBP source currencies across two report
-// years.
-// Authored by: OpenCode
-func mixedCurrencyConversionProtectedActivityCache(t *testing.T, activityCount int) syncmodel.ProtectedActivityCache {
-	t.Helper()
-
-	var activities = make([]syncmodel.ActivityRecord, 0, activityCount)
-	var currencies = []string{"USD", "EUR", "GBP"}
-	for index := 0; index < activityCount; index++ {
-		var year = 2024
-		if index%2 == 1 {
-			year = 2025
-		}
-		var currency = currencies[index%len(currencies)]
-		var date = time.Date(year, time.January, 2+(index%24), 10, 0, 0, 0, time.FixedZone("source", (index%5-2)*60*60))
-		if index == 6 {
-			date = time.Date(2024, time.January, 6, 11, 0, 0, 0, time.UTC)
-		}
-
-		activities = append(activities, roundedReportActivity(t, roundedReportActivityInput{
-			SourceID:         mixedCurrencySourceID(currency, year, index),
-			OccurredAt:       date.Format(time.RFC3339),
-			ActivityType:     syncmodel.ActivityTypeBuy,
-			AssetIdentityKey: "asset-mixed-001",
-			AssetSymbol:      "MIX",
-			AssetName:        "Mixed Currency Asset",
-			Quantity:         "1",
-			OrderCurrency:    currency,
-			OrderUnitPrice:   "10",
-			OrderGrossValue:  "10",
-			OrderFeeAmount:   "1",
-		}))
-	}
-
-	return syncmodel.ProtectedActivityCache{
-		SyncedAt:             mustReportFixtureTime(t),
-		RetrievedCount:       len(activities),
-		ActivityCount:        len(activities),
-		AvailableReportYears: []int{2024, 2025},
-		Activities:           activities,
-	}
-}
-
-// offsetSensitiveCurrencyProtectedActivityCache builds two activities whose UTC
-// dates differ from their preserved source-offset calendar dates.
-// Authored by: OpenCode
-func offsetSensitiveCurrencyProtectedActivityCache(t *testing.T) syncmodel.ProtectedActivityCache {
-	t.Helper()
-
-	var activities = []syncmodel.ActivityRecord{
-		roundedReportActivity(t, roundedReportActivityInput{
-			SourceID:         "offset-before-utc-buy",
-			OccurredAt:       "2024-01-01T23:30:00-02:00",
-			ActivityType:     syncmodel.ActivityTypeBuy,
-			AssetIdentityKey: "asset-offset-001",
-			AssetSymbol:      "OFF",
-			AssetName:        "Offset Asset",
-			Quantity:         "1",
-			OrderCurrency:    "EUR",
-			OrderUnitPrice:   "10",
-			OrderGrossValue:  "10",
-			OrderFeeAmount:   "1",
-		}),
-		roundedReportActivity(t, roundedReportActivityInput{
-			SourceID:         "offset-after-utc-buy",
-			OccurredAt:       "2024-01-02T00:30:00+02:00",
-			ActivityType:     syncmodel.ActivityTypeBuy,
-			AssetIdentityKey: "asset-offset-001",
-			AssetSymbol:      "OFF",
-			AssetName:        "Offset Asset",
-			Quantity:         "1",
-			OrderCurrency:    "GBP",
-			OrderUnitPrice:   "10",
-			OrderGrossValue:  "10",
-			OrderFeeAmount:   "1",
-		}),
-	}
-
-	return syncmodel.ProtectedActivityCache{
-		SyncedAt:             mustReportFixtureTime(t),
-		RetrievedCount:       len(activities),
-		ActivityCount:        len(activities),
-		AvailableReportYears: []int{2024},
-		Activities:           activities,
-	}
-}
-
-// mixedCurrencySourceID returns a deterministic activity reference for the
-// mixed-currency conversion fixture.
-// Authored by: OpenCode
-func mixedCurrencySourceID(currency string, year int, index int) string {
-	return strings.ToLower("mixed-"+currency+"-buy-") + strconv.Itoa(year) + "-" + leftPadThree(index)
-}
-
-// leftPadThree renders one small deterministic fixture index.
-// Authored by: OpenCode
-func leftPadThree(value int) string {
-	var raw = strconv.Itoa(value)
-	for len(raw) < 3 {
-		raw = "0" + raw
-	}
-
-	return raw
-}
-
-// mustIntegrationReportRequest creates one validated report request for
-// integration conversion tests.
-// Authored by: OpenCode
-func mustIntegrationReportRequest(t *testing.T, year int, reportBaseCurrency reportmodel.ReportBaseCurrency) reportmodel.ReportRequest {
-	t.Helper()
-
-	var request, err = reportmodel.NewReportRequest(
-		year,
-		reportmodel.CostBasisMethodFIFO,
-		reportBaseCurrency,
-		reportmodel.ReportOutputFormatMarkdown,
-		time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
-	)
-	if err != nil {
-		t.Fatalf("new integration report request: %v", err)
-	}
-
-	return request
-}
-
-// mustIntegrationReportRequestForFormat creates one validated report request for
-// integration tests that exercise a specific output format.
-// Authored by: OpenCode
-func mustIntegrationReportRequestForFormat(t *testing.T, year int, outputFormat reportmodel.ReportOutputFormat) reportmodel.ReportRequest {
-	t.Helper()
-
-	var request, err = reportmodel.NewReportRequest(
-		year,
-		reportmodel.CostBasisMethodFIFO,
-		reportmodel.ReportBaseCurrencyUSD,
-		outputFormat,
-		time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
-	)
-	if err != nil {
-		t.Fatalf("new integration report request for %s: %v", outputFormat, err)
-	}
-
-	return request
-}
-
-// selectedMainReportPath returns the main output path for the selected report
-// format in integration assertions.
-// Authored by: OpenCode
-func selectedMainReportPath(t *testing.T, markdownFiles []string, pdfFiles []string, outputFormat reportmodel.ReportOutputFormat) string {
-	t.Helper()
-
-	switch outputFormat {
-	case reportmodel.ReportOutputFormatMarkdown:
-		if len(markdownFiles) == 0 {
-			t.Fatalf("expected at least one Markdown main report")
-		}
-		return markdownFiles[0]
-	case reportmodel.ReportOutputFormatPDF:
-		if len(pdfFiles) == 0 {
-			t.Fatalf("expected at least one PDF report")
-		}
-		return pdfFiles[0]
-	default:
-		t.Fatalf("unsupported report output format %q", outputFormat)
-		return ""
-	}
-}
-
-// mustPDFFiles returns all generated PDF files in one directory.
-// Authored by: OpenCode
-func mustPDFFiles(t *testing.T, dir string) []string {
-	t.Helper()
-
-	var entries, err = os.ReadDir(dir)
-	if err != nil {
-		t.Fatalf("read dir %q: %v", dir, err)
-	}
-
-	var files []string
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".pdf") {
-			continue
-		}
-		files = append(files, filepath.Join(dir, entry.Name()))
-	}
-
-	return files
 }
 
 // capturingReportService records runtime report-generation requests received
@@ -1001,100 +700,4 @@ func newReportCaptureFlowHarness(
 		ReportService: reportService,
 	})
 	return harness
-}
-
-// roundedReportActivityInput stores one compact rounded-division integration
-// fixture before conversion into a normalized activity record.
-// Authored by: OpenCode
-type roundedReportActivityInput struct {
-	SourceID         string
-	OccurredAt       string
-	ActivityType     syncmodel.ActivityType
-	AssetIdentityKey string
-	AssetSymbol      string
-	AssetName        string
-	Quantity         string
-	OrderCurrency    string
-	OrderUnitPrice   string
-	OrderGrossValue  string
-	OrderFeeAmount   string
-}
-
-// roundedReportActivity converts one compact rounded-division integration
-// fixture into the normalized activity record used by the runtime flow.
-// Authored by: OpenCode
-func roundedReportActivity(t *testing.T, input roundedReportActivityInput) syncmodel.ActivityRecord {
-	t.Helper()
-
-	return syncmodel.ActivityRecord{
-		SourceID:         input.SourceID,
-		OccurredAt:       input.OccurredAt,
-		ActivityType:     input.ActivityType,
-		AssetIdentityKey: input.AssetIdentityKey,
-		AssetSymbol:      input.AssetSymbol,
-		AssetName:        input.AssetName,
-		Quantity:         mustRoundedIntegrationDecimal(t, input.Quantity),
-		OrderCurrency:    input.OrderCurrency,
-		OrderUnitPrice:   roundedIntegrationDecimalPointer(t, input.OrderUnitPrice),
-		OrderGrossValue:  roundedIntegrationDecimalPointer(t, input.OrderGrossValue),
-		OrderFeeAmount:   roundedIntegrationDecimalPointer(t, input.OrderFeeAmount),
-	}
-}
-
-// mustReportGenerationSyncConfig returns one custom-origin config for sync then
-// runtime-backed report generation within the same base directory.
-// Authored by: OpenCode
-func mustReportGenerationSyncConfig(t *testing.T, origin string) configmodel.AppSetupConfig {
-	t.Helper()
-
-	config, err := configmodel.NewSetupConfig(configmodel.ServerModeCustomOrigin, origin, true, time.Now())
-	if err != nil {
-		t.Fatalf("new report-generation sync config: %v", err)
-	}
-
-	return config
-}
-
-// mustReportFixtureTime parses one RFC3339 fixture timestamp for integration
-// caches.
-// Authored by: OpenCode
-func mustReportFixtureTime(t *testing.T) time.Time {
-	t.Helper()
-
-	const raw = "2026-05-20T15:04:05Z"
-
-	var parsed, err = time.Parse(time.RFC3339, raw)
-	if err != nil {
-		t.Fatalf("parse report fixture time %q: %v", raw, err)
-	}
-
-	return parsed
-}
-
-// roundedIntegrationDecimalPointer parses one optional decimal fixture for
-// rounded-division integration tests.
-// Authored by: OpenCode
-func roundedIntegrationDecimalPointer(t *testing.T, raw string) *apd.Decimal {
-	t.Helper()
-
-	if raw == "" {
-		return nil
-	}
-
-	var value = mustRoundedIntegrationDecimal(t, raw)
-	return &value
-}
-
-// mustRoundedIntegrationDecimal parses one decimal fixture for rounded-
-// division integration tests.
-// Authored by: OpenCode
-func mustRoundedIntegrationDecimal(t *testing.T, raw string) apd.Decimal {
-	t.Helper()
-
-	var value, _, err = decimalsupport.ParseString(raw)
-	if err != nil {
-		t.Fatalf("parse rounded integration decimal %q: %v", raw, err)
-	}
-
-	return value
 }

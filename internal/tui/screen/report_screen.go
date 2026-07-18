@@ -270,7 +270,7 @@ func reportResultSummary(outcome runtime.ReportOutcome) string {
 	if outcome.Success {
 		var files = reportOutputFiles(outcome)
 		if len(files) > 0 {
-			return reportOutputBundleSummary(outcome, files)
+			return reportSuccessfulOutputSummary(outcome, files)
 		}
 		return outcome.Message
 	}
@@ -302,10 +302,13 @@ func reportOutputFiles(outcome runtime.ReportOutcome) []reportmodel.ReportOutput
 	return nil
 }
 
-// reportOutputBundleSummary formats every saved path in a successful output
-// bundle.
+// reportSuccessfulOutputSummary formats every saved path in a successful
+// output, whether the files came from the preferred bundle or the legacy
+// single OutputFile fallback. The caller preserves bundle precedence, role-
+// specific path labels, cleartext disclosure, deletion guidance, and the
+// outcome-message fallback when no file was saved.
 // Authored by: OpenCode
-func reportOutputBundleSummary(outcome runtime.ReportOutcome, files []reportmodel.ReportOutputFile) string {
+func reportSuccessfulOutputSummary(outcome runtime.ReportOutcome, files []reportmodel.ReportOutputFile) string {
 	var lines = []string{component.ReportCleartextExportDisclosureText}
 	for _, file := range files {
 		var label string
@@ -319,7 +322,8 @@ func reportOutputBundleSummary(outcome runtime.ReportOutcome, files []reportmode
 		}
 		lines = append(lines, fmt.Sprintf("%s: %s", label, file.Path))
 	}
-	if message := strings.TrimSpace(outcome.Message); message != "" {
+	var message = strings.TrimSpace(outcome.Message)
+	if message != "" {
 		lines = append(lines, message)
 	}
 	lines = append(lines, component.ReportCleartextExportDeletionGuidanceText)

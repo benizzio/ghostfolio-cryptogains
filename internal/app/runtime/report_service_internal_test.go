@@ -161,15 +161,18 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		if opener.CallCount() != 1 || len(opener.Paths()) != 1 || opener.Paths()[0] != savedPath {
 			t.Fatalf("expected one opener request for %q, got %#v", savedPath, opener.Paths())
 		}
-		if !strings.Contains(outcome.Message, "delete") || !strings.Contains(outcome.Message, savedPath) {
-			t.Fatalf("expected saved-path removal guidance, got %q", outcome.Message)
+		if !strings.Contains(outcome.Message, "Report saved successfully") || !strings.Contains(outcome.Message, "automatic opening was requested") {
+			t.Fatalf("expected operational save/open status, got %q", outcome.Message)
+		}
+		if strings.Contains(outcome.Message, savedPath) || strings.Contains(outcome.Message, "cleartext") || strings.Contains(outcome.Message, "delete") {
+			t.Fatalf("expected runtime success message to omit TUI disclosure guidance, got %q", outcome.Message)
 		}
 	})
 
 	t.Run("preserves success with warning when automatic open fails", func(t *testing.T) {
 		var request = reportRequestFixture(t, 2024)
 		var fixture = testutil.NewReportIOFixture(t)
-		var opener = testutil.NewOpenPathSpy(errors.New("open boom"))
+		var opener = testutil.NewOpenPathSpy(errors.New("Bearer synthetic-open-token: open boom"))
 		var savedPath = filepath.Join(fixture.DocumentsDir, "report.md")
 		var service = &reportService{
 			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
@@ -192,8 +195,11 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		if outcome.FailureReason != ReportFailureAutomaticOpenFailedAfterSave {
 			t.Fatalf("expected automatic-open warning, got %#v", outcome)
 		}
-		if !strings.Contains(outcome.Message, "open boom") {
-			t.Fatalf("expected preserved saved file with open error, got %#v", outcome.OutputFile)
+		if !strings.Contains(outcome.Message, "Report saved successfully") || !strings.Contains(outcome.Message, "automatic opening failed: Bearer [REDACTED] boom") || strings.Contains(outcome.Message, "synthetic-open-token") {
+			t.Fatalf("expected redacted opener detail, got %q", outcome.Message)
+		}
+		if strings.Contains(outcome.Message, savedPath) || strings.Contains(outcome.Message, "cleartext") || strings.Contains(outcome.Message, "delete") {
+			t.Fatalf("expected runtime opener warning to omit TUI disclosure guidance, got %q", outcome.Message)
 		}
 		if opener.CallCount() != 1 {
 			t.Fatalf("expected one opener request, got %d", opener.CallCount())
@@ -413,7 +419,7 @@ func TestReportServiceRenderFailureLeavesOutputBoundaryAndRetryAvailable(t *test
 	}
 
 	for _, failureCase := range failureCases {
-		failureCase := failureCase
+		var failureCase = failureCase
 		t.Run(failureCase.name, func(t *testing.T) {
 			var request = reportRequestFixture(t, 2024)
 			request.OutputFormat = reportmodel.ReportOutputFormatPDF

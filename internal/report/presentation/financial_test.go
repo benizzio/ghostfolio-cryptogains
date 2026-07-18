@@ -42,7 +42,7 @@ func TestFormatFinancialValueUsesScaleTwoHalfUp(t *testing.T) {
 		var testCase = testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			var value = mustFinancialDecimal(t, testCase.input)
-			got, err := formatFinancialValue(value)
+			var got, err = formatFinancialValue(value)
 			if err != nil {
 				t.Fatalf("format financial value: %v", err)
 			}
@@ -50,7 +50,7 @@ func TestFormatFinancialValueUsesScaleTwoHalfUp(t *testing.T) {
 				t.Fatalf("formatted value = %q, want %q", got, testCase.want)
 			}
 
-			matched, matchErr := regexp.MatchString(`^-?[0-9]+\.[0-9]{2}$`, got)
+			var matched, matchErr = regexp.MatchString(`^-?[0-9]+\.[0-9]{2}$`, got)
 			if matchErr != nil || !matched {
 				t.Fatalf("formatted value %q does not match the fixed-point grammar", got)
 			}
@@ -62,7 +62,7 @@ func TestFormatFinancialValueUsesScaleTwoHalfUp(t *testing.T) {
 // optional amount remains blank instead of becoming a visible zero.
 // Authored by: OpenCode
 func TestFormatOptionalFinancialValuePreservesNil(t *testing.T) {
-	got, err := formatOptionalFinancialValue(nil)
+	var got, err = formatOptionalFinancialValue(nil)
 	if err != nil {
 		t.Fatalf("format nil optional financial value: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestFormatOptionalFinancialValueUsesTheExportedBoundary(t *testing.T) {
 
 	var value = mustFinancialDecimal(t, "1.005")
 	var before = value
-	got, err := FormatOptionalFinancialValue(&value)
+	var got, err = FormatOptionalFinancialValue(&value)
 	if err != nil {
 		t.Fatalf("format exported optional value: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestFormatOptionalFinancialValueUsesTheExportedBoundary(t *testing.T) {
 func TestFormatFinancialValueNormalizesNegativeZero(t *testing.T) {
 	for _, input := range []string{"-0", "-0.000", "-0.0049"} {
 		var value = mustFinancialDecimal(t, input)
-		got, err := formatFinancialValue(value)
+		var got, err = formatFinancialValue(value)
 		if err != nil {
 			t.Fatalf("format %q: %v", input, err)
 		}
@@ -117,7 +117,7 @@ func TestFormatFinancialValueDoesNotMutateSource(t *testing.T) {
 	var source = mustFinancialDecimal(t, "1234567890123456789012345678901234567890.125")
 	var before = source
 
-	got, err := formatFinancialValue(source)
+	var got, err = formatFinancialValue(source)
 	if err != nil {
 		t.Fatalf("format source value: %v", err)
 	}
@@ -149,7 +149,7 @@ func TestFormatFinancialValueAcceptsAdjustedExponentBounds(t *testing.T) {
 		var testCase = testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			var value = mustFinancialDecimal(t, testCase.input)
-			got, err := formatFinancialValue(value)
+			var got, err = formatFinancialValue(value)
 			if err != nil {
 				t.Fatalf("format adjusted-exponent boundary: %v", err)
 			}
@@ -229,7 +229,7 @@ func TestCheckedFinancialPrecisionAcceptsOnlyUint32RepresentableResults(t *testi
 	for _, testCase := range testCases {
 		var testCase = testCase
 		t.Run(testCase.name, func(t *testing.T) {
-			got, err := checkedFinancialPrecision(testCase.sourceDigits, testCase.expansion)
+			var got, err = checkedFinancialPrecision(testCase.sourceDigits, testCase.expansion)
 			if testCase.wantError {
 				if err == nil {
 					t.Fatalf("precision result = %d without an error", got)
@@ -283,7 +283,7 @@ func TestCheckedFinancialAdjustedExponentRejectsInvalidInputs(t *testing.T) {
 	} {
 		var testCase = testCase
 		t.Run(testCase.name, func(t *testing.T) {
-			got, err := checkedFinancialAdjustedExponent(testCase.exponent, testCase.sourceDigits)
+			var got, err = checkedFinancialAdjustedExponent(testCase.exponent, testCase.sourceDigits)
 			if err == nil || !strings.Contains(err.Error(), testCase.wantErrorText) {
 				t.Fatalf("adjusted exponent = %d, error = %v, want %q", got, err, testCase.wantErrorText)
 			}
@@ -449,7 +449,7 @@ func decimalWithExponent(exponent int32, negative bool) apd.Decimal {
 func assertFinancialFormattingError(t *testing.T, name string, value apd.Decimal) {
 	t.Helper()
 
-	got, err := formatFinancialValue(value)
+	var got, err = formatFinancialValue(value)
 	if err == nil {
 		t.Fatalf("format %s returned %q without an error", name, got)
 	}

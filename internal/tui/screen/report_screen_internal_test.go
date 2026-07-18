@@ -311,9 +311,12 @@ func TestReportResultScreenViewDisclosesCleartextFilesAndDeletionGuidance(t *tes
 				component.ReportCleartextExportDeletionGuidanceText,
 			})
 			for _, file := range testCase.files {
-				if !strings.Contains(content, file.Path) {
+				if strings.Count(content, file.Path) != 1 {
 					t.Fatalf("expected saved path %q, got %q", file.Path, content)
 				}
+			}
+			if strings.Count(content, component.ReportCleartextExportDisclosureText) != 1 || strings.Count(content, component.ReportCleartextExportDeletionGuidanceText) != 1 {
+				t.Fatalf("expected cleartext disclosure and deletion guidance once, got %q", content)
 			}
 		})
 	}

@@ -12,6 +12,7 @@ import (
 	reportmarkdown "github.com/benizzio/ghostfolio-cryptogains/internal/report/markdown"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 	"github.com/cockroachdb/apd/v3"
 )
 
@@ -133,7 +134,7 @@ func TestRenderMarkdownCanonicalDecimalsCurrenciesAndSecretExclusion(t *testing.
 // Authored by: OpenCode
 func TestRenderMarkdownEmitsExactStandaloneWarning(t *testing.T) {
 	var report = populatedMarkdownReportFixture()
-	var warning = "The data in this report does not follow any legally required rules for any country's tax returns and is for reference only."
+	var warning = testutil.ReportPresentationLegalWarningText
 	var expectedLine = "**" + warning + "**"
 
 	var document, err = reportmarkdown.Render(report)

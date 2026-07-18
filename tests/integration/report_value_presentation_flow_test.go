@@ -17,11 +17,6 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeflow"
 )
 
-// reportValuePresentationLegalWarning is the US1 warning expected in each main
-// report and intentionally excluded from the separate Markdown Annex.
-// Authored by: OpenCode
-const reportValuePresentationLegalWarning = "The data in this report does not follow any legally required rules for any country's tax returns and is for reference only."
-
 // TestReportValuePresentationPreservesAUD001AcrossMarkdownAndPDF verifies that
 // both runtime-selected renderers consume the same mixed-currency cache without
 // changing the complete calculated report model or its output bundle shape.
@@ -29,7 +24,7 @@ const reportValuePresentationLegalWarning = "The data in this report does not fo
 func TestReportValuePresentationPreservesAUD001AcrossMarkdownAndPDF(t *testing.T) {
 	var reportIO = testutil.NewReportIOFixture(t)
 	var openLogPath = runtimeflow.InstallOpenCommandRecorder(t, 0)
-	var cache = mixedCurrencyConversionProtectedActivityCache(t, 6)
+	var cache = runtimeflow.MixedCurrencyConversionProtectedActivityCache(t, 6)
 	var harness = runtimeflow.NewRuntimeBackedFlowHarness(t, t.TempDir(), runtimeflow.MustCloudSetupConfig(t), false)
 	var token = "report-value-presentation-token"
 
@@ -45,7 +40,7 @@ func TestReportValuePresentationPreservesAUD001AcrossMarkdownAndPDF(t *testing.T
 		reportmodel.ReportOutputFormatPDF,
 	}
 	for _, outputFormat := range formats {
-		var request = mustIntegrationReportRequestForFormat(t, 2024, outputFormat)
+		var request = runtimeflow.MustIntegrationReportRequestForFormat(t, 2024, outputFormat)
 		var before, err = calculator.Calculate(context.Background(), request, cache)
 		if err != nil {
 			t.Fatalf("calculate AUD-001 baseline for %s: %v", outputFormat, err)
@@ -110,7 +105,7 @@ func assertReportValuePresentationBundle(t *testing.T, documentsDir string, outp
 		if len(files) != 2 {
 			t.Fatalf("expected two Markdown files, got %#v", files)
 		}
-		var reportPath, annexPath = markdownBundlePaths(t, files)
+		var reportPath, annexPath = runtimeflow.MarkdownBundlePaths(t, files)
 		assertReportOutputFilePaths(t, outcome, documentsDir, reportmodel.ReportDocumentRoleMain, reportmodel.ReportMediaTypeMarkdown)
 		assertReportOutputFilePaths(t, outcome, documentsDir, reportmodel.ReportDocumentRoleAnnex, reportmodel.ReportMediaTypeMarkdown)
 
@@ -123,7 +118,7 @@ func assertReportValuePresentationBundle(t *testing.T, documentsDir string, outp
 		if !strings.Contains(reportText, "| mixed-usd-buy-2024-000 | BUY | 1 | 10.00 | 10.00 | 1.00 |") {
 			t.Fatalf("expected US1 two-place Markdown values, got %q", reportText)
 		}
-		if strings.Count(reportText, reportValuePresentationLegalWarning) != 1 {
+		if strings.Count(reportText, testutil.ReportPresentationLegalWarningText) != 1 {
 			t.Fatalf("expected one legal-use warning in Markdown main report, got %q", reportText)
 		}
 		// #nosec G304 -- annexPath is created in the test-owned Documents fixture.
@@ -131,14 +126,14 @@ func assertReportValuePresentationBundle(t *testing.T, documentsDir string, outp
 		if annexErr != nil {
 			t.Fatalf("read generated Markdown annex %q: %v", annexPath, annexErr)
 		}
-		if strings.Contains(string(rawAnnex), reportValuePresentationLegalWarning) {
+		if strings.Contains(string(rawAnnex), testutil.ReportPresentationLegalWarningText) {
 			t.Fatalf("expected legal-use warning to be excluded from Markdown Annex 1")
 		}
 	case reportmodel.ReportOutputFormatPDF:
 		if len(outcome.OutputBundle.Files) != 1 {
 			t.Fatalf("expected one combined PDF bundle, got %#v", outcome.OutputBundle.Files)
 		}
-		var files = mustPDFFiles(t, documentsDir)
+		var files = runtimeflow.PDFFiles(t, documentsDir)
 		if len(files) != 1 {
 			t.Fatalf("expected one PDF file, got %#v", files)
 		}
@@ -152,7 +147,7 @@ func assertReportValuePresentationBundle(t *testing.T, documentsDir string, outp
 		if inspectErr != nil {
 			t.Fatalf("inspect generated PDF: %v", inspectErr)
 		}
-		if !inspection.ContainsSearchableText("10.00") || !inspection.ContainsSearchableText(reportValuePresentationLegalWarning) {
+		if !inspection.ContainsSearchableText("10.00") || !inspection.ContainsSearchableText(testutil.ReportPresentationLegalWarningText) {
 			t.Fatalf("expected US1 two-place value and legal-use warning in PDF, got %q", inspection.SearchableText)
 		}
 	default:

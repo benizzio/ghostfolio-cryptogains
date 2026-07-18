@@ -11,10 +11,8 @@ import (
 
 	reportmarkdown "github.com/benizzio/ghostfolio-cryptogains/internal/report/markdown"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
-	reportpdf "github.com/benizzio/ghostfolio-cryptogains/internal/report/pdf"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
-	"golang.org/x/image/font/gofont/gobold"
-	"golang.org/x/image/font/gofont/goregular"
+	testreportpdf "github.com/benizzio/ghostfolio-cryptogains/tests/testutil/reportpdf"
 )
 
 // TestReportConvertedAmountsPopulationContract verifies the concrete C and E
@@ -35,8 +33,8 @@ func TestReportConvertedAmountsPopulationContract(t *testing.T) {
 	}
 	var conversionRows = reportRenderingPopulationCount(manifest.Cases, testutil.ReportPresentationPopulationConversionRow)
 	var convertedEntries = reportRenderingPopulationCount(manifest.Cases, testutil.ReportPresentationPopulationConvertedEntry)
-	var conversionRowsDenominator = reportRenderingPopulationCounter(manifest.Counters, testutil.ReportPresentationPopulationConversionRow)
-	var convertedEntriesDenominator = reportRenderingPopulationCounter(manifest.Counters, testutil.ReportPresentationPopulationConvertedEntry)
+	var conversionRowsDenominator = reportRenderingPopulationCounter(t, manifest.Counters, testutil.ReportPresentationPopulationConversionRow)
+	var convertedEntriesDenominator = reportRenderingPopulationCounter(t, manifest.Counters, testutil.ReportPresentationPopulationConvertedEntry)
 	if cases != 8 || conversionRows != 16 || conversionRowsDenominator != 16 {
 		t.Fatalf("converted population C = cases %d, numerator/denominator %d/%d, want 8 and 16/16", cases, conversionRows, conversionRowsDenominator)
 	}
@@ -76,21 +74,9 @@ func TestReportConvertedAmountsConcreteMarkdownContract(t *testing.T) {
 func TestReportConvertedAmountsConcretePDFContract(t *testing.T) {
 	t.Parallel()
 
-	var renderer, err = reportpdf.NewRenderer(reportpdf.RenderOptions{
-		Fonts: reportpdf.FontData{Regular: goregular.TTF, Bold: gobold.TTF},
-	})
-	if err != nil {
-		t.Fatalf("create PDF renderer: %v", err)
-	}
-	var payload []byte
-	payload, err = renderer.Render(contractConvertedAmountsReportFixture())
+	var inspection, err = testreportpdf.RenderAndInspect(contractConvertedAmountsReportFixture())
 	if err != nil {
 		t.Fatalf("render converted-amount PDF: %v", err)
-	}
-	var inspection testutil.GeneratedPDF
-	inspection, err = testutil.InspectGeneratedPDF(payload)
-	if err != nil {
-		t.Fatalf("inspect converted-amount PDF: %v", err)
 	}
 	assertLandscapeA4PDF(t, inspection)
 	if !inspection.ContainsSearchableText("Currency Conversion Audit") {

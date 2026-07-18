@@ -128,16 +128,19 @@ Expected result:
   activities across two assets, 3,334 USD, 3,333 EUR, and 3,333 GBP rows
 - the request is 2025/HIFO/USD at `2026-05-21T10:00:00Z`, and the local rate
   service supplies exact `1.1` without network access
-- exactly 6,666 conversion rows contain all three converted entries in both
-  formats, and the PDF audit spans continuation pages without clipping or loss
+- the workload exercises exactly 6,666 non-USD conversions; deterministic
+  package, contract, and integration tests verify conversion-row content and
+  PDF continuation behavior separately
 - one Markdown generation and one PDF generation are timed independently from
   immediately before generation through save, bundle validation, and opener
-  return; fixture setup and output inspection remain outside each interval
+  return; fixture setup and non-empty output checks remain outside each interval
 - each selected-format generation completes in strictly under two minutes and
   records its format and elapsed duration separately
 - `test-performance / run` records the Ubuntu runner image/version, architecture,
   available CPU count, and Go version used for authoritative evidence
 - no performance coverage artifact is created
+- performance does not assert warning text, exact rates or currencies, entry
+  grammar or cardinality, headings, or generated PDF pagination/content
 
 ## Changed-Source Quality Gate
 

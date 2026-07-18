@@ -167,7 +167,7 @@ func TestReportGenerationWorkflowContract(t *testing.T) {
 		SelectedIndex: 0,
 		Outcome: runtime.ReportOutcome{
 			Success:      true,
-			Message:      "Saved the report to \"/tmp/Documents/ghostfolio-capital-gains-2024-fifo.pdf\" and requested automatic opening.",
+			Message:      "Report saved successfully and automatic opening was requested.",
 			Request:      request,
 			OutputFormat: reportmodel.ReportOutputFormatPDF,
 			OutputFile:   outputFile,
@@ -218,7 +218,7 @@ func TestReportGenerationWorkflowContract(t *testing.T) {
 		SelectedIndex: 0,
 		Outcome: runtime.ReportOutcome{
 			Success:      true,
-			Message:      "Saved both Markdown report files and requested automatic opening.",
+			Message:      "Report saved successfully and automatic opening was requested.",
 			Request:      request,
 			OutputFormat: reportmodel.ReportOutputFormatMarkdown,
 			OutputFile:   markdownBundle.Files[0],
@@ -248,7 +248,7 @@ func TestReportGenerationWorkflowContract(t *testing.T) {
 		Outcome: runtime.ReportOutcome{
 			Success:       true,
 			FailureReason: runtime.ReportFailureAutomaticOpenFailedAfterSave,
-			Message:       "Saved the synthetic PDF, but automatic opening failed. Open the file manually.",
+			Message:       "Report saved successfully, but automatic opening failed: synthetic opener warning. Open the file manually.",
 			Request:       request,
 			OutputFormat:  reportmodel.ReportOutputFormatPDF,
 			OutputFile:    warningFile,

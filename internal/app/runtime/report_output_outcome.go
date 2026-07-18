@@ -34,7 +34,7 @@ func requestAutomaticOpenBundle(
 	var primaryPath = outputBundle.Files[0].Path
 	if open == nil {
 		var openErr = "automatic opening is unavailable in this runtime"
-		var outcome = reportFailureOutcome(request, ReportFailureAutomaticOpenFailedAfterSave, reportOpenFailureMessage(primaryPath, openErr))
+		var outcome = reportFailureOutcome(request, ReportFailureAutomaticOpenFailedAfterSave, reportOpenFailureMessage(openErr))
 		outcome.Success = true
 		outcome.OutputFormat = request.OutputFormat
 		outcome.OutputBundle = reportOutputBundleForOpen(request.OutputFormat, outputBundle.Files, openErr)
@@ -48,11 +48,11 @@ func requestAutomaticOpenBundle(
 		return openedBundle, nil
 	}
 
-	var detail = strings.TrimSpace(redact.ErrorText(err))
+	var detail = strings.TrimSpace(redact.ErrorText(err, primaryPath))
 	var openedBundle = reportOutputBundleForOpen(request.OutputFormat, outputBundle.Files, detail)
 	return openedBundle, pointerToReportOutcome(ReportOutcome{
 		Success:       true,
-		Message:       reportOpenFailureMessage(primaryPath, detail),
+		Message:       reportOpenFailureMessage(detail),
 		FailureReason: ReportFailureAutomaticOpenFailedAfterSave,
 		Request:       request,
 		OutputFormat:  request.OutputFormat,
@@ -146,28 +146,21 @@ func reportWriteDiagnosticError(reason ReportFailureReason, err error) error {
 	return fmt.Errorf("could not save the report file: %w", err)
 }
 
-// reportOpenFailureMessage formats one non-fatal automatic-open warning.
+// reportOpenFailureMessage formats one non-fatal automatic-open warning without
+// duplicating saved-path or cleartext-export guidance owned by the TUI.
 // Authored by: OpenCode
-func reportOpenFailureMessage(path string, detail string) string {
+func reportOpenFailureMessage(detail string) string {
 	return fmt.Sprintf(
-		"Saved the report to %q, but automatic opening failed: %s. Open the file manually. To remove this cleartext report later, delete %q.",
-		path,
+		"Report saved successfully, but automatic opening failed: %s. Open the file manually.",
 		detail,
-		path,
 	)
 }
 
-// reportBundleSuccessMessage formats one successful bundle outcome.
+// reportBundleSuccessMessage formats one successful save and open request
+// outcome without duplicating result-screen disclosure or path guidance.
 // Authored by: OpenCode
-func reportBundleSuccessMessage(files []reportmodel.ReportOutputFile) string {
-	var paths = make([]string, 0, len(files))
-	for _, file := range files {
-		paths = append(paths, fmt.Sprintf("%q", file.Path))
-	}
-	return fmt.Sprintf(
-		"Saved the report output to %s and requested automatic opening. To remove these cleartext reports later, delete the listed files.",
-		strings.Join(paths, ", "),
-	)
+func reportBundleSuccessMessage(_ []reportmodel.ReportOutputFile) string {
+	return "Report saved successfully and automatic opening was requested."
 }
 
 // pointerToReportOutcome returns the address of one local report outcome value.

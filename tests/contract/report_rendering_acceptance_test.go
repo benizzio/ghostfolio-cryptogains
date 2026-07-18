@@ -736,8 +736,8 @@ func renderingAcceptanceCloneReport(report reportmodel.CapitalGainsReport) (repo
 // Authored by: OpenCode
 func assertRenderingAcceptanceManifest(t *testing.T, manifest testutil.ReportPresentationAcceptanceManifest) {
 	t.Helper()
-	if len(manifest.Cases) != 148 || manifest.Counters.A != 148 {
-		t.Fatalf("closed acceptance case population A = %d/%d, want 148/148", len(manifest.Cases), manifest.Counters.A)
+	if len(manifest.Cases) != 148 || manifest.Counters.CaseCount != 148 {
+		t.Fatalf("closed acceptance case population A = %d/%d, want 148/148", len(manifest.Cases), manifest.Counters.CaseCount)
 	}
 	var IDs = make(map[string]struct{}, len(manifest.Cases))
 	for _, acceptanceCase := range manifest.Cases {
@@ -772,8 +772,22 @@ func assertRenderingAcceptanceManifest(t *testing.T, manifest testutil.ReportPre
 			t.Fatalf("closed acceptance case %q is extra", ID)
 		}
 	}
-	var expectedCounters = testutil.ReportPresentationAcceptanceCounters{A: 148, W: 296, V: 664, M: 296, Q: 10, B: 4, Z: 2, N: 4, C: 16, P: 491, E: 24}
-	if manifest.Counters != expectedCounters {
+	var expectedCounters = testutil.ReportPresentationAcceptanceCounters{
+		CaseCount: 148,
+		Populations: map[testutil.ReportPresentationPopulation]int{
+			testutil.ReportPresentationPopulationWarning:            296,
+			testutil.ReportPresentationPopulationVisibleFinancial:   664,
+			testutil.ReportPresentationPopulationModelIntegrity:     296,
+			testutil.ReportPresentationPopulationQuantity:           10,
+			testutil.ReportPresentationPopulationBoolean:            4,
+			testutil.ReportPresentationPopulationClassifiedCurrency: 2,
+			testutil.ReportPresentationPopulationUnclassified:       4,
+			testutil.ReportPresentationPopulationConversionRow:      16,
+			testutil.ReportPresentationPopulationParity:             491,
+			testutil.ReportPresentationPopulationConvertedEntry:     24,
+		},
+	}
+	if manifest.Counters.CaseCount != expectedCounters.CaseCount || !reflect.DeepEqual(manifest.Counters.Populations, expectedCounters.Populations) {
 		t.Fatalf("closed acceptance counters = %#v, want %#v", manifest.Counters, expectedCounters)
 	}
 }

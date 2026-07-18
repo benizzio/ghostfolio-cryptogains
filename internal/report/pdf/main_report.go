@@ -111,10 +111,7 @@ func renderRateSourceSection(document pdfContentLayout, report reportmodel.Capit
 		return fmt.Errorf("add report base currency: %w", err)
 	}
 	if len(report.RateSources) == 0 {
-		if err := document.AddParagraph("Exchange Rate Use: No activity required exchange-rate conversion."); err != nil {
-			return fmt.Errorf("add empty rate source paragraph: %w", err)
-		}
-		return nil
+		return renderEmptyRateSourceParagraph(document)
 	}
 
 	var rendered = make(map[string]bool)
@@ -136,6 +133,15 @@ func renderRateSourceSection(document pdfContentLayout, report reportmodel.Capit
 		if err := document.AddKeyValue("Unavailable-Date Rule", sanitizeText(reportmodel.RateProviderUnavailableDateRule(source.ProviderID))); err != nil {
 			return fmt.Errorf("add rate source unavailable-date rule: %w", err)
 		}
+	}
+	return nil
+}
+
+// renderEmptyRateSourceParagraph renders the rate-source summary when no conversion was required.
+// Authored by: OpenCode
+func renderEmptyRateSourceParagraph(document pdfContentLayout) error {
+	if err := document.AddParagraph("Exchange Rate Use: No activity required exchange-rate conversion."); err != nil {
+		return fmt.Errorf("add empty rate source paragraph: %w", err)
 	}
 	return nil
 }

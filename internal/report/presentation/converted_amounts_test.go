@@ -19,34 +19,34 @@ func TestConvertedAmountsCoversCanonicalSubsequences(t *testing.T) {
 	var cases = []struct {
 		name          string
 		includedKinds []reportmodel.ConvertedAmountKind
-		want          []string
+		want          []ConvertedAmountEntry
 	}{
 		{name: "empty", want: nil},
-		{name: "unit price", includedKinds: []reportmodel.ConvertedAmountKind{reportmodel.ConvertedAmountKindUnitPrice}, want: []string{
-			"unit_price: 10.01 -> 20.01",
+		{name: "unit price", includedKinds: []reportmodel.ConvertedAmountKind{reportmodel.ConvertedAmountKindUnitPrice}, want: []ConvertedAmountEntry{
+			{Label: "unit_price", OriginalAmount: "10.01", ConvertedAmount: "20.01"},
 		}},
-		{name: "gross value", includedKinds: []reportmodel.ConvertedAmountKind{reportmodel.ConvertedAmountKindGrossValue}, want: []string{
-			"gross_value: 30.00 -> 40.00",
+		{name: "gross value", includedKinds: []reportmodel.ConvertedAmountKind{reportmodel.ConvertedAmountKindGrossValue}, want: []ConvertedAmountEntry{
+			{Label: "gross_value", OriginalAmount: "30.00", ConvertedAmount: "40.00"},
 		}},
-		{name: "fee amount", includedKinds: []reportmodel.ConvertedAmountKind{reportmodel.ConvertedAmountKindFeeAmount}, want: []string{
-			"fee_amount: 50.01 -> 60.01",
+		{name: "fee amount", includedKinds: []reportmodel.ConvertedAmountKind{reportmodel.ConvertedAmountKindFeeAmount}, want: []ConvertedAmountEntry{
+			{Label: "fee_amount", OriginalAmount: "50.01", ConvertedAmount: "60.01"},
 		}},
-		{name: "unit price and gross value", includedKinds: []reportmodel.ConvertedAmountKind{reportmodel.ConvertedAmountKindUnitPrice, reportmodel.ConvertedAmountKindGrossValue}, want: []string{
-			"unit_price: 10.01 -> 20.01",
-			"gross_value: 30.00 -> 40.00",
+		{name: "unit price and gross value", includedKinds: []reportmodel.ConvertedAmountKind{reportmodel.ConvertedAmountKindUnitPrice, reportmodel.ConvertedAmountKindGrossValue}, want: []ConvertedAmountEntry{
+			{Label: "unit_price", OriginalAmount: "10.01", ConvertedAmount: "20.01"},
+			{Label: "gross_value", OriginalAmount: "30.00", ConvertedAmount: "40.00"},
 		}},
-		{name: "unit price and fee amount", includedKinds: []reportmodel.ConvertedAmountKind{reportmodel.ConvertedAmountKindUnitPrice, reportmodel.ConvertedAmountKindFeeAmount}, want: []string{
-			"unit_price: 10.01 -> 20.01",
-			"fee_amount: 50.01 -> 60.01",
+		{name: "unit price and fee amount", includedKinds: []reportmodel.ConvertedAmountKind{reportmodel.ConvertedAmountKindUnitPrice, reportmodel.ConvertedAmountKindFeeAmount}, want: []ConvertedAmountEntry{
+			{Label: "unit_price", OriginalAmount: "10.01", ConvertedAmount: "20.01"},
+			{Label: "fee_amount", OriginalAmount: "50.01", ConvertedAmount: "60.01"},
 		}},
-		{name: "gross value and fee amount", includedKinds: []reportmodel.ConvertedAmountKind{reportmodel.ConvertedAmountKindGrossValue, reportmodel.ConvertedAmountKindFeeAmount}, want: []string{
-			"gross_value: 30.00 -> 40.00",
-			"fee_amount: 50.01 -> 60.01",
+		{name: "gross value and fee amount", includedKinds: []reportmodel.ConvertedAmountKind{reportmodel.ConvertedAmountKindGrossValue, reportmodel.ConvertedAmountKindFeeAmount}, want: []ConvertedAmountEntry{
+			{Label: "gross_value", OriginalAmount: "30.00", ConvertedAmount: "40.00"},
+			{Label: "fee_amount", OriginalAmount: "50.01", ConvertedAmount: "60.01"},
 		}},
-		{name: "unit price gross value and fee amount", includedKinds: []reportmodel.ConvertedAmountKind{reportmodel.ConvertedAmountKindUnitPrice, reportmodel.ConvertedAmountKindGrossValue, reportmodel.ConvertedAmountKindFeeAmount}, want: []string{
-			"unit_price: 10.01 -> 20.01",
-			"gross_value: 30.00 -> 40.00",
-			"fee_amount: 50.01 -> 60.01",
+		{name: "unit price gross value and fee amount", includedKinds: []reportmodel.ConvertedAmountKind{reportmodel.ConvertedAmountKindUnitPrice, reportmodel.ConvertedAmountKindGrossValue, reportmodel.ConvertedAmountKindFeeAmount}, want: []ConvertedAmountEntry{
+			{Label: "unit_price", OriginalAmount: "10.01", ConvertedAmount: "20.01"},
+			{Label: "gross_value", OriginalAmount: "30.00", ConvertedAmount: "40.00"},
+			{Label: "fee_amount", OriginalAmount: "50.01", ConvertedAmount: "60.01"},
 		}},
 	}
 
@@ -61,7 +61,7 @@ func TestConvertedAmountsCoversCanonicalSubsequences(t *testing.T) {
 				}
 			}
 
-			got, err := ConvertedAmounts(11, amounts)
+			var got, err = ConvertedAmounts(11, amounts)
 			if err != nil {
 				t.Fatalf("convert canonical subsequence: %v", err)
 			}
@@ -82,13 +82,13 @@ func TestConvertedAmountsOmitsOnlyExactZeroToZero(t *testing.T) {
 		convertedAmount(t, reportmodel.ConvertedAmountKindFeeAmount, "3", "0"),
 	}
 
-	got, err := ConvertedAmounts(12, amounts)
+	var got, err = ConvertedAmounts(12, amounts)
 	if err != nil {
 		t.Fatalf("convert zero-pair subsequence: %v", err)
 	}
-	var want = []string{
-		"gross_value: 0.00 -> 2.00",
-		"fee_amount: 3.00 -> 0.00",
+	var want = []ConvertedAmountEntry{
+		{Label: "gross_value", OriginalAmount: "0.00", ConvertedAmount: "2.00"},
+		{Label: "fee_amount", OriginalAmount: "3.00", ConvertedAmount: "0.00"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("converted entries = %#v, want %#v", got, want)
@@ -105,14 +105,14 @@ func TestConvertedAmountsIncludesNonZeroValuesDisplayedAsZero(t *testing.T) {
 		convertedAmount(t, reportmodel.ConvertedAmountKindFeeAmount, "0", "0.004"),
 	}
 
-	got, err := ConvertedAmounts(13, amounts)
+	var got, err = ConvertedAmounts(13, amounts)
 	if err != nil {
 		t.Fatalf("convert sub-cent amounts: %v", err)
 	}
-	var want = []string{
-		"unit_price: 0.00 -> 0.00",
-		"gross_value: 0.00 -> 0.00",
-		"fee_amount: 0.00 -> 0.00",
+	var want = []ConvertedAmountEntry{
+		{Label: "unit_price", OriginalAmount: "0.00", ConvertedAmount: "0.00"},
+		{Label: "gross_value", OriginalAmount: "0.00", ConvertedAmount: "0.00"},
+		{Label: "fee_amount", OriginalAmount: "0.00", ConvertedAmount: "0.00"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("converted entries = %#v, want %#v", got, want)
@@ -131,16 +131,16 @@ func TestConvertedAmountsPreservesReceivedSupportedKindOrder(t *testing.T) {
 		convertedAmount(t, reportmodel.ConvertedAmountKindUnitPrice, "9", "10"),
 	}
 
-	got, err := ConvertedAmounts(14, amounts)
+	var got, err = ConvertedAmounts(14, amounts)
 	if err != nil {
 		t.Fatalf("convert received supported-kind order: %v", err)
 	}
-	var want = []string{
-		"fee_amount: 1.00 -> 2.00",
-		"unit_price: 3.00 -> 4.00",
-		"fee_amount: 5.00 -> 6.00",
-		"gross_value: 7.00 -> 8.00",
-		"unit_price: 9.00 -> 10.00",
+	var want = []ConvertedAmountEntry{
+		{Label: "fee_amount", OriginalAmount: "1.00", ConvertedAmount: "2.00"},
+		{Label: "unit_price", OriginalAmount: "3.00", ConvertedAmount: "4.00"},
+		{Label: "fee_amount", OriginalAmount: "5.00", ConvertedAmount: "6.00"},
+		{Label: "gross_value", OriginalAmount: "7.00", ConvertedAmount: "8.00"},
+		{Label: "unit_price", OriginalAmount: "9.00", ConvertedAmount: "10.00"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("converted entries = %#v, want received order %#v", got, want)
@@ -168,7 +168,7 @@ func TestConvertedAmountsReturnsComponentErrors(t *testing.T) {
 			var amount = convertedAmount(t, reportmodel.ConvertedAmountKindUnitPrice, "1", "2")
 			testCase.configure(&amount)
 
-			got, err := ConvertedAmounts(15, []reportmodel.ConvertedActivityAmount{amount})
+			var got, err = ConvertedAmounts(15, []reportmodel.ConvertedActivityAmount{amount})
 			if err == nil {
 				t.Fatalf("converted entries = %#v without an error", got)
 			}
@@ -192,17 +192,17 @@ func TestConvertedAmountsDoesNotMutateSourceSequence(t *testing.T) {
 	}
 	var before = append([]reportmodel.ConvertedActivityAmount(nil), amounts...)
 
-	got, err := ConvertedAmounts(16, amounts)
+	var got, err = ConvertedAmounts(16, amounts)
 	if err != nil {
 		t.Fatalf("convert immutable source sequence: %v", err)
 	}
 	if !reflect.DeepEqual(amounts, before) {
 		t.Fatalf("source sequence changed: before=%#v after=%#v", before, amounts)
 	}
-	var want = []string{
-		"fee_amount: 5.01 -> 6.01",
-		"unit_price: 0.00 -> 0.00",
-		"gross_value: 7.01 -> 8.01",
+	var want = []ConvertedAmountEntry{
+		{Label: "fee_amount", OriginalAmount: "5.01", ConvertedAmount: "6.01"},
+		{Label: "unit_price", OriginalAmount: "0.00", ConvertedAmount: "0.00"},
+		{Label: "gross_value", OriginalAmount: "7.01", ConvertedAmount: "8.01"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("converted entries = %#v, want %#v", got, want)

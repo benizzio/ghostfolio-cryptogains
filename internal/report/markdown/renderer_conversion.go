@@ -75,35 +75,16 @@ func writeConversionAuditRow(builder *strings.Builder, entryIndex int, entry rep
 	return nil
 }
 
-// renderConvertedAmountEntries assembles sanitized logical entries with the
-// Markdown-only boundary used inside the conversion-audit table cell.
+// renderConvertedAmountEntries escapes each logical entry component before
+// assembling the Markdown-only syntax and boundary used in the table cell.
 // Authored by: OpenCode
-func renderConvertedAmountEntries(entries []string) string {
+func renderConvertedAmountEntries(entries []presentation.ConvertedAmountEntry) string {
 	var rendered = make([]string, 0, len(entries))
 	for _, entry := range entries {
-		var label, original, converted = splitConvertedAmountEntry(entry)
-		rendered = append(rendered, fmt.Sprintf("%s: %s -> %s", sanitizeConvertedAmountComponent(label), sanitizeConvertedAmountComponent(original), sanitizeConvertedAmountComponent(converted)))
+		rendered = append(rendered, fmt.Sprintf("%s: %s -> %s", sanitizeConvertedAmountComponent(entry.Label), sanitizeConvertedAmountComponent(entry.OriginalAmount), sanitizeConvertedAmountComponent(entry.ConvertedAmount)))
 	}
 
 	return strings.Join(rendered, ";<br>")
-}
-
-// splitConvertedAmountEntry separates the presentation entry at its generated
-// syntax while allowing dynamic labels to contain the same separator text.
-// Authored by: OpenCode
-func splitConvertedAmountEntry(entry string) (string, string, string) {
-	var arrowIndex = strings.LastIndex(entry, " -> ")
-	if arrowIndex < 0 {
-		return entry, "", ""
-	}
-
-	var prefix = entry[:arrowIndex]
-	var labelSeparatorIndex = strings.LastIndex(prefix, ": ")
-	if labelSeparatorIndex < 0 {
-		return entry, "", ""
-	}
-
-	return prefix[:labelSeparatorIndex], prefix[labelSeparatorIndex+2:], entry[arrowIndex+3:]
 }
 
 // rateAuthorityLabel returns report-facing authority labels for canonical rate

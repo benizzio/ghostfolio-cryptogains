@@ -386,7 +386,11 @@ func TestBuildConversionAuditRowFormatsAmountsAndCanonicalRate(t *testing.T) {
 	if rendered.RateValue != "0.8601" {
 		t.Fatalf("conversion rate = %q, want canonical %q", rendered.RateValue, "0.8601")
 	}
-	var wantAmounts = []string{"unit_price: 1.01 -> 2.01", "gross_value: 3.00 -> 4.00", "fee_amount: 5.01 -> 6.01"}
+	var wantAmounts = []ConvertedAmountEntry{
+		{Label: "unit_price", OriginalAmount: "1.01", ConvertedAmount: "2.01"},
+		{Label: "gross_value", OriginalAmount: "3.00", ConvertedAmount: "4.00"},
+		{Label: "fee_amount", OriginalAmount: "5.01", ConvertedAmount: "6.01"},
+	}
 	if !reflect.DeepEqual(rendered.ConvertedAmountEntries, wantAmounts) {
 		t.Fatalf("converted amount entries = %#v, want %#v", rendered.ConvertedAmountEntries, wantAmounts)
 	}
@@ -415,7 +419,10 @@ func TestBuildConversionAuditRowUsesExactZeroDecisions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build conversion audit row: %v", err)
 	}
-	var want = []string{"gross_value: 0.00 -> 0.00", "fee_amount: 0.00 -> 0.00"}
+	var want = []ConvertedAmountEntry{
+		{Label: "gross_value", OriginalAmount: "0.00", ConvertedAmount: "0.00"},
+		{Label: "fee_amount", OriginalAmount: "0.00", ConvertedAmount: "0.00"},
+	}
 	if !reflect.DeepEqual(rendered.ConvertedAmountEntries, want) {
 		t.Fatalf("converted amount entries = %#v, want %#v", rendered.ConvertedAmountEntries, want)
 	}

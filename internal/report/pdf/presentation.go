@@ -62,16 +62,17 @@ func conversionStatusColumn(row reportmodel.AssetActivityRow) (string, error) {
 	return sanitizeText(label), nil
 }
 
-// sanitizeConvertedCell sanitizes each logical converted entry before inserting
-// the PDF-only semicolon and line-break boundary.
+// sanitizeConvertedCell assembles and sanitizes each complete logical converted
+// entry before inserting the PDF-only semicolon and line-break boundary.
 // Authored by: OpenCode
-func sanitizeConvertedCell(entries []string) string {
+func sanitizeConvertedCell(entries []presentation.ConvertedAmountEntry) string {
 	var sanitized = make([]string, 0, len(entries))
 	// gopdf's vertically centered MultiCell draws explicit lines bottom-first;
 	// reverse the input so the visible top-to-bottom order matches the model.
 	for index := len(entries) - 1; index >= 0; index-- {
 		var entry = entries[index]
-		sanitized = append(sanitized, sanitizeText(entry))
+		var rendered = entry.Label + ": " + entry.OriginalAmount + " -> " + entry.ConvertedAmount
+		sanitized = append(sanitized, sanitizeText(rendered))
 	}
 	return strings.Join(sanitized, ";\n")
 }

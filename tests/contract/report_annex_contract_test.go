@@ -10,10 +10,8 @@ import (
 
 	reportmarkdown "github.com/benizzio/ghostfolio-cryptogains/internal/report/markdown"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
-	reportpdf "github.com/benizzio/ghostfolio-cryptogains/internal/report/pdf"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
-	"golang.org/x/image/font/gofont/gobold"
-	"golang.org/x/image/font/gofont/goregular"
+	testreportpdf "github.com/benizzio/ghostfolio-cryptogains/tests/testutil/reportpdf"
 )
 
 // TestReportAnnexRenderingContract verifies Annex 1 title, section order,
@@ -64,7 +62,7 @@ func TestReportAnnexUS2PopulationContract(t *testing.T) {
 	}
 	for population, want := range expected {
 		var numerator = reportRenderingPopulationCount(manifest.Cases, population)
-		var denominator = reportRenderingPopulationCounter(manifest.Counters, population)
+		var denominator = reportRenderingPopulationCounter(t, manifest.Counters, population)
 		if numerator == 0 || denominator == 0 {
 			t.Fatalf("Annex population %s must be non-empty: %d/%d", population, numerator, denominator)
 		}
@@ -83,21 +81,9 @@ func TestReportAnnexConcretePDFContract(t *testing.T) {
 
 	var report = contractMarkdownReportFixture(reportmodel.ReportBaseCurrencyEUR.Label())
 	report.AuditAnnex = contractDetailedAuditAnnex()
-	var renderer, err = reportpdf.NewRenderer(reportpdf.RenderOptions{
-		Fonts: reportpdf.FontData{Regular: goregular.TTF, Bold: gobold.TTF},
-	})
-	if err != nil {
-		t.Fatalf("create PDF renderer: %v", err)
-	}
-	var payload []byte
-	payload, err = renderer.Render(report)
+	var inspection, err = testreportpdf.RenderAndInspect(report)
 	if err != nil {
 		t.Fatalf("render PDF report: %v", err)
-	}
-	var inspection testutil.GeneratedPDF
-	inspection, err = testutil.InspectGeneratedPDF(payload)
-	if err != nil {
-		t.Fatalf("inspect generated PDF: %v", err)
 	}
 	assertLandscapeA4PDF(t, inspection)
 	if !inspection.ContainsSearchableText("Annex 1 - Audit") {

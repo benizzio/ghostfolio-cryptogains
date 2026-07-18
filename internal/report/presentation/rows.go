@@ -1,4 +1,9 @@
-// Package presentation builds format-neutral report table values.
+// Package presentation converts calculated report-domain values into
+// format-neutral report table values. It applies presentation-only financial
+// rounding, canonical quantity and rate formatting, boolean labels, and
+// applicability rules without mutating the source report model or applying
+// Markdown escaping or PDF layout sanitization. Renderers consume these values
+// and remain responsible for their own syntax and layout policy.
 // Authored by: OpenCode
 package presentation
 
@@ -13,7 +18,10 @@ import (
 )
 
 // ActivityRow contains format-neutral values for one in-year activity table
-// row. Renderers apply their own table escaping and layout rules to its fields.
+// row. Monetary fields are presentation strings at the report's two-place
+// display scale when present, quantities retain canonical decimal formatting,
+// and dynamic text remains free of renderer-specific syntax. Renderers apply
+// their own table escaping and layout rules to the fields.
 // Authored by: OpenCode
 type ActivityRow struct {
 	Date                string
@@ -32,6 +40,10 @@ type ActivityRow struct {
 }
 
 // LiquidationRow contains format-neutral values for one liquidation table row.
+// Disposed quantity retains canonical decimal formatting, while allocated
+// basis, net proceeds, and gain or loss use the report's two-place financial
+// display policy. The calculation currency is always represented by a visible
+// label, using the supplied report fallback when the row has none.
 // Authored by: OpenCode
 type LiquidationRow struct {
 	Date                string
@@ -44,6 +56,11 @@ type LiquidationRow struct {
 }
 
 // AnnexActivityRow contains format-neutral values for one Annex 1 activity row.
+// Optional monetary values are blank when absent and otherwise use the
+// two-place financial display policy. A classified zero-priced holding
+// reduction keeps its audit classification in the source model but exposes a
+// blank activity-currency cell because that currency is not applicable to the
+// visible row.
 // Authored by: OpenCode
 type AnnexActivityRow struct {
 	Date                 string
@@ -66,7 +83,10 @@ type AnnexActivityRow struct {
 }
 
 // ConversionAuditRow contains format-neutral values for one conversion-audit
-// table row.
+// table row. ConvertedAmountEntries contains explicit logical entries in the
+// received order, with exact zero-to-zero pairs already omitted by the
+// presentation boundary. RateValue retains canonical normalized-rate
+// formatting rather than the two-place financial display scale.
 // Authored by: OpenCode
 type ConversionAuditRow struct {
 	Date               string
@@ -75,16 +95,29 @@ type ConversionAuditRow struct {
 	RateDate           string
 	SourceCurrency     string
 	ReportBaseCurrency string
-	// ConvertedAmountEntries contains one delimiter-free logical entry per
-	// included converted amount, in the received order.
+	// ConvertedAmountEntries contains one explicit logical entry per included
+	// converted amount, in the received order.
 	// Authored by: OpenCode
-	ConvertedAmountEntries []string
+	ConvertedAmountEntries []ConvertedAmountEntry
 	QuoteDirection         string
 	RateValue              string
 }
 
-// BuildActivityRow canonicalizes report-domain activity fields for either
-// renderer without applying Markdown escaping or PDF layout sanitization.
+// BuildActivityRow canonicalizes one report-domain activity for either
+// renderer. It formats quantities and normalized labels, applies presentation-
+// only two-place financial rounding to monetary values, leaves absent optional
+// amounts blank, and does not mutate row or apply Markdown escaping or PDF
+// layout sanitization. An error identifies the source row and field that could
+// not be presented.
+//
+// Example usage:
+//
+//	activityRow, err := presentation.BuildActivityRow(activity)
+//	if err != nil {
+//		return err
+//	}
+//	markdownCell := escapeMarkdown(activityRow.GrossValue)
+//
 // Authored by: OpenCode
 func BuildActivityRow(row reportmodel.AssetActivityRow) (ActivityRow, error) {
 	quantity, err := decimalsupport.CanonicalString(row.Quantity)
@@ -137,15 +170,39 @@ func BuildActivityRow(row reportmodel.AssetActivityRow) (ActivityRow, error) {
 	}, nil
 }
 
-// ActivityConversionStatus derives the visible conversion status for a monetary
-// activity row without applying renderer-specific escaping.
+// ActivityConversionStatus derives the visible conversion status for a
+// monetary activity row without applying renderer-specific escaping. It
+// returns an empty label for rows without monetary context, otherwise honoring
+// an explicit status or deriving same-currency versus converted status from the
+// row currencies.
+//
+// Example usage:
+//
+//	status, err := presentation.ActivityConversionStatus(activity)
+//	if err != nil {
+//		return err
+//	}
+//	columnValue := sanitizeForRenderer(status)
+//
 // Authored by: OpenCode
 func ActivityConversionStatus(row reportmodel.AssetActivityRow) (string, error) {
 	return activityConversionStatus(row)
 }
 
-// BuildLiquidationRow canonicalizes report-domain liquidation fields for either
-// renderer without applying Markdown escaping or PDF layout sanitization.
+// BuildLiquidationRow canonicalizes one report-domain liquidation for either
+// renderer. It preserves canonical disposed-quantity formatting, applies
+// presentation-only two-place financial rounding to monetary fields, uses the
+// fallback currency only when the calculation has no currency, and leaves
+// renderer escaping to the caller. The input calculation is not mutated.
+//
+// Example usage:
+//
+//	liquidationRow, err := presentation.BuildLiquidationRow(calculation, "USD")
+//	if err != nil {
+//		return err
+//	}
+//	pdfCells := []string{liquidationRow.DisposedQuantity, liquidationRow.GainOrLoss}
+//
 // Authored by: OpenCode
 func BuildLiquidationRow(liquidation reportmodel.LiquidationCalculation, fallbackCurrency string) (LiquidationRow, error) {
 	disposedQuantity, err := decimalsupport.CanonicalString(liquidation.DisposedQuantity)
@@ -168,8 +225,21 @@ func BuildLiquidationRow(liquidation reportmodel.LiquidationCalculation, fallbac
 	return LiquidationRow{Date: liquidation.OccurredAt.UTC().Format("2006-01-02 15:04:05"), SourceID: sanitize(liquidation.SourceID), DisposedQuantity: disposedQuantity, AllocatedBasis: allocatedBasis, NetProceeds: netProceeds, GainOrLoss: gainOrLoss, CalculationCurrency: CalculationCurrencyLabelWithFallback(liquidation.CalculationCurrency, fallbackCurrency)}, nil
 }
 
-// BuildAnnexActivityRow canonicalizes detailed audit activity fields for either
-// renderer without applying Markdown escaping or PDF layout sanitization.
+// BuildAnnexActivityRow canonicalizes one detailed audit activity for either
+// renderer. It preserves canonical quantities, formats present monetary values
+// at two places, maps structured booleans to Yes or No, and suppresses only the
+// visible activity currency for a classified zero-priced holding reduction.
+// Source audit values remain unchanged and renderer-specific escaping is left
+// to the caller.
+//
+// Example usage:
+//
+//	annexRow, err := presentation.BuildAnnexActivityRow(entry)
+//	if err != nil {
+//		return err
+//	}
+//	row := []string{annexRow.ActivityType, annexRow.FullLiquidationEvent, annexRow.GainOrLoss}
+//
 // Authored by: OpenCode
 func BuildAnnexActivityRow(entry reportmodel.AuditActivityEntry) (AnnexActivityRow, error) {
 	quantity, err := decimalsupport.CanonicalString(entry.Quantity)
@@ -223,8 +293,23 @@ func BuildAnnexActivityRow(entry reportmodel.AuditActivityEntry) (AnnexActivityR
 	return AnnexActivityRow{Date: entry.OccurredAt.UTC().Format("2006-01-02 15:04:05"), SourceID: sanitize(entry.SourceID), ActivityType: sanitize(activityType), Quantity: quantity, UnitPrice: unitPrice, GrossValue: grossValue, Fee: fee, ActivityCurrency: annexActivityCurrency(entry), CalculationCurrency: sanitize(entry.CalculationCurrency), QuantityAfter: quantityAfter, BasisAfter: basisAfter, FullLiquidationEvent: booleanLabel(entry.FullLiquidationEvent), AllocatedBasis: allocatedBasis, NetProceeds: netProceeds, GainOrLoss: gainOrLoss, ConversionStatus: sanitize(conversionStatus), Note: sanitize(entry.Note)}, nil
 }
 
-// BuildConversionAuditRow builds visible conversion-audit values without
-// applying Markdown escaping or PDF layout sanitization.
+// BuildConversionAuditRow builds one visible conversion-audit row without
+// applying Markdown escaping or PDF layout sanitization. It retains the
+// received order of non-zero converted amount entries, applies two-place
+// financial formatting only to their amounts, and keeps the exchange-rate
+// value in canonical normalized form. Errors include the audit-entry index and
+// failing field context.
+//
+// Example usage:
+//
+//	auditRow, err := presentation.BuildConversionAuditRow(0, conversion)
+//	if err != nil {
+//		return err
+//	}
+//	for _, amount := range auditRow.ConvertedAmountEntries {
+//		renderConversion(amount.Label, amount.OriginalAmount, amount.ConvertedAmount)
+//	}
+//
 // Authored by: OpenCode
 func BuildConversionAuditRow(index int, entry reportmodel.ConversionAuditEntry) (ConversionAuditRow, error) {
 	rateValue, err := decimalsupport.CanonicalString(entry.RateValue)
@@ -252,8 +337,16 @@ func BuildConversionAuditRow(index int, entry reportmodel.ConversionAuditEntry) 
 	}, nil
 }
 
-// CalculationCurrencyLabel returns the report-visible fallback for an absent
-// calculation currency without applying renderer-specific escaping.
+// CalculationCurrencyLabel returns a sanitized report currency or the exact
+// NOT APPLICABLE fallback for an absent calculation currency. The result is a
+// single-line, renderer-neutral label and still requires renderer-specific
+// escaping before output.
+//
+// Example usage:
+//
+//	currency := presentation.CalculationCurrencyLabel(report.CalculationCurrency)
+//	markdownValue := escapeMarkdown(currency)
+//
 // Authored by: OpenCode
 func CalculationCurrencyLabel(raw string) string {
 	if normalized := sanitize(raw); normalized != "" {
@@ -262,8 +355,15 @@ func CalculationCurrencyLabel(raw string) string {
 	return "NOT APPLICABLE"
 }
 
-// CalculationCurrencyLabelWithFallback returns a report currency or its
-// report-wide fallback without applying renderer-specific escaping.
+// CalculationCurrencyLabelWithFallback returns a sanitized row currency when
+// available, otherwise applying the same report-visible fallback policy to the
+// supplied report-wide currency. The returned label is renderer-neutral.
+//
+// Example usage:
+//
+//	currency := presentation.CalculationCurrencyLabelWithFallback(row.Currency, "USD")
+//	pdfCell := sanitizePDFText(currency)
+//
 // Authored by: OpenCode
 func CalculationCurrencyLabelWithFallback(raw string, fallback string) string {
 	if normalized := sanitize(raw); normalized != "" {

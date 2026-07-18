@@ -26,7 +26,7 @@
 
 ### CODE-STAND-DRIFT-001: Integration Scenarios Bypass Shared Test Support
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: High
 **Diverges from**:
 
@@ -53,7 +53,7 @@ Move the integration-neutral mixed-currency fixture, report-request, output-disc
 
 ### CODE-STAND-DRIFT-002: Converted Amounts Use a Stringly Typed Renderer Boundary
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: Medium
 **Diverges from**:
 
@@ -76,7 +76,7 @@ Introduce an explicit `ConvertedAmountEntry` presentation type with separate lab
 
 ### CODE-STAND-DRIFT-003: Successful Report Copy Has Competing Runtime and TUI Owners
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: Medium
 **Diverges from**:
 
@@ -100,7 +100,7 @@ Reduce runtime success and opener-warning messages to operational save/open stat
 
 ### CODE-STAND-DRIFT-004: Report PDF Rendering Exceeds the Complexity Threshold
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: Medium
 **Diverges from**:
 
@@ -122,7 +122,7 @@ Extract only the empty-rate-source paragraph branch into a private helper and re
 
 ### CODE-STAND-DRIFT-005: Acceptance Fixture Combines Independent Responsibilities
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: Medium
 **Diverges from**:
 
@@ -146,7 +146,7 @@ Split `report_presentation_fixtures.go` within package `testutil` into cohesive 
 
 ### CODE-STAND-DRIFT-006: PDF Inspection Support Spans Multiple Parser Layers
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: Medium
 **Diverges from**:
 
@@ -170,7 +170,7 @@ Split `pdf_inspection.go` within package `testutil` into the public inspection/s
 
 ### CODE-STAND-DRIFT-007: Acceptance Keys Use Error-Prone Positional String APIs
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: Medium
 **Diverges from**:
 
@@ -193,7 +193,7 @@ Change `newPresentationCase` to accept a named `ReportPresentationAcceptanceCase
 
 ### CODE-STAND-DRIFT-008: Population Counters Duplicate Their Domain Mapping
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: Medium
 **Diverges from**:
 
@@ -217,7 +217,7 @@ Replace the letter-named counter fields with `CaseCount` plus a freshly allocate
 
 ### CODE-STAND-DRIFT-009: Performance Tests Duplicate Deterministic Document Contracts
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: Medium
 **Diverges from**:
 
@@ -241,7 +241,7 @@ Remove exact document text, delimiter, row-count, heading, rate-occurrence, and 
 
 ### CODE-STAND-DRIFT-010: Agent-Touched Declarations Have Incomplete Documentation and Attribution
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: Medium
 **Diverges from**:
 
@@ -273,7 +273,7 @@ After the structural and ownership remediations settle declaration locations, up
 
 ### CODE-STAND-DRIFT-011: PDF Renderer Tests Mix Unrelated Production Responsibilities
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: Low
 **Diverges from**:
 
@@ -298,7 +298,7 @@ Move the cited test functions, unchanged and still in package `pdf`, into respon
 
 ### CODE-STAND-DRIFT-012: Report Tests Duplicate Shared Setup and Fixed Presentation Text
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: Low
 **Diverges from**:
 
@@ -327,7 +327,7 @@ Add a dedicated `tests/testutil/reportpdf` helper package that constructs the st
 
 ### CODE-STAND-DRIFT-013: Names and Comments Lag the Current Behavior
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: Low
 **Diverges from**:
 
@@ -350,7 +350,7 @@ Rename `reportOutputBundleSummary` to `reportSuccessfulOutputSummary` and update
 
 ### CODE-STAND-DRIFT-014: Feature-Added Declarations Bypass the `var` Preference
 
-**Status**: Pending
+**Status**: Resolved
 **Severity**: Low
 **Diverges from**:
 
@@ -372,6 +372,28 @@ Rename `reportOutputBundleSummary` to `reportSuccessfulOutputSummary` and update
 **Remediation plan**:
 
 After the overlapping structural, typed-entry, and TUI changes, convert the report-cited standalone short declarations and `if` initializers to explicit `var` declarations while retaining one evaluation, scope-safe descriptive names, subtest capture, assertion order, and existing error handling. Do not rewrite range clauses or legitimate multi-assignment/reuse sites covered by the documented exception. Run `gofmt` and focused presentation, runtime, screen, and converted-amount integration tests.
+
+## Resolution Evidence
+
+All fourteen findings are resolved after T050-T063 and T064 passed. Focused
+tests, `make test`, `make coverage`, `make test-performance`,
+`make quality QUALITY_BASE_REF=origin/main`, `golangci-lint config verify`, the
+targeted `gocognit` check, and `git diff --check` passed on the final tree.
+
+- **CODE-STAND-DRIFT-001**: Shared runtime fixtures, output helpers, and PDF row/cell inspection moved to `tests/testutil/runtimeflow`; integration scenarios retain local semantic assertions. Verified by `go test ./tests/testutil/runtimeflow ./tests/integration -count=1`.
+- **CODE-STAND-DRIFT-002**: Converted amounts now cross the presentation boundary as explicit typed entries; Markdown and PDF assemble renderer-specific syntax directly. Verified by presentation, Markdown, PDF, contract, and integration tests.
+- **CODE-STAND-DRIFT-003**: Runtime outcomes now contain operational save/open status only; TUI owns cleartext, path, and deletion guidance. Verified by runtime, TUI, workflow-contract, and integration tests.
+- **CODE-STAND-DRIFT-004**: PDF rate-source empty-state rendering was extracted and `gocognit` enforcement was set to 14. Configuration and targeted complexity checks passed.
+- **CODE-STAND-DRIFT-005**: Acceptance fixture declarations were split into schema, catalog, occurrence, financial, and scalar files without API or ordering changes. Verified by testutil and contract tests.
+- **CODE-STAND-DRIFT-006**: PDF inspection support was split by parser responsibility without changing public APIs or parsing behavior. Verified by testutil, contract, and integration tests.
+- **CODE-STAND-DRIFT-007**: Acceptance-case and occurrence construction uses named typed values rather than positional string arguments. Closed-manifest and contract tests passed.
+- **CODE-STAND-DRIFT-008**: Population accounting uses typed population maps with explicit required-key and exact-map checks. Acceptance, Annex, and converted-population tests passed.
+- **CODE-STAND-DRIFT-009**: Performance tests retain workload, timing, output, opener, and environment evidence while deterministic document assertions remain with deterministic owners. `make test-performance` passed with separate Markdown and PDF timings under two minutes.
+- **CODE-STAND-DRIFT-010**: Agent-touched declarations received accurate purpose documentation, public usage examples where applicable, and OpenCode attribution. Focused tests and quality checks passed.
+- **CODE-STAND-DRIFT-011**: PDF renderer tests were split into responsibility-specific same-package files with unchanged test names and ordering. PDF test-list comparison and `go test ./internal/report/pdf -count=1` passed.
+- **CODE-STAND-DRIFT-012**: Shared font-backed report PDF setup and independent warning fixture usage were centralized under `tests/testutil/reportpdf` and `tests/testutil`. Contract, integration, unit, Markdown, and performance-package checks passed.
+- **CODE-STAND-DRIFT-013**: Successful-output summary naming and PDF test-double comments now describe current behavior, including the legacy single-file fallback. TUI and PDF tests passed.
+- **CODE-STAND-DRIFT-014**: Cited standalone declarations and initializers use explicit `var` declarations while preserving evaluation and scope. Focused presentation, runtime, TUI, and integration tests passed.
 
 ## Notes
 
