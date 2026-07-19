@@ -220,36 +220,50 @@ func renderReportOutputBundleWithOptions(
 ) ([]reportmodel.ReportDocument, error) {
 	switch outputFormat {
 	case reportmodel.ReportOutputFormatMarkdown:
-		var renderer = reportmarkdown.NewRenderer(reportmarkdown.RenderOptions{FinancialFormatting: pipelineOptions.MarkdownFinancialFormatting})
-		if pipelineOptions.MarkdownRenderObserver != nil {
-			pipelineOptions.MarkdownRenderObserver()
-		}
-		return renderer.RenderDocuments(report)
+		return renderMarkdownReportOutputBundle(report, pipelineOptions)
 	case reportmodel.ReportOutputFormatPDF:
-		var renderOptions = reportPDFRenderOptions()
-		renderOptions.FinancialFormatting = pipelineOptions.PDFFinancialFormatting
-		renderOptions.ByteFinalizer = pipelineOptions.PDFByteFinalizer
-		var renderer, err = reportpdf.NewRenderer(renderOptions)
-		if err != nil {
-			return nil, err
-		}
-		if pipelineOptions.PDFRenderObserver != nil {
-			pipelineOptions.PDFRenderObserver()
-		}
-		var payload []byte
-		payload, err = renderer.Render(report)
-		if err != nil {
-			return nil, err
-		}
-		var document reportmodel.ReportDocument
-		document, err = newReportDocumentForRuntime(reportmodel.ReportDocumentTypePDF, reportmodel.ReportDocumentRoleCombined, payload, report.Year, report.CostBasisMethod, report.GeneratedAt)
-		if err != nil {
-			return nil, err
-		}
-		return []reportmodel.ReportDocument{document}, nil
+		return renderPDFReportOutputBundle(report, pipelineOptions)
 	default:
 		return nil, fmt.Errorf("unsupported report output format %q", outputFormat)
 	}
+}
+
+// renderMarkdownReportOutputBundle renders the Markdown documents and invokes
+// the optional observer immediately before rendering.
+// Authored by: OpenCode
+func renderMarkdownReportOutputBundle(report reportmodel.CapitalGainsReport, pipelineOptions ReportPipelineOptions) ([]reportmodel.ReportDocument, error) {
+	var renderer = reportmarkdown.NewRenderer(reportmarkdown.RenderOptions{FinancialFormatting: pipelineOptions.MarkdownFinancialFormatting})
+	if pipelineOptions.MarkdownRenderObserver != nil {
+		pipelineOptions.MarkdownRenderObserver()
+	}
+	return renderer.RenderDocuments(report)
+}
+
+// renderPDFReportOutputBundle renders one combined PDF document and invokes
+// the optional observer after renderer construction succeeds.
+// Authored by: OpenCode
+func renderPDFReportOutputBundle(report reportmodel.CapitalGainsReport, pipelineOptions ReportPipelineOptions) ([]reportmodel.ReportDocument, error) {
+	var renderOptions = reportPDFRenderOptions()
+	renderOptions.FinancialFormatting = pipelineOptions.PDFFinancialFormatting
+	renderOptions.ByteFinalizer = pipelineOptions.PDFByteFinalizer
+	var renderer, err = reportpdf.NewRenderer(renderOptions)
+	if err != nil {
+		return nil, err
+	}
+	if pipelineOptions.PDFRenderObserver != nil {
+		pipelineOptions.PDFRenderObserver()
+	}
+	var payload []byte
+	payload, err = renderer.Render(report)
+	if err != nil {
+		return nil, err
+	}
+	var document reportmodel.ReportDocument
+	document, err = newReportDocumentForRuntime(reportmodel.ReportDocumentTypePDF, reportmodel.ReportDocumentRoleCombined, payload, report.Year, report.CostBasisMethod, report.GeneratedAt)
+	if err != nil {
+		return nil, err
+	}
+	return []reportmodel.ReportDocument{document}, nil
 }
 
 // readAvailableCache validates that the shared unlocked snapshot can satisfy
