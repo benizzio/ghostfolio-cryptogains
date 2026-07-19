@@ -27,10 +27,10 @@ func writeSummarySectionWithFinancialFormatting(builder *strings.Builder, report
 		entry         reportmodel.AssetSummaryEntry
 		netGainOrLoss string
 	}
-	for _, entry := range report.SummaryEntries {
+	for index, entry := range report.SummaryEntries {
 		var netGainOrLoss, err = options.Format(entry.NetGainOrLoss)
 		if err != nil {
-			return fmt.Errorf("render summary entry %q net gain or loss: %w", entry.AssetIdentityKey, err)
+			return fmt.Errorf("render summary entry %d net gain or loss: %w", index+1, err)
 		}
 		if entry.NetGainOrLoss.Sign() == 0 {
 			continue

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/signintech/gopdf"
 	"golang.org/x/image/font/gofont/gobold"
 	"golang.org/x/image/font/gofont/goregular"
 )
@@ -94,7 +95,85 @@ func TestRendererByteFinalizerOptionPreservesCauseIdentity(t *testing.T) {
 	if !errors.Is(err, finalizationErr) {
 		t.Fatalf("finalization error = %v, want injected cause %v", err, finalizationErr)
 	}
+	if errors.Unwrap(errors.Unwrap(err)) != nil {
+		t.Fatalf("finalization error exposed its original cause through Unwrap: %v", err)
+	}
 	if !strings.Contains(err.Error(), "Bearer [REDACTED]") || strings.Contains(err.Error(), finalizationErr.Error()) {
 		t.Fatalf("expected redacted finalization error, got %v", err)
+	}
+}
+
+// TestRendererLayoutFailureRedactsReportIdentifier verifies a dependency cause
+// matching an ordinary report identifier is absent from the public PDF error.
+// Authored by: OpenCode
+func TestRendererLayoutFailureRedactsReportIdentifier(t *testing.T) {
+	var previousDocument = newPDFDocumentForRenderer
+	defer func() { newPDFDocumentForRenderer = previousDocument }()
+
+	var report = pdfPresentationReportFixture(t)
+	var identifier = report.DetailSections[0].AssetIdentityKey
+	var sentinel = errors.New(identifier)
+	newPDFDocumentForRenderer = func(ByteFinalizer) pdfLayoutDocument {
+		return &failingLayoutDocument{tableErr: sentinel}
+	}
+	var renderer, err = NewRenderer(RenderOptions{Fonts: FontData{Regular: []byte("regular"), Bold: []byte("bold")}})
+	if err != nil {
+		t.Fatalf("new renderer: %v", err)
+	}
+
+	var payload []byte
+	payload, err = renderer.Render(report)
+	if err == nil || payload != nil {
+		t.Fatalf("expected nil payload and layout error, payload=%q error=%v", payload, err)
+	}
+	if !errors.Is(err, sentinel) || !strings.Contains(err.Error(), "[REDACTED]") || strings.Contains(err.Error(), identifier) {
+		t.Fatalf("expected identity-matchable identifier-safe layout error, got %v", err)
+	}
+}
+
+// TestRendererLayoutFailuresAreRedactedAndIdentityMatchable verifies public
+// measurement and drawing failures use the same safe operational boundary as
+// byte finalization.
+// Authored by: OpenCode
+func TestRendererLayoutFailuresAreRedactedAndIdentityMatchable(t *testing.T) {
+	for _, testCase := range []struct {
+		name     string
+		sentinel error
+		install  func(error) func()
+	}{
+		{name: "measurement", sentinel: errors.New("Bearer synthetic-measurement-secret"), install: func(sentinel error) func() {
+			var previous = measureTableCellForGopdfDocument
+			measureTableCellForGopdfDocument = func(*gopdfDocument, *gopdf.Rect, string) (bool, float64, error) {
+				return false, 0, sentinel
+			}
+			return func() { measureTableCellForGopdfDocument = previous }
+		}},
+		{name: "drawing", sentinel: errors.New("Bearer synthetic-drawing-secret"), install: func(sentinel error) func() {
+			var previous = drawTableForGopdfDocument
+			drawTableForGopdfDocument = func(gopdf.TableLayout) error { return sentinel }
+			return func() { drawTableForGopdfDocument = previous }
+		}},
+	} {
+		var testCase = testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			var restore = testCase.install(testCase.sentinel)
+			defer restore()
+			var renderer, err = NewRenderer(RenderOptions{Fonts: FontData{Regular: goregular.TTF, Bold: gobold.TTF}})
+			if err != nil {
+				t.Fatalf("new renderer: %v", err)
+			}
+
+			var payload []byte
+			payload, err = renderer.Render(pdfNonZeroLiquidationReportFixture(t))
+			if err == nil || payload != nil {
+				t.Fatalf("expected nil payload and layout error, payload=%q error=%v", payload, err)
+			}
+			if !errors.Is(err, testCase.sentinel) {
+				t.Fatalf("layout error = %v, want injected cause %v", err, testCase.sentinel)
+			}
+			if !strings.Contains(err.Error(), "render PDF main report") || !strings.Contains(err.Error(), "Bearer [REDACTED]") || strings.Contains(err.Error(), "synthetic-"+testCase.name+"-secret") {
+				t.Fatalf("expected staged redacted layout error, got %v", err)
+			}
+		})
 	}
 }

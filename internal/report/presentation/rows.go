@@ -107,8 +107,8 @@ type ConversionAuditRow struct {
 // renderer. It formats quantities and normalized labels, applies presentation-
 // only two-place financial rounding to monetary values, leaves absent optional
 // amounts blank, and does not mutate row or apply Markdown escaping or PDF
-// layout sanitization. An error identifies the source row and field that could
-// not be presented.
+// layout sanitization. An error identifies the semantic field that could not
+// be presented without disclosing report identifiers.
 //
 // Example usage:
 //
@@ -129,35 +129,35 @@ func BuildActivityRow(row reportmodel.AssetActivityRow) (ActivityRow, error) {
 func BuildActivityRowWithFinancialFormatting(row reportmodel.AssetActivityRow, options FinancialFormattingOptions) (ActivityRow, error) {
 	quantity, err := decimalsupport.CanonicalString(row.Quantity)
 	if err != nil {
-		return ActivityRow{}, fmt.Errorf("render activity row %q quantity: %w", row.SourceID, err)
+		return ActivityRow{}, fmt.Errorf("render activity quantity: %w", err)
 	}
 	unitPrice, err := options.FormatOptional(row.UnitPrice)
 	if err != nil {
-		return ActivityRow{}, fmt.Errorf("render activity row %q unit price: %w", row.SourceID, err)
+		return ActivityRow{}, fmt.Errorf("render activity unit price: %w", err)
 	}
 	grossValue, err := options.FormatOptional(row.GrossValue)
 	if err != nil {
-		return ActivityRow{}, fmt.Errorf("render activity row %q gross value: %w", row.SourceID, err)
+		return ActivityRow{}, fmt.Errorf("render activity gross value: %w", err)
 	}
 	fee, err := options.FormatOptional(row.FeeAmount)
 	if err != nil {
-		return ActivityRow{}, fmt.Errorf("render activity row %q fee: %w", row.SourceID, err)
+		return ActivityRow{}, fmt.Errorf("render activity fee: %w", err)
 	}
 	basisAfterRow, err := options.Format(row.BasisAfterRow)
 	if err != nil {
-		return ActivityRow{}, fmt.Errorf("render activity row %q basis after row: %w", row.SourceID, err)
+		return ActivityRow{}, fmt.Errorf("render activity basis after row: %w", err)
 	}
 	quantityAfterRow, err := decimalsupport.CanonicalString(row.QuantityAfterRow)
 	if err != nil {
-		return ActivityRow{}, fmt.Errorf("render activity row %q quantity after row: %w", row.SourceID, err)
+		return ActivityRow{}, fmt.Errorf("render activity quantity after row: %w", err)
 	}
 	activityType, err := reportmodel.RenderActivityTypeLabel(row)
 	if err != nil {
-		return ActivityRow{}, fmt.Errorf("render activity row %q type label: %w", row.SourceID, err)
+		return ActivityRow{}, fmt.Errorf("render activity type label: %w", err)
 	}
 	conversionStatus, err := activityConversionStatus(row)
 	if err != nil {
-		return ActivityRow{}, fmt.Errorf("render activity row %q conversion status label: %w", row.SourceID, err)
+		return ActivityRow{}, fmt.Errorf("render activity conversion status label: %w", err)
 	}
 
 	return ActivityRow{
@@ -221,19 +221,19 @@ func BuildLiquidationRow(liquidation reportmodel.LiquidationCalculation, fallbac
 func BuildLiquidationRowWithFinancialFormatting(liquidation reportmodel.LiquidationCalculation, fallbackCurrency string, options FinancialFormattingOptions) (LiquidationRow, error) {
 	disposedQuantity, err := decimalsupport.CanonicalString(liquidation.DisposedQuantity)
 	if err != nil {
-		return LiquidationRow{}, fmt.Errorf("render liquidation %q disposed quantity: %w", liquidation.SourceID, err)
+		return LiquidationRow{}, fmt.Errorf("render liquidation disposed quantity: %w", err)
 	}
 	allocatedBasis, err := options.Format(liquidation.AllocatedBasis)
 	if err != nil {
-		return LiquidationRow{}, fmt.Errorf("render liquidation %q allocated basis: %w", liquidation.SourceID, err)
+		return LiquidationRow{}, fmt.Errorf("render liquidation allocated basis: %w", err)
 	}
 	netProceeds, err := options.Format(liquidation.NetLiquidationProceeds)
 	if err != nil {
-		return LiquidationRow{}, fmt.Errorf("render liquidation %q net proceeds: %w", liquidation.SourceID, err)
+		return LiquidationRow{}, fmt.Errorf("render liquidation net proceeds: %w", err)
 	}
 	gainOrLoss, err := options.Format(liquidation.GainOrLoss)
 	if err != nil {
-		return LiquidationRow{}, fmt.Errorf("render liquidation %q gain or loss: %w", liquidation.SourceID, err)
+		return LiquidationRow{}, fmt.Errorf("render liquidation gain or loss: %w", err)
 	}
 
 	return LiquidationRow{Date: liquidation.OccurredAt.UTC().Format("2006-01-02 15:04:05"), SourceID: sanitize(liquidation.SourceID), DisposedQuantity: disposedQuantity, AllocatedBasis: allocatedBasis, NetProceeds: netProceeds, GainOrLoss: gainOrLoss, CalculationCurrency: CalculationCurrencyLabelWithFallback(liquidation.CalculationCurrency, fallbackCurrency)}, nil
@@ -265,49 +265,49 @@ func BuildAnnexActivityRow(entry reportmodel.AuditActivityEntry) (AnnexActivityR
 func BuildAnnexActivityRowWithFinancialFormatting(entry reportmodel.AuditActivityEntry, options FinancialFormattingOptions) (AnnexActivityRow, error) {
 	quantity, err := decimalsupport.CanonicalString(entry.Quantity)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q quantity: %w", entry.SourceID, err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity quantity: %w", err)
 	}
 	unitPrice, err := options.FormatOptional(entry.UnitPrice)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q unit price: %w", entry.SourceID, err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity unit price: %w", err)
 	}
 	grossValue, err := options.FormatOptional(entry.GrossValue)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q gross value: %w", entry.SourceID, err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity gross value: %w", err)
 	}
 	fee, err := options.FormatOptional(entry.FeeAmount)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q fee: %w", entry.SourceID, err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity fee: %w", err)
 	}
 	quantityAfter, err := decimalsupport.CanonicalString(entry.QuantityAfterActivity)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q quantity after activity: %w", entry.SourceID, err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity quantity after activity: %w", err)
 	}
 	basisAfter, err := options.Format(entry.BasisAfterActivity)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q basis after activity: %w", entry.SourceID, err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity basis after activity: %w", err)
 	}
 	allocatedBasis, err := options.FormatOptional(entry.AllocatedBasis)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q allocated basis: %w", entry.SourceID, err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity allocated basis: %w", err)
 	}
 	netProceeds, err := options.FormatOptional(entry.NetLiquidationProceeds)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q net liquidation proceeds: %w", entry.SourceID, err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity net liquidation proceeds: %w", err)
 	}
 	gainOrLoss, err := options.FormatOptional(entry.GainOrLoss)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q gain or loss: %w", entry.SourceID, err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity gain or loss: %w", err)
 	}
 	activityType, err := reportmodel.RenderAuditActivityTypeLabel(entry)
 	if err != nil {
-		return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q activity type label: %w", entry.SourceID, err)
+		return AnnexActivityRow{}, fmt.Errorf("render annex activity type label: %w", err)
 	}
 	conversionStatus := ""
 	if strings.TrimSpace(string(entry.ConversionStatus)) != "" {
 		conversionStatus, err = reportmodel.RenderConversionStatusLabel(entry.ConversionStatus)
 		if err != nil {
-			return AnnexActivityRow{}, fmt.Errorf("render annex activity row %q conversion status label: %w", entry.SourceID, err)
+			return AnnexActivityRow{}, fmt.Errorf("render annex activity conversion status label: %w", err)
 		}
 	}
 

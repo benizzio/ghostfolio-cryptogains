@@ -130,7 +130,7 @@ func TestRendererInternalErrorBranches(t *testing.T) {
 		}
 
 		var err = writeSummarySection(&builder, report, "USD")
-		if err == nil || !strings.Contains(err.Error(), `render summary entry "asset-1" net gain or loss`) {
+		if err == nil || !strings.Contains(err.Error(), `render summary entry 1 net gain or loss`) {
 			t.Fatalf("expected wrapped summary-entry error, got %v", err)
 		}
 	})
@@ -162,7 +162,7 @@ func TestRendererInternalErrorBranches(t *testing.T) {
 		}
 
 		var err = writeDetailSection(&builder, section, "USD")
-		if err == nil || !strings.Contains(err.Error(), `render opening position for "asset-1"`) {
+		if err == nil || !strings.Contains(err.Error(), `render opening position`) || strings.Contains(err.Error(), section.AssetIdentityKey) {
 			t.Fatalf("expected wrapped opening-position error, got %v", err)
 		}
 	})
@@ -183,7 +183,7 @@ func TestRendererInternalErrorBranches(t *testing.T) {
 		}
 
 		var err = writeDetailSection(&builder, section, "USD")
-		if err == nil || !strings.Contains(err.Error(), `render closing position for "asset-2"`) {
+		if err == nil || !strings.Contains(err.Error(), `render closing position`) || strings.Contains(err.Error(), section.AssetIdentityKey) {
 			t.Fatalf("expected wrapped closing-position error, got %v", err)
 		}
 	})
@@ -205,7 +205,7 @@ func TestRendererInternalErrorBranches(t *testing.T) {
 				QuantityAfterRow:    *apd.New(1, 0),
 			}},
 		})
-		if err == nil || !strings.Contains(err.Error(), `render activity row "row-1" gross value`) {
+		if err == nil || !strings.Contains(err.Error(), `render activity row 1: render activity gross value`) || strings.Contains(err.Error(), "row-1") {
 			t.Fatalf("expected wrapped activity-row error, got %v", err)
 		}
 	})
@@ -227,7 +227,7 @@ func TestRendererInternalErrorBranches(t *testing.T) {
 				QuantityAfterRow:    *apd.New(1, 0),
 			}},
 		})
-		if err == nil || !strings.Contains(err.Error(), `render activity row "row-unit-price" unit price`) {
+		if err == nil || !strings.Contains(err.Error(), `render activity row 1: render activity unit price`) || strings.Contains(err.Error(), "row-unit-price") {
 			t.Fatalf("expected wrapped activity-row unit-price error, got %v", err)
 		}
 	})
@@ -248,7 +248,7 @@ func TestRendererInternalErrorBranches(t *testing.T) {
 				ActivityCurrency:       "USD",
 			}},
 		}, "USD")
-		if err == nil || !strings.Contains(err.Error(), `render liquidation "sell-1" allocated basis`) {
+		if err == nil || !strings.Contains(err.Error(), `render liquidation row 1: render liquidation allocated basis`) || strings.Contains(err.Error(), "sell-1") {
 			t.Fatalf("expected wrapped liquidation error, got %v", err)
 		}
 	})
@@ -278,7 +278,7 @@ func TestRendererInternalErrorBranches(t *testing.T) {
 		}
 
 		var err = writeDetailSection(&builder, section, "USD")
-		if err == nil || !strings.Contains(err.Error(), `render liquidation calculations for "asset-3"`) {
+		if err == nil || !strings.Contains(err.Error(), `render liquidation calculations`) || strings.Contains(err.Error(), section.AssetIdentityKey) {
 			t.Fatalf("expected wrapped liquidation-block error, got %v", err)
 		}
 	})
@@ -382,6 +382,54 @@ func TestRenderWrapsInjectedHelperFailures(t *testing.T) {
 		}
 	})
 
+}
+
+// TestRendererConnectsAndRedactsRateAndReferenceFailures verifies the scoped
+// renderer checks both helper errors and excludes report identifiers while
+// preserving cause identity.
+// Authored by: OpenCode
+func TestRendererConnectsAndRedactsRateAndReferenceFailures(t *testing.T) {
+	var report = markdownAnnexReportFixture(t)
+	var identifier = report.AuditAnnex.PerAssetAuditSections[0].AssetIdentityKey
+	var renderer = NewRenderer(RenderOptions{})
+
+	for _, testCase := range []struct {
+		name    string
+		stage   string
+		install func(error) func()
+	}{
+		{name: "rate source", stage: "render Markdown rate source summary", install: func(sentinel error) func() {
+			var previous = renderWriteRateSourceSummary
+			renderWriteRateSourceSummary = func(*strings.Builder, reportmodel.CapitalGainsReport) error { return sentinel }
+			return func() { renderWriteRateSourceSummary = previous }
+		}},
+		{name: "reference", stage: "render Markdown reference section", install: func(sentinel error) func() {
+			var previous = renderWriteReferenceSection
+			renderWriteReferenceSection = func(*strings.Builder, reportmodel.CapitalGainsReport) error { return sentinel }
+			return func() { renderWriteReferenceSection = previous }
+		}},
+	} {
+		var testCase = testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			var sentinel = errors.New(identifier)
+			var restore = testCase.install(sentinel)
+			defer restore()
+
+			var document, err = renderer.Render(report)
+			if err == nil || len(document.Content) != 0 {
+				t.Fatalf("expected empty document and helper error, document=%q error=%v", document.Content, err)
+			}
+			if !errors.Is(err, sentinel) {
+				t.Fatalf("render error = %v, want injected cause %v", err, sentinel)
+			}
+			if errors.Unwrap(errors.Unwrap(err)) != nil {
+				t.Fatalf("render error exposed its original cause through Unwrap: %v", err)
+			}
+			if !strings.Contains(err.Error(), testCase.stage) || strings.Contains(err.Error(), identifier) || !strings.Contains(err.Error(), "[REDACTED]") {
+				t.Fatalf("expected staged identifier-safe error, got %v", err)
+			}
+		})
+	}
 }
 
 // TestRenderRendersReferenceEmptyState verifies the valid no-reference branch
@@ -612,7 +660,7 @@ func TestRenderCoversDetailAndLiquidationBranches(t *testing.T) {
 				}},
 			}},
 		}, "USD")
-		if err == nil || !strings.Contains(err.Error(), `render in-year activity for "asset-btc"`) {
+		if err == nil || !strings.Contains(err.Error(), `render asset detail section 1: render in-year activity`) || strings.Contains(err.Error(), "asset-btc") {
 			t.Fatalf("expected wrapped detail-section render failure, got %v", err)
 		}
 	})
@@ -633,7 +681,7 @@ func TestRenderCoversDetailAndLiquidationBranches(t *testing.T) {
 				ActivityCurrency:       "USD",
 			}},
 		}, "USD")
-		if err == nil || !strings.Contains(err.Error(), `render liquidation "sell-2" gain or loss`) {
+		if err == nil || !strings.Contains(err.Error(), `render liquidation row 1: render liquidation gain or loss`) || strings.Contains(err.Error(), "sell-2") {
 			t.Fatalf("expected wrapped liquidation gain-or-loss error, got %v", err)
 		}
 	})
@@ -919,7 +967,7 @@ func TestRendererAdditionalHelperFailures(t *testing.T) {
 		BasisAfterRow:       *apd.New(1, 0),
 		CalculationCurrency: "USD",
 		QuantityAfterRow:    *apd.New(1, 0),
-	}}}); err == nil || !strings.Contains(err.Error(), `render activity row "row-quantity" quantity`) {
+	}}}); err == nil || !strings.Contains(err.Error(), `render activity row 1: render activity quantity`) || strings.Contains(err.Error(), "row-quantity") {
 		t.Fatalf("expected invalid activity quantity to fail, got %v", err)
 	}
 
@@ -933,7 +981,7 @@ func TestRendererAdditionalHelperFailures(t *testing.T) {
 		BasisAfterRow:       *apd.New(1, 0),
 		CalculationCurrency: "USD",
 		QuantityAfterRow:    *apd.New(1, 0),
-	}}}); err == nil || !strings.Contains(err.Error(), `render activity row "row-fee" fee`) {
+	}}}); err == nil || !strings.Contains(err.Error(), `render activity row 1: render activity fee`) || strings.Contains(err.Error(), "row-fee") {
 		t.Fatalf("expected invalid activity fee to fail, got %v", err)
 	}
 
@@ -946,7 +994,7 @@ func TestRendererAdditionalHelperFailures(t *testing.T) {
 		BasisAfterRow:       reportInvalidDecimalForRenderer(),
 		CalculationCurrency: "USD",
 		QuantityAfterRow:    *apd.New(1, 0),
-	}}}); err == nil || !strings.Contains(err.Error(), `render activity row "row-basis" basis after row`) {
+	}}}); err == nil || !strings.Contains(err.Error(), `render activity row 1: render activity basis after row`) || strings.Contains(err.Error(), "row-basis") {
 		t.Fatalf("expected invalid activity basis-after-row to fail, got %v", err)
 	}
 
@@ -959,7 +1007,7 @@ func TestRendererAdditionalHelperFailures(t *testing.T) {
 		BasisAfterRow:       *apd.New(1, 0),
 		CalculationCurrency: "USD",
 		QuantityAfterRow:    reportInvalidDecimalForRenderer(),
-	}}}); err == nil || !strings.Contains(err.Error(), `render activity row "row-after" quantity after row`) {
+	}}}); err == nil || !strings.Contains(err.Error(), `render activity row 1: render activity quantity after row`) || strings.Contains(err.Error(), "row-after") {
 		t.Fatalf("expected invalid activity quantity-after-row to fail, got %v", err)
 	}
 
@@ -972,7 +1020,7 @@ func TestRendererAdditionalHelperFailures(t *testing.T) {
 		NetLiquidationProceeds: *apd.New(2, 0),
 		GainOrLoss:             *apd.New(1, 0),
 		ActivityCurrency:       "USD",
-	}}}, "USD"); err == nil || !strings.Contains(err.Error(), `render liquidation "sell-qty" disposed quantity`) {
+	}}}, "USD"); err == nil || !strings.Contains(err.Error(), `render liquidation row 1: render liquidation disposed quantity`) || strings.Contains(err.Error(), "sell-qty") {
 		t.Fatalf("expected invalid liquidation quantity to fail, got %v", err)
 	}
 
@@ -985,7 +1033,7 @@ func TestRendererAdditionalHelperFailures(t *testing.T) {
 		NetLiquidationProceeds: reportInvalidDecimalForRenderer(),
 		GainOrLoss:             *apd.New(1, 0),
 		ActivityCurrency:       "USD",
-	}}}, "USD"); err == nil || !strings.Contains(err.Error(), `render liquidation "sell-proceeds" net proceeds`) {
+	}}}, "USD"); err == nil || !strings.Contains(err.Error(), `render liquidation row 1: render liquidation net proceeds`) || strings.Contains(err.Error(), "sell-proceeds") {
 		t.Fatalf("expected invalid liquidation proceeds to fail, got %v", err)
 	}
 }
@@ -1144,7 +1192,7 @@ func TestRendererAnnexHelperFailures(t *testing.T) {
 		AssetIdentityKey: "asset-btc",
 		DisplayLabel:     "BTC",
 		Entries:          []reportmodel.AuditActivityEntry{{SourceID: "bad-annex-row", Quantity: invalid}},
-	}}}); err == nil || !strings.Contains(err.Error(), `render annex audit entry "bad-annex-row"`) {
+	}}}); err == nil || !strings.Contains(err.Error(), `render annex section 1 activity row 1`) || strings.Contains(err.Error(), "bad-annex-row") {
 		t.Fatalf("expected per-asset annex wrapper error, got %v", err)
 	}
 

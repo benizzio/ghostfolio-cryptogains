@@ -70,15 +70,15 @@ func TestBuildRowsReturnContextualErrors(t *testing.T) {
 		{name: "activity", build: func() error {
 			_, err := BuildActivityRow(reportmodel.AssetActivityRow{SourceID: "activity", Quantity: invalid})
 			return err
-		}, want: "activity row \"activity\" quantity"},
+		}, want: "activity quantity"},
 		{name: "liquidation", build: func() error {
 			_, err := BuildLiquidationRow(reportmodel.LiquidationCalculation{SourceID: "liquidation", DisposedQuantity: invalid}, "USD")
 			return err
-		}, want: "liquidation \"liquidation\" disposed quantity"},
+		}, want: "liquidation disposed quantity"},
 		{name: "annex", build: func() error {
 			_, err := BuildAnnexActivityRow(reportmodel.AuditActivityEntry{SourceID: "annex", Quantity: invalid})
 			return err
-		}, want: "annex activity row \"annex\" quantity"},
+		}, want: "annex activity quantity"},
 		{name: "conversion", build: func() error {
 			_, err := BuildConversionAuditRow(3, reportmodel.ConversionAuditEntry{RateValue: invalid})
 			return err
@@ -122,7 +122,7 @@ func TestBuildAnnexActivityRowReturnsContextualErrors(t *testing.T) {
 		{name: "gain or loss", configure: func(entry *reportmodel.AuditActivityEntry) { entry.GainOrLoss = &invalid }, operation: "gain or loss"},
 		{name: "activity type label", configure: func(entry *reportmodel.AuditActivityEntry) {
 			entry.ActivityType = reportmodel.ActivityType("unsupported")
-		}, operation: "activity type label"},
+		}, operation: "type label"},
 		{name: "conversion status label", configure: func(entry *reportmodel.AuditActivityEntry) {
 			entry.ConversionStatus = reportmodel.ConversionStatus("unsupported")
 		}, operation: "conversion status label"},
@@ -133,9 +133,12 @@ func TestBuildAnnexActivityRowReturnsContextualErrors(t *testing.T) {
 			testCase.configure(&configured)
 
 			_, err := BuildAnnexActivityRow(configured)
-			var want = "render annex activity row \"annex-activity\" " + testCase.operation
+			var want = "render annex activity " + testCase.operation
 			if err == nil || !strings.Contains(err.Error(), want) {
 				t.Fatalf("error = %v, want context %q", err, want)
+			}
+			if strings.Contains(err.Error(), entry.SourceID) {
+				t.Fatalf("error disclosed source identifier %q: %v", entry.SourceID, err)
 			}
 		})
 	}
@@ -566,12 +569,12 @@ func TestBuildRowsReturnContextualErrorsForEveryFinancialField(t *testing.T) {
 		configure func(*reportmodel.AssetActivityRow)
 		want      string
 	}{
-		{name: "quantity", configure: func(row *reportmodel.AssetActivityRow) { row.Quantity = invalid }, want: "activity row \"activity-error\" quantity"},
-		{name: "unit price", configure: func(row *reportmodel.AssetActivityRow) { row.UnitPrice = &invalid }, want: "activity row \"activity-error\" unit price"},
-		{name: "gross value", configure: func(row *reportmodel.AssetActivityRow) { row.GrossValue = &invalid }, want: "activity row \"activity-error\" gross value"},
-		{name: "fee", configure: func(row *reportmodel.AssetActivityRow) { row.FeeAmount = &invalid }, want: "activity row \"activity-error\" fee"},
-		{name: "basis after row", configure: func(row *reportmodel.AssetActivityRow) { row.BasisAfterRow = invalid }, want: "activity row \"activity-error\" basis after row"},
-		{name: "quantity after row", configure: func(row *reportmodel.AssetActivityRow) { row.QuantityAfterRow = invalid }, want: "activity row \"activity-error\" quantity after row"},
+		{name: "quantity", configure: func(row *reportmodel.AssetActivityRow) { row.Quantity = invalid }, want: "activity quantity"},
+		{name: "unit price", configure: func(row *reportmodel.AssetActivityRow) { row.UnitPrice = &invalid }, want: "activity unit price"},
+		{name: "gross value", configure: func(row *reportmodel.AssetActivityRow) { row.GrossValue = &invalid }, want: "activity gross value"},
+		{name: "fee", configure: func(row *reportmodel.AssetActivityRow) { row.FeeAmount = &invalid }, want: "activity fee"},
+		{name: "basis after row", configure: func(row *reportmodel.AssetActivityRow) { row.BasisAfterRow = invalid }, want: "activity basis after row"},
+		{name: "quantity after row", configure: func(row *reportmodel.AssetActivityRow) { row.QuantityAfterRow = invalid }, want: "activity quantity after row"},
 	} {
 		var testCase = testCase
 		t.Run("activity/"+testCase.name, func(t *testing.T) {
@@ -580,6 +583,9 @@ func TestBuildRowsReturnContextualErrorsForEveryFinancialField(t *testing.T) {
 			_, err := BuildActivityRow(configured)
 			if err == nil || !strings.Contains(err.Error(), "render "+testCase.want) {
 				t.Fatalf("error = %v, want context %q", err, testCase.want)
+			}
+			if strings.Contains(err.Error(), activity.SourceID) {
+				t.Fatalf("error disclosed source identifier %q: %v", activity.SourceID, err)
 			}
 		})
 	}
@@ -597,10 +603,10 @@ func TestBuildRowsReturnContextualErrorsForEveryFinancialField(t *testing.T) {
 		configure func(*reportmodel.LiquidationCalculation)
 		want      string
 	}{
-		{name: "disposed quantity", configure: func(row *reportmodel.LiquidationCalculation) { row.DisposedQuantity = invalid }, want: "liquidation \"liquidation-error\" disposed quantity"},
-		{name: "allocated basis", configure: func(row *reportmodel.LiquidationCalculation) { row.AllocatedBasis = invalid }, want: "liquidation \"liquidation-error\" allocated basis"},
-		{name: "net proceeds", configure: func(row *reportmodel.LiquidationCalculation) { row.NetLiquidationProceeds = invalid }, want: "liquidation \"liquidation-error\" net proceeds"},
-		{name: "gain or loss", configure: func(row *reportmodel.LiquidationCalculation) { row.GainOrLoss = invalid }, want: "liquidation \"liquidation-error\" gain or loss"},
+		{name: "disposed quantity", configure: func(row *reportmodel.LiquidationCalculation) { row.DisposedQuantity = invalid }, want: "liquidation disposed quantity"},
+		{name: "allocated basis", configure: func(row *reportmodel.LiquidationCalculation) { row.AllocatedBasis = invalid }, want: "liquidation allocated basis"},
+		{name: "net proceeds", configure: func(row *reportmodel.LiquidationCalculation) { row.NetLiquidationProceeds = invalid }, want: "liquidation net proceeds"},
+		{name: "gain or loss", configure: func(row *reportmodel.LiquidationCalculation) { row.GainOrLoss = invalid }, want: "liquidation gain or loss"},
 	} {
 		var testCase = testCase
 		t.Run("liquidation/"+testCase.name, func(t *testing.T) {
@@ -609,6 +615,9 @@ func TestBuildRowsReturnContextualErrorsForEveryFinancialField(t *testing.T) {
 			_, err := BuildLiquidationRow(configured, "USD")
 			if err == nil || !strings.Contains(err.Error(), "render "+testCase.want) {
 				t.Fatalf("error = %v, want context %q", err, testCase.want)
+			}
+			if strings.Contains(err.Error(), liquidation.SourceID) {
+				t.Fatalf("error disclosed source identifier %q: %v", liquidation.SourceID, err)
 			}
 		})
 	}
@@ -633,15 +642,15 @@ func TestBuildRowsReturnContextualErrorsForEveryFinancialField(t *testing.T) {
 		configure func(*reportmodel.AuditActivityEntry)
 		want      string
 	}{
-		{name: "quantity", configure: func(entry *reportmodel.AuditActivityEntry) { entry.Quantity = invalid }, want: "annex activity row \"annex-error\" quantity"},
-		{name: "unit price", configure: func(entry *reportmodel.AuditActivityEntry) { entry.UnitPrice = &invalid }, want: "annex activity row \"annex-error\" unit price"},
-		{name: "gross value", configure: func(entry *reportmodel.AuditActivityEntry) { entry.GrossValue = &invalid }, want: "annex activity row \"annex-error\" gross value"},
-		{name: "fee", configure: func(entry *reportmodel.AuditActivityEntry) { entry.FeeAmount = &invalid }, want: "annex activity row \"annex-error\" fee"},
-		{name: "quantity after activity", configure: func(entry *reportmodel.AuditActivityEntry) { entry.QuantityAfterActivity = invalid }, want: "annex activity row \"annex-error\" quantity after activity"},
-		{name: "basis after activity", configure: func(entry *reportmodel.AuditActivityEntry) { entry.BasisAfterActivity = invalid }, want: "annex activity row \"annex-error\" basis after activity"},
-		{name: "allocated basis", configure: func(entry *reportmodel.AuditActivityEntry) { entry.AllocatedBasis = &invalid }, want: "annex activity row \"annex-error\" allocated basis"},
-		{name: "net liquidation proceeds", configure: func(entry *reportmodel.AuditActivityEntry) { entry.NetLiquidationProceeds = &invalid }, want: "annex activity row \"annex-error\" net liquidation proceeds"},
-		{name: "gain or loss", configure: func(entry *reportmodel.AuditActivityEntry) { entry.GainOrLoss = &invalid }, want: "annex activity row \"annex-error\" gain or loss"},
+		{name: "quantity", configure: func(entry *reportmodel.AuditActivityEntry) { entry.Quantity = invalid }, want: "annex activity quantity"},
+		{name: "unit price", configure: func(entry *reportmodel.AuditActivityEntry) { entry.UnitPrice = &invalid }, want: "annex activity unit price"},
+		{name: "gross value", configure: func(entry *reportmodel.AuditActivityEntry) { entry.GrossValue = &invalid }, want: "annex activity gross value"},
+		{name: "fee", configure: func(entry *reportmodel.AuditActivityEntry) { entry.FeeAmount = &invalid }, want: "annex activity fee"},
+		{name: "quantity after activity", configure: func(entry *reportmodel.AuditActivityEntry) { entry.QuantityAfterActivity = invalid }, want: "annex activity quantity after activity"},
+		{name: "basis after activity", configure: func(entry *reportmodel.AuditActivityEntry) { entry.BasisAfterActivity = invalid }, want: "annex activity basis after activity"},
+		{name: "allocated basis", configure: func(entry *reportmodel.AuditActivityEntry) { entry.AllocatedBasis = &invalid }, want: "annex activity allocated basis"},
+		{name: "net liquidation proceeds", configure: func(entry *reportmodel.AuditActivityEntry) { entry.NetLiquidationProceeds = &invalid }, want: "annex activity net liquidation proceeds"},
+		{name: "gain or loss", configure: func(entry *reportmodel.AuditActivityEntry) { entry.GainOrLoss = &invalid }, want: "annex activity gain or loss"},
 	} {
 		var testCase = testCase
 		t.Run("annex/"+testCase.name, func(t *testing.T) {
@@ -650,6 +659,9 @@ func TestBuildRowsReturnContextualErrorsForEveryFinancialField(t *testing.T) {
 			_, err := BuildAnnexActivityRow(configured)
 			if err == nil || !strings.Contains(err.Error(), "render "+testCase.want) {
 				t.Fatalf("error = %v, want context %q", err, testCase.want)
+			}
+			if strings.Contains(err.Error(), annex.SourceID) {
+				t.Fatalf("error disclosed source identifier %q: %v", annex.SourceID, err)
 			}
 		})
 	}

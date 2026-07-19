@@ -33,10 +33,10 @@ func RenderAnnex(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocum
 	builder.WriteString(annex.Title)
 	builder.WriteString("\n\n")
 	if err := writeAnnexPerAssetAuditForRender(&builder, annex); err != nil {
-		return reportmodel.ReportDocument{}, err
+		return reportmodel.ReportDocument{}, wrapMarkdownOperationalError("render Markdown Annex per-asset audit", err, report)
 	}
 	if err := writeAnnexConversionAuditForRender(&builder, annex); err != nil {
-		return reportmodel.ReportDocument{}, err
+		return reportmodel.ReportDocument{}, wrapMarkdownOperationalError("render Markdown Annex conversion audit", err, report)
 	}
 	return reportmodel.NewReportDocument(reportmodel.ReportDocumentTypeMarkdown, reportmodel.ReportDocumentRoleAnnex, []byte(builder.String()), report.Year, report.CostBasisMethod, report.GeneratedAt)
 }
@@ -56,10 +56,10 @@ func RenderAnnexWithFinancialFormatting(report reportmodel.CapitalGainsReport, o
 	builder.WriteString(annex.Title)
 	builder.WriteString("\n\n")
 	if err := writeAnnexPerAssetAuditWithFinancialFormatting(&builder, annex, options); err != nil {
-		return reportmodel.ReportDocument{}, err
+		return reportmodel.ReportDocument{}, wrapMarkdownOperationalError("render Markdown Annex per-asset audit", err, report)
 	}
 	if err := writeAnnexConversionAuditWithFinancialFormatting(&builder, annex, options); err != nil {
-		return reportmodel.ReportDocument{}, err
+		return reportmodel.ReportDocument{}, wrapMarkdownOperationalError("render Markdown Annex conversion audit", err, report)
 	}
 
 	return reportmodel.NewReportDocument(
@@ -88,13 +88,13 @@ func writeAnnexPerAssetAuditWithFinancialFormatting(builder *strings.Builder, an
 		return nil
 	}
 
-	for _, section := range annex.PerAssetAuditSections {
+	for sectionIndex, section := range annex.PerAssetAuditSections {
 		fmt.Fprintf(builder, "### Asset: %s\n\n", renderDisplayLabel(section.DisplayLabel, section.AssetIdentityKey))
 		builder.WriteString("| Date/Time | Source ID | Activity Type | Quantity | Unit Price | Gross Value | Fee | Original Activity Currency | Calculation Currency | Quantity After Activity | Basis After Activity | Full Liquidation Event | Allocated Basis | Net Liquidation Proceeds | Gain/Loss | Conversion Status | Sanitized Note |\n")
 		builder.WriteString("|-----------|-----------|---------------|----------|------------|-------------|-----|----------------------------|----------------------|-------------------------|----------------------|------------------------|-----------------|--------------------------|-----------|-------------------|----------------|\n")
-		for _, entry := range section.Entries {
+		for entryIndex, entry := range section.Entries {
 			if err := writeAnnexActivityEntryWithFinancialFormatting(builder, entry, options); err != nil {
-				return fmt.Errorf("render annex audit entry %q: %w", entry.SourceID, err)
+				return fmt.Errorf("render annex section %d activity row %d: %w", sectionIndex+1, entryIndex+1, err)
 			}
 		}
 		builder.WriteString("\n")

@@ -4,11 +4,13 @@
 package markdown
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
 )
 
 const notApplicableCalculationCurrency = "NOT APPLICABLE"
@@ -35,6 +37,71 @@ type RenderOptions struct {
 // Authored by: OpenCode
 type Renderer struct {
 	options RenderOptions
+}
+
+// redactedMarkdownOperationalCause exposes a report-safe cause while
+// preserving errors.Is identity without exposing the original unwrap chain.
+// Authored by: OpenCode
+type redactedMarkdownOperationalCause struct {
+	cause       error
+	identifiers []string
+}
+
+// Error applies shared redaction to an operational Markdown cause.
+// Authored by: OpenCode
+func (cause redactedMarkdownOperationalCause) Error() string {
+	return redact.ErrorText(cause.cause, cause.identifiers...)
+}
+
+// Is preserves matching against the original operational cause.
+// Authored by: OpenCode
+func (cause redactedMarkdownOperationalCause) Is(target error) bool {
+	return errors.Is(cause.cause, target)
+}
+
+// wrapMarkdownOperationalError adds stable semantic stage context to a
+// non-unwrapping, identity-matchable redacted cause.
+// Authored by: OpenCode
+func wrapMarkdownOperationalError(stage string, err error, report reportmodel.CapitalGainsReport) error {
+	return fmt.Errorf("%s: %w", stage, redactedMarkdownOperationalCause{cause: err, identifiers: markdownReportIdentifiers(report)})
+}
+
+// markdownReportIdentifiers returns report identifiers prohibited from error
+// channels while remaining visible in successful requested exports.
+// Authored by: OpenCode
+func markdownReportIdentifiers(report reportmodel.CapitalGainsReport) []string {
+	var identifiers []string
+	for _, entry := range report.SummaryEntries {
+		identifiers = append(identifiers, entry.AssetIdentityKey, entry.DisplayLabel)
+	}
+	for _, entry := range report.ReferenceEntries {
+		identifiers = append(identifiers, entry.AssetIdentityKey, entry.DisplayLabel)
+	}
+	for _, section := range report.DetailSections {
+		identifiers = append(identifiers, section.AssetIdentityKey, section.DisplayLabel)
+		for _, row := range section.ActivityRows {
+			identifiers = append(identifiers, row.SourceID)
+		}
+		for _, liquidation := range section.LiquidationSummaries {
+			identifiers = append(identifiers, liquidation.SourceID)
+			for _, match := range liquidation.Matches {
+				identifiers = append(identifiers, match.AcquisitionSourceID)
+			}
+		}
+	}
+	for _, section := range report.AuditAnnex.PerAssetAuditSections {
+		identifiers = append(identifiers, section.AssetIdentityKey, section.DisplayLabel)
+		for _, entry := range section.Entries {
+			identifiers = append(identifiers, entry.SourceID)
+		}
+	}
+	for _, entry := range report.AuditAnnex.ConversionAuditEntries {
+		identifiers = append(identifiers, entry.SourceID, entry.AssetLabel)
+		for _, amount := range entry.Amounts {
+			identifiers = append(identifiers, amount.SourceID)
+		}
+	}
+	return identifiers
 }
 
 // NewRenderer creates one Markdown renderer with immutable local options.
@@ -74,16 +141,16 @@ func Render(report reportmodel.CapitalGainsReport) (reportmodel.ReportDocument, 
 	builder.WriteString(presentation.LegalWarningText)
 	builder.WriteString("**\n\n")
 	if err := renderWriteSummarySection(&builder, report, calculationCurrency); err != nil {
-		return reportmodel.ReportDocument{}, err
+		return reportmodel.ReportDocument{}, wrapMarkdownOperationalError("render Markdown summary", err, report)
 	}
 	if err := renderWriteRateSourceSummary(&builder, report); err != nil {
-		return reportmodel.ReportDocument{}, err
+		return reportmodel.ReportDocument{}, wrapMarkdownOperationalError("render Markdown rate source summary", err, report)
 	}
 	if err := renderWriteReferenceSection(&builder, report); err != nil {
-		return reportmodel.ReportDocument{}, err
+		return reportmodel.ReportDocument{}, wrapMarkdownOperationalError("render Markdown reference section", err, report)
 	}
 	if err := renderWriteDetailSections(&builder, report, calculationCurrency); err != nil {
-		return reportmodel.ReportDocument{}, err
+		return reportmodel.ReportDocument{}, wrapMarkdownOperationalError("render Markdown detail sections", err, report)
 	}
 	return reportmodel.NewReportDocument(
 		reportmodel.ReportDocumentTypeMarkdown,
@@ -128,12 +195,16 @@ func (renderer Renderer) Render(report reportmodel.CapitalGainsReport) (reportmo
 	builder.WriteString(presentation.LegalWarningText)
 	builder.WriteString("**\n\n")
 	if err := writeSummarySectionWithFinancialFormatting(&builder, report, calculationCurrency, options); err != nil {
-		return reportmodel.ReportDocument{}, err
+		return reportmodel.ReportDocument{}, wrapMarkdownOperationalError("render Markdown summary", err, report)
 	}
-	_ = writeRateSourceSummary(&builder, report)
-	_ = writeReferenceSection(&builder, report)
+	if err := renderWriteRateSourceSummary(&builder, report); err != nil {
+		return reportmodel.ReportDocument{}, wrapMarkdownOperationalError("render Markdown rate source summary", err, report)
+	}
+	if err := renderWriteReferenceSection(&builder, report); err != nil {
+		return reportmodel.ReportDocument{}, wrapMarkdownOperationalError("render Markdown reference section", err, report)
+	}
 	if err := writeDetailSectionsWithFinancialFormatting(&builder, report, calculationCurrency, options); err != nil {
-		return reportmodel.ReportDocument{}, err
+		return reportmodel.ReportDocument{}, wrapMarkdownOperationalError("render Markdown detail sections", err, report)
 	}
 	return reportmodel.NewReportDocument(reportmodel.ReportDocumentTypeMarkdown, reportmodel.ReportDocumentRoleMain, []byte(builder.String()), report.Year, report.CostBasisMethod, report.GeneratedAt)
 }

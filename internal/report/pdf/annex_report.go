@@ -51,15 +51,15 @@ func renderAnnexPerAssetAuditWithFinancialFormatting(document pdfContentLayout, 
 	if len(annex.PerAssetAuditSections) == 0 {
 		return document.AddParagraph("No per-asset audit activity is available for this report.")
 	}
-	for _, section := range annex.PerAssetAuditSections {
+	for sectionIndex, section := range annex.PerAssetAuditSections {
 		if err := document.AddSubsectionHeading("Asset: " + renderDisplayLabel(section.DisplayLabel, section.AssetIdentityKey)); err != nil {
 			return err
 		}
 		var rows [][]string
-		for _, entry := range section.Entries {
+		for entryIndex, entry := range section.Entries {
 			var row, err = renderAnnexActivityRowWithFinancialFormatting(entry, options)
 			if err != nil {
-				return fmt.Errorf("render annex audit entry %q: %w", entry.SourceID, err)
+				return fmt.Errorf("render annex section %d activity row %d: %w", sectionIndex+1, entryIndex+1, err)
 			}
 			rows = append(rows, row)
 		}

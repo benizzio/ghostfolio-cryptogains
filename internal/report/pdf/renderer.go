@@ -117,24 +117,70 @@ type Renderer struct {
 	options RenderOptions
 }
 
-// redactedPDFFinalizationCause exposes a safe cause message while preserving
-// errors.Is identity checks for the original finalization failure.
+// redactedPDFOperationalCause exposes a safe cause message while preserving
+// errors.Is identity checks for the original rendering failure.
 // Authored by: OpenCode
-type redactedPDFFinalizationCause struct {
-	cause error
+type redactedPDFOperationalCause struct {
+	cause       error
+	identifiers []string
 }
 
-// Error returns the finalization cause after applying the shared redaction policy.
+// Error returns the operational cause after applying the shared redaction policy.
 // Authored by: OpenCode
-func (cause redactedPDFFinalizationCause) Error() string {
-	return redact.ErrorText(cause.cause)
+func (cause redactedPDFOperationalCause) Error() string {
+	return redact.ErrorText(cause.cause, cause.identifiers...)
 }
 
-// Is preserves matching against the original finalization cause without
+// Is preserves matching against the original operational cause without
 // exposing that cause through the unwrap chain.
 // Authored by: OpenCode
-func (cause redactedPDFFinalizationCause) Is(target error) bool {
+func (cause redactedPDFOperationalCause) Is(target error) bool {
 	return errors.Is(cause.cause, target)
+}
+
+// wrapPDFOperationalError adds stable stage context and a non-unwrapping,
+// identity-matchable redacted cause.
+// Authored by: OpenCode
+func wrapPDFOperationalError(stage string, err error, identifiers []string) error {
+	return fmt.Errorf("%s: %w", stage, redactedPDFOperationalCause{cause: err, identifiers: identifiers})
+}
+
+// reportIdentifiers returns report-owned identifiers that are valid in a
+// successful export but prohibited from renderer error channels.
+// Authored by: OpenCode
+func reportIdentifiers(report reportmodel.CapitalGainsReport) []string {
+	var identifiers []string
+	for _, entry := range report.SummaryEntries {
+		identifiers = append(identifiers, entry.AssetIdentityKey, entry.DisplayLabel)
+	}
+	for _, entry := range report.ReferenceEntries {
+		identifiers = append(identifiers, entry.AssetIdentityKey, entry.DisplayLabel)
+	}
+	for _, section := range report.DetailSections {
+		identifiers = append(identifiers, section.AssetIdentityKey, section.DisplayLabel)
+		for _, row := range section.ActivityRows {
+			identifiers = append(identifiers, row.SourceID)
+		}
+		for _, liquidation := range section.LiquidationSummaries {
+			identifiers = append(identifiers, liquidation.SourceID)
+			for _, match := range liquidation.Matches {
+				identifiers = append(identifiers, match.AcquisitionSourceID)
+			}
+		}
+	}
+	for _, section := range report.AuditAnnex.PerAssetAuditSections {
+		identifiers = append(identifiers, section.AssetIdentityKey, section.DisplayLabel)
+		for _, entry := range section.Entries {
+			identifiers = append(identifiers, entry.SourceID)
+		}
+	}
+	for _, entry := range report.AuditAnnex.ConversionAuditEntries {
+		identifiers = append(identifiers, entry.SourceID, entry.AssetLabel)
+		for _, amount := range entry.Amounts {
+			identifiers = append(identifiers, amount.SourceID)
+		}
+	}
+	return identifiers
 }
 
 // NewRenderer creates one validated local PDF renderer. A nil ByteFinalizer
@@ -184,26 +230,27 @@ func (renderer Renderer) Render(report reportmodel.CapitalGainsReport) ([]byte, 
 		return nil, err
 	}
 
+	var identifiers = reportIdentifiers(report)
 	var document = newPDFDocumentForRenderer(renderer.options.ByteFinalizer)
 	if err := startPDFDocument(document); err != nil {
-		return nil, err
+		return nil, wrapPDFOperationalError("start PDF document", err, identifiers)
 	}
 	if err := loadApplicationFonts(document, renderer.options.Fonts); err != nil {
-		return nil, err
+		return nil, wrapPDFOperationalError("load PDF fonts", err, identifiers)
 	}
 	if err := renderMainReportWithFinancialFormatting(document, report, renderer.options.FinancialFormatting); err != nil {
-		return nil, err
+		return nil, wrapPDFOperationalError("render PDF main report", err, identifiers)
 	}
 	if err := document.AddAnnexPageBreak(); err != nil {
-		return nil, err
+		return nil, wrapPDFOperationalError("add PDF Annex page break", err, identifiers)
 	}
 	if err := renderAnnexWithFinancialFormatting(document, report.AuditAnnex, renderer.options.FinancialFormatting); err != nil {
-		return nil, err
+		return nil, wrapPDFOperationalError("render PDF Annex", err, identifiers)
 	}
 
 	var payload, err = document.Bytes()
 	if err != nil {
-		return nil, fmt.Errorf("PDF byte finalization failed: %w", redactedPDFFinalizationCause{cause: err})
+		return nil, wrapPDFOperationalError("PDF byte finalization failed", err, identifiers)
 	}
 
 	return payload, nil

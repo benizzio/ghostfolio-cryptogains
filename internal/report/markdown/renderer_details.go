@@ -23,9 +23,9 @@ func writeDetailSections(builder *strings.Builder, report reportmodel.CapitalGai
 // renderer-scoped immutable financial policy.
 // Authored by: OpenCode
 func writeDetailSectionsWithFinancialFormatting(builder *strings.Builder, report reportmodel.CapitalGainsReport, calculationCurrency string, options presentation.FinancialFormattingOptions) error {
-	for _, section := range report.DetailSections {
+	for index, section := range report.DetailSections {
 		if err := writeDetailSectionWithFinancialFormatting(builder, section, calculationCurrency, options); err != nil {
-			return err
+			return fmt.Errorf("render asset detail section %d: %w", index+1, err)
 		}
 	}
 
@@ -45,22 +45,22 @@ func writeDetailSectionWithFinancialFormatting(builder *strings.Builder, section
 	fmt.Fprintf(builder, "## Asset Detail: %s\n\n", renderDisplayLabel(section.DisplayLabel, section.AssetIdentityKey))
 	if len(section.ActivityRows) == 0 {
 		if err := writePositionBlockWithFinancialFormatting(builder, "Historical Position", section.ClosingQuantity, section.ClosingCostBasis, section.CalculationCurrency, calculationCurrency, options); err != nil {
-			return fmt.Errorf("render historical position for %q: %w", section.AssetIdentityKey, err)
+			return fmt.Errorf("render historical position: %w", err)
 		}
 
 		return nil
 	}
 	if err := writePositionBlockWithFinancialFormatting(builder, "Opening Position", section.OpeningQuantity, section.OpeningCostBasis, section.CalculationCurrency, calculationCurrency, options); err != nil {
-		return fmt.Errorf("render opening position for %q: %w", section.AssetIdentityKey, err)
+		return fmt.Errorf("render opening position: %w", err)
 	}
 	if err := writeActivityBlockWithFinancialFormatting(builder, section, options); err != nil {
-		return fmt.Errorf("render in-year activity for %q: %w", section.AssetIdentityKey, err)
+		return fmt.Errorf("render in-year activity: %w", err)
 	}
 	if err := writeLiquidationBlockWithFinancialFormatting(builder, section, calculationCurrency, options); err != nil {
-		return fmt.Errorf("render liquidation calculations for %q: %w", section.AssetIdentityKey, err)
+		return fmt.Errorf("render liquidation calculations: %w", err)
 	}
 	if err := writePositionBlockWithFinancialFormatting(builder, "Closing Position", section.ClosingQuantity, section.ClosingCostBasis, section.CalculationCurrency, calculationCurrency, options); err != nil {
-		return fmt.Errorf("render closing position for %q: %w", section.AssetIdentityKey, err)
+		return fmt.Errorf("render closing position: %w", err)
 	}
 
 	return nil
@@ -112,9 +112,9 @@ func writeActivityBlockWithFinancialFormatting(builder *strings.Builder, section
 
 	builder.WriteString("| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |\n")
 	builder.WriteString("|------|-----------|------|----------|------------|-------------|-----|--------------------|-----------------|----------------------------|----------------------|-------------------|------|\n")
-	for _, row := range section.ActivityRows {
+	for index, row := range section.ActivityRows {
 		if err := writeActivityRowWithFinancialFormatting(builder, row, options); err != nil {
-			return err
+			return fmt.Errorf("render activity row %d: %w", index+1, err)
 		}
 	}
 
@@ -164,9 +164,9 @@ func writeLiquidationBlockWithFinancialFormatting(builder *strings.Builder, sect
 	builder.WriteString("### Liquidation Calculations\n\n")
 	builder.WriteString("| Date | Source ID | Disposed Quantity | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |\n")
 	builder.WriteString("|------|-----------|-------------------|-----------------|--------------------------|--------------|----------------------|\n")
-	for _, liquidation := range section.LiquidationSummaries {
+	for index, liquidation := range section.LiquidationSummaries {
 		if err := writeLiquidationRowWithFinancialFormatting(builder, liquidation, fallbackCurrency, options); err != nil {
-			return err
+			return fmt.Errorf("render liquidation row %d: %w", index+1, err)
 		}
 	}
 
