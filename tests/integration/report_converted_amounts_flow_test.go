@@ -70,7 +70,7 @@ func TestConvertedAmountsRuntimeParityPreservesAUD001(t *testing.T) {
 		if calculateErr != nil {
 			t.Fatalf("calculate %s converted-amount post-render model: %v", outputFormat, calculateErr)
 		}
-		assertAUD001ReportEqual(t, outputFormat, before, after)
+		assertCalculatedReportUnchanged(t, outputFormat, before, after)
 		observations[outputFormat] = readConvertedAmountsOutput(t, reportIO.DocumentsDir, outcome)
 	}
 
@@ -143,7 +143,7 @@ func TestConvertedAmountsPDFLayoutFailureLeavesBoundaryAndAllowsRetry(t *testing
 	if calculateErr != nil {
 		t.Fatalf("calculate multiline failure AUD-001 post-render model: %v", calculateErr)
 	}
-	assertAUD001ReportEqual(t, reportmodel.ReportOutputFormatPDF, failureBaseline, failureAfter)
+	assertCalculatedReportUnchanged(t, reportmodel.ReportOutputFormatPDF, failureBaseline, failureAfter)
 
 	var retryCache = runtimeflow.MixedCurrencyConversionProtectedActivityCache(t, 6)
 	runtimeflow.SeedProtectedSnapshot(t, harness, token, retryCache)
@@ -168,7 +168,7 @@ func TestConvertedAmountsPDFLayoutFailureLeavesBoundaryAndAllowsRetry(t *testing
 	if retryErr != nil {
 		t.Fatalf("calculate retry AUD-001 post-render model: %v", retryErr)
 	}
-	assertAUD001ReportEqual(t, reportmodel.ReportOutputFormatPDF, retryBaseline, retryAfter)
+	assertCalculatedReportUnchanged(t, reportmodel.ReportOutputFormatPDF, retryBaseline, retryAfter)
 	var retryMarkdownFiles = runtimeflow.AllMarkdownFiles(t, reportIO.DocumentsDir)
 	if len(retryMarkdownFiles) != 0 {
 		t.Fatalf("expected retry to save only PDF output, got Markdown files %#v", retryMarkdownFiles)

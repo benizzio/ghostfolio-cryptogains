@@ -142,7 +142,7 @@ func TestReportFinancialFormattingFailuresStopBeforeOutputAndRetry(t *testing.T)
 				if calculateErr != nil {
 					t.Fatalf("calculate post-retry model: %v", calculateErr)
 				}
-				assertAUD001ReportEqual(t, outputFormat, baseline, after)
+				assertCalculatedReportUnchanged(t, outputFormat, baseline, after)
 				var savedPaths = runtimeflow.ReportOutputPaths(t, reportIO.DocumentsDir, outputFormat)
 				if len(savedPaths) != expectedFinancialFormattingOutputCount(outputFormat) {
 					t.Fatalf("expected selected-format output only, got %#v", savedPaths)

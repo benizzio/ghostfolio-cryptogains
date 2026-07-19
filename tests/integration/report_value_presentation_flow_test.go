@@ -17,11 +17,11 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeflow"
 )
 
-// TestReportValuePresentationPreservesAUD001AcrossMarkdownAndPDF verifies that
+// TestReportValuePresentationPreservesCalculatedReportAcrossMarkdownAndPDF verifies that
 // both runtime-selected renderers consume the same mixed-currency cache without
 // changing the complete calculated report model or its output bundle shape.
 // Authored by: OpenCode
-func TestReportValuePresentationPreservesAUD001AcrossMarkdownAndPDF(t *testing.T) {
+func TestReportValuePresentationPreservesCalculatedReportAcrossMarkdownAndPDF(t *testing.T) {
 	var reportIO = testutil.NewReportIOFixture(t)
 	var openLogPath = runtimeflow.InstallOpenCommandRecorder(t, 0)
 	var cache = runtimeflow.MixedCurrencyConversionProtectedActivityCache(t, 6)
@@ -59,7 +59,7 @@ func TestReportValuePresentationPreservesAUD001AcrossMarkdownAndPDF(t *testing.T
 		if err != nil {
 			t.Fatalf("calculate post-render AUD-001 model for %s: %v", outputFormat, err)
 		}
-		assertAUD001ReportEqual(t, outputFormat, before, after)
+		assertCalculatedReportUnchanged(t, outputFormat, before, after)
 		assertReportValuePresentationBundle(t, reportIO.DocumentsDir, outputFormat, outcome)
 	}
 
@@ -70,11 +70,11 @@ func TestReportValuePresentationPreservesAUD001AcrossMarkdownAndPDF(t *testing.T
 	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
 }
 
-// assertAUD001ReportEqual compares the complete calculated report model so all
+// assertCalculatedReportUnchanged compares the complete calculated report model so all
 // exact values, quantities, rates, rate metadata, currencies, and inclusion
 // states remain tied to the pre-presentation baseline.
 // Authored by: OpenCode
-func assertAUD001ReportEqual(t *testing.T, outputFormat reportmodel.ReportOutputFormat, before reportmodel.CapitalGainsReport, after reportmodel.CapitalGainsReport) {
+func assertCalculatedReportUnchanged(t *testing.T, outputFormat reportmodel.ReportOutputFormat, before reportmodel.CapitalGainsReport, after reportmodel.CapitalGainsReport) {
 	t.Helper()
 	if !reflect.DeepEqual(before, after) {
 		t.Fatalf("AUD-001 report model changed after %s rendering: before=%#v after=%#v", outputFormat, before, after)

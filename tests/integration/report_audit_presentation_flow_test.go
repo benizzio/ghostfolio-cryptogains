@@ -85,7 +85,7 @@ func TestReportAuditPresentationPreservesAUD001AndMatchesFormats(t *testing.T) {
 		if calculateErr != nil {
 			t.Fatalf("calculate post-render AUD-001 Annex model for %s: %v", outputFormat, calculateErr)
 		}
-		assertAUD001ReportEqual(t, outputFormat, baseline, after)
+		assertCalculatedReportUnchanged(t, outputFormat, baseline, after)
 		assertAuditPresentationEntryUnchanged(t, outputFormat, baseline, after, auditPresentationClassifiedSourceID)
 		assertAuditPresentationEntryUnchanged(t, outputFormat, baseline, after, auditPresentationUnclassifiedSourceID)
 
