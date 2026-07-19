@@ -9,6 +9,7 @@ import (
 	"context"
 	"math"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -180,7 +181,6 @@ func assertScalePDFRows(t *testing.T, inspection testutil.GeneratedPDF, expected
 	var conversionPage, conversionY = scalePDFConversionHeading(t, inspection)
 	var sourceRuns = make(map[string][]testutil.PDFTextRun, len(expectedSources))
 	var sourceOccurrences = make(map[string]int, len(expectedSources))
-	var entryCounts = make(map[string]int)
 	var conversionPages = make(map[int]struct{})
 	var conversionRuns []testutil.PDFTextRun
 	for _, run := range inspection.TextRuns {
@@ -192,11 +192,6 @@ func assertScalePDFRows(t *testing.T, inspection testutil.GeneratedPDF, expected
 		}
 		conversionRuns = append(conversionRuns, run)
 		conversionPages[run.Page] = struct{}{}
-		for _, label := range []string{"unit_price:", "gross_value:", "fee_amount:"} {
-			if strings.Contains(run.Text, label) {
-				entryCounts[label]++
-			}
-		}
 	}
 	var unexpectedSources = collectScalePDFSourceGroups(sourceRuns, sourceOccurrences, conversionRuns, expectedSources)
 	if len(conversionPages) < 2 {
@@ -208,30 +203,21 @@ func assertScalePDFRows(t *testing.T, inspection testutil.GeneratedPDF, expected
 	if len(sourceRuns) != len(expectedSources) {
 		t.Fatalf("PDF conversion source row count = %d, want %d", len(sourceRuns), len(expectedSources))
 	}
-	var rowEntryCounts = scalePDFRowEntryCounts(t, sourceRuns, conversionRuns)
+	var convertedCells = scalePDFConvertedCells(t, sourceRuns, conversionRuns)
 	var searchableText = compactScalePDFText(inspection.SearchableText)
+	var sourceIDs = make([]string, 0, len(expectedSources))
 	for sourceID := range expectedSources {
+		sourceIDs = append(sourceIDs, sourceID)
+	}
+	sort.Strings(sourceIDs)
+	for _, sourceID := range sourceIDs {
 		if sourceOccurrences[sourceID] != 1 {
 			t.Fatalf("PDF conversion source %q occurrence count = %d, want exactly one", sourceID, sourceOccurrences[sourceID])
 		}
 		if !strings.Contains(searchableText, compactScalePDFText(sourceID)) {
 			t.Fatalf("PDF conversion source %q is not searchable", sourceID)
 		}
-		for _, entry := range markdownRows[sourceID] {
-			if !strings.Contains(searchableText, compactScalePDFText(entry)) {
-				t.Fatalf("PDF conversion entry %q for source %q is not searchable", entry, sourceID)
-			}
-		}
-		for _, label := range []string{"unit_price:", "gross_value:", "fee_amount:"} {
-			if rowEntryCounts[sourceID][label] != 1 {
-				t.Fatalf("PDF conversion source %q entry %s count = %d, want one", sourceID, label, rowEntryCounts[sourceID][label])
-			}
-		}
-	}
-	for _, label := range []string{"unit_price:", "gross_value:", "fee_amount:"} {
-		if entryCounts[label] != len(expectedSources) {
-			t.Fatalf("PDF conversion entry %s count = %d, want %d", label, entryCounts[label], len(expectedSources))
-		}
+		assertScalePDFConvertedCell(t, sourceID, convertedCells[sourceID], markdownRows[sourceID])
 	}
 	var repeatedHeaders = 0
 	var repeatedContinuation = 0
@@ -246,18 +232,16 @@ func assertScalePDFRows(t *testing.T, inspection testutil.GeneratedPDF, expected
 	if repeatedHeaders < 2 || repeatedContinuation == 0 {
 		t.Fatalf("expected repeated conversion headers and continuation context, headers=%d continuation=%d", repeatedHeaders, repeatedContinuation)
 	}
-	assertScalePDFRepresentativeRows(t, inspection, sourceRuns, markdownRows)
 }
 
-// scalePDFRowEntryCounts associates every conversion entry run with its
-// nearest source row on the same page, proving each source row has one of each
-// controlled entry rather than only proving a document-wide total.
+// scalePDFConvertedCells indexes converted-column runs by exact source-row
+// boundaries so every cell can be checked without repeated document scans.
 // Authored by: OpenCode
-func scalePDFRowEntryCounts(t *testing.T, sourceRuns map[string][]testutil.PDFTextRun, conversionRuns []testutil.PDFTextRun) map[string]map[string]int {
+func scalePDFConvertedCells(t *testing.T, sourceRuns map[string][]testutil.PDFTextRun, conversionRuns []testutil.PDFTextRun) map[string][]testutil.PDFTextRun {
 	t.Helper()
 	type sourceRow struct {
 		sourceID string
-		y        float64
+		centerY  float64
 	}
 	var rowsByPage = make(map[int][]sourceRow)
 	for sourceID, runs := range sourceRuns {
@@ -267,38 +251,100 @@ func scalePDFRowEntryCounts(t *testing.T, sourceRuns map[string][]testutil.PDFTe
 			minimumY = math.Min(minimumY, run.Y)
 			maximumY = math.Max(maximumY, run.Y)
 		}
-		rowsByPage[runs[0].Page] = append(rowsByPage[runs[0].Page], sourceRow{sourceID: sourceID, y: (minimumY + maximumY) / 2})
+		rowsByPage[runs[0].Page] = append(rowsByPage[runs[0].Page], sourceRow{sourceID: sourceID, centerY: (minimumY + maximumY) / 2})
 	}
-	var counts = make(map[string]map[string]int, len(sourceRuns))
+	for page := range rowsByPage {
+		sort.SliceStable(rowsByPage[page], func(left, right int) bool {
+			return rowsByPage[page][left].centerY > rowsByPage[page][right].centerY
+		})
+	}
+
+	var convertedX float64
+	var foundConvertedColumn bool
 	for _, run := range conversionRuns {
-		var label string
-		for _, candidate := range []string{"unit_price:", "gross_value:", "fee_amount:"} {
-			if strings.Contains(run.Text, candidate) {
-				label = candidate
+		if strings.Contains(run.Text, "unit_price:") {
+			convertedX = run.X
+			foundConvertedColumn = true
+			break
+		}
+	}
+	if !foundConvertedColumn {
+		t.Fatal("could not locate PDF Converted Amounts column")
+	}
+
+	var convertedRunsByPage = make(map[int][]testutil.PDFTextRun)
+	for _, run := range conversionRuns {
+		if math.Abs(run.X-convertedX) <= 0.01 {
+			convertedRunsByPage[run.Page] = append(convertedRunsByPage[run.Page], run)
+		}
+	}
+	var cells = make(map[string][]testutil.PDFTextRun, len(sourceRuns))
+	for page, rows := range rowsByPage {
+		var runs = convertedRunsByPage[page]
+		sort.SliceStable(runs, func(left, right int) bool {
+			return runs[left].Y > runs[right].Y
+		})
+		var rowIndex int
+		for _, run := range runs {
+			var upperBoundary = rows[0].centerY + 18
+			if len(rows) > 1 {
+				upperBoundary = rows[0].centerY + (rows[0].centerY-rows[1].centerY)/2
+			}
+			if run.Y > upperBoundary {
+				continue
+			}
+			for rowIndex+1 < len(rows) && run.Y <= (rows[rowIndex].centerY+rows[rowIndex+1].centerY)/2 {
+				rowIndex++
+			}
+			cells[rows[rowIndex].sourceID] = append(cells[rows[rowIndex].sourceID], run)
+		}
+	}
+	return cells
+}
+
+// assertScalePDFConvertedCell reconstructs one row's Converted Amounts cell
+// and compares its exact entries, delimiters, order, and logical line starts.
+// Authored by: OpenCode
+func assertScalePDFConvertedCell(t *testing.T, sourceID string, runs []testutil.PDFTextRun, expectedEntries []string) {
+	t.Helper()
+	var actualEntries []string
+	var startYs []float64
+	for _, run := range runs {
+		var line = strings.Join(strings.Fields(run.Text), " ")
+		if line == "" {
+			continue
+		}
+		var startsEntry bool
+		for _, label := range []string{"unit_price: ", "gross_value: ", "fee_amount: "} {
+			if strings.HasPrefix(line, label) {
+				startsEntry = true
 				break
 			}
 		}
-		if label == "" {
+		if startsEntry {
+			actualEntries = append(actualEntries, line)
+			startYs = append(startYs, run.Y)
 			continue
 		}
-		var closest sourceRow
-		var closestDistance = math.MaxFloat64
-		for _, row := range rowsByPage[run.Page] {
-			var distance = math.Abs(row.y - run.Y)
-			if distance < closestDistance {
-				closest = row
-				closestDistance = distance
-			}
+		if len(actualEntries) == 0 {
+			t.Fatalf("PDF conversion source %q has unexpected text before its first entry: %q", sourceID, line)
 		}
-		if closest.sourceID == "" || closestDistance > 20 {
-			t.Fatalf("could not associate PDF conversion entry %#v with a source row", run)
-		}
-		if counts[closest.sourceID] == nil {
-			counts[closest.sourceID] = make(map[string]int)
-		}
-		counts[closest.sourceID][label]++
+		actualEntries[len(actualEntries)-1] += " " + line
 	}
-	return counts
+	if len(actualEntries) != len(expectedEntries) {
+		t.Fatalf("PDF conversion source %q entries = %#v, want %d exact entries", sourceID, actualEntries, len(expectedEntries))
+	}
+	for index, expected := range expectedEntries {
+		if index < len(expectedEntries)-1 {
+			expected += ";"
+		}
+		if actualEntries[index] != expected {
+			t.Fatalf("PDF conversion source %q entry %d = %q, want %q", sourceID, index, actualEntries[index], expected)
+		}
+		if index > 0 && startYs[index] >= startYs[index-1] {
+			t.Fatalf("PDF conversion source %q entry %q starts at Y %.2f after previous Y %.2f; want a lower logical line", sourceID, actualEntries[index], startYs[index], startYs[index-1])
+		}
+	}
 }
 
 // collectScalePDFSourceGroups reconstructs wrapped source identifiers from
@@ -383,36 +429,6 @@ func scalePDFConversionHeading(t *testing.T, inspection testutil.GeneratedPDF) (
 // Authored by: OpenCode
 func scalePDFRunInConversionSection(run testutil.PDFTextRun, page int, headingY float64) bool {
 	return run.Page > page || run.Page == page && run.Y < headingY
-}
-
-// assertScalePDFRepresentativeRows checks row-local entry order and vertical
-// line starts on rows at the beginning, middle, and end of the workload.
-// Authored by: OpenCode
-func assertScalePDFRepresentativeRows(t *testing.T, inspection testutil.GeneratedPDF, sourceRuns map[string][]testutil.PDFTextRun, markdownRows scaleMarkdownRows) {
-	t.Helper()
-	var sourceIDs []string
-	for sourceID := range sourceRuns {
-		sourceIDs = append(sourceIDs, sourceID)
-	}
-	var selected = []string{sourceIDs[0], sourceIDs[len(sourceIDs)/2], sourceIDs[len(sourceIDs)-1]}
-	for _, sourceID := range selected {
-		var rowRuns, found = runtimeflow.FindPDFConversionRowRuns(inspection, sourceID)
-		if !found {
-			t.Fatalf("could not isolate PDF conversion row %q", sourceID)
-		}
-		var previousY float64
-		for index, entry := range markdownRows[sourceID] {
-			var label = strings.SplitN(entry, ":", 2)[0]
-			var y, ok = runtimeflow.PDFConversionStartY(inspection, sourceID, label, 0)
-			if !ok || (index > 0 && y >= previousY) {
-				t.Fatalf("PDF conversion row %q entry %q lacks a lower logical line start", sourceID, entry)
-			}
-			previousY = y
-		}
-		if len(rowRuns) == 0 {
-			t.Fatalf("PDF conversion row %q has no searchable row runs", sourceID)
-		}
-	}
 }
 
 // compactScalePDFText normalizes PDF layout whitespace for searchable-content
