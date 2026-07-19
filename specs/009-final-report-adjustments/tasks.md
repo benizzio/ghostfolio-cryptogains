@@ -488,5 +488,4 @@ Final response: files changed; task IDs completed; tests run with results; expec
 - The output writer remains the sole owner of reservation, `0600` mode, cleanup, bundle completion, and opener warnings.
 - Successful result screens disclose cleartext financial-data status, every saved path, and deletion guidance without creating retained report or path state.
 - Stop under DEP-001 rather than adding a dependency, external binary, browser, platform service, remote renderer, network path, or weakened requirement.
-- Automated T048 evidence passes through the focused report contracts, concrete PDF inspector, output-transaction contracts, TUI workflow contracts, confidentiality contracts, `make test`, `make coverage`, `make quality QUALITY_BASE_REF=origin/main`, and `make test-performance`; the human PDF-reader portion remains open because this environment cannot empirically perform that reader inspection.
 - T077 is the only Phase 8 task authorized to resolve COV-DRIFT findings, and only matching findings with successful remediation plus focused and aggregate validation may change from `Pending` to `Resolved`.
