@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cockroachdb/apd/v3"
+
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
@@ -23,13 +25,15 @@ import (
 // Authored by: OpenCode
 func TestReportFinancialFormattingFailuresStopBeforeOutputAndRetry(t *testing.T) {
 	var failureCases = []struct {
-		name    string
-		context string
+		name              string
+		value             func() apd.Decimal
+		injectedPrecision bool
+		wantContext       string
 	}{
-		{name: "adjusted exponent below lower bound", context: "adjusted exponent -100001"},
-		{name: "adjusted exponent above upper bound", context: "adjusted exponent 100001"},
-		{name: "upper bound carry", context: "upper-bound carry adjusted exponent 100001"},
-		{name: "required precision above apd limit", context: "required precision above 2147383649"},
+		{name: "adjusted exponent below lower bound", value: func() apd.Decimal { return financialFormattingDecimalWithExponent(-100001) }, wantContext: "adjusted exponent is out of range"},
+		{name: "adjusted exponent above upper bound", value: func() apd.Decimal { return financialFormattingDecimalWithExponent(100001) }, wantContext: "adjusted exponent is out of range"},
+		{name: "upper bound carry", value: financialFormattingUpperBoundCarry, wantContext: "adjusted exponent exceeds range after rounding"},
+		{name: "required precision above apd limit", value: func() apd.Decimal { return *apd.New(123, -2) }, injectedPrecision: true, wantContext: "required precision 2147383650 exceeds apd operational limit"},
 	}
 
 	for _, failureCase := range failureCases {
@@ -39,9 +43,26 @@ func TestReportFinancialFormattingFailuresStopBeforeOutputAndRetry(t *testing.T)
 			t.Run(failureCase.name+"/"+string(outputFormat), func(t *testing.T) {
 				var reportIO = testutil.NewReportIOFixture(t)
 				var openLogPath = runtimeflow.InstallOpenCommandRecorder(t, 0)
+				var markdownCalls int
+				var pdfCalls int
+				var transformCalls int
 				var pipelineOptions = runtime.ReportPipelineOptions{
-					MarkdownFinancialFormatting: runtimeflow.FinancialFormattingFailureOptions(t, failureCase.context),
-					PDFFinancialFormatting:      runtimeflow.FinancialFormattingFailureOptions(t, failureCase.context),
+					CalculatedReportTransform: func(report reportmodel.CapitalGainsReport) reportmodel.CapitalGainsReport {
+						transformCalls++
+						if transformCalls == 1 {
+							report.YearlyNetTotal = failureCase.value()
+						}
+						return report
+					},
+					MarkdownRenderObserver: func() { markdownCalls++ },
+					PDFRenderObserver:      func() { pdfCalls++ },
+				}
+				if failureCase.injectedPrecision {
+					if outputFormat == reportmodel.ReportOutputFormatMarkdown {
+						pipelineOptions.MarkdownFinancialFormatting = runtimeflow.RequiredPrecisionFailureOptions(t)
+					} else {
+						pipelineOptions.PDFFinancialFormatting = runtimeflow.RequiredPrecisionFailureOptions(t)
+					}
 				}
 				var harness = runtimeflow.NewRuntimeBackedFlowHarnessWithCurrencyRateServiceAndReportPipelineOptions(
 					t,
@@ -74,9 +95,16 @@ func TestReportFinancialFormattingFailuresStopBeforeOutputAndRetry(t *testing.T)
 				if failed.Success || failed.FailureReason != runtime.ReportFailureUnsupportedReportCalculation {
 					t.Fatalf("expected selected %s formatting failure, got %#v", outputFormat, failed)
 				}
-				if !strings.Contains(failed.Message, failureCase.context) || !strings.Contains(failed.Message, "[REDACTED]") || strings.Contains(failed.Message, "synthetic-financial-format-secret") {
+				if !strings.Contains(failed.Message, failureCase.wantContext) || strings.Contains(failed.Message, "synthetic-financial-format-secret") {
 					t.Fatalf("expected contextual redacted formatting failure, got %q", failed.Message)
 				}
+				if !failureCase.injectedPrecision && !strings.Contains(failed.Message, "render yearly net total") {
+					t.Fatalf("expected calculated yearly total to reach selected renderer, got %q", failed.Message)
+				}
+				if failureCase.injectedPrecision && !strings.Contains(failed.Message, "Bearer [REDACTED]") {
+					t.Fatalf("expected injected precision secret to be redacted, got %q", failed.Message)
+				}
+				assertFinancialFormattingRendererCalls(t, outputFormat, markdownCalls, pdfCalls, 1)
 				if strings.Contains(failed.Message, component.ReportCleartextExportDisclosureText) || strings.Contains(failed.Message, component.ReportCleartextExportDeletionGuidanceText) {
 					t.Fatalf("expected TUI-owned disclosure to stay out of failure message, got %q", failed.Message)
 				}
@@ -84,8 +112,14 @@ func TestReportFinancialFormattingFailuresStopBeforeOutputAndRetry(t *testing.T)
 					t.Fatalf("expected no document, bundle, saved path, or output metadata, got %#v", failed)
 				}
 				var diagnosticText = failed.Diagnostic.Request.Context.FailureDetail + " " + strings.Join(failed.Diagnostic.Request.Context.FailureCauseChain, " ")
-				if !strings.Contains(diagnosticText, "[REDACTED]") || strings.Contains(diagnosticText, "synthetic-financial-format-secret") {
+				if !strings.Contains(diagnosticText, failureCase.wantContext) || strings.Contains(diagnosticText, "synthetic-financial-format-secret") {
 					t.Fatalf("expected redacted diagnostic formatting context, got %#v", failed.Diagnostic.Request.Context)
+				}
+				if !failureCase.injectedPrecision && !strings.Contains(diagnosticText, "render yearly net total") {
+					t.Fatalf("expected calculated yearly total diagnostic context, got %#v", failed.Diagnostic.Request.Context)
+				}
+				if failureCase.injectedPrecision && !strings.Contains(diagnosticText, "Bearer [REDACTED]") {
+					t.Fatalf("expected redacted injected precision diagnostic, got %#v", failed.Diagnostic.Request.Context)
 				}
 				if files, readErr := os.ReadDir(reportIO.DocumentsDir); readErr != nil || len(files) != 0 {
 					t.Fatalf("expected no writer reservation or file after formatting failure, files=%#v err=%v", files, readErr)
@@ -103,6 +137,7 @@ func TestReportFinancialFormattingFailuresStopBeforeOutputAndRetry(t *testing.T)
 				if !retried.Success || retried.OutputFormat != outputFormat || retried.FailureReason != runtime.ReportFailureNone {
 					t.Fatalf("expected successful same-format retry, got %#v", retried)
 				}
+				assertFinancialFormattingRendererCalls(t, outputFormat, markdownCalls, pdfCalls, 2)
 				var after, calculateErr = calculator.Calculate(context.Background(), request, fixture.ProtectedActivityCache)
 				if calculateErr != nil {
 					t.Fatalf("calculate post-retry model: %v", calculateErr)
@@ -118,6 +153,44 @@ func TestReportFinancialFormattingFailuresStopBeforeOutputAndRetry(t *testing.T)
 				runtimeflow.AssertNoCleartextReportInAppStorage(t, harness.BaseDir)
 			})
 		}
+	}
+}
+
+// financialFormattingDecimalWithExponent constructs a finite one-digit value
+// that reaches the production adjusted-exponent guard without large allocation.
+// Authored by: OpenCode
+func financialFormattingDecimalWithExponent(exponent int32) apd.Decimal {
+	var value apd.Decimal
+	value.Form = apd.Finite
+	value.Coeff.SetInt64(1)
+	value.Exponent = exponent
+	return value
+}
+
+// financialFormattingUpperBoundCarry constructs the accepted upper-bound value
+// whose concrete HALF UP quantization carries into adjusted exponent 100001.
+// Authored by: OpenCode
+func financialFormattingUpperBoundCarry() apd.Decimal {
+	var value apd.Decimal
+	if _, _, err := value.SetString(strings.Repeat("9", 100001) + ".995"); err != nil {
+		panic(err)
+	}
+	return value
+}
+
+// assertFinancialFormattingRendererCalls proves that only the selected concrete
+// renderer was entered for the expected number of failure and retry attempts.
+// Authored by: OpenCode
+func assertFinancialFormattingRendererCalls(t testing.TB, outputFormat reportmodel.ReportOutputFormat, markdownCalls int, pdfCalls int, wantSelected int) {
+	t.Helper()
+	if outputFormat == reportmodel.ReportOutputFormatMarkdown {
+		if markdownCalls != wantSelected || pdfCalls != 0 {
+			t.Fatalf("renderer calls Markdown=%d PDF=%d, want Markdown=%d PDF=0", markdownCalls, pdfCalls, wantSelected)
+		}
+		return
+	}
+	if pdfCalls != wantSelected || markdownCalls != 0 {
+		t.Fatalf("renderer calls Markdown=%d PDF=%d, want Markdown=0 PDF=%d", markdownCalls, pdfCalls, wantSelected)
 	}
 }
 

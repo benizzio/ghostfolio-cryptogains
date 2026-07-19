@@ -16,6 +16,13 @@ import (
 // assembling the report pipeline. A zero value preserves production behavior.
 // Authored by: OpenCode
 type ReportPipelineOptions struct {
+	// CalculatedReportTransform changes the calculated report before rendering.
+	// It is nil in production and exists for runtime-backed boundary tests.
+	CalculatedReportTransform func(reportmodel.CapitalGainsReport) reportmodel.CapitalGainsReport
+	// MarkdownRenderObserver observes entry into the concrete Markdown renderer.
+	MarkdownRenderObserver func()
+	// PDFRenderObserver observes entry into the concrete PDF renderer.
+	PDFRenderObserver func()
 	// MarkdownFinancialFormatting scopes financial formatting to Markdown
 	// renderers assembled by this pipeline.
 	MarkdownFinancialFormatting presentation.FinancialFormattingOptions

@@ -80,13 +80,23 @@ func newReportService(
 	pipelineOptions ReportPipelineOptions,
 ) ReportService {
 	var calculator = reportcalculate.NewCalculator(currencyRates)
+	var calculate reportCalculator = calculator.Calculate
+	if pipelineOptions.CalculatedReportTransform != nil {
+		calculate = func(ctx context.Context, request reportmodel.ReportRequest, cache syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			var report, err = calculator.Calculate(ctx, request, cache)
+			if err != nil {
+				return reportmodel.CapitalGainsReport{}, err
+			}
+			return pipelineOptions.CalculatedReportTransform(report), nil
+		}
+	}
 
 	var service = &reportService{
 		snapshots:         snapshots,
 		allowDevHTTP:      allowDevHTTP,
 		diagnosticReports: newDiagnosticReportService(baseConfigDir),
 		currencyRates:     currencyRates,
-		calculate:         calculator.Calculate,
+		calculate:         calculate,
 		renderBundle: func(outputFormat reportmodel.ReportOutputFormat, report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
 			return renderReportOutputBundleWithOptions(outputFormat, report, pipelineOptions)
 		},
@@ -208,6 +218,9 @@ func renderReportOutputBundleWithOptions(
 	switch outputFormat {
 	case reportmodel.ReportOutputFormatMarkdown:
 		var renderer = reportmarkdown.NewRenderer(reportmarkdown.RenderOptions{FinancialFormatting: pipelineOptions.MarkdownFinancialFormatting})
+		if pipelineOptions.MarkdownRenderObserver != nil {
+			pipelineOptions.MarkdownRenderObserver()
+		}
 		return renderer.RenderDocuments(report)
 	case reportmodel.ReportOutputFormatPDF:
 		var renderOptions = reportPDFRenderOptions()
@@ -216,6 +229,9 @@ func renderReportOutputBundleWithOptions(
 		var renderer, err = reportpdf.NewRenderer(renderOptions)
 		if err != nil {
 			return nil, err
+		}
+		if pipelineOptions.PDFRenderObserver != nil {
+			pipelineOptions.PDFRenderObserver()
 		}
 		var payload []byte
 		payload, err = renderer.Render(report)
