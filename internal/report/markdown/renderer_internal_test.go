@@ -1367,6 +1367,46 @@ func TestRendererEmitsExactLegalWarning(t *testing.T) {
 	}
 }
 
+// TestSummaryOmitsOutOfDomainExactZeroBeforeFormatting verifies an omitted
+// exact-zero row never reaches the financial formatter while the yearly total
+// retains normal formatting and the summary retains its empty state.
+// Authored by: OpenCode
+func TestSummaryOmitsOutOfDomainExactZeroBeforeFormatting(t *testing.T) {
+	var outOfDomainZero = *apd.New(0, 100001)
+	var entry, entryErr = reportmodel.NewAssetSummaryEntry("omitted-zero", "Omitted Zero", outOfDomainZero, "USD")
+	if entryErr != nil {
+		t.Fatalf("create exact-zero summary entry: %v", entryErr)
+	}
+
+	var formatterCalls int
+	var options = presentation.NewFinancialFormattingTestOptions(func(int64, int64) error {
+		formatterCalls++
+		return nil
+	})
+	var report = reportmodel.CapitalGainsReport{
+		SummaryEntries: []reportmodel.AssetSummaryEntry{entry},
+		YearlyNetTotal: *apd.New(125, -2),
+	}
+	var builder strings.Builder
+	if err := writeSummarySectionWithFinancialFormatting(&builder, report, "USD", options); err != nil {
+		t.Fatalf("write summary with out-of-domain exact zero: %v", err)
+	}
+
+	var rendered = builder.String()
+	if formatterCalls != 1 {
+		t.Fatalf("expected only the yearly total to reach formatting, got %d calls", formatterCalls)
+	}
+	if strings.Contains(rendered, "| Omitted Zero |") {
+		t.Fatalf("expected exact-zero summary entry to remain omitted, got %q", rendered)
+	}
+	if !strings.Contains(rendered, "No assets had a non-zero net gain or loss in the selected year.") {
+		t.Fatalf("expected exact-zero summary to retain empty state, got %q", rendered)
+	}
+	if !strings.Contains(rendered, "| Overall Yearly Net Total | 1.25 | USD |") {
+		t.Fatalf("expected yearly total formatting to remain unchanged, got %q", rendered)
+	}
+}
+
 // TestRendererFinancialMatrixUsesScaleTwoAndPreservesSources verifies every
 // direct and row-built Markdown financial field against the presentation
 // vectors, including exact-zero conversion omission and source immutability.
