@@ -63,7 +63,7 @@ func TestReportGenerationMatchesControlledLedgersAcrossCostBasisMethods(t *testi
 				t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
 			}
 
-			var content = normalizeRenderedText(model.View().Content)
+			var content = runtimeflow.ReportResultText(t, model)
 			if !strings.Contains(content, "Selected Year: 2024") || !strings.Contains(content, "Cost Basis Method: "+method.Label()) {
 				t.Fatalf("expected selected year and method in result view, got %q", content)
 			}
@@ -148,7 +148,7 @@ func TestReportGenerationSupportsRoundedRepeatingDecimalHistoryAcrossMethods(t *
 			if model.ActiveScreen() != "report_result" {
 				t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
 			}
-			var content = normalizeRenderedText(model.View().Content)
+			var content = runtimeflow.ReportResultText(t, model)
 			if !strings.Contains(content, "Saved Markdown Path:") || !strings.Contains(content, "Cost Basis Method: "+method.Label()) {
 				t.Fatalf("expected successful rounded report result for %q, got %q", method.Label(), content)
 			}

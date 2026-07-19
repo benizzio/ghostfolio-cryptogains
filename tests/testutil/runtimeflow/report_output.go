@@ -126,10 +126,10 @@ func AssertReportResultDisclosure(t *testing.T, content string, outputFormat rep
 	t.Helper()
 
 	if strings.Count(content, component.ReportCleartextExportDisclosureText) != 1 {
-		t.Fatalf("expected cleartext export disclosure exactly once, got %q", content)
+		t.Fatalf("expected cleartext export disclosure exactly once in reachable result pages, got %q", content)
 	}
 	if strings.Count(content, component.ReportCleartextExportDeletionGuidanceText) != 1 {
-		t.Fatalf("expected export deletion guidance exactly once, got %q", content)
+		t.Fatalf("expected export deletion guidance exactly once in reachable result pages, got %q", content)
 	}
 
 	var expectedLabels = reportResultPathLabels(t, outputFormat, len(paths))
@@ -164,7 +164,7 @@ func assertReportResultLabels(t *testing.T, content string, labels []string) {
 	t.Helper()
 	for _, label := range labels {
 		if strings.Count(content, label) != 1 {
-			t.Fatalf("expected result label %q exactly once, got %q", label, content)
+			t.Fatalf("expected result label %q exactly once in reachable result pages, got %q", label, content)
 		}
 	}
 }
@@ -184,7 +184,7 @@ func assertReportResultPathsOnce(t *testing.T, content string, paths []string) {
 		}
 		seen[path] = struct{}{}
 		if strings.Count(compactContent, path) != 1 {
-			t.Fatalf("expected saved report path %q exactly once, got %q", path, content)
+			t.Fatalf("expected saved report path %q exactly once in reachable result pages, got %q", path, content)
 		}
 	}
 }

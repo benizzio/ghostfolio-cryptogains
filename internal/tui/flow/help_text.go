@@ -83,7 +83,7 @@ func (m *Model) reportBusyHelpText() string {
 func (m *Model) reportResultHelpText() string {
 	return component.RenderHelp(
 		component.ContentWidthForScreen(m.width),
-		component.Bindings{Short: []key.Binding{upBinding(), downBinding(), enterBinding(), quitBinding()}},
+		component.Bindings{Short: []key.Binding{reportActionHelpBinding(), reportScrollHelpBinding(), enterBinding(), quitBinding()}},
 	)
 }
 

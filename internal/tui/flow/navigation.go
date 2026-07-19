@@ -20,6 +20,10 @@ var (
 	cachedCancelBinding    = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel"))
 	cachedEditSetupBinding = key.NewBinding(key.WithKeys("ctrl+e"), key.WithHelp("ctrl+e", "edit setup"))
 	cachedQuitBinding      = key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit"))
+	cachedPageUpBinding    = key.NewBinding(key.WithKeys("pgup"), key.WithHelp("pgup", "scroll up"))
+	cachedPageDownBinding  = key.NewBinding(key.WithKeys("pgdown"), key.WithHelp("pgdn", "scroll down"))
+	cachedReportActionHelp = key.NewBinding(key.WithKeys("up", "down"), key.WithHelp("up/down", "choose action"))
+	cachedReportScrollHelp = key.NewBinding(key.WithKeys("pgup", "pgdown"), key.WithHelp("pgup/pgdn", "scroll"))
 )
 
 // upBinding returns the shared upward menu navigation binding.
@@ -62,6 +66,30 @@ func editSetupBinding() key.Binding {
 // Authored by: OpenCode
 func quitBinding() key.Binding {
 	return cachedQuitBinding
+}
+
+// pageUpBinding returns the report-result upward paging binding.
+// Authored by: OpenCode
+func pageUpBinding() key.Binding {
+	return cachedPageUpBinding
+}
+
+// pageDownBinding returns the report-result downward paging binding.
+// Authored by: OpenCode
+func pageDownBinding() key.Binding {
+	return cachedPageDownBinding
+}
+
+// reportActionHelpBinding returns compact report-result action-navigation help.
+// Authored by: OpenCode
+func reportActionHelpBinding() key.Binding {
+	return cachedReportActionHelp
+}
+
+// reportScrollHelpBinding returns compact report-result paging help.
+// Authored by: OpenCode
+func reportScrollHelpBinding() key.Binding {
+	return cachedReportScrollHelp
 }
 
 // updateMainMenu handles main-menu navigation.
@@ -284,6 +312,7 @@ func (m *Model) generateDiagnosticReport() (tea.Model, tea.Cmd) {
 			m.syncReports.ReportResult.Diagnostic.Request = request
 			m.report.Busy = true
 			m.syncReports.ReportResult.Diagnostic.GenerationMessage = "Generating diagnostic report..."
+			m.refreshReportResultViewport(false)
 		} else {
 			m.result.Outcome.Diagnostic.Request = request
 			m.result.Busy = true
@@ -316,11 +345,13 @@ func (m *Model) handleDiagnosticReportFinished(message diagnosticReportFinishedM
 		m.report.Busy = false
 		if message.Err != nil {
 			m.syncReports.ReportResult.Diagnostic.GenerationMessage = "Diagnostic report generation failed. Try again."
+			m.refreshReportResultViewport(false)
 			return m, nil
 		}
 
 		m.syncReports.ReportResult.Diagnostic.Path = message.Path
 		m.syncReports.ReportResult.Diagnostic.GenerationMessage = "Diagnostic report generated successfully."
+		m.refreshReportResultViewport(false)
 		return m, nil
 	}
 

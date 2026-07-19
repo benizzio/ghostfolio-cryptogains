@@ -124,6 +124,9 @@ func (m *Model) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = typedMessage.Width
 		m.height = typedMessage.Height
+		if m.active == reportResultScreenKey {
+			m.refreshReportResultViewport(false)
+		}
 		return m, nil
 	case tea.KeyPressMsg:
 		if typedMessage.String() == "ctrl+c" {

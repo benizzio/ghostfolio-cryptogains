@@ -196,7 +196,15 @@ func (m *Model) viewReportBusyScreen() string {
 // viewReportResultScreen renders completed report output state.
 // Authored by: OpenCode
 func (m *Model) viewReportResultScreen() string {
-	return screen.ReportResultScreenView(screen.ReportResultScreenParams{
+	var params = m.reportResultScreenParams()
+	params.BodyView = m.report.ResultViewport.View()
+	return screen.ReportResultScreenView(params)
+}
+
+// reportResultScreenParams builds the shared report-result rendering state.
+// Authored by: OpenCode
+func (m *Model) reportResultScreenParams() screen.ReportResultScreenParams {
+	return screen.ReportResultScreenParams{
 		Theme:         m.theme,
 		Width:         m.width,
 		Height:        m.height,
@@ -205,7 +213,21 @@ func (m *Model) viewReportResultScreen() string {
 		MenuItems:     m.reportResultMenuItems(),
 		SelectedIndex: m.report.ActionIndex,
 		HelpText:      m.reportResultHelpText(),
-	})
+	}
+}
+
+// refreshReportResultViewport updates report-result content and dimensions,
+// optionally returning the viewport to its first line for a new result.
+// Authored by: OpenCode
+func (m *Model) refreshReportResultViewport(reset bool) {
+	var params = m.reportResultScreenParams()
+	var width, height = screen.ReportResultBodyContentSize(params)
+	m.report.ResultViewport.SetWidth(width)
+	m.report.ResultViewport.SetHeight(height)
+	m.report.ResultViewport.SetContent(screen.ReportResultBodyView(params))
+	if reset {
+		m.report.ResultViewport.GotoTop()
+	}
 }
 
 // viewServerReplacementScreen renders server-replacement confirmation.

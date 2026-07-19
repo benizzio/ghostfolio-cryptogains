@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/component"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 )
@@ -174,6 +175,86 @@ func ApplyBatchCmd(t *testing.T, model *flow.Model, cmd tea.Cmd) *flow.Model {
 		}
 	}
 	return model
+}
+
+// ReportResultText scrolls through every page of the current report-result
+// viewport and returns its normalized visible text in page order.
+//
+// For example, call it after report generation reaches `report_result`, then
+// assert that saved paths or failure guidance occur in the returned text. The
+// helper widens the deterministic test terminal to avoid introducing artificial
+// word splits while exercising the same page-up and page-down flow bindings.
+// Authored by: OpenCode
+func ReportResultText(t *testing.T, model *flow.Model) string {
+	t.Helper()
+	if model.ActiveScreen() != "report_result" {
+		t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
+	}
+
+	var updated tea.Model
+	updated, _ = model.Update(tea.WindowSizeMsg{Width: 1000, Height: 32})
+	model = AssertFlowModel(t, updated)
+	for attempt := 0; attempt < 256; attempt++ {
+		var before = NormalizeRenderedText(model.View().Content)
+		updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyPgUp}))
+		model = AssertFlowModel(t, updated)
+		if NormalizeRenderedText(model.View().Content) == before {
+			break
+		}
+	}
+
+	var bodyWords []string
+	for attempt := 0; attempt < 256; attempt++ {
+		var current = NormalizeRenderedText(model.View().Content)
+		bodyWords = mergeReportResultBodyWords(bodyWords, strings.Fields(reportResultVisibleBody(current)))
+		updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyPgDown}))
+		model = AssertFlowModel(t, updated)
+		if NormalizeRenderedText(model.View().Content) == current {
+			return strings.Join(bodyWords, " ")
+		}
+	}
+
+	t.Fatal("expected report-result paging to reach the final viewport page")
+	return ""
+}
+
+// reportResultVisibleBody removes repeated report-result chrome from one
+// normalized viewport page while retaining only the currently visible body.
+// Authored by: OpenCode
+func reportResultVisibleBody(content string) string {
+	const subtitle = "Review the saved-path outcome and choose the next step."
+	var subtitleIndex = strings.Index(content, subtitle)
+	if subtitleIndex >= 0 {
+		content = content[subtitleIndex+len(subtitle):]
+	}
+	var statusIndex = strings.Index(content, component.ReportSavedPathsTransientStatusText)
+	if statusIndex >= 0 {
+		content = content[:statusIndex]
+	}
+	return strings.TrimSpace(content)
+}
+
+// mergeReportResultBodyWords appends one visible body page after removing the
+// longest viewport overlap with the preceding accumulated body text.
+// Authored by: OpenCode
+func mergeReportResultBodyWords(accumulated []string, page []string) []string {
+	var maximumOverlap = len(accumulated)
+	if len(page) < maximumOverlap {
+		maximumOverlap = len(page)
+	}
+	for overlap := maximumOverlap; overlap > 0; overlap-- {
+		var matches = true
+		for index := 0; index < overlap; index++ {
+			if accumulated[len(accumulated)-overlap+index] != page[index] {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return append(accumulated, page[overlap:]...)
+		}
+	}
+	return append(accumulated, page...)
 }
 
 // AssertFlowModel returns updated as a flow model or fails the test. For example,

@@ -84,6 +84,7 @@ func (m *Model) enterReportResult(outcome runtime.ReportOutcome) {
 	m.report.AttemptID = ""
 	m.report.ActionIndex = 0
 	m.syncReports.ReportResult = outcome
+	m.refreshReportResultViewport(true)
 }
 
 // enterSync routes the application to the sync entry screen.

@@ -105,7 +105,7 @@ func TestReportGenerationSuccessWritesMarkdownAndReturnsToUnlockedContext(t *tes
 				}
 			}
 
-			var content = runtimeflow.NormalizeRenderedText(model.View().Content)
+			var content = runtimeflow.ReportResultText(t, model)
 			runtimeflow.AssertReportResultDisclosure(t, content, selectedFormat, files)
 			if !strings.Contains(content, "Selected Year: 2024") || !strings.Contains(content, "Cost Basis Method: FIFO") || !strings.Contains(content, "Report Base Currency: USD") || !strings.Contains(content, "Output Format: "+selectedFormat.Label()) {
 				t.Fatalf("expected selected report settings in result view, got %q", content)
@@ -240,7 +240,7 @@ func TestReportGenerationOpenWarningPreservesSavedReportAndAllowsAnotherRun(t *t
 				reportPath, _ = runtimeflow.MarkdownBundlePaths(t, files)
 			}
 
-			var content = runtimeflow.NormalizeRenderedText(model.View().Content)
+			var content = runtimeflow.ReportResultText(t, model)
 			runtimeflow.AssertReportResultDisclosure(t, content, selectedFormat, files)
 			if !strings.Contains(content, "Output Format: "+selectedFormat.Label()) {
 				t.Fatalf("expected selected output format in result view, got %q", content)
@@ -306,7 +306,7 @@ func TestReportGenerationSkipsCurrencylessOrderTier(t *testing.T) {
 	if model.ActiveScreen() != "report_result" {
 		t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
 	}
-	var content = normalizeRenderedText(model.View().Content)
+	var content = runtimeflow.ReportResultText(t, model)
 	if !strings.Contains(content, "Saved Markdown Path:") {
 		t.Fatalf("expected successful report result, got %q", content)
 	}

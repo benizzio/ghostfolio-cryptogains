@@ -128,7 +128,7 @@ func TestReportGenerationIncompleteMonetaryContextShowsFailure(t *testing.T) {
 		t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
 	}
 
-	var content = normalizeRenderedText(model.View().Content)
+	var content = runtimeflow.ReportResultText(t, model)
 	for _, expected := range []string{
 		"Failure Category: unsupported report calculation",
 		"DOGE",
@@ -155,12 +155,12 @@ func TestReportGenerationIncompleteMonetaryContextShowsFailure(t *testing.T) {
 	var updated tea.Model
 	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	model = assertFlowModel(t, updated)
-	if !strings.Contains(normalizeRenderedText(model.View().Content), "Generating diagnostic report...") {
+	if !strings.Contains(runtimeflow.ReportResultText(t, model), "Generating diagnostic report...") {
 		t.Fatalf("expected report result diagnostics busy state, got %q", model.View().Content)
 	}
 	updated, _ = model.Update(testutil.RunCmd(cmd))
 	model = assertFlowModel(t, updated)
-	content = normalizeRenderedText(model.View().Content)
+	content = runtimeflow.ReportResultText(t, model)
 	if !strings.Contains(content, "Diagnostic Report Path:") {
 		t.Fatalf("expected report diagnostics path disclosure, got %q", content)
 	}
@@ -200,7 +200,7 @@ func TestReportGenerationIncompleteMonetaryContextAutoGeneratesDiagnosticsInExpl
 		t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
 	}
 
-	var content = normalizeRenderedText(model.View().Content)
+	var content = runtimeflow.ReportResultText(t, model)
 	if strings.Contains(content, "Generate Diagnostic Report") {
 		t.Fatalf("expected explicit development mode to skip the prompt, got %q", content)
 	}
@@ -268,7 +268,7 @@ func TestReportGenerationIncompleteMonetaryContextFailsAfterAllExplicitCurrencyT
 		t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
 	}
 
-	var content = normalizeRenderedText(model.View().Content)
+	var content = runtimeflow.ReportResultText(t, model)
 	for _, expected := range []string{
 		"Failure Category: unsupported report calculation",
 		"ADA",
@@ -375,7 +375,7 @@ func TestReportGenerationConversionFailureMatrixShowsSafeFailure(t *testing.T) {
 			if model.ActiveScreen() != "report_result" {
 				t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
 			}
-			var content = normalizeRenderedText(model.View().Content)
+			var content = runtimeflow.ReportResultText(t, model)
 			for _, expected := range testCase.expectedSnippets {
 				if !strings.Contains(content, expected) {
 					t.Fatalf("expected conversion failure result to contain %q, got %q", expected, content)
@@ -425,7 +425,7 @@ func TestReportGenerationDocumentsUnavailableShowsFailure(t *testing.T) {
 		t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
 	}
 
-	var content = normalizeRenderedText(model.View().Content)
+	var content = runtimeflow.ReportResultText(t, model)
 	if !strings.Contains(content, "Failure Category: documents folder unavailable") {
 		t.Fatalf("expected documents-folder failure category, got %q", content)
 	}
@@ -549,7 +549,7 @@ func runReportGenerationWriteFailureScenario(t *testing.T) {
 		t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
 	}
 
-	var content = normalizeRenderedText(model.View().Content)
+	var content = runtimeflow.ReportResultText(t, model)
 	for _, expected := range []string{
 		"Failure Category: report file write failed",
 		"Could not save the report file:",
