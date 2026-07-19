@@ -216,16 +216,17 @@ func TestTableContinuationAndWrappedCellLayout(t *testing.T) {
 	}
 }
 
-// TestTableRowsUseIndividualMeasuredHeights verifies a tall row does not force
-// the same height onto a following short row during pagination or drawing.
+// TestTableRowsUseIndividualMeasuredHeights verifies a tall first-page row does
+// not prevent a following short row from being drawn on a continuation page.
 // Authored by: OpenCode
 func TestTableRowsUseIndividualMeasuredHeights(t *testing.T) {
 	var document = startedTestDocument(t)
-	var tallRow = strings.TrimSuffix(strings.Repeat("TALL-ROW\n", 35), "\n")
+	var tallRow = strings.Repeat("TALL-ROW-LINE\n", 70) + "TALL-ROW-END"
+	var shortRow = "SHORT-ROW"
 	var table = pdfTable{
 		ContinuationTitle: "Mixed-height table (continued)",
 		Columns:           []pdfColumn{{Header: "Entry", Width: 1, Align: "left"}},
-		Rows:              [][]string{{tallRow}, {"SHORT-ROW"}},
+		Rows:              [][]string{{tallRow}, {shortRow}},
 	}
 	var rowHeights, err = document.tableRowHeights(printableWidthColumns(table.Columns), table.Rows, 24)
 	if err != nil {
@@ -233,6 +234,10 @@ func TestTableRowsUseIndividualMeasuredHeights(t *testing.T) {
 	}
 	if rowHeights[0] <= rowHeights[1] {
 		t.Fatalf("mixed row heights = %#v, want first row taller than second", rowHeights)
+	}
+	var continuationCapacity = pageBottom - document.tableContinuationStartY() - 12 - 24
+	if rowHeights[0] <= continuationCapacity {
+		t.Fatalf("tall row height = %.2f, want more than fresh continuation capacity %.2f", rowHeights[0], continuationCapacity)
 	}
 	if err = document.AddTable(table); err != nil {
 		t.Fatalf("draw mixed-height table: %v", err)
@@ -248,11 +253,27 @@ func TestTableRowsUseIndividualMeasuredHeights(t *testing.T) {
 	if err != nil {
 		t.Fatalf("inspect mixed-height table: %v", err)
 	}
-	if len(inspection.PageBoxes) != 1 {
-		t.Fatalf("mixed-height table pages = %d, want 1", len(inspection.PageBoxes))
+	if len(inspection.PageBoxes) != 2 {
+		t.Fatalf("mixed-height table pages = %d, want 2", len(inspection.PageBoxes))
 	}
-	if !inspection.ContainsSearchableText("TALL-ROW") || !inspection.ContainsSearchableText("SHORT-ROW") {
+	if !inspection.ContainsSearchableText(tallRow) || !inspection.ContainsSearchableText(shortRow) {
 		t.Fatalf("mixed-height rows are not both searchable: %q", inspection.SearchableText)
+	}
+	var tallRowEndPage int
+	var shortRowPage int
+	for _, run := range inspection.TextRuns {
+		if strings.Contains(run.Text, "TALL-ROW-END") {
+			tallRowEndPage = run.Page
+		}
+		if strings.Contains(run.Text, shortRow) {
+			shortRowPage = run.Page
+		}
+	}
+	if tallRowEndPage != 1 {
+		t.Fatalf("tall row end page = %d, want page 1", tallRowEndPage)
+	}
+	if shortRowPage != 2 {
+		t.Fatalf("short row page = %d, want continuation page 2", shortRowPage)
 	}
 }
 
