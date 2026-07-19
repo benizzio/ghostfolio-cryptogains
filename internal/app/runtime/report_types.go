@@ -114,7 +114,11 @@ type ReportOutcome struct {
 	OutputFormat  reportmodel.ReportOutputFormat
 	OutputBundle  reportmodel.ReportOutputBundle
 	OutputFile    reportmodel.ReportOutputFile
-	Diagnostic    DiagnosticReportState
+	// ResidualOutputPaths identifies current-attempt files whose cleanup failed
+	// and which may still contain cleartext financial data. It is transient
+	// failure guidance, not successful output metadata.
+	ResidualOutputPaths []string
+	Diagnostic          DiagnosticReportState
 }
 
 // ReportFailureDiagnosticCarrier exposes original persisted-record context for

@@ -45,6 +45,31 @@ func TestFailureHelpersCoverNilAndWrappedBranches(t *testing.T) {
 	if got := typed.Category(); got != FailureCategoryReportFileWriteFailed {
 		t.Fatalf("expected wrapped failure category, got %q", got)
 	}
+
+	var cleanupPaths = []string{"/tmp/report.md", "/tmp/annex.md"}
+	var residualPaths = []string{"/tmp/report.md"}
+	var detailed = NewFailureWithCleanup(FailureCategoryReportFileWriteFailed, errors.New("cleanup boom"), cleanupPaths, residualPaths)
+	cleanupPaths[0] = "mutated"
+	residualPaths[0] = "mutated"
+	var gotCleanup = CleanupPathsOf(detailed)
+	var gotResidual = ResidualPathsOf(detailed)
+	if len(gotCleanup) != 2 || gotCleanup[0] != "/tmp/report.md" || len(gotResidual) != 1 || gotResidual[0] != "/tmp/report.md" {
+		t.Fatalf("expected defensively copied cleanup details, got cleanup=%#v residual=%#v", gotCleanup, gotResidual)
+	}
+	gotCleanup[0] = "mutated again"
+	gotResidual[0] = "mutated again"
+	if CleanupPathsOf(detailed)[0] != "/tmp/report.md" || ResidualPathsOf(detailed)[0] != "/tmp/report.md" {
+		t.Fatalf("expected detail accessors to return defensive copies")
+	}
+	if CleanupPathsOf(errors.New("plain")) != nil || ResidualPathsOf(errors.New("plain")) != nil {
+		t.Fatalf("expected plain errors to expose no cleanup context")
+	}
+	if !CleanupFailed(detailed) || CleanupFailed(errors.New("plain")) {
+		t.Fatalf("expected cleanup failure status only for detailed cleanup failure")
+	}
+	if NewFailureWithCleanup(FailureCategoryReportFileWriteFailed, nil, cleanupPaths, residualPaths) != nil {
+		t.Fatalf("expected nil detailed failure input to remain nil")
+	}
 }
 
 // TestDeterministicWriteFailureAfterCreateError verifies package-internal env
@@ -71,6 +96,30 @@ func TestDeterministicWriteFailureAfterCreateError(t *testing.T) {
 	}
 	if category, ok := FailureCategoryOf(wrapFailure(FailureCategoryReportFileWriteFailed, deterministicWriteFailureAfterCreateError())); !ok || category != FailureCategoryReportFileWriteFailed {
 		t.Fatalf("expected configured write failure to remain wrappable as typed output failure, got category=%q ok=%t", category, ok)
+	}
+}
+
+// TestDeterministicCleanupRemovalFailureError verifies package-internal env
+// parsing for deterministic cleanup removal failures.
+// Authored by: OpenCode
+func TestDeterministicCleanupRemovalFailureError(t *testing.T) {
+	var previousLookupEnv = lookupEnv
+	t.Cleanup(func() {
+		lookupEnv = previousLookupEnv
+	})
+
+	lookupEnv = func(string) (string, bool) {
+		return "   ", true
+	}
+	if err := deterministicCleanupRemovalFailureError(); err != nil {
+		t.Fatalf("expected blank cleanup failure to be ignored, got %v", err)
+	}
+
+	lookupEnv = func(string) (string, bool) {
+		return " cleanup removal failed ", true
+	}
+	if err := deterministicCleanupRemovalFailureError(); err == nil || err.Error() != "cleanup removal failed" {
+		t.Fatalf("expected trimmed cleanup removal failure, got %v", err)
 	}
 }
 

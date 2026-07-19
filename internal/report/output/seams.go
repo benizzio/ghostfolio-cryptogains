@@ -18,6 +18,11 @@ import (
 // Authored by: OpenCode
 const deterministicWriteFailureAfterCreateEnvName = "GHOSTFOLIO_CRYPTOGAINS_OUTPUT_FAIL_WRITE_AFTER_CREATE"
 
+// deterministicCleanupRemovalFailureEnvName enables one package-internal
+// deterministic removal failure after a failed report output attempt.
+// Authored by: OpenCode
+const deterministicCleanupRemovalFailureEnvName = "GHOSTFOLIO_CRYPTOGAINS_OUTPUT_FAIL_CLEANUP_REMOVE"
+
 // Test seams wrap platform and filesystem behavior so output tests can verify
 // failure handling without mutating the host system.
 // Authored by: OpenCode
@@ -58,7 +63,13 @@ var openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncC
 
 // Test seams wrap file removal so output tests can verify cleanup behavior.
 // Authored by: OpenCode
-var removePath = os.Remove
+var removePath = func(path string) error {
+	var removeErr = deterministicCleanupRemovalFailureError()
+	if removeErr != nil {
+		return removeErr
+	}
+	return os.Remove(path)
+}
 
 // Test seams wrap timestamp generation so output tests can verify fallback time
 // behavior safely.
@@ -89,6 +100,18 @@ func wrapDeterministicWriteFailure(file *os.File) writeSyncCloser {
 // Authored by: OpenCode
 func deterministicWriteFailureAfterCreateError() error {
 	var value, ok = lookupEnv(deterministicWriteFailureAfterCreateEnvName)
+	if !ok || strings.TrimSpace(value) == "" {
+		return nil
+	}
+
+	return errors.New(strings.TrimSpace(value))
+}
+
+// deterministicCleanupRemovalFailureError returns the configured package-
+// internal cleanup removal failure, if any.
+// Authored by: OpenCode
+func deterministicCleanupRemovalFailureError() error {
+	var value, ok = lookupEnv(deterministicCleanupRemovalFailureEnvName)
 	if !ok || strings.TrimSpace(value) == "" {
 		return nil
 	}

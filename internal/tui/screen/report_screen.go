@@ -320,6 +320,9 @@ func reportResultSummary(outcome runtime.ReportOutcome) string {
 	}
 
 	var lines = []string{outcome.Message}
+	if len(outcome.ResidualOutputPaths) > 0 {
+		lines = append(lines, reportResidualOutputSummary(outcome.ResidualOutputPaths))
+	}
 	if strings.TrimSpace(outcome.Diagnostic.GenerationMessage) != "" {
 		lines = append(lines, outcome.Diagnostic.GenerationMessage)
 	}
@@ -331,6 +334,18 @@ func reportResultSummary(outcome runtime.ReportOutcome) string {
 	}
 
 	return strings.Join(lines, "\n\n")
+}
+
+// reportResidualOutputSummary discloses every maybe-residual cleartext path and
+// gives explicit deletion guidance after failed cleanup.
+// Authored by: OpenCode
+func reportResidualOutputSummary(paths []string) string {
+	var lines = []string{"Cleartext financial-data files from this failed report attempt may remain."}
+	for _, path := range paths {
+		lines = append(lines, fmt.Sprintf("Residual or maybe-residual path: %s", path))
+	}
+	lines = append(lines, "Delete every listed path to remove the cleartext financial data from this failed attempt.")
+	return strings.Join(lines, "\n")
 }
 
 // reportOutputFiles returns every saved file in the successful outcome without

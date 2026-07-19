@@ -152,15 +152,18 @@ func (s *reportService) Generate(ctx context.Context, request ReportGenerationRe
 	outputBundle, err = s.writeReportDocuments(request.Request.OutputFormat, documents)
 	if err != nil {
 		var reason = reportWriteFailureReason(err)
-		var wrappedErr = reportWriteDiagnosticError(reason, err)
-		return s.reportFailureOutcome(
+		var cleanupPaths = reportoutput.CleanupPathsOf(err)
+		var wrappedErr = reportWriteDiagnosticError(reason, err, cleanupPaths)
+		var outcome = s.reportFailureOutcome(
 			ctx,
 			request,
 			outcomeAttempt,
 			reason,
-			reportWriteFailureMessage(reason, err),
+			reportWriteFailureMessage(reason, err, cleanupPaths, reportoutput.ResidualPathsOf(err), reportoutput.CleanupFailed(err)),
 			reportDiagnosticContextFromError(wrappedErr),
 		)
+		outcome.ResidualOutputPaths = reportoutput.ResidualPathsOf(err)
+		return outcome
 	}
 
 	var openedOutputBundle, openedOutcome = requestAutomaticOpenBundle(request.Request, outputBundle, s.open)

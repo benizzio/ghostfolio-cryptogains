@@ -327,6 +327,47 @@ func TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes(t *testin
 		}
 	})
 
+	t.Run("carries residual output paths without saved metadata or diagnostic disclosure", func(t *testing.T) {
+		var request = reportRequestFixture(t, 2024)
+		var mainPath = "/tmp/Documents/synthetic-main.md"
+		var annexPath = "/tmp/Documents/synthetic-annex.md"
+		var service = &reportService{
+			snapshots: reportSnapshotLifecycleWithCache(testutil.DeterministicReportLedgerFixture().ProtectedActivityCache),
+			calculate: func(_ context.Context, request reportmodel.ReportRequest, _ syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+				return capitalGainsReportFixture(t, request), nil
+			},
+			renderBundle: func(_ reportmodel.ReportOutputFormat, report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+				return reportDocumentBundleFixture(t, report), nil
+			},
+			writeBundle: func(reportmodel.ReportOutputFormat, []reportmodel.ReportDocument) (reportmodel.ReportOutputBundle, error) {
+				return reportmodel.ReportOutputBundle{}, reportoutput.NewFailureWithCleanup(
+					reportoutput.FailureCategoryReportFileWriteFailed,
+					errors.New("synthetic Annex write and cleanup failure at "+mainPath),
+					[]string{mainPath, annexPath},
+					[]string{mainPath},
+				)
+			},
+		}
+
+		var outcome = service.Generate(context.Background(), ReportGenerationRequest{Request: request})
+		if outcome.Success || outcome.OutputFile.Path != "" || len(outcome.OutputBundle.Files) != 0 {
+			t.Fatalf("expected failed output without saved metadata, got %#v", outcome)
+		}
+		if len(outcome.ResidualOutputPaths) != 1 || outcome.ResidualOutputPaths[0] != mainPath {
+			t.Fatalf("expected structured residual path, got %#v", outcome.ResidualOutputPaths)
+		}
+		if strings.Contains(outcome.Message, mainPath) || strings.Contains(outcome.Message, annexPath) || strings.Contains(outcome.Message, "was removed") {
+			t.Fatalf("expected redacted and accurate failure message, got %q", outcome.Message)
+		}
+		if !strings.Contains(outcome.Message, "could not confirm removal") {
+			t.Fatalf("expected incomplete-cleanup wording, got %q", outcome.Message)
+		}
+		var diagnostic = strings.Join(outcome.Diagnostic.Request.Context.FailureCauseChain, "\n")
+		if strings.Contains(diagnostic, mainPath) || strings.Contains(diagnostic, annexPath) {
+			t.Fatalf("expected cleanup paths redacted from diagnostics, got %q", diagnostic)
+		}
+	})
+
 	t.Run("production calculation failure exposes pending diagnostics with original persisted record", func(t *testing.T) {
 		var request = reportRequestFixture(t, 2025)
 		var offendingRecord = reportFailureActivityRecordFixture(t)

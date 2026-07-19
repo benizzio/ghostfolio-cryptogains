@@ -10,6 +10,7 @@ import (
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	reportoutput "github.com/benizzio/ghostfolio-cryptogains/internal/report/output"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
+	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
 
 // requestAutomaticOpenBundle performs one post-save opener request for the first
@@ -120,11 +121,23 @@ func reportWriteFailureReason(err error) ReportFailureReason {
 
 // reportWriteFailureMessage formats one actionable save failure.
 // Authored by: OpenCode
-func reportWriteFailureMessage(reason ReportFailureReason, err error) string {
-	var detail = strings.TrimSpace(redact.ErrorText(err))
+func reportWriteFailureMessage(reason ReportFailureReason, err error, cleanupPaths []string, residualPaths []string, cleanupFailed bool) string {
+	var detail = strings.TrimSpace(redact.ErrorText(err, cleanupPaths...))
 	if reason == ReportFailureDocumentsFolderUnavailable {
 		return fmt.Sprintf(
 			"Could not save the report because the Documents folder is unavailable: %s. Ensure the folder exists and is writable, then try again. No report file was saved.",
+			detail,
+		)
+	}
+	if len(residualPaths) > 0 {
+		return fmt.Sprintf(
+			"Could not save the report file: %s. Check write permissions and free space in the Documents folder, then try again. Cleanup could not confirm removal of every partial file created during this attempt.",
+			detail,
+		)
+	}
+	if cleanupFailed {
+		return fmt.Sprintf(
+			"Could not save the report file: %s. Check write permissions and free space in the Documents folder, then try again. Cleanup reported an additional close or removal error, but no path removal failure was reported.",
 			detail,
 		)
 	}
@@ -138,12 +151,36 @@ func reportWriteFailureMessage(reason ReportFailureReason, err error) string {
 // reportWriteDiagnosticError wraps one output-preparation failure with a stable
 // report-level summary for diagnostics.
 // Authored by: OpenCode
-func reportWriteDiagnosticError(reason ReportFailureReason, err error) error {
+func reportWriteDiagnosticError(reason ReportFailureReason, err error, cleanupPaths []string) error {
+	var summary = "could not save the report file"
 	if reason == ReportFailureDocumentsFolderUnavailable {
-		return fmt.Errorf("could not save the report because the Documents folder is unavailable: %w", err)
+		summary = "could not save the report because the Documents folder is unavailable"
 	}
 
-	return fmt.Errorf("could not save the report file: %w", err)
+	var context = diagnosticContextFromError(err, "", cleanupPaths...)
+	context.FailureDetail = summary
+	context.FailureCauseChain = append([]string{summary}, context.FailureCauseChain...)
+	return reportWriteDiagnosticFailure{summary: summary, context: context}
+}
+
+// reportWriteDiagnosticFailure carries a pre-redacted output cause chain into
+// diagnostics without exposing current-attempt filesystem paths.
+// Authored by: OpenCode
+type reportWriteDiagnosticFailure struct {
+	summary string
+	context syncmodel.DiagnosticContext
+}
+
+// Error returns the stable report-level diagnostic summary.
+// Authored by: OpenCode
+func (failure reportWriteDiagnosticFailure) Error() string {
+	return failure.summary
+}
+
+// DiagnosticReportContext returns the pre-redacted output failure context.
+// Authored by: OpenCode
+func (failure reportWriteDiagnosticFailure) DiagnosticReportContext() syncmodel.DiagnosticContext {
+	return failure.context
 }
 
 // reportOpenFailureMessage formats one non-fatal automatic-open warning without

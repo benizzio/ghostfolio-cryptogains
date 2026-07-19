@@ -168,6 +168,42 @@ func TestReportResultScreenViewRendersFailureBaseCurrency(t *testing.T) {
 	assertReportScreenContainsAll(t, content, []string{"Failure Category: unsupported report calculation", "Report Base Currency: USD"})
 }
 
+// TestReportResultScreenViewDisclosesResidualOutputPaths verifies failed cleanup
+// identifies cleartext risk and every path without presenting saved metadata.
+// Authored by: OpenCode
+func TestReportResultScreenViewDisclosesResidualOutputPaths(t *testing.T) {
+	t.Parallel()
+
+	var paths = []string{"/tmp/Documents/synthetic-main.md", "/tmp/Documents/synthetic-annex.md"}
+	var outcome = runtime.ReportOutcome{
+		Success:             false,
+		FailureReason:       runtime.ReportFailureReportFileWriteFailed,
+		Message:             "Cleanup could not confirm removal of every partial file.",
+		ResidualOutputPaths: paths,
+	}
+	var content = ReportResultScreenView(ReportResultScreenParams{
+		Theme:       component.DefaultTheme(),
+		Width:       100,
+		Height:      32,
+		MethodLabel: "FIFO",
+		MenuItems:   []component.MenuItem{{Label: component.BackToSyncReportsActionLabel, Enabled: true}},
+		Outcome:     outcome,
+	})
+
+	assertReportScreenContainsAll(t, content, []string{
+		"Cleartext financial-data files from this failed report attempt may remain.",
+		"Delete every listed path",
+	})
+	for _, path := range paths {
+		if strings.Count(content, path) != 1 {
+			t.Fatalf("expected residual path %q exactly once, got %q", path, content)
+		}
+	}
+	if strings.Contains(content, "Saved Markdown Path") || strings.Contains(content, "Any partial file created during this attempt was removed") {
+		t.Fatalf("expected no saved metadata or complete-cleanup claim, got %q", content)
+	}
+}
+
 // TestReportSelectionScreenViewRendersUnselectedOutputFormatGuidance verifies
 // stale output-format selections render actionable fallback copy.
 // Authored by: OpenCode

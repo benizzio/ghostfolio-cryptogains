@@ -1124,12 +1124,166 @@ func TestWriteReservedReportOutputFilesRejectsMismatchedCounts(t *testing.T) {
 	}
 }
 
+// TestWriteReportOutputBundleReportsReservationCleanupFailure verifies a path
+// reserved before a later reservation failure is surfaced when removal fails.
+// Authored by: OpenCode
+func TestWriteReportOutputBundleReportsReservationCleanupFailure(t *testing.T) {
+	var fixtureDir = t.TempDir()
+	var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+	defer restoreOutputSeams()
+
+	var reservationErr = errors.New("synthetic Annex reservation failure")
+	var removalErr = errors.New("synthetic reservation cleanup removal failure")
+	var reservedPath string
+	var openCount int
+	openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+		openCount++
+		if openCount == 2 {
+			return nil, reservationErr
+		}
+		reservedPath = path
+		//nolint:gosec // Test seam intentionally opens the writer-provided path.
+		return os.OpenFile(path, flag, perm)
+	}
+	removePath = func(path string) error {
+		if path == reservedPath {
+			return removalErr
+		}
+		return os.Remove(path)
+	}
+
+	var bundle, err = WriteReportOutputBundle(
+		reportmodel.ReportOutputFormatMarkdown,
+		markdownDocumentPair(validReportDocument(time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC))),
+	)
+	if err == nil || !errors.Is(err, reservationErr) || !errors.Is(err, removalErr) {
+		t.Fatalf("expected reservation and cleanup errors to remain reachable, got %v", err)
+	}
+	if category, ok := FailureCategoryOf(err); !ok || category != FailureCategoryReportFileWriteFailed {
+		t.Fatalf("expected write failure category, got category=%q ok=%t", category, ok)
+	}
+	assertNoSavedOutputBundle(t, bundle)
+	if paths := ResidualPathsOf(err); len(paths) != 1 || paths[0] != reservedPath {
+		t.Fatalf("expected reserved path as residual cleanup context, got %#v", paths)
+	}
+	if _, statErr := os.Stat(reservedPath); statErr != nil {
+		t.Fatalf("expected failed-removal path to remain, got %v", statErr)
+	}
+}
+
+// TestWriteReportOutputBundleReportsMixedCleanupAfterAnnexFailure verifies the
+// written main report is disclosed while a successfully removed Annex is not.
+// Authored by: OpenCode
+func TestWriteReportOutputBundleReportsMixedCleanupAfterAnnexFailure(t *testing.T) {
+	var fixtureDir = t.TempDir()
+	var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+	defer restoreOutputSeams()
+
+	var writeErr = errors.New("synthetic Annex write failure")
+	var removalErr = errors.New("synthetic main cleanup removal failure")
+	var openedPaths []string
+	openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+		//nolint:gosec // Test seam intentionally opens the writer-provided path.
+		var file, err = os.OpenFile(path, flag, perm)
+		if err != nil {
+			return nil, err
+		}
+		openedPaths = append(openedPaths, path)
+		if len(openedPaths) == 2 {
+			return failingWriteFile{File: file, writeErr: writeErr}, nil
+		}
+		return file, nil
+	}
+	removePath = func(path string) error {
+		if len(openedPaths) > 0 && path == openedPaths[0] {
+			return removalErr
+		}
+		return os.Remove(path)
+	}
+
+	var bundle, err = WriteReportOutputBundle(
+		reportmodel.ReportOutputFormatMarkdown,
+		markdownDocumentPair(validReportDocument(time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC))),
+	)
+	if err == nil || !errors.Is(err, writeErr) || !errors.Is(err, removalErr) {
+		t.Fatalf("expected Annex write and main removal failures, got %v", err)
+	}
+	assertNoSavedOutputBundle(t, bundle)
+	if paths := CleanupPathsOf(err); len(paths) != 2 {
+		t.Fatalf("expected both current-attempt paths in cleanup context, got %#v", paths)
+	}
+	if paths := ResidualPathsOf(err); len(paths) != 1 || paths[0] != openedPaths[0] {
+		t.Fatalf("expected only failed main removal as residual, got %#v", paths)
+	}
+	assertPathContent(t, openedPaths[0], "# Report\n")
+	assertPathDoesNotExist(t, openedPaths[1])
+}
+
+// TestWriteReportOutputBundleCollectsCleanupCloseFailure verifies cleanup close
+// errors remain reachable without falsely identifying a successfully removed path.
+// Authored by: OpenCode
+func TestWriteReportOutputBundleCollectsCleanupCloseFailure(t *testing.T) {
+	var fixtureDir = t.TempDir()
+	var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+	defer restoreOutputSeams()
+
+	var writeErr = errors.New("synthetic write failure")
+	var closeErr = errors.New("synthetic cleanup close failure")
+	var openedPaths []string
+	openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+		//nolint:gosec // Test seam intentionally opens the writer-provided path.
+		var file, err = os.OpenFile(path, flag, perm)
+		if err != nil {
+			return nil, err
+		}
+		openedPaths = append(openedPaths, path)
+		if len(openedPaths) == 1 {
+			return failingWriteAndCloseFile{File: file, writeErr: writeErr, closeErr: closeErr}, nil
+		}
+		return file, nil
+	}
+
+	var bundle, err = WriteReportOutputBundle(
+		reportmodel.ReportOutputFormatMarkdown,
+		markdownDocumentPair(validReportDocument(time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC))),
+	)
+	if err == nil || !errors.Is(err, writeErr) || !errors.Is(err, closeErr) {
+		t.Fatalf("expected initiating write and cleanup close errors, got %v", err)
+	}
+	assertNoSavedOutputBundle(t, bundle)
+	if paths := ResidualPathsOf(err); len(paths) != 0 {
+		t.Fatalf("expected no residual path after successful removal, got %#v", paths)
+	}
+	assertPathsRemoved(t, openedPaths, 2)
+}
+
 // failingWriteFile injects a deterministic write error after the file has been
 // reserved on disk.
 // Authored by: OpenCode
 type failingWriteFile struct {
 	*os.File
 	writeErr error
+}
+
+// failingWriteAndCloseFile injects independent initiating write and cleanup
+// close failures while leaving removal available to the test.
+// Authored by: OpenCode
+type failingWriteAndCloseFile struct {
+	*os.File
+	writeErr error
+	closeErr error
+}
+
+// Write returns the configured initiating write failure.
+// Authored by: OpenCode
+func (file failingWriteAndCloseFile) Write([]byte) (int, error) {
+	return 0, file.writeErr
+}
+
+// Close returns the configured cleanup close failure.
+// Authored by: OpenCode
+func (file failingWriteAndCloseFile) Close() error {
+	return file.closeErr
 }
 
 // Write returns the configured deterministic write error.

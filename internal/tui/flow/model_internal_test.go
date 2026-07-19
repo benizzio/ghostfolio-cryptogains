@@ -2037,6 +2037,12 @@ func TestGenerateDiagnosticReportAndServerReplacementIgnoreBranches(t *testing.T
 		t.Fatalf("expected report diagnostic error message, got %#v", model.syncReports.ReportResult.Diagnostic)
 	}
 
+	model.syncReports.ReportResult.ResidualOutputPaths = []string{"/tmp/Documents/synthetic-report.md"}
+	model.clearTransientReportState()
+	if len(model.syncReports.ReportResult.ResidualOutputPaths) != 0 {
+		t.Fatalf("expected report exit to clear residual output paths, got %#v", model.syncReports.ReportResult)
+	}
+
 	model = newTestModel(t, &config)
 	model.deps.SyncService = testSyncService{}
 	model.active = syncResultScreenKey

@@ -288,6 +288,26 @@ func TestReportGenerationWorkflowContract(t *testing.T) {
 	assertContains(t, failure, "Generate Diagnostic Report is available for this failure from this screen.")
 	assertContains(t, failure, "Back To Sync and Reports")
 
+	var residualFailure = screen.ReportResultScreenView(screen.ReportResultScreenParams{
+		Theme:       component.DefaultTheme(),
+		Width:       100,
+		Height:      32,
+		MethodLabel: "FIFO",
+		MenuItems:   []component.MenuItem{{Label: "Back To Sync and Reports", Enabled: true}},
+		Outcome: runtime.ReportOutcome{
+			Success:             false,
+			FailureReason:       runtime.ReportFailureReportFileWriteFailed,
+			Message:             "Cleanup could not confirm removal of every partial file.",
+			ResidualOutputPaths: []string{"/tmp/Documents/synthetic-residual-main.md", "/tmp/Documents/synthetic-residual-annex.md"},
+		},
+	})
+	assertContains(t, residualFailure, "Cleartext financial-data files from this failed report attempt may remain.")
+	assertContains(t, residualFailure, "Residual or maybe-residual path: /tmp/Documents/synthetic-residual-main.md")
+	assertContains(t, residualFailure, "Residual or maybe-residual path: /tmp/Documents/synthetic-residual-annex.md")
+	assertContains(t, residualFailure, "Delete every listed path")
+	assertNotContains(t, residualFailure, "Saved Markdown Path")
+	assertNotContains(t, residualFailure, "Any partial file created during this attempt was removed")
+
 	var devFailure = screen.ReportResultScreenView(screen.ReportResultScreenParams{
 		Theme:         component.DefaultTheme(),
 		Width:         100,

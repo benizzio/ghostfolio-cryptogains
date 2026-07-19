@@ -524,6 +524,29 @@ func TestReportGenerationBundleWriteFailureLeavesNoPartialBundleFiles(t *testing
 	}
 }
 
+// TestReportGenerationCleanupRemovalFailureShowsResidualPaths verifies the
+// runtime-backed result discloses every maybe-residual current-attempt path.
+// Authored by: OpenCode
+func TestReportGenerationCleanupRemovalFailureShowsResidualPaths(t *testing.T) {
+	if os.Getenv("GHOSTFOLIO_CRYPTOGAINS_HELPER_CLEANUP_REMOVAL_FAILURE") == "1" {
+		runReportGenerationCleanupRemovalFailureScenario(t)
+		return
+	}
+
+	//nolint:gosec // This test intentionally re-executes the current test binary as a helper process.
+	var command = exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestReportGenerationCleanupRemovalFailureShowsResidualPaths$")
+	command.Env = append(
+		os.Environ(),
+		"GHOSTFOLIO_CRYPTOGAINS_HELPER_CLEANUP_REMOVAL_FAILURE=1",
+		"GHOSTFOLIO_CRYPTOGAINS_OUTPUT_FAIL_WRITE_AFTER_CREATE=forced write failure",
+		"GHOSTFOLIO_CRYPTOGAINS_OUTPUT_FAIL_CLEANUP_REMOVE=forced cleanup removal failure",
+	)
+	var output, err = command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("run cleanup-removal-failure helper process: %v\n%s", err, string(output))
+	}
+}
+
 // runReportGenerationWriteFailureScenario executes the runtime-backed write
 // failure assertions in a helper subprocess so report-output test seams stay
 // isolated from other parallel integration tests.
@@ -620,6 +643,71 @@ func runReportGenerationBundleWriteFailureScenario(t *testing.T) {
 		t.Fatalf("expected no opener request when bundle save failed, got %#v", openerRequests)
 	}
 	assertNoCleartextReportInAppStorage(t, harness.BaseDir)
+}
+
+// runReportGenerationCleanupRemovalFailureScenario executes runtime and TUI
+// residual-path assertions in an isolated helper subprocess.
+// Authored by: OpenCode
+func runReportGenerationCleanupRemovalFailureScenario(t *testing.T) {
+	t.Helper()
+
+	var reportIO = testutil.NewReportIOFixture(t)
+	var openLogPath = installOpenCommandRecorder(t, 0)
+	var fixture = testutil.DeterministicReportLedgerFixture()
+	var harness = newRuntimeBackedFlowHarness(t, t.TempDir(), mustCloudSetupConfig(t), false)
+
+	seedProtectedSnapshot(t, harness, "token-123", fixture.ProtectedActivityCache)
+	var model = unlockSyncReportsContext(t, harness.Model, "token-123")
+	model = openReportSelectionFromContext(t, model)
+	model = selectReportYear(t, model, fixture.PrimaryReportYear)
+	model = selectReportBaseCurrency(t, model, reportmodel.ReportBaseCurrencyUSD)
+	model, cmd := startReportGenerationFromSelection(t, model)
+	model = applyBatchCmd(t, model, cmd)
+
+	var entries, err = os.ReadDir(reportIO.DocumentsDir)
+	if err != nil {
+		t.Fatalf("read residual report paths: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected both failed-attempt Markdown reservations to remain, got %#v", entries)
+	}
+	var content = runtimeflow.ReportResultText(t, model)
+	for _, expected := range []string{
+		"Failure Category: report file write failed",
+		"Cleanup could not confirm removal of every partial file",
+		"Cleartext financial-data files from this failed report attempt may remain.",
+		"Delete every listed path",
+	} {
+		if !strings.Contains(content, expected) {
+			t.Fatalf("expected cleanup failure result to contain %q, got %q", expected, content)
+		}
+	}
+	for _, entry := range entries {
+		var path = filepath.Join(reportIO.DocumentsDir, entry.Name())
+		if strings.Count(content, path) != 1 {
+			t.Fatalf("expected residual path %q exactly once, got %q", path, content)
+		}
+	}
+	if strings.Contains(content, "Any partial file created during this attempt was removed") || strings.Contains(content, "Saved Markdown Path") {
+		t.Fatalf("expected no complete-cleanup or saved-output claim, got %q", content)
+	}
+	if openerRequests := readOpenCommandRequests(t, openLogPath); len(openerRequests) != 0 {
+		t.Fatalf("expected no opener request after failed output, got %#v", openerRequests)
+	}
+
+	var updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	model = assertFlowModel(t, updated)
+	updated, _ = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	model = assertFlowModel(t, updated)
+	if model.ActiveScreen() != "sync_reports_menu" {
+		t.Fatalf("expected residual failure dismissal to return to Sync and Reports, got %s", model.ActiveScreen())
+	}
+	var dismissed = model.View().Content
+	for _, entry := range entries {
+		if strings.Contains(dismissed, filepath.Join(reportIO.DocumentsDir, entry.Name())) {
+			t.Fatalf("expected dismissal to clear residual path state, got %q", dismissed)
+		}
+	}
 }
 
 // runReportGenerationWriteFailureDiagnosticScenario exercises the report-result
