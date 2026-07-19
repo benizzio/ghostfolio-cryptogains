@@ -216,11 +216,81 @@ func TestTableContinuationAndWrappedCellLayout(t *testing.T) {
 	}
 }
 
-// TestT028PDFTableMeasurementMatchesDrawingWrapAndExplicitNewlines verifies
+// TestTableRowsUseIndividualMeasuredHeights verifies a tall row does not force
+// the same height onto a following short row during pagination or drawing.
+// Authored by: OpenCode
+func TestTableRowsUseIndividualMeasuredHeights(t *testing.T) {
+	var document = startedTestDocument(t)
+	var tallRow = strings.TrimSuffix(strings.Repeat("TALL-ROW\n", 35), "\n")
+	var table = pdfTable{
+		ContinuationTitle: "Mixed-height table (continued)",
+		Columns:           []pdfColumn{{Header: "Entry", Width: 1, Align: "left"}},
+		Rows:              [][]string{{tallRow}, {"SHORT-ROW"}},
+	}
+	var rowHeights, err = document.tableRowHeights(printableWidthColumns(table.Columns), table.Rows, 24)
+	if err != nil {
+		t.Fatalf("measure mixed-height rows: %v", err)
+	}
+	if rowHeights[0] <= rowHeights[1] {
+		t.Fatalf("mixed row heights = %#v, want first row taller than second", rowHeights)
+	}
+	if err = document.AddTable(table); err != nil {
+		t.Fatalf("draw mixed-height table: %v", err)
+	}
+
+	var payload []byte
+	payload, err = document.Bytes()
+	if err != nil {
+		t.Fatalf("finalize mixed-height table: %v", err)
+	}
+	var inspection testutil.GeneratedPDF
+	inspection, err = testutil.InspectGeneratedPDF(payload)
+	if err != nil {
+		t.Fatalf("inspect mixed-height table: %v", err)
+	}
+	if len(inspection.PageBoxes) != 1 {
+		t.Fatalf("mixed-height table pages = %d, want 1", len(inspection.PageBoxes))
+	}
+	if !inspection.ContainsSearchableText("TALL-ROW") || !inspection.ContainsSearchableText("SHORT-ROW") {
+		t.Fatalf("mixed-height rows are not both searchable: %q", inspection.SearchableText)
+	}
+}
+
+// TestLongNumericTableCellRetainsExactSearchableText verifies numeric content
+// is left intact for width-aware gopdf measurement and drawing.
+// Authored by: OpenCode
+func TestLongNumericTableCellRetainsExactSearchableText(t *testing.T) {
+	const numericValue = "12345678901234567890.12"
+	if sanitized := sanitizeTableCell(numericValue); sanitized != numericValue {
+		t.Fatalf("sanitized numeric cell = %q, want exact %q", sanitized, numericValue)
+	}
+
+	var document = startedTestDocument(t)
+	if err := document.AddTable(pdfTable{
+		Columns: []pdfColumn{{Header: "Value", Width: 1, Align: "right"}},
+		Rows:    [][]string{{numericValue}},
+	}); err != nil {
+		t.Fatalf("draw numeric table: %v", err)
+	}
+	var payload, err = document.Bytes()
+	if err != nil {
+		t.Fatalf("finalize numeric table: %v", err)
+	}
+	var inspection testutil.GeneratedPDF
+	inspection, err = testutil.InspectGeneratedPDF(payload)
+	if err != nil {
+		t.Fatalf("inspect numeric table: %v", err)
+	}
+	if !inspection.ContainsSearchableText(numericValue) {
+		t.Fatalf("numeric value is not exactly searchable: %q", inspection.SearchableText)
+	}
+}
+
+// TestPDFTableMeasurementMatchesDrawingWrapAndExplicitNewlines verifies
 // explicit cell boundaries and indicator-sensitive space wrapping use the same
 // measured line count and height as the table drawing path.
 // Authored by: OpenCode
-func TestT028PDFTableMeasurementMatchesDrawingWrapAndExplicitNewlines(t *testing.T) {
+func TestPDFTableMeasurementMatchesDrawingWrapAndExplicitNewlines(t *testing.T) {
 	var document = startedTestDocument(t)
 	var columns = printableWidthColumns([]pdfColumn{
 		{Header: "Entry", Width: 1, Align: "left"},
@@ -276,11 +346,11 @@ func TestT028PDFTableMeasurementMatchesDrawingWrapAndExplicitNewlines(t *testing
 	}
 }
 
-// TestT028PDFTableDrawnLinesMatchMeasuredRowHeightAndBottomMargin verifies
+// TestPDFTableDrawnLinesMatchMeasuredRowHeightAndBottomMargin verifies
 // explicit PDF cell lines appear as distinct drawn runs and remain within the
 // printable bottom margin after the row's measured height is applied.
 // Authored by: OpenCode
-func TestT028PDFTableDrawnLinesMatchMeasuredRowHeightAndBottomMargin(t *testing.T) {
+func TestPDFTableDrawnLinesMatchMeasuredRowHeightAndBottomMargin(t *testing.T) {
 	var document = startedTestDocument(t)
 	if err := document.pdf.SetFont(fontRegular, "", 6.5); err != nil {
 		t.Fatalf("set table font: %v", err)
@@ -298,8 +368,8 @@ func TestT028PDFTableDrawnLinesMatchMeasuredRowHeightAndBottomMargin(t *testing.
 	if len(splitLines) != 3 {
 		t.Fatalf("drawn line count = %d, want 3", len(splitLines))
 	}
-	var measuredRowHeight float64
-	measuredRowHeight, err = document.tableRowHeight(columns, table.Rows, 24)
+	var measuredRowHeights []float64
+	measuredRowHeights, err = document.tableRowHeights(columns, table.Rows, 24)
 	if err != nil {
 		t.Fatalf("measure table row: %v", err)
 	}
@@ -312,8 +382,8 @@ func TestT028PDFTableDrawnLinesMatchMeasuredRowHeightAndBottomMargin(t *testing.
 	if expectedRowHeight < 24 {
 		expectedRowHeight = 24
 	}
-	if measuredRowHeight != expectedRowHeight {
-		t.Fatalf("measured row height = %.2f, want %.2f", measuredRowHeight, expectedRowHeight)
+	if measuredRowHeights[0] != expectedRowHeight {
+		t.Fatalf("measured row height = %.2f, want %.2f", measuredRowHeights[0], expectedRowHeight)
 	}
 	if err := document.AddTable(table); err != nil {
 		t.Fatalf("draw multiline table: %v", err)
@@ -342,13 +412,13 @@ func TestT028PDFTableDrawnLinesMatchMeasuredRowHeightAndBottomMargin(t *testing.
 	}
 }
 
-// TestT028PDFFreshPagePreflightMovesWholeRowWithoutContinuationLabel verifies
+// TestPDFFreshPagePreflightMovesWholeRowWithoutContinuationLabel verifies
 // a table-start row moves before drawing when only the remaining page is too
 // small, without pretending that the table already continued.
 // Authored by: OpenCode
-func TestT028PDFFreshPagePreflightMovesWholeRowWithoutContinuationLabel(t *testing.T) {
+func TestPDFFreshPagePreflightMovesWholeRowWithoutContinuationLabel(t *testing.T) {
 	var document = startedTestDocument(t)
-	document.y = pageBottom - 90
+	document.y = pageBottom - 60
 	var table = pdfTable{
 		ContinuationTitle: "Fresh relocation (continued)",
 		Columns:           []pdfColumn{{Header: "Entry", Width: 1, Align: "left"}},
@@ -382,10 +452,10 @@ func TestT028PDFFreshPagePreflightMovesWholeRowWithoutContinuationLabel(t *testi
 	}
 }
 
-// TestT028PDFContinuationRepeatsContextAndHeaderAfterWholeRows verifies actual
+// TestPDFContinuationRepeatsContextAndHeaderAfterWholeRows verifies actual
 // continuation pages repeat the context and header while keeping complete rows.
 // Authored by: OpenCode
-func TestT028PDFContinuationRepeatsContextAndHeaderAfterWholeRows(t *testing.T) {
+func TestPDFContinuationRepeatsContextAndHeaderAfterWholeRows(t *testing.T) {
 	var previousTextWriter = writeTextForGopdfDocument
 	var contexts []string
 	writeTextForGopdfDocument = func(document *gopdfDocument, text string) error {
@@ -444,10 +514,10 @@ func TestT028PDFContinuationRepeatsContextAndHeaderAfterWholeRows(t *testing.T) 
 	}
 }
 
-// TestT028PDFOverheightNewlineRowFailsBeforeFinalization verifies an explicit
+// TestPDFOverheightNewlineRowFailsBeforeFinalization verifies an explicit
 // newline row that cannot fit a fresh page fails before drawing or finalizing.
 // Authored by: OpenCode
-func TestT028PDFOverheightNewlineRowFailsBeforeFinalization(t *testing.T) {
+func TestPDFOverheightNewlineRowFailsBeforeFinalization(t *testing.T) {
 	var document = startedTestDocument(t)
 	var previousDrawer = drawTableForGopdfDocument
 	var drawCalls int
@@ -489,10 +559,10 @@ func TestT028PDFOverheightNewlineRowFailsBeforeFinalization(t *testing.T) {
 	}
 }
 
-// TestT028PDFTableMeasurementAndDrawingErrorsIncludeStageAndRow verifies table
+// TestPDFTableMeasurementAndDrawingErrorsIncludeStageAndRow verifies table
 // failures identify whether measurement or drawing failed and which row failed.
 // Authored by: OpenCode
-func TestT028PDFTableMeasurementAndDrawingErrorsIncludeStageAndRow(t *testing.T) {
+func TestPDFTableMeasurementAndDrawingErrorsIncludeStageAndRow(t *testing.T) {
 	var previousMeasurer = measureTableCellForGopdfDocument
 	var previousDrawer = drawTableForGopdfDocument
 	defer func() {
@@ -524,11 +594,11 @@ func TestT028PDFTableMeasurementAndDrawingErrorsIncludeStageAndRow(t *testing.T)
 	}
 }
 
-// TestT028PDFControlledNewlinesDoNotWeakenGenericSanitization verifies only
+// TestPDFControlledNewlinesDoNotWeakenGenericSanitization verifies only
 // renderer-controlled cell boundaries survive while arbitrary PDF text remains
 // single-line and delimiter-safe.
 // Authored by: OpenCode
-func TestT028PDFControlledNewlinesDoNotWeakenGenericSanitization(t *testing.T) {
+func TestPDFControlledNewlinesDoNotWeakenGenericSanitization(t *testing.T) {
 	var dynamic = "dynamic\nlabel|delimiter"
 	if got := sanitizeText(dynamic); got != "dynamic label/delimiter" {
 		t.Fatalf("generic sanitized text = %q, want single-line delimiter-safe text", got)

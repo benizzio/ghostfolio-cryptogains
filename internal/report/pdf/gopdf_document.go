@@ -155,41 +155,41 @@ func (document *gopdfDocument) AddTable(table pdfTable) error {
 	if len(table.Rows) == 0 {
 		return nil
 	}
-	var rowHeight = table.RowHeight
-	if rowHeight <= 0 {
-		rowHeight = 24
+	var minimumRowHeight = table.RowHeight
+	if minimumRowHeight <= 0 {
+		minimumRowHeight = 24
 	}
 	var columns = printableWidthColumns(table.Columns)
-	var err error
-	rowHeight, err = document.tableRowHeight(columns, table.Rows, rowHeight)
+	var rowHeights, err = document.tableRowHeights(columns, table.Rows, minimumRowHeight)
 	if err != nil {
 		return err
 	}
-	if err = document.prepareTableStart(table.Title, rowHeight); err != nil {
+	if err = document.prepareTableStart(table.Title, minimumRowHeight, rowHeights[0]); err != nil {
 		return fmt.Errorf("table preflight failed for row 1: %w", err)
 	}
-	return document.addTableRows(table, columns, rowHeight)
+	return document.addTableRows(table, columns, rowHeights, minimumRowHeight)
 }
 
 // addTableRows draws preflighted rows and creates continuation pages only when
 // the remaining rows require them.
 // Authored by: OpenCode
-func (document *gopdfDocument) addTableRows(table pdfTable, columns []pdfColumn, rowHeight float64) error {
+func (document *gopdfDocument) addTableRows(table pdfTable, columns []pdfColumn, rowHeights []float64, headerHeight float64) error {
 	var rowOffset int
 	var remainingRows = table.Rows
 	for len(remainingRows) > 0 {
-		var capacity = document.tableRowCapacity(rowHeight)
-		if capacity > len(remainingRows) {
-			capacity = len(remainingRows)
+		var remainingHeights = rowHeights[rowOffset:]
+		var capacity = document.tableRowCountAt(document.y, remainingHeights, headerHeight)
+		if capacity == 0 {
+			return fmt.Errorf("table preflight failed for row %d: row does not fit within the current page", rowOffset+1)
 		}
 		var chunk = remainingRows[:capacity]
-		if err := document.drawTableChunk(table, columns, chunk, rowHeight, rowOffset, len(remainingRows) == len(chunk)); err != nil {
+		if err := document.drawTableChunk(table, columns, chunk, remainingHeights[:capacity], headerHeight, rowOffset, len(remainingRows) == len(chunk)); err != nil {
 			return err
 		}
 		remainingRows = remainingRows[capacity:]
 		rowOffset += capacity
 		if len(remainingRows) > 0 {
-			if document.tableRowCapacityAt(document.tableContinuationStartY(), rowHeight) == 0 {
+			if document.tableRowCountAt(document.tableContinuationStartY(), rowHeights[rowOffset:], headerHeight) == 0 {
 				return fmt.Errorf("table preflight failed for row %d: row does not fit within a fresh continuation page", rowOffset+1)
 			}
 			if err := document.addTableContinuationPage(table.ContinuationTitle); err != nil {
@@ -201,24 +201,25 @@ func (document *gopdfDocument) addTableRows(table pdfTable, columns []pdfColumn,
 	return nil
 }
 
-// tableRowHeight returns a single table row height that contains every wrapped
-// cell before the table preflight reserves its header, rows, and borders.
+// tableRowHeights returns the measured height of each row for row-specific
+// preflight, pagination, and drawing.
 // Authored by: OpenCode
-func (document *gopdfDocument) tableRowHeight(columns []pdfColumn, rows [][]string, minimum float64) (float64, error) {
+func (document *gopdfDocument) tableRowHeights(columns []pdfColumn, rows [][]string, minimum float64) ([]float64, error) {
 	if err := document.pdf.SetFont(fontRegular, "", 6.5); err != nil {
-		return 0, fmt.Errorf("table measurement failed before row 1: %w", err)
+		return nil, fmt.Errorf("table measurement failed before row 1: %w", err)
 	}
-	var rowHeight = minimum
+	var rowHeights = make([]float64, len(rows))
 	for rowIndex, row := range rows {
 		var height, err = document.tableRowContentHeight(columns, row)
 		if err != nil {
-			return 0, fmt.Errorf("table measurement failed for row %d: %w", rowIndex+1, err)
+			return nil, fmt.Errorf("table measurement failed for row %d: %w", rowIndex+1, err)
 		}
-		if height > rowHeight {
-			rowHeight = height
+		if height < minimum {
+			height = minimum
 		}
+		rowHeights[rowIndex] = height
 	}
-	return rowHeight, nil
+	return rowHeights, nil
 }
 
 // tableRowContentHeight measures the padded height required by one table row.
@@ -327,28 +328,57 @@ func (document *gopdfDocument) tableRowCapacityAt(startY float64, rowHeight floa
 	return int(available / rowHeight)
 }
 
+// tableRowCountAt returns the leading row count that fits after one fixed
+// header and the table border allowance at a page position.
+// Authored by: OpenCode
+func (document *gopdfDocument) tableRowCountAt(startY float64, rowHeights []float64, headerHeight float64) int {
+	var available = pageBottom - startY - 12 - headerHeight
+	var used float64
+	var count int
+	for _, rowHeight := range rowHeights {
+		if rowHeight <= 0 || used+rowHeight > available {
+			break
+		}
+		used += rowHeight
+		count++
+	}
+	return count
+}
+
 // drawTableChunk draws one page-local table chunk and records its text extract.
 // Authored by: OpenCode
-func (document *gopdfDocument) drawTableChunk(table pdfTable, columns []pdfColumn, rows [][]string, rowHeight float64, rowOffset int, includeStyledLastRow bool) error {
-	var layout = document.pdf.NewTableLayout(pageMargin, document.y, rowHeight, len(rows))
+func (document *gopdfDocument) drawTableChunk(table pdfTable, columns []pdfColumn, rows [][]string, rowHeights []float64, headerHeight float64, rowOffset int, includeStyledLastRow bool) error {
+	var header = document.pdf.NewTableLayout(pageMargin, document.y, headerHeight, 0)
 	for _, column := range columns {
-		layout.AddColumn(sanitizeText(column.Header), column.Width, column.Align)
+		header.AddColumn(sanitizeText(column.Header), column.Width, column.Align)
 	}
-	layout.SetTableStyle(tableStyle())
-	layout.SetHeaderStyle(headerStyle())
-	layout.SetCellStyle(cellStyle())
+	header.SetTableStyle(tableStyle())
+	header.SetHeaderStyle(headerStyle())
+	if err := drawTableForGopdfDocument(header); err != nil {
+		return fmt.Errorf("table drawing failed for row %d: %w", rowOffset+1, err)
+	}
+	var rowY = document.y + headerHeight
 	for rowIndex, row := range rows {
+		var rowHeight = rowHeights[rowIndex]
+		var layout = document.pdf.NewTableLayout(pageMargin, rowY-rowHeight, rowHeight, 1)
+		for _, column := range columns {
+			layout.AddColumn("", column.Width, column.Align)
+		}
+		layout.SetTableStyle(gopdf.CellStyle{})
+		layout.SetHeaderStyle(gopdf.CellStyle{})
+		layout.SetCellStyle(cellStyle())
 		var sanitizedRow = sanitizeRow(row)
 		if includeStyledLastRow && table.StyledLastRow && rowIndex == len(rows)-1 {
 			layout.AddStyledRow(styledRowCells(sanitizedRow))
 		} else {
 			layout.AddRow(sanitizedRow)
 		}
+		if err := drawTableForGopdfDocument(layout); err != nil {
+			return fmt.Errorf("table drawing failed for row %d: %w", rowOffset+rowIndex+1, err)
+		}
+		rowY += rowHeight
 	}
-	if err := drawTableForGopdfDocument(layout); err != nil {
-		return fmt.Errorf("table drawing failed for row %d: %w", rowOffset+1, err)
-	}
-	document.y += rowHeight*float64(len(rows)+1) + 12
+	document.y = rowY + 12
 	return nil
 }
 
@@ -386,7 +416,7 @@ func (document *gopdfDocument) tableContinuationStartY() float64 {
 // prepareTableStart reserves enough space for a table title, header, and first
 // row before emitting any part of the table block.
 // Authored by: OpenCode
-func (document *gopdfDocument) prepareTableStart(title string, rowHeight float64) error {
+func (document *gopdfDocument) prepareTableStart(title string, headerHeight float64, firstRowHeight float64) error {
 	var titleHeight float64
 	if title != "" {
 		titleHeight = 16
@@ -394,17 +424,17 @@ func (document *gopdfDocument) prepareTableStart(title string, rowHeight float64
 			titleHeight += sectionSpacing
 		}
 	}
-	var required = titleHeight + tableSpacing + rowHeight*2 + 12
+	var required = titleHeight + tableSpacing + headerHeight + firstRowHeight + 12
 	if document.y+required > pageBottom {
 		document.addPage()
 		titleHeight = 0
 		if title != "" {
 			titleHeight = 16
 		}
-		required = titleHeight + tableSpacing + rowHeight*2 + 12
+		required = titleHeight + tableSpacing + headerHeight + firstRowHeight + 12
 	}
 	if document.y+required > pageBottom {
-		return fmt.Errorf("table row height %.0f does not fit within the printable page area", rowHeight)
+		return fmt.Errorf("table row height %.0f does not fit within the printable page area", firstRowHeight)
 	}
 	if title != "" {
 		if err := document.AddSubsectionHeading(title); err != nil {
@@ -412,8 +442,8 @@ func (document *gopdfDocument) prepareTableStart(title string, rowHeight float64
 		}
 	}
 	document.y += tableSpacing
-	if document.tableRowCapacity(rowHeight) == 0 {
-		return fmt.Errorf("table row height %.0f does not fit within the printable page area", rowHeight)
+	if document.tableRowCountAt(document.y, []float64{firstRowHeight}, headerHeight) == 0 {
+		return fmt.Errorf("table row height %.0f does not fit within the printable page area", firstRowHeight)
 	}
 	return nil
 }

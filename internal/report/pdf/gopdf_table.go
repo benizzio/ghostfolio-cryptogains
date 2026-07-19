@@ -92,40 +92,6 @@ func sanitizeTableCell(raw string) string {
 	var lines = strings.Split(raw, "\n")
 	for index := range lines {
 		lines[index] = sanitizeText(lines[index])
-		lines[index] = wrapLongNumericTableCell(lines[index])
 	}
 	return strings.Join(lines, "\n")
-}
-
-// wrapLongNumericTableCell adds explicit PDF line boundaries for long numeric
-// values that otherwise exceed a gopdf table cell's fixed row height.
-// Authored by: OpenCode
-func wrapLongNumericTableCell(line string) string {
-	if len(line) <= 18 || !isNumericTableCell(line) {
-		return line
-	}
-	var parts []string
-	for len(line) > 8 {
-		parts = append(parts, line[:8])
-		line = line[8:]
-	}
-	parts = append(parts, line)
-	return strings.Join(parts, "\n")
-}
-
-// isNumericTableCell reports whether a table cell is one long signed decimal.
-// Authored by: OpenCode
-func isNumericTableCell(line string) bool {
-	var digits int
-	for index, character := range line {
-		if character >= '0' && character <= '9' {
-			digits++
-			continue
-		}
-		if (character == '-' && index == 0) || character == '.' {
-			continue
-		}
-		return false
-	}
-	return digits > 0
 }

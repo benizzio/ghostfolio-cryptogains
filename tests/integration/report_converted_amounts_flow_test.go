@@ -305,8 +305,8 @@ func assertConvertedAmountsOutputsMatch(t *testing.T, baseline reportmodel.Capit
 				t.Fatalf("PDF converted amounts for %q omit logical start %q from text runs", entry.SourceID, expected)
 			}
 			labelOccurrences[label]++
-			if index > 0 && y <= previousY {
-				t.Fatalf("PDF converted amount %q starts at Y %.2f after previous Y %.2f; want a later logical line", expected, y, previousY)
+			if index > 0 && y >= previousY {
+				t.Fatalf("PDF converted amount %q starts at Y %.2f after previous Y %.2f; want a lower logical line", expected, y, previousY)
 			}
 			previousY = y
 		}

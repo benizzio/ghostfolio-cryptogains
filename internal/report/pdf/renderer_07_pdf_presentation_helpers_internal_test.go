@@ -1,12 +1,34 @@
 package pdf
 
 import (
+	"strings"
 	"testing"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
 	"github.com/cockroachdb/apd/v3"
 )
+
+// TestSanitizeConvertedCellPreservesReceivedOrder verifies PDF delimiters are
+// inserted without reordering the presentation-layer entries.
+// Authored by: OpenCode
+func TestSanitizeConvertedCellPreservesReceivedOrder(t *testing.T) {
+	var entries = []presentation.ConvertedAmountEntry{
+		{Label: "unit_price", OriginalAmount: "1.00", ConvertedAmount: "2.00"},
+		{Label: "gross_value", OriginalAmount: "3.00", ConvertedAmount: "4.00"},
+		{Label: "fee_amount", OriginalAmount: "5.00", ConvertedAmount: "6.00"},
+	}
+	var rendered = sanitizeConvertedCell(entries)
+	var unitPrice = strings.Index(rendered, "unit_price:")
+	var grossValue = strings.Index(rendered, "gross_value:")
+	var feeAmount = strings.Index(rendered, "fee_amount:")
+	if unitPrice < 0 || unitPrice >= grossValue || grossValue >= feeAmount {
+		t.Fatalf("converted cell order = %q, want unit_price, gross_value, fee_amount", rendered)
+	}
+	if !strings.Contains(rendered, "2.00;\ngross_value:") || !strings.Contains(rendered, "4.00;\nfee_amount:") || strings.HasSuffix(rendered, ";") {
+		t.Fatalf("converted cell delimiters = %q, want semicolons only between entries", rendered)
+	}
+}
 
 // TestPDFFormattingHelperFallbackBranches covers PDF-only label and conversion
 // fallback paths that are not naturally exercised by the report fixtures.

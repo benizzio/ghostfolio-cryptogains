@@ -336,7 +336,7 @@ func countPDFConversionBoundaries(inspection testutil.GeneratedPDF) int {
 			if strings.TrimSpace(inspection.TextRuns[next].Text) == "" {
 				continue
 			}
-			if strings.HasPrefix(strings.TrimSpace(inspection.TextRuns[next].Text), "unit_price:") {
+			if strings.HasPrefix(strings.TrimSpace(inspection.TextRuns[next].Text), "gross_value:") {
 				count++
 			}
 			break

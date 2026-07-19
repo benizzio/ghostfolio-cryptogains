@@ -117,8 +117,8 @@ func TestReportConvertedAmountsConcretePDFContract(t *testing.T) {
 			if math.Abs(starts[index].X-starts[0].X) > 0.01 {
 				t.Fatalf("PDF conversion row %q entry %d X = %.2f, want cell origin %.2f", sequence.SourceID, index, starts[index].X, starts[0].X)
 			}
-			if starts[index].Y <= starts[index-1].Y+0.01 {
-				t.Fatalf("PDF conversion row %q entry %d Y = %.2f, want later than %.2f", sequence.SourceID, index, starts[index].Y, starts[index-1].Y)
+			if starts[index].Y >= starts[index-1].Y-0.01 {
+				t.Fatalf("PDF conversion row %q entry %d Y = %.2f, want lower than %.2f", sequence.SourceID, index, starts[index].Y, starts[index-1].Y)
 			}
 		}
 		for _, kind := range sequence.Kinds {
@@ -153,7 +153,7 @@ func contractPDFConvertedCellRuns(rowRuns []testutil.PDFTextRun) []testutil.PDFT
 		}
 	}
 	sort.SliceStable(result, func(left int, right int) bool {
-		return result[left].Y < result[right].Y
+		return result[left].Y > result[right].Y
 	})
 	return result
 }

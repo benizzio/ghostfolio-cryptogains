@@ -404,8 +404,8 @@ func assertScalePDFRepresentativeRows(t *testing.T, inspection testutil.Generate
 		for index, entry := range markdownRows[sourceID] {
 			var label = strings.SplitN(entry, ":", 2)[0]
 			var y, ok = runtimeflow.PDFConversionStartY(inspection, sourceID, label, 0)
-			if !ok || (index > 0 && y <= previousY) {
-				t.Fatalf("PDF conversion row %q entry %q lacks a later logical line start", sourceID, entry)
+			if !ok || (index > 0 && y >= previousY) {
+				t.Fatalf("PDF conversion row %q entry %q lacks a lower logical line start", sourceID, entry)
 			}
 			previousY = y
 		}

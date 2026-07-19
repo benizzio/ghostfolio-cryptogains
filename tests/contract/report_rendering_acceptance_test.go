@@ -1219,7 +1219,8 @@ func renderingAcceptancePDFValue(acceptanceCase testutil.ReportPresentationAccep
 			if !found {
 				return "", false
 			}
-			return renderingAcceptancePDFCell(rowRuns, 500, 585, true), true
+			var bounds = renderingAcceptancePDFTableColumnBounds([]float64{220, 150, 150}, 1)
+			return renderingAcceptancePDFCell(rowRuns, bounds[0], bounds[1], true), true
 		}
 		if occurrence.Section == "position" {
 			var heading = "Opening Position"
@@ -1236,11 +1237,12 @@ func renderingAcceptancePDFValue(acceptanceCase testutil.ReportPresentationAccep
 			if !found {
 				return "", false
 			}
-			var columns = map[string][2]float64{"unit_price": {290, 345}, "gross_value": {345, 400}, "fee_amount": {400, 450}, "basis_after_row": {500, 550}}
-			bounds, ok := columns[occurrence.FieldName]
+			var columns = map[string]int{"unit_price": 4, "gross_value": 5, "fee_amount": 6, "basis_after_row": 8}
+			column, ok := columns[occurrence.FieldName]
 			if !ok {
 				return "", false
 			}
+			var bounds = renderingAcceptancePDFTableColumnBounds([]float64{52, 45, 42, 40, 40, 38, 34, 42, 46, 42, 42, 52, 50}, column)
 			return renderingAcceptancePDFCell(rowRuns, bounds[0], bounds[1], true), true
 		}
 		if occurrence.Section == "liquidation_calculations" {
@@ -1248,11 +1250,12 @@ func renderingAcceptancePDFValue(acceptanceCase testutil.ReportPresentationAccep
 			if !found {
 				return "", false
 			}
-			var columns = map[string][2]float64{"allocated_basis": {380, 490}, "net_proceeds": {490, 600}, "gain_or_loss": {600, 675}}
-			bounds, ok := columns[occurrence.FieldName]
+			var columns = map[string]int{"allocated_basis": 3, "net_proceeds": 4, "gain_or_loss": 5}
+			column, ok := columns[occurrence.FieldName]
 			if !ok {
 				return "", false
 			}
+			var bounds = renderingAcceptancePDFTableColumnBounds([]float64{72, 66, 76, 74, 72, 70, 88}, column)
 			return renderingAcceptancePDFCell(rowRuns, bounds[0], bounds[1], true), true
 		}
 		if occurrence.Section == "detailed_per_asset_audit" {
@@ -1310,13 +1313,17 @@ func renderingAcceptancePDFQuantityValue(inspection testutil.GeneratedPDF, occur
 		return renderingAcceptancePDFPositionValue(inspection, occurrence.AssetIdentity, "Historical Position", "Quantity")
 	case "activity_quantity", "quantity_after_row", "disposed_quantity":
 		var rowRuns, found = renderingAcceptancePDFMainSourceRow(inspection, occurrence.SourceOrRowIdentity)
+		var widths = []float64{52, 45, 42, 40, 40, 38, 34, 42, 46, 42, 42, 52, 50}
+		var column = map[string]int{"activity_quantity": 3, "quantity_after_row": 7}[occurrence.FieldName]
 		if occurrence.FieldName == "disposed_quantity" {
 			rowRuns, found = renderingAcceptancePDFMainSourceRowInRange(inspection, occurrence.SourceOrRowIdentity, 140, 260)
+			widths = []float64{72, 66, 76, 74, 72, 70, 88}
+			column = 2
 		}
 		if !found {
 			return "", false
 		}
-		var bounds = map[string][2]float64{"activity_quantity": {230, 290}, "quantity_after_row": {450, 500}, "disposed_quantity": {260, 380}}[occurrence.FieldName]
+		var bounds = renderingAcceptancePDFTableColumnBounds(widths, column)
 		return renderingAcceptancePDFCell(rowRuns, bounds[0], bounds[1], true), true
 	case "audit_quantity", "quantity_after_activity":
 		var cells, found = renderingAcceptancePDFAuditCells(inspection, occurrence.SourceOrRowIdentity)
@@ -1468,17 +1475,44 @@ func renderingAcceptancePDFMainSourceRowInRange(inspection testutil.GeneratedPDF
 // be right-aligned or split across physical PDF runs.
 // Authored by: OpenCode
 func renderingAcceptancePDFCell(runs []testutil.PDFTextRun, minimumX float64, maximumX float64, compact bool) string {
-	var values []string
+	var cellRuns []testutil.PDFTextRun
 	for _, run := range runs {
 		if run.X >= minimumX && run.X < maximumX {
-			values = append(values, run.Text)
+			cellRuns = append(cellRuns, run)
 		}
+	}
+	sort.SliceStable(cellRuns, func(left int, right int) bool {
+		return cellRuns[left].Y > cellRuns[right].Y
+	})
+	var values = make([]string, 0, len(cellRuns))
+	for _, run := range cellRuns {
+		values = append(values, run.Text)
 	}
 	var value = strings.Join(values, " ")
 	if compact {
 		return strings.Join(strings.Fields(value), "")
 	}
 	return strings.Join(strings.Fields(value), " ")
+}
+
+// renderingAcceptancePDFTableColumnBounds scales one declared table column to
+// the production printable-width geometry used by gopdf.
+// Authored by: OpenCode
+func renderingAcceptancePDFTableColumnBounds(widths []float64, target int) [2]float64 {
+	const tableStartX = 36.0
+	const tableWidth = 770.0
+	var totalWidth float64
+	for _, width := range widths {
+		totalWidth += width
+	}
+	var sourceStart float64
+	for column := 0; column < target; column++ {
+		sourceStart += widths[column]
+	}
+	return [2]float64{
+		tableStartX + sourceStart*tableWidth/totalWidth,
+		tableStartX + (sourceStart+widths[target])*tableWidth/totalWidth,
+	}
 }
 
 // renderingAcceptanceReport creates the deterministic synthetic model used by

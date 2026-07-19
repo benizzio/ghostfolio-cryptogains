@@ -67,10 +67,7 @@ func conversionStatusColumn(row reportmodel.AssetActivityRow) (string, error) {
 // Authored by: OpenCode
 func sanitizeConvertedCell(entries []presentation.ConvertedAmountEntry) string {
 	var sanitized = make([]string, 0, len(entries))
-	// gopdf's vertically centered MultiCell draws explicit lines bottom-first;
-	// reverse the input so the visible top-to-bottom order matches the model.
-	for index := len(entries) - 1; index >= 0; index-- {
-		var entry = entries[index]
+	for _, entry := range entries {
 		var rendered = entry.Label + ": " + entry.OriginalAmount + " -> " + entry.ConvertedAmount
 		sanitized = append(sanitized, sanitizeText(rendered))
 	}
