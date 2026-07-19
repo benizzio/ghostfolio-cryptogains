@@ -12,9 +12,12 @@
 package pdf
 
 import (
+	"errors"
 	"fmt"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
 )
 
 const (
@@ -67,10 +70,27 @@ func (fonts FontData) Validate() error {
 	return nil
 }
 
+// ByteFinalizer can replace one renderer's PDF byte-finalization behavior while
+// retaining access to the concrete production finalizer for fallback or retry.
+// The callback must return a nil payload when it returns an error.
+//
+// Example:
+//
+//	finalizer := pdf.ByteFinalizer(func(defaultFinalize func() ([]byte, error)) ([]byte, error) {
+//		return defaultFinalize()
+//	})
+//	_ = finalizer
+//
+// Authored by: OpenCode
+type ByteFinalizer func(func() ([]byte, error)) ([]byte, error)
+
 // RenderOptions stores local PDF renderer configuration.
 // Authored by: OpenCode
 type RenderOptions struct {
-	Fonts FontData
+	Fonts               FontData
+	FinancialFormatting presentation.FinancialFormattingOptions
+	// ByteFinalizer is scoped to the renderer created from these options.
+	ByteFinalizer ByteFinalizer
 }
 
 // Validate verifies local PDF renderer options before a render attempt.
@@ -97,7 +117,82 @@ type Renderer struct {
 	options RenderOptions
 }
 
-// NewRenderer creates one validated local PDF renderer.
+// redactedPDFOperationalCause exposes a safe cause message while preserving
+// errors.Is identity checks for the original rendering failure.
+// Authored by: OpenCode
+type redactedPDFOperationalCause struct {
+	cause       error
+	identifiers []string
+}
+
+// Error returns the operational cause after applying the shared redaction policy.
+// Authored by: OpenCode
+func (cause redactedPDFOperationalCause) Error() string {
+	return redact.ErrorText(cause.cause, cause.identifiers...)
+}
+
+// Is preserves matching against the original operational cause without
+// exposing that cause through the unwrap chain.
+// Authored by: OpenCode
+func (cause redactedPDFOperationalCause) Is(target error) bool {
+	return errors.Is(cause.cause, target)
+}
+
+// wrapPDFOperationalError adds stable stage context and a non-unwrapping,
+// identity-matchable redacted cause.
+// Authored by: OpenCode
+func wrapPDFOperationalError(stage string, err error, identifiers []string) error {
+	return fmt.Errorf("%s: %w", stage, redactedPDFOperationalCause{cause: err, identifiers: identifiers})
+}
+
+// reportIdentifiers returns report-owned identifiers that are valid in a
+// successful export but prohibited from renderer error channels.
+// Authored by: OpenCode
+func reportIdentifiers(report reportmodel.CapitalGainsReport) []string {
+	var identifiers []string
+	for _, entry := range report.SummaryEntries {
+		identifiers = append(identifiers, entry.AssetIdentityKey, entry.DisplayLabel)
+	}
+	for _, entry := range report.ReferenceEntries {
+		identifiers = append(identifiers, entry.AssetIdentityKey, entry.DisplayLabel)
+	}
+	identifiers = appendReportDetailIdentifiers(identifiers, report.DetailSections)
+	for _, section := range report.AuditAnnex.PerAssetAuditSections {
+		identifiers = append(identifiers, section.AssetIdentityKey, section.DisplayLabel)
+		for _, entry := range section.Entries {
+			identifiers = append(identifiers, entry.SourceID)
+		}
+	}
+	for _, entry := range report.AuditAnnex.ConversionAuditEntries {
+		identifiers = append(identifiers, entry.SourceID, entry.AssetLabel)
+		for _, amount := range entry.Amounts {
+			identifiers = append(identifiers, amount.SourceID)
+		}
+	}
+	return identifiers
+}
+
+// appendReportDetailIdentifiers collects identifiers from detailed activity
+// and liquidation rows for renderer error redaction.
+// Authored by: OpenCode
+func appendReportDetailIdentifiers(identifiers []string, sections []reportmodel.AssetDetailSection) []string {
+	for _, section := range sections {
+		identifiers = append(identifiers, section.AssetIdentityKey, section.DisplayLabel)
+		for _, row := range section.ActivityRows {
+			identifiers = append(identifiers, row.SourceID)
+		}
+		for _, liquidation := range section.LiquidationSummaries {
+			identifiers = append(identifiers, liquidation.SourceID)
+			for _, match := range liquidation.Matches {
+				identifiers = append(identifiers, match.AcquisitionSourceID)
+			}
+		}
+	}
+	return identifiers
+}
+
+// NewRenderer creates one validated local PDF renderer. A nil ByteFinalizer
+// preserves the production GetBytesPdfReturnErr finalization path.
 //
 // Example:
 //
@@ -143,22 +238,28 @@ func (renderer Renderer) Render(report reportmodel.CapitalGainsReport) ([]byte, 
 		return nil, err
 	}
 
-	var document = newPDFDocumentForRenderer()
+	var identifiers = reportIdentifiers(report)
+	var document = newPDFDocumentForRenderer(renderer.options.ByteFinalizer)
 	if err := startPDFDocument(document); err != nil {
-		return nil, err
+		return nil, wrapPDFOperationalError("start PDF document", err, identifiers)
 	}
 	if err := loadApplicationFonts(document, renderer.options.Fonts); err != nil {
-		return nil, err
+		return nil, wrapPDFOperationalError("load PDF fonts", err, identifiers)
 	}
-	if err := renderMainReport(document, report); err != nil {
-		return nil, err
+	if err := renderMainReportWithFinancialFormatting(document, report, renderer.options.FinancialFormatting); err != nil {
+		return nil, wrapPDFOperationalError("render PDF main report", err, identifiers)
 	}
 	if err := document.AddAnnexPageBreak(); err != nil {
-		return nil, err
+		return nil, wrapPDFOperationalError("add PDF Annex page break", err, identifiers)
 	}
-	if err := renderAnnex(document, report.AuditAnnex); err != nil {
-		return nil, err
+	if err := renderAnnexWithFinancialFormatting(document, report.AuditAnnex, renderer.options.FinancialFormatting); err != nil {
+		return nil, wrapPDFOperationalError("render PDF Annex", err, identifiers)
 	}
 
-	return document.Bytes(), nil
+	var payload, err = document.Bytes()
+	if err != nil {
+		return nil, wrapPDFOperationalError("PDF byte finalization failed", err, identifiers)
+	}
+
+	return payload, nil
 }

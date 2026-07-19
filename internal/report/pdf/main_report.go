@@ -13,6 +13,13 @@ import (
 // renderMainReport renders the main report through structured PDF operations.
 // Authored by: OpenCode
 func renderMainReport(document pdfContentLayout, report reportmodel.CapitalGainsReport) error {
+	return renderMainReportWithFinancialFormatting(document, report, presentation.DefaultFinancialFormattingOptions())
+}
+
+// renderMainReportWithFinancialFormatting renders the main report with one
+// renderer-scoped immutable financial policy.
+// Authored by: OpenCode
+func renderMainReportWithFinancialFormatting(document pdfContentLayout, report reportmodel.CapitalGainsReport, options presentation.FinancialFormattingOptions) error {
 	if document == nil {
 		return fmt.Errorf("pdf layout document is required")
 	}
@@ -22,21 +29,24 @@ func renderMainReport(document pdfContentLayout, report reportmodel.CapitalGains
 
 	var calculationCurrency = calculationCurrencyLabel(report.ReportCalculationCurrency)
 	if err := document.AddTitle(MainReportTitle); err != nil {
-		return err
+		return fmt.Errorf("add main report title: %w", err)
 	}
 	if err := document.AddKeyValue("Year", fmt.Sprintf("%d", report.Year)); err != nil {
-		return err
+		return fmt.Errorf("add year metadata: %w", err)
 	}
 	if err := document.AddKeyValue("Cost Basis Method", report.CostBasisMethod.Label()); err != nil {
-		return err
+		return fmt.Errorf("add cost basis method metadata: %w", err)
 	}
 	if err := document.AddKeyValue("Generated At", report.GeneratedAt.Local().Format("2006-01-02 15:04:05 MST")); err != nil {
-		return err
+		return fmt.Errorf("add generated-at metadata: %w", err)
 	}
 	if err := document.AddKeyValue("Report Calculation Currency", calculationCurrency); err != nil {
-		return err
+		return fmt.Errorf("add report calculation currency metadata: %w", err)
 	}
-	if err := renderSummarySection(document, report, calculationCurrency); err != nil {
+	if err := document.AddBoldParagraph(presentation.LegalWarningText); err != nil {
+		return fmt.Errorf("add legal-use warning: %w", err)
+	}
+	if err := renderSummarySectionWithFinancialFormatting(document, report, calculationCurrency, options); err != nil {
 		return err
 	}
 	if err := renderRateSourceSection(document, report); err != nil {
@@ -45,28 +55,37 @@ func renderMainReport(document pdfContentLayout, report reportmodel.CapitalGains
 	if err := renderReferenceSection(document, report); err != nil {
 		return err
 	}
-	return renderDetailSections(document, report, calculationCurrency)
+	return renderDetailSectionsWithFinancialFormatting(document, report, calculationCurrency, options)
 }
 
 // renderSummarySection renders non-zero summary rows and the yearly total.
 // Authored by: OpenCode
+//
+//nolint:unparam // The currency argument is part of the direct renderer seam.
 func renderSummarySection(document pdfContentLayout, report reportmodel.CapitalGainsReport, calculationCurrency string) error {
+	return renderSummarySectionWithFinancialFormatting(document, report, calculationCurrency, presentation.DefaultFinancialFormattingOptions())
+}
+
+// renderSummarySectionWithFinancialFormatting renders summary monetary values
+// with one renderer-scoped immutable policy.
+// Authored by: OpenCode
+func renderSummarySectionWithFinancialFormatting(document pdfContentLayout, report reportmodel.CapitalGainsReport, calculationCurrency string, options presentation.FinancialFormattingOptions) error {
 	if err := document.AddSectionHeading("Gains-And-Losses Summary"); err != nil {
-		return err
+		return fmt.Errorf("add gains-and-losses summary heading: %w", err)
 	}
-	var yearlyNetTotal, err = decimalsupport.CanonicalString(report.YearlyNetTotal)
+	var yearlyNetTotal, err = options.Format(report.YearlyNetTotal)
 	if err != nil {
 		return fmt.Errorf("render yearly net total: %w", err)
 	}
 	var rows [][]string
-	for _, entry := range report.SummaryEntries {
+	for index, entry := range report.SummaryEntries {
 		if entry.NetGainOrLoss.Sign() == 0 {
 			continue
 		}
 		var netGainOrLoss string
-		netGainOrLoss, err = decimalsupport.CanonicalString(entry.NetGainOrLoss)
+		netGainOrLoss, err = options.Format(entry.NetGainOrLoss)
 		if err != nil {
-			return fmt.Errorf("render summary entry %q net gain or loss: %w", entry.AssetIdentityKey, err)
+			return fmt.Errorf("render summary entry %d net gain or loss: %w", index+1, err)
 		}
 		rows = append(rows, []string{
 			renderDisplayLabel(entry.DisplayLabel, entry.AssetIdentityKey),
@@ -76,9 +95,12 @@ func renderSummarySection(document pdfContentLayout, report reportmodel.CapitalG
 	}
 	if len(rows) == 0 {
 		if err := document.AddParagraph("No assets had a non-zero net gain or loss in the selected year."); err != nil {
-			return err
+			return fmt.Errorf("add empty summary paragraph: %w", err)
 		}
-		return document.AddKeyValue("Overall Yearly Net Total", yearlyNetTotal+" "+calculationCurrency)
+		if err := document.AddKeyValue("Overall Yearly Net Total", yearlyNetTotal+" "+calculationCurrency); err != nil {
+			return fmt.Errorf("add overall yearly net total: %w", err)
+		}
+		return nil
 	} else if err := document.AddTable(pdfTable{
 		Title:             "Gains-And-Losses Summary Table",
 		ContinuationTitle: "Gains-And-Losses Summary Table (continued)",
@@ -90,7 +112,7 @@ func renderSummarySection(document pdfContentLayout, report reportmodel.CapitalG
 		Rows:          append(rows, []string{"Overall Yearly Net Total", yearlyNetTotal, calculationCurrency}),
 		StyledLastRow: true,
 	}); err != nil {
-		return err
+		return fmt.Errorf("add gains-and-losses summary table: %w", err)
 	}
 	return nil
 }
@@ -99,13 +121,13 @@ func renderSummarySection(document pdfContentLayout, report reportmodel.CapitalG
 // Authored by: OpenCode
 func renderRateSourceSection(document pdfContentLayout, report reportmodel.CapitalGainsReport) error {
 	if err := document.AddSectionHeading("Rate Source Summary"); err != nil {
-		return err
+		return fmt.Errorf("add rate source summary heading: %w", err)
 	}
 	if err := document.AddKeyValue("Report Base Currency", calculationCurrencyLabel(report.ReportCalculationCurrency)); err != nil {
-		return err
+		return fmt.Errorf("add report base currency: %w", err)
 	}
 	if len(report.RateSources) == 0 {
-		return document.AddParagraph("Exchange Rate Use: No activity required exchange-rate conversion.")
+		return renderEmptyRateSourceParagraph(document)
 	}
 
 	var rendered = make(map[string]bool)
@@ -116,17 +138,26 @@ func renderRateSourceSection(document pdfContentLayout, report reportmodel.Capit
 		}
 		rendered[key] = true
 		if err := document.AddKeyValue("Authority", sanitizeText(reportmodel.RateAuthorityDisplayLabel(source.Authority))); err != nil {
-			return err
+			return fmt.Errorf("add rate source authority: %w", err)
 		}
 		if err := document.AddKeyValue("Provider", rateProviderLabel(source.ProviderID)); err != nil {
-			return err
+			return fmt.Errorf("add rate source provider: %w", err)
 		}
 		if err := document.AddKeyValue("Rate Kind", sanitizeText(source.RateKind)); err != nil {
-			return err
+			return fmt.Errorf("add rate source kind: %w", err)
 		}
 		if err := document.AddKeyValue("Unavailable-Date Rule", sanitizeText(reportmodel.RateProviderUnavailableDateRule(source.ProviderID))); err != nil {
-			return err
+			return fmt.Errorf("add rate source unavailable-date rule: %w", err)
 		}
+	}
+	return nil
+}
+
+// renderEmptyRateSourceParagraph renders the rate-source summary when no conversion was required.
+// Authored by: OpenCode
+func renderEmptyRateSourceParagraph(document pdfContentLayout) error {
+	if err := document.AddParagraph("Exchange Rate Use: No activity required exchange-rate conversion."); err != nil {
+		return fmt.Errorf("add empty rate source paragraph: %w", err)
 	}
 	return nil
 }
@@ -135,10 +166,13 @@ func renderRateSourceSection(document pdfContentLayout, report reportmodel.Capit
 // Authored by: OpenCode
 func renderReferenceSection(document pdfContentLayout, report reportmodel.CapitalGainsReport) error {
 	if err := document.AddSectionHeading("Reference Section"); err != nil {
-		return err
+		return fmt.Errorf("add reference section heading: %w", err)
 	}
 	if len(report.ReferenceEntries) == 0 {
-		return document.AddParagraph("No assets reached full liquidation by year end.")
+		if err := document.AddParagraph("No assets reached full liquidation by year end."); err != nil {
+			return fmt.Errorf("add empty reference paragraph: %w", err)
+		}
+		return nil
 	}
 
 	var rows [][]string
@@ -149,7 +183,7 @@ func renderReferenceSection(document pdfContentLayout, report reportmodel.Capita
 			sanitizeText(string(entry.MainSectionStatus)),
 		})
 	}
-	return document.AddTable(pdfTable{
+	if err := document.AddTable(pdfTable{
 		ContinuationTitle: "Reference Section (continued)",
 		Columns: []pdfColumn{
 			{Header: "Asset", Width: 170, Align: "left"},
@@ -157,95 +191,127 @@ func renderReferenceSection(document pdfContentLayout, report reportmodel.Capita
 			{Header: "Main Section Status", Width: 160, Align: "left"},
 		},
 		Rows: rows,
-	})
+	}); err != nil {
+		return fmt.Errorf("add reference table: %w", err)
+	}
+	return nil
 }
 
 // renderDetailSections renders asset detail sections from report-domain rows.
 // Authored by: OpenCode
 func renderDetailSections(document pdfContentLayout, report reportmodel.CapitalGainsReport, calculationCurrency string) error {
-	for _, section := range report.DetailSections {
-		if err := renderDetailSection(document, section, calculationCurrency); err != nil {
-			return err
+	return renderDetailSectionsWithFinancialFormatting(document, report, calculationCurrency, presentation.DefaultFinancialFormattingOptions())
+}
+
+// renderDetailSectionsWithFinancialFormatting renders all detail sections with
+// one renderer-scoped immutable financial policy.
+// Authored by: OpenCode
+func renderDetailSectionsWithFinancialFormatting(document pdfContentLayout, report reportmodel.CapitalGainsReport, calculationCurrency string, options presentation.FinancialFormattingOptions) error {
+	for index, section := range report.DetailSections {
+		if err := renderDetailSectionWithFinancialFormatting(document, section, calculationCurrency, options); err != nil {
+			return fmt.Errorf("render asset detail section %d: %w", index+1, err)
 		}
 	}
 	return nil
 }
 
-// renderDetailSection renders one historical or active asset detail section.
+// renderDetailSectionWithFinancialFormatting renders one detail section with a
+// renderer-scoped immutable financial policy.
 // Authored by: OpenCode
-func renderDetailSection(document pdfContentLayout, section reportmodel.AssetDetailSection, calculationCurrency string) error {
+func renderDetailSectionWithFinancialFormatting(document pdfContentLayout, section reportmodel.AssetDetailSection, calculationCurrency string, options presentation.FinancialFormattingOptions) error {
 	if err := document.AddSectionHeading("Asset Detail: " + renderDisplayLabel(section.DisplayLabel, section.AssetIdentityKey)); err != nil {
-		return err
+		return fmt.Errorf("add asset detail heading: %w", err)
 	}
 	if len(section.ActivityRows) == 0 {
-		return renderHistoricalDetailSection(document, section, calculationCurrency)
+		return renderHistoricalDetailSectionWithFinancialFormatting(document, section, calculationCurrency, options)
 	}
-	return renderActiveDetailSection(document, section, calculationCurrency)
+	return renderActiveDetailSectionWithFinancialFormatting(document, section, calculationCurrency, options)
 }
 
-// renderHistoricalDetailSection renders an asset that has no report-year activity.
+// renderHistoricalDetailSectionWithFinancialFormatting renders a historical
+// position with a renderer-scoped immutable financial policy.
 // Authored by: OpenCode
-func renderHistoricalDetailSection(document pdfContentLayout, section reportmodel.AssetDetailSection, currency string) error {
-	if err := renderPositionBlock(document, "Historical Position", section.ClosingQuantity, section.ClosingCostBasis, section.CalculationCurrency, currency); err != nil {
-		return fmt.Errorf("render historical position for %q: %w", section.AssetIdentityKey, err)
+func renderHistoricalDetailSectionWithFinancialFormatting(document pdfContentLayout, section reportmodel.AssetDetailSection, currency string, options presentation.FinancialFormattingOptions) error {
+	if err := renderPositionBlockWithFinancialFormatting(document, "Historical Position", section.ClosingQuantity, section.ClosingCostBasis, section.CalculationCurrency, currency, options); err != nil {
+		return fmt.Errorf("render historical position: %w", err)
 	}
 	return nil
 }
 
-// renderActiveDetailSection renders all normal activity, liquidation, and closing blocks.
+// renderActiveDetailSectionWithFinancialFormatting renders active detail blocks
+// with a renderer-scoped immutable financial policy.
 // Authored by: OpenCode
-func renderActiveDetailSection(document pdfContentLayout, section reportmodel.AssetDetailSection, currency string) error {
-	if err := renderPositionBlock(document, "Opening Position", section.OpeningQuantity, section.OpeningCostBasis, section.CalculationCurrency, currency); err != nil {
-		return fmt.Errorf("render opening position for %q: %w", section.AssetIdentityKey, err)
+func renderActiveDetailSectionWithFinancialFormatting(document pdfContentLayout, section reportmodel.AssetDetailSection, currency string, options presentation.FinancialFormattingOptions) error {
+	if err := renderPositionBlockWithFinancialFormatting(document, "Opening Position", section.OpeningQuantity, section.OpeningCostBasis, section.CalculationCurrency, currency, options); err != nil {
+		return fmt.Errorf("render opening position: %w", err)
 	}
-	if err := renderActivityRows(document, section); err != nil {
-		return fmt.Errorf("render in-year activity for %q: %w", section.AssetIdentityKey, err)
+	if err := renderActivityRowsWithFinancialFormatting(document, section, options); err != nil {
+		return fmt.Errorf("render in-year activity: %w", err)
 	}
-	if err := renderLiquidationRows(document, section, currency); err != nil {
-		return fmt.Errorf("render liquidation calculations for %q: %w", section.AssetIdentityKey, err)
+	if err := renderLiquidationRowsWithFinancialFormatting(document, section, currency, options); err != nil {
+		return fmt.Errorf("render liquidation calculations: %w", err)
 	}
-	if err := renderPositionBlock(document, "Closing Position", section.ClosingQuantity, section.ClosingCostBasis, section.CalculationCurrency, currency); err != nil {
-		return fmt.Errorf("render closing position for %q: %w", section.AssetIdentityKey, err)
+	if err := renderPositionBlockWithFinancialFormatting(document, "Closing Position", section.ClosingQuantity, section.ClosingCostBasis, section.CalculationCurrency, currency, options); err != nil {
+		return fmt.Errorf("render closing position: %w", err)
 	}
 	return nil
 }
 
 // renderPositionBlock renders one asset position block with styled labels.
 // Authored by: OpenCode
+//
+//nolint:unparam // Both currency arguments remain part of the direct renderer seam.
 func renderPositionBlock(document pdfContentLayout, heading string, quantity apd.Decimal, basis apd.Decimal, sectionCurrency string, fallbackCurrency string) error {
+	return renderPositionBlockWithFinancialFormatting(document, heading, quantity, basis, sectionCurrency, fallbackCurrency, presentation.DefaultFinancialFormattingOptions())
+}
+
+// renderPositionBlockWithFinancialFormatting renders one position block with a
+// renderer-scoped immutable financial policy.
+// Authored by: OpenCode
+func renderPositionBlockWithFinancialFormatting(document pdfContentLayout, heading string, quantity apd.Decimal, basis apd.Decimal, sectionCurrency string, fallbackCurrency string, options presentation.FinancialFormattingOptions) error {
 	if err := document.AddSubsectionHeading(heading); err != nil {
-		return err
+		return fmt.Errorf("add %s heading: %w", heading, err)
 	}
 	var quantityText, err = decimalsupport.CanonicalString(quantity)
 	if err != nil {
 		return fmt.Errorf("render quantity: %w", err)
 	}
 	var basisText string
-	basisText, err = decimalsupport.CanonicalString(basis)
+	basisText, err = options.Format(basis)
 	if err != nil {
 		return fmt.Errorf("render cost basis: %w", err)
 	}
 	if err := document.AddKeyValue("Quantity", quantityText); err != nil {
-		return err
+		return fmt.Errorf("add %s quantity: %w", heading, err)
 	}
 	if err := document.AddKeyValue("Cost Basis", basisText); err != nil {
-		return err
+		return fmt.Errorf("add %s cost basis: %w", heading, err)
 	}
-	return document.AddKeyValue("Calculation Currency", calculationCurrencyLabelWithFallback(sectionCurrency, fallbackCurrency))
+	if err := document.AddKeyValue("Calculation Currency", calculationCurrencyLabelWithFallback(sectionCurrency, fallbackCurrency)); err != nil {
+		return fmt.Errorf("add %s calculation currency: %w", heading, err)
+	}
+	return nil
 }
 
 // renderActivityRows renders in-year asset activity as a table.
 // Authored by: OpenCode
 func renderActivityRows(document pdfContentLayout, section reportmodel.AssetDetailSection) error {
+	return renderActivityRowsWithFinancialFormatting(document, section, presentation.DefaultFinancialFormattingOptions())
+}
+
+// renderActivityRowsWithFinancialFormatting renders activity rows with one
+// renderer-scoped immutable financial policy.
+// Authored by: OpenCode
+func renderActivityRowsWithFinancialFormatting(document pdfContentLayout, section reportmodel.AssetDetailSection, options presentation.FinancialFormattingOptions) error {
 	var rows [][]string
-	for _, row := range section.ActivityRows {
-		var rendered, err = renderActivityRow(row)
+	for index, row := range section.ActivityRows {
+		var rendered, err = renderActivityRowWithFinancialFormatting(row, options)
 		if err != nil {
-			return err
+			return fmt.Errorf("render activity row %d: %w", index+1, err)
 		}
 		rows = append(rows, rendered)
 	}
-	return document.AddTable(pdfTable{
+	if err := document.AddTable(pdfTable{
 		Title:             "In-Year Activity",
 		ContinuationTitle: "In-Year Activity (continued)",
 		Columns: []pdfColumn{
@@ -265,13 +331,23 @@ func renderActivityRows(document pdfContentLayout, section reportmodel.AssetDeta
 		},
 		Rows:      rows,
 		RowHeight: 32,
-	})
+	}); err != nil {
+		return fmt.Errorf("add in-year activity table: %w", err)
+	}
+	return nil
 }
 
 // renderActivityRow formats one in-year activity row for a PDF table.
 // Authored by: OpenCode
 func renderActivityRow(row reportmodel.AssetActivityRow) ([]string, error) {
-	var rendered, err = presentation.BuildActivityRow(row)
+	return renderActivityRowWithFinancialFormatting(row, presentation.DefaultFinancialFormattingOptions())
+}
+
+// renderActivityRowWithFinancialFormatting renders one activity row with a
+// renderer-scoped immutable financial policy.
+// Authored by: OpenCode
+func renderActivityRowWithFinancialFormatting(row reportmodel.AssetActivityRow, options presentation.FinancialFormattingOptions) ([]string, error) {
+	var rendered, err = presentation.BuildActivityRowWithFinancialFormatting(row, options)
 	if err != nil {
 		return nil, err
 	}
@@ -283,18 +359,25 @@ func renderActivityRow(row reportmodel.AssetActivityRow) ([]string, error) {
 // renderLiquidationRows renders priced liquidation rows when present.
 // Authored by: OpenCode
 func renderLiquidationRows(document pdfContentLayout, section reportmodel.AssetDetailSection, fallbackCurrency string) error {
+	return renderLiquidationRowsWithFinancialFormatting(document, section, fallbackCurrency, presentation.DefaultFinancialFormattingOptions())
+}
+
+// renderLiquidationRowsWithFinancialFormatting renders liquidation rows with a
+// renderer-scoped immutable financial policy.
+// Authored by: OpenCode
+func renderLiquidationRowsWithFinancialFormatting(document pdfContentLayout, section reportmodel.AssetDetailSection, fallbackCurrency string, options presentation.FinancialFormattingOptions) error {
 	if len(section.LiquidationSummaries) == 0 {
 		return nil
 	}
 	var rows [][]string
-	for _, liquidation := range section.LiquidationSummaries {
-		var row, err = renderLiquidationRow(liquidation, fallbackCurrency)
+	for index, liquidation := range section.LiquidationSummaries {
+		var row, err = renderLiquidationRowWithFinancialFormatting(liquidation, fallbackCurrency, options)
 		if err != nil {
-			return err
+			return fmt.Errorf("render liquidation row %d: %w", index+1, err)
 		}
 		rows = append(rows, row)
 	}
-	return document.AddTable(pdfTable{
+	if err := document.AddTable(pdfTable{
 		Title:             "Liquidation Calculations",
 		ContinuationTitle: "Liquidation Calculations (continued)",
 		Columns: []pdfColumn{
@@ -307,13 +390,23 @@ func renderLiquidationRows(document pdfContentLayout, section reportmodel.AssetD
 			{Header: "Calculation Currency", Width: 88, Align: "left"},
 		},
 		Rows: rows,
-	})
+	}); err != nil {
+		return fmt.Errorf("add liquidation calculations table: %w", err)
+	}
+	return nil
 }
 
 // renderLiquidationRow formats one liquidation calculation row.
 // Authored by: OpenCode
 func renderLiquidationRow(liquidation reportmodel.LiquidationCalculation, fallbackCurrency string) ([]string, error) {
-	var rendered, err = presentation.BuildLiquidationRow(liquidation, fallbackCurrency)
+	return renderLiquidationRowWithFinancialFormatting(liquidation, fallbackCurrency, presentation.DefaultFinancialFormattingOptions())
+}
+
+// renderLiquidationRowWithFinancialFormatting renders one liquidation row with
+// a renderer-scoped immutable financial policy.
+// Authored by: OpenCode
+func renderLiquidationRowWithFinancialFormatting(liquidation reportmodel.LiquidationCalculation, fallbackCurrency string, options presentation.FinancialFormattingOptions) ([]string, error) {
+	var rendered, err = presentation.BuildLiquidationRowWithFinancialFormatting(liquidation, fallbackCurrency, options)
 	if err != nil {
 		return nil, err
 	}

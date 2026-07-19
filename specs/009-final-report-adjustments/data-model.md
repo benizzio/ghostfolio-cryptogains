@@ -84,11 +84,16 @@ Validation rules:
 
 - Source value must be finite.
 - Formatting must not mutate `source_value` or its coefficient storage.
-- Quantization starts from a copy of `apd.BaseContext` so the normative adjusted-
-  exponent bounds `-100000` through `100000` and default traps remain active.
+- Quantization uses a package-owned context with the pinned `apd` adjusted-
+  exponent bounds `-100000` through `100000` and default traps.
 - Required precision is derived with checked arithmetic from source digit count,
-  expansion to exponent `-2`, and one possible carry digit; a result above
-  unsigned 32-bit maximum `4294967295` is rejected before quantization.
+  expansion to exponent `-2`, and one possible carry digit; a result above the
+  pinned implementation's maximum safe signed exponent-arithmetic precision
+  `2147383649` is rejected before quantization.
+- Ordinary scale changes are delegated directly to `apd.Context.Quantize`.
+  Coefficients are pre-expanded only when the source exponent would require a
+  scale shift below `apd.MinExponent`, which preserves the accepted upper
+  adjusted-exponent boundary without duplicating ordinary library behavior.
 - A source at adjusted exponent `100000` is accepted only when HALF UP
   quantization cannot carry its result to adjusted exponent `100001`.
 - Only `Rounded` and `Inexact` operation conditions are accepted; every other

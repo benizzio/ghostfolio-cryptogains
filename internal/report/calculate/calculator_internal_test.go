@@ -804,6 +804,73 @@ func TestCalculateBuildsAuditAnnexThroughSelectedYear(t *testing.T) {
 	}
 }
 
+// TestBuildAuditActivityEntryPropagatesInheritedClassificationPreservesAuditValues
+// verifies that calculation copies the inherited classification without changing
+// the pre-format currency or any other Annex 1 evidence.
+// Authored by: OpenCode
+func TestBuildAuditActivityEntryPropagatesInheritedClassificationPreservesAuditValues(t *testing.T) {
+	t.Parallel()
+
+	var occurredAt = time.Date(2024, time.February, 4, 10, 11, 12, 0, time.FixedZone("source", 2*60*60))
+	var input = reportmodel.ActivityCalculationInput{
+		SourceID:                     "audit-sell-1",
+		OccurredAt:                   occurredAt,
+		ActivityType:                 reportmodel.ActivityTypeSell,
+		Quantity:                     mustReportDecimal(t, "2"),
+		UnitPrice:                    decimalPointer(t, "0"),
+		GrossValue:                   decimalPointer(t, "0"),
+		FeeAmount:                    decimalPointer(t, "0"),
+		SelectedCurrencyCode:         "USD",
+		ActivityCurrencyCode:         "EUR",
+		ConversionStatus:             reportmodel.ConversionStatusConverted,
+		IsZeroPricedHoldingReduction: true,
+		Comment:                      "audit note",
+	}
+	var basisAfter = mustReportDecimal(t, "12")
+	var quantityAfter = mustReportDecimal(t, "0")
+	var allocatedBasis = mustReportDecimal(t, "12")
+	var netProceeds = mustReportDecimal(t, "0")
+	var gainOrLoss = mustReportDecimal(t, "-12")
+
+	var entry, err = buildAuditActivityEntry(input, basisAfter, quantityAfter, basisApplicationResult{
+		allocatedBasis: &allocatedBasis,
+		netProceeds:    &netProceeds,
+		gainOrLoss:     &gainOrLoss,
+		reachedZero:    true,
+	})
+	if err != nil {
+		t.Fatalf("build audit activity entry: %v", err)
+	}
+
+	if !entry.IsZeroPricedHoldingReduction {
+		t.Fatalf("expected inherited zero-priced classification to reach audit entry, got %#v", entry)
+	}
+	if entry.SourceID != input.SourceID || !entry.OccurredAt.Equal(input.OccurredAt) || entry.ActivityType != input.ActivityType {
+		t.Fatalf("unexpected audit identity values: %#v", entry)
+	}
+	if entry.Quantity.Cmp(&input.Quantity) != 0 {
+		t.Fatalf("unexpected audit quantity: got %s want %s", entry.Quantity.Text('f'), input.Quantity.Text('f'))
+	}
+	assertReportDecimalPointer(t, entry.UnitPrice, "0")
+	assertReportDecimalPointer(t, entry.GrossValue, "0")
+	assertReportDecimalPointer(t, entry.FeeAmount, "0")
+	if entry.ActivityCurrency != "EUR" || entry.CalculationCurrency != "USD" {
+		t.Fatalf("expected pre-format activity currency and calculation currency to remain distinct, got %#v", entry)
+	}
+	if entry.QuantityAfterActivity.Cmp(&quantityAfter) != 0 || entry.BasisAfterActivity.Cmp(&basisAfter) != 0 {
+		t.Fatalf("unexpected post-activity replay values: %#v", entry)
+	}
+	if !entry.FullLiquidationEvent {
+		t.Fatalf("expected full-liquidation evidence to be retained, got %#v", entry)
+	}
+	assertReportDecimalPointer(t, entry.AllocatedBasis, "12")
+	assertReportDecimalPointer(t, entry.NetLiquidationProceeds, "0")
+	assertReportDecimalPointer(t, entry.GainOrLoss, "-12")
+	if entry.ConversionStatus != reportmodel.ConversionStatusConverted || entry.Note != "audit note" {
+		t.Fatalf("unexpected audit classification or note values: %#v", entry)
+	}
+}
+
 // TestApplyReportCurrencyBoundaryUsesRateServiceForCrossCurrency verifies cross-
 // currency priced rows use the seam and surface lookup failures safely.
 // Authored by: OpenCode

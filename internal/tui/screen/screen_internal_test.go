@@ -316,7 +316,7 @@ func TestReportScreenViewsCoverSelectionBusyAndResultBranches(t *testing.T) {
 		HelpText:      "help",
 		Outcome: runtime.ReportOutcome{
 			Success:      true,
-			Message:      "Saved the report to \"/tmp/report.md\" and requested automatic opening.",
+			Message:      "Report saved successfully and automatic opening was requested.",
 			Request:      request,
 			OutputFile:   outputFile,
 			OutputBundle: outputBundle,
@@ -448,13 +448,22 @@ func TestReportScreenHelperBranches(t *testing.T) {
 		Outcome: runtime.ReportOutcome{
 			Success:       true,
 			FailureReason: runtime.ReportFailureAutomaticOpenFailedAfterSave,
-			Message:       "Saved the report to \"/tmp/report.md\", but automatic opening failed.",
+			Message:       "Report saved successfully, but automatic opening failed: open boom. Open the saved file manually.",
 			Request:       request,
 			OutputFile:    outputFile,
 		},
 	})
 	if !strings.Contains(warning, "Success With Warning: automatic open failed after save") {
 		t.Fatalf("expected report warning status, got %q", warning)
+	}
+	var warningSummary = reportResultSummary(runtime.ReportOutcome{
+		Success:       true,
+		FailureReason: runtime.ReportFailureAutomaticOpenFailedAfterSave,
+		Message:       "Report saved successfully, but automatic opening failed: open boom. Open the file manually.",
+		OutputFile:    outputFile,
+	})
+	if strings.Count(warningSummary, component.ReportCleartextExportDisclosureText) != 1 || strings.Count(warningSummary, component.ReportCleartextExportDeletionGuidanceText) != 1 || strings.Count(warningSummary, outputFile.Path) != 1 {
+		t.Fatalf("expected legacy single-output result to disclose one path and each ownership message once, got %q", warningSummary)
 	}
 
 	var failure = ReportResultScreenView(ReportResultScreenParams{

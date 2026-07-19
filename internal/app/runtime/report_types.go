@@ -7,8 +7,31 @@ import (
 	"context"
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	reportpdf "github.com/benizzio/ghostfolio-cryptogains/internal/report/pdf"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/report/presentation"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
+
+// ReportPipelineOptions stores the optional renderer-scoped controls used while
+// assembling the report pipeline. A zero value preserves production behavior.
+// Authored by: OpenCode
+type ReportPipelineOptions struct {
+	// CalculatedReportTransform changes the calculated report before rendering.
+	// It is nil in production and exists for runtime-backed boundary tests.
+	CalculatedReportTransform func(reportmodel.CapitalGainsReport) reportmodel.CapitalGainsReport
+	// MarkdownRenderObserver observes entry into the concrete Markdown renderer.
+	MarkdownRenderObserver func()
+	// PDFRenderObserver observes entry into the concrete PDF renderer.
+	PDFRenderObserver func()
+	// MarkdownFinancialFormatting scopes financial formatting to Markdown
+	// renderers assembled by this pipeline.
+	MarkdownFinancialFormatting presentation.FinancialFormattingOptions
+	// PDFFinancialFormatting scopes financial formatting to PDF renderers
+	// assembled by this pipeline.
+	PDFFinancialFormatting presentation.FinancialFormattingOptions
+	// PDFByteFinalizer is scoped to PDF renderers assembled by this pipeline.
+	PDFByteFinalizer reportpdf.ByteFinalizer
+}
 
 // SyncReportsUnlockState identifies how one Sync and Reports unlock attempt
 // completed before the context menu can be exposed.
@@ -91,7 +114,11 @@ type ReportOutcome struct {
 	OutputFormat  reportmodel.ReportOutputFormat
 	OutputBundle  reportmodel.ReportOutputBundle
 	OutputFile    reportmodel.ReportOutputFile
-	Diagnostic    DiagnosticReportState
+	// ResidualOutputPaths identifies current-attempt files whose cleanup failed
+	// and which may still contain cleartext financial data. It is transient
+	// failure guidance, not successful output metadata.
+	ResidualOutputPaths []string
+	Diagnostic          DiagnosticReportState
 }
 
 // ReportFailureDiagnosticCarrier exposes original persisted-record context for

@@ -124,6 +124,42 @@ func RenderScreen(
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Top, content)
 }
 
+// ScreenBodyContentSize returns the width and height available inside the body
+// panel after the shared header, status, footer, borders, and padding are
+// accounted for.
+//
+// Example:
+//
+//	width, height := component.ScreenBodyContentSize(theme, 80, 24, "Title", "Subtitle", "Status", "Help")
+//	viewport.SetWidth(width)
+//	viewport.SetHeight(height)
+//
+// Use this helper when a screen renders a height-aware body component inside
+// `RenderScreen`. The supplied chrome strings must match those passed to
+// `RenderScreen` so the returned body height keeps the complete rendered page
+// within the terminal height.
+// Authored by: OpenCode
+func ScreenBodyContentSize(theme Theme, width int, height int, title string, subtitle string, status string, footer string) (int, int) {
+	if width <= 0 {
+		width = 100
+	}
+	if height <= 0 {
+		height = 32
+	}
+
+	var panelWidth = ContentWidthForScreen(width)
+	var header = theme.Panel.Width(panelWidth).Render(strings.TrimSpace(renderApplicationIdentity(theme) + "\n" + theme.Title.Render(title) + "\n" + theme.Subtitle.Render(subtitle)))
+	var statusPanel = theme.Panel.Width(panelWidth).Render(status)
+	var footerPanel = theme.Panel.Width(panelWidth).Render(footer)
+	var emptyBodyPanel = theme.SummaryPanel.Width(panelWidth).Render("")
+	var bodyHeight = height - lipgloss.Height(header) - lipgloss.Height(statusPanel) - lipgloss.Height(footerPanel) - lipgloss.Height(emptyBodyPanel)
+	if bodyHeight < 1 {
+		bodyHeight = 1
+	}
+
+	return panelWidth, bodyHeight
+}
+
 // ContentWidthForScreen clamps the interior panel width so very narrow terminals
 // do not produce negative or zero-width panels after shared padding is applied.
 //

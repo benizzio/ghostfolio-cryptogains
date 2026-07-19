@@ -16,6 +16,7 @@ import (
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/integration/currency"
 	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
+	reportpdf "github.com/benizzio/ghostfolio-cryptogains/internal/report/pdf"
 	snapshotmodel "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/model"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
@@ -57,12 +58,55 @@ func NewRuntimeBackedFlowHarnessWithCurrencyRateService(
 	currencyRates reportcalculate.CurrencyRateService,
 ) RuntimeBackedFlowHarness {
 	t.Helper()
+	return NewRuntimeBackedFlowHarnessWithCurrencyRateServiceAndPDFByteFinalizer(t, baseDir, config, allowDevHTTP, currencyRates, nil)
+}
 
+// NewRuntimeBackedFlowHarnessWithCurrencyRateServiceAndPDFByteFinalizer creates
+// an application-backed TUI harness with one renderer-scoped PDF finalizer.
+// Authored by: OpenCode
+func NewRuntimeBackedFlowHarnessWithCurrencyRateServiceAndPDFByteFinalizer(
+	t *testing.T,
+	baseDir string,
+	config configmodel.AppSetupConfig,
+	allowDevHTTP bool,
+	currencyRates reportcalculate.CurrencyRateService,
+	finalizer reportpdf.ByteFinalizer,
+) RuntimeBackedFlowHarness {
+	t.Helper()
 	var options = bootstrap.DefaultOptions()
 	options.ConfigDir = baseDir
 	options.AllowDevHTTP = allowDevHTTP
-	var app = runtimeapp.NewWithReportCurrencyRateService(t, options, currencyRates)
+	var app = runtimeapp.NewWithReportCurrencyRateServiceAndPDFByteFinalizer(t, options, currencyRates, finalizer)
 	var err = app.ConfigStore.Save(context.Background(), config)
+	if err != nil {
+		t.Fatalf("save setup config: %v", err)
+	}
+	var model = flow.NewModel(flow.Dependencies{Options: options, Startup: bootstrap.StartupState{ActiveConfig: &config}, SetupService: app.SetupService, SyncService: app.SyncService, ReportService: app.ReportService})
+	return RuntimeBackedFlowHarness{BaseDir: baseDir, App: app, Config: config, Model: model}
+}
+
+// NewRuntimeBackedFlowHarnessWithCurrencyRateServiceAndReportPipelineOptions creates a
+// runtime-backed harness with immutable renderer-scoped report
+// options while retaining the production calculation, snapshot, output, and
+// TUI seams.
+// Authored by: OpenCode
+func NewRuntimeBackedFlowHarnessWithCurrencyRateServiceAndReportPipelineOptions(
+	t *testing.T,
+	baseDir string,
+	config configmodel.AppSetupConfig,
+	allowDevHTTP bool,
+	currencyRates reportcalculate.CurrencyRateService,
+	pipelineOptions runtime.ReportPipelineOptions,
+) RuntimeBackedFlowHarness {
+	t.Helper()
+	var options = bootstrap.DefaultOptions()
+	options.ConfigDir = baseDir
+	options.AllowDevHTTP = allowDevHTTP
+	var app, err = runtime.NewWithReportCurrencyRateServiceAndReportPipelineOptions(options, currencyRates, pipelineOptions)
+	if err != nil {
+		t.Fatalf("runtime new: %v", err)
+	}
+	err = app.ConfigStore.Save(context.Background(), config)
 	if err != nil {
 		t.Fatalf("save setup config: %v", err)
 	}

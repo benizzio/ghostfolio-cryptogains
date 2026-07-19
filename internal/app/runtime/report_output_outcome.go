@@ -9,6 +9,8 @@ import (
 
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	reportoutput "github.com/benizzio/ghostfolio-cryptogains/internal/report/output"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
+	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 )
 
 // requestAutomaticOpenBundle performs one post-save opener request for the first
@@ -25,7 +27,7 @@ func requestAutomaticOpenBundle(
 			reportFailureOutcome(
 				request,
 				ReportFailureReportFileWriteFailed,
-				fmt.Sprintf("Could not finalize the saved report result: %s. The saved files may still exist.", strings.TrimSpace(err.Error())),
+				fmt.Sprintf("Could not finalize the saved report result: %s. The saved files may still exist.", strings.TrimSpace(redact.ErrorText(err))),
 			),
 		)
 	}
@@ -33,7 +35,7 @@ func requestAutomaticOpenBundle(
 	var primaryPath = outputBundle.Files[0].Path
 	if open == nil {
 		var openErr = "automatic opening is unavailable in this runtime"
-		var outcome = reportFailureOutcome(request, ReportFailureAutomaticOpenFailedAfterSave, reportOpenFailureMessage(primaryPath, openErr))
+		var outcome = reportFailureOutcome(request, ReportFailureAutomaticOpenFailedAfterSave, reportOpenFailureMessage(openErr))
 		outcome.Success = true
 		outcome.OutputFormat = request.OutputFormat
 		outcome.OutputBundle = reportOutputBundleForOpen(request.OutputFormat, outputBundle.Files, openErr)
@@ -47,11 +49,11 @@ func requestAutomaticOpenBundle(
 		return openedBundle, nil
 	}
 
-	var detail = strings.TrimSpace(err.Error())
+	var detail = strings.TrimSpace(redact.ErrorText(err, primaryPath))
 	var openedBundle = reportOutputBundleForOpen(request.OutputFormat, outputBundle.Files, detail)
 	return openedBundle, pointerToReportOutcome(ReportOutcome{
 		Success:       true,
-		Message:       reportOpenFailureMessage(primaryPath, detail),
+		Message:       reportOpenFailureMessage(detail),
 		FailureReason: ReportFailureAutomaticOpenFailedAfterSave,
 		Request:       request,
 		OutputFormat:  request.OutputFormat,
@@ -119,11 +121,23 @@ func reportWriteFailureReason(err error) ReportFailureReason {
 
 // reportWriteFailureMessage formats one actionable save failure.
 // Authored by: OpenCode
-func reportWriteFailureMessage(reason ReportFailureReason, err error) string {
-	var detail = strings.TrimSpace(err.Error())
+func reportWriteFailureMessage(reason ReportFailureReason, err error, cleanupPaths []string, residualPaths []string, cleanupFailed bool) string {
+	var detail = strings.TrimSpace(redact.ErrorText(err, cleanupPaths...))
 	if reason == ReportFailureDocumentsFolderUnavailable {
 		return fmt.Sprintf(
 			"Could not save the report because the Documents folder is unavailable: %s. Ensure the folder exists and is writable, then try again. No report file was saved.",
+			detail,
+		)
+	}
+	if len(residualPaths) > 0 {
+		return fmt.Sprintf(
+			"Could not save the report file: %s. Check write permissions and free space in the Documents folder, then try again. Cleanup could not confirm removal of every partial file created during this attempt.",
+			detail,
+		)
+	}
+	if cleanupFailed {
+		return fmt.Sprintf(
+			"Could not save the report file: %s. Check write permissions and free space in the Documents folder, then try again. Cleanup reported an additional close or removal error, but no path removal failure was reported.",
 			detail,
 		)
 	}
@@ -137,36 +151,53 @@ func reportWriteFailureMessage(reason ReportFailureReason, err error) string {
 // reportWriteDiagnosticError wraps one output-preparation failure with a stable
 // report-level summary for diagnostics.
 // Authored by: OpenCode
-func reportWriteDiagnosticError(reason ReportFailureReason, err error) error {
+func reportWriteDiagnosticError(reason ReportFailureReason, err error, cleanupPaths []string) error {
+	var summary = "could not save the report file"
 	if reason == ReportFailureDocumentsFolderUnavailable {
-		return fmt.Errorf("could not save the report because the Documents folder is unavailable: %w", err)
+		summary = "could not save the report because the Documents folder is unavailable"
 	}
 
-	return fmt.Errorf("could not save the report file: %w", err)
+	var context = diagnosticContextFromError(err, "", cleanupPaths...)
+	context.FailureDetail = summary
+	context.FailureCauseChain = append([]string{summary}, context.FailureCauseChain...)
+	return reportWriteDiagnosticFailure{summary: summary, context: context}
 }
 
-// reportOpenFailureMessage formats one non-fatal automatic-open warning.
+// reportWriteDiagnosticFailure carries a pre-redacted output cause chain into
+// diagnostics without exposing current-attempt filesystem paths.
 // Authored by: OpenCode
-func reportOpenFailureMessage(path string, detail string) string {
+type reportWriteDiagnosticFailure struct {
+	summary string
+	context syncmodel.DiagnosticContext
+}
+
+// Error returns the stable report-level diagnostic summary.
+// Authored by: OpenCode
+func (failure reportWriteDiagnosticFailure) Error() string {
+	return failure.summary
+}
+
+// DiagnosticReportContext returns the pre-redacted output failure context.
+// Authored by: OpenCode
+func (failure reportWriteDiagnosticFailure) DiagnosticReportContext() syncmodel.DiagnosticContext {
+	return failure.context
+}
+
+// reportOpenFailureMessage formats one non-fatal automatic-open warning without
+// duplicating saved-path or cleartext-export guidance owned by the TUI.
+// Authored by: OpenCode
+func reportOpenFailureMessage(detail string) string {
 	return fmt.Sprintf(
-		"Saved the report to %q, but automatic opening failed: %s. Open the file manually. To remove this cleartext report later, delete %q.",
-		path,
+		"Report saved successfully, but automatic opening failed: %s. Open the file manually.",
 		detail,
-		path,
 	)
 }
 
-// reportBundleSuccessMessage formats one successful bundle outcome.
+// reportBundleSuccessMessage formats one successful save and open request
+// outcome without duplicating result-screen disclosure or path guidance.
 // Authored by: OpenCode
-func reportBundleSuccessMessage(files []reportmodel.ReportOutputFile) string {
-	var paths = make([]string, 0, len(files))
-	for _, file := range files {
-		paths = append(paths, fmt.Sprintf("%q", file.Path))
-	}
-	return fmt.Sprintf(
-		"Saved the report output to %s and requested automatic opening. To remove these cleartext reports later, delete the listed files.",
-		strings.Join(paths, ", "),
-	)
+func reportBundleSuccessMessage(_ []reportmodel.ReportOutputFile) string {
+	return "Report saved successfully and automatic opening was requested."
 }
 
 // pointerToReportOutcome returns the address of one local report outcome value.

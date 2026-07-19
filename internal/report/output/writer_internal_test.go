@@ -688,6 +688,417 @@ func TestWriteReportOutputBundleCleansUpOnSyncAndCloseFailures(t *testing.T) {
 	}
 }
 
+// TestWriteReportOutputBundleRemovesMainWhenAnnexReservationFails verifies that
+// a Markdown second-path reservation failure removes the already reserved main
+// path and reports no partial bundle.
+// Authored by: OpenCode
+func TestWriteReportOutputBundleRemovesMainWhenAnnexReservationFails(t *testing.T) {
+	var fixtureDir = t.TempDir()
+	var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+	defer restoreOutputSeams()
+
+	var attemptedPaths []string
+	var reservedPaths []string
+	openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+		attemptedPaths = append(attemptedPaths, path)
+		if len(attemptedPaths) == 2 {
+			return nil, errors.New("synthetic annex reservation failure")
+		}
+		//nolint:gosec // Test seam intentionally opens the writer-provided path.
+		var file, err = os.OpenFile(path, flag, perm)
+		if err != nil {
+			return nil, err
+		}
+		reservedPaths = append(reservedPaths, path)
+		return file, nil
+	}
+
+	var bundle, err = WriteReportOutputBundle(
+		reportmodel.ReportOutputFormatMarkdown,
+		markdownDocumentPair(validReportDocument(time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC))),
+	)
+	if err == nil || !strings.Contains(err.Error(), "reserve report file") {
+		t.Fatalf("expected second-path reservation failure, got %v", err)
+	}
+	assertNoSavedOutputBundle(t, bundle)
+	assertPathsRemoved(t, reservedPaths, 1)
+	if len(attemptedPaths) != 2 {
+		t.Fatalf("expected main and Annex paths to be attempted, got %v", attemptedPaths)
+	}
+	assertPathDoesNotExist(t, attemptedPaths[1])
+}
+
+// TestWriteReportOutputBundleCleansUpFormatFailureMatrix verifies write, sync,
+// and close failures for both formats, including failures in the Markdown Annex
+// after the main document has completed.
+// Authored by: OpenCode
+func TestWriteReportOutputBundleCleansUpFormatFailureMatrix(t *testing.T) {
+	var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
+	var testCases = []struct {
+		name             string
+		outputFormat     reportmodel.ReportOutputFormat
+		documents        []reportmodel.ReportDocument
+		failureFileIndex int
+		wrap             func(*os.File) writeSyncCloser
+		message          string
+		expectedFiles    int
+	}{
+		{
+			name:             "Markdown Annex write failure",
+			outputFormat:     reportmodel.ReportOutputFormatMarkdown,
+			documents:        markdownDocumentPair(validReportDocument(generatedAt)),
+			failureFileIndex: 2,
+			wrap: func(file *os.File) writeSyncCloser {
+				return failingWriteFile{File: file, writeErr: errors.New("synthetic Annex write failure")}
+			},
+			message:       "write report file",
+			expectedFiles: 2,
+		},
+		{
+			name:             "Markdown Annex sync failure",
+			outputFormat:     reportmodel.ReportOutputFormatMarkdown,
+			documents:        markdownDocumentPair(validReportDocument(generatedAt)),
+			failureFileIndex: 2,
+			wrap: func(file *os.File) writeSyncCloser {
+				return failingSyncFile{File: file, syncErr: errors.New("synthetic Annex sync failure")}
+			},
+			message:       "sync report file",
+			expectedFiles: 2,
+		},
+		{
+			name:             "Markdown Annex close failure",
+			outputFormat:     reportmodel.ReportOutputFormatMarkdown,
+			documents:        markdownDocumentPair(validReportDocument(generatedAt)),
+			failureFileIndex: 2,
+			wrap: func(file *os.File) writeSyncCloser {
+				return failingCloseFile{File: file, closeErr: errors.New("synthetic Annex close failure")}
+			},
+			message:       "close report file",
+			expectedFiles: 2,
+		},
+		{
+			name:             "PDF write failure",
+			outputFormat:     reportmodel.ReportOutputFormatPDF,
+			documents:        []reportmodel.ReportDocument{validPDFReportDocument([]byte("%PDF synthetic payload\n"), generatedAt)},
+			failureFileIndex: 1,
+			wrap: func(file *os.File) writeSyncCloser {
+				return failingWriteFile{File: file, writeErr: errors.New("synthetic PDF write failure")}
+			},
+			message:       "write report file",
+			expectedFiles: 1,
+		},
+		{
+			name:             "PDF sync failure",
+			outputFormat:     reportmodel.ReportOutputFormatPDF,
+			documents:        []reportmodel.ReportDocument{validPDFReportDocument([]byte("%PDF synthetic payload\n"), generatedAt)},
+			failureFileIndex: 1,
+			wrap: func(file *os.File) writeSyncCloser {
+				return failingSyncFile{File: file, syncErr: errors.New("synthetic PDF sync failure")}
+			},
+			message:       "sync report file",
+			expectedFiles: 1,
+		},
+		{
+			name:             "PDF close failure",
+			outputFormat:     reportmodel.ReportOutputFormatPDF,
+			documents:        []reportmodel.ReportDocument{validPDFReportDocument([]byte("%PDF synthetic payload\n"), generatedAt)},
+			failureFileIndex: 1,
+			wrap: func(file *os.File) writeSyncCloser {
+				return failingCloseFile{File: file, closeErr: errors.New("synthetic PDF close failure")}
+			},
+			message:       "close report file",
+			expectedFiles: 1,
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			var fixtureDir = t.TempDir()
+			var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+			defer restoreOutputSeams()
+
+			var openedPaths []string
+			openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+				//nolint:gosec // Test seam intentionally opens the writer-provided path.
+				var file, err = os.OpenFile(path, flag, perm)
+				if err != nil {
+					return nil, err
+				}
+				openedPaths = append(openedPaths, path)
+				if len(openedPaths) == testCase.failureFileIndex {
+					return testCase.wrap(file), nil
+				}
+				return file, nil
+			}
+
+			var bundle, err = WriteReportOutputBundle(testCase.outputFormat, testCase.documents)
+			if err == nil || !strings.Contains(err.Error(), testCase.message) {
+				t.Fatalf("expected %s, got %v", testCase.message, err)
+			}
+			assertNoSavedOutputBundle(t, bundle)
+			assertPathsRemoved(t, openedPaths, testCase.expectedFiles)
+		})
+	}
+}
+
+// TestWriteReportOutputBundleCleansUpOnOutputValidationAndBundleFailures
+// verifies that both output metadata validation and final bundle validation
+// failures remove all paths reserved by either supported format.
+// Authored by: OpenCode
+func TestWriteReportOutputBundleCleansUpOnOutputValidationAndBundleFailures(t *testing.T) {
+	var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
+	var testCases = []struct {
+		name          string
+		outputFormat  reportmodel.ReportOutputFormat
+		documents     []reportmodel.ReportDocument
+		expectedFiles int
+	}{
+		{
+			name:          "Markdown",
+			outputFormat:  reportmodel.ReportOutputFormatMarkdown,
+			documents:     markdownDocumentPair(validReportDocument(generatedAt)),
+			expectedFiles: 2,
+		},
+		{
+			name:          "PDF",
+			outputFormat:  reportmodel.ReportOutputFormatPDF,
+			documents:     []reportmodel.ReportDocument{validPDFReportDocument([]byte("%PDF synthetic payload\n"), generatedAt)},
+			expectedFiles: 1,
+		},
+	}
+
+	for _, failureType := range []string{"output validation", "bundle validation"} {
+		failureType := failureType
+		var expectedError = "synthetic " + failureType + " failure"
+		for _, testCase := range testCases {
+			testCase := testCase
+			t.Run(failureType+"/"+testCase.name, func(t *testing.T) {
+				var fixtureDir = t.TempDir()
+				var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+				defer restoreOutputSeams()
+
+				var previousOutputFileConstructor = newReportOutputFileForWrite
+				var previousBundleConstructor = newReportOutputBundleForWrite
+				t.Cleanup(func() {
+					newReportOutputFileForWrite = previousOutputFileConstructor
+					newReportOutputBundleForWrite = previousBundleConstructor
+				})
+
+				if failureType == "output validation" {
+					newReportOutputFileForWrite = func(string, string, string, reportmodel.ReportDocumentRole, string, time.Time) (reportmodel.ReportOutputFile, error) {
+						return reportmodel.ReportOutputFile{}, errors.New("synthetic output validation failure")
+					}
+				} else {
+					newReportOutputBundleForWrite = func(reportmodel.ReportOutputFormat, []reportmodel.ReportOutputFile, time.Time, bool, string) (reportmodel.ReportOutputBundle, error) {
+						return reportmodel.ReportOutputBundle{}, errors.New("synthetic bundle validation failure")
+					}
+				}
+
+				var openedPaths []string
+				openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+					//nolint:gosec // Test seam intentionally opens the writer-provided path.
+					var file, err = os.OpenFile(path, flag, perm)
+					if err != nil {
+						return nil, err
+					}
+					openedPaths = append(openedPaths, path)
+					return file, nil
+				}
+
+				var bundle, err = WriteReportOutputBundle(testCase.outputFormat, testCase.documents)
+				if err == nil || !strings.Contains(err.Error(), expectedError) {
+					t.Fatalf("expected %s failure, got %v", failureType, err)
+				}
+				assertNoSavedOutputBundle(t, bundle)
+				assertPathsRemoved(t, openedPaths, testCase.expectedFiles)
+			})
+		}
+	}
+}
+
+// TestWriteReportOutputBundleRequestsOwnerOnlyPermissions verifies the exact
+// mode requested for every Markdown and PDF reservation and the resulting file
+// mode on the deterministic local filesystem.
+// Authored by: OpenCode
+func TestWriteReportOutputBundleRequestsOwnerOnlyPermissions(t *testing.T) {
+	var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
+	var testCases = []struct {
+		name         string
+		outputFormat reportmodel.ReportOutputFormat
+		documents    []reportmodel.ReportDocument
+	}{
+		{
+			name:         "Markdown",
+			outputFormat: reportmodel.ReportOutputFormatMarkdown,
+			documents:    markdownDocumentPair(validReportDocument(generatedAt)),
+		},
+		{
+			name:         "PDF",
+			outputFormat: reportmodel.ReportOutputFormatPDF,
+			documents:    []reportmodel.ReportDocument{validPDFReportDocument([]byte("%PDF synthetic payload\n"), generatedAt)},
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			var fixtureDir = t.TempDir()
+			var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+			defer restoreOutputSeams()
+
+			var requestedModes []os.FileMode
+			openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+				requestedModes = append(requestedModes, perm)
+				//nolint:gosec // Test seam intentionally opens the writer-provided path.
+				return os.OpenFile(path, flag, perm)
+			}
+
+			var bundle, err = WriteReportOutputBundle(testCase.outputFormat, testCase.documents)
+			if err != nil {
+				t.Fatalf("write %s output: %v", testCase.name, err)
+			}
+			if len(requestedModes) != len(bundle.Files) {
+				t.Fatalf("expected one mode request per saved file, got modes=%d files=%d", len(requestedModes), len(bundle.Files))
+			}
+			for index, requestedMode := range requestedModes {
+				if requestedMode != reportFileMode {
+					t.Fatalf("requested mode %d = %#o, want %#o", index, requestedMode, reportFileMode)
+				}
+				var info, statErr = os.Stat(bundle.Files[index].Path)
+				if statErr != nil {
+					t.Fatalf("stat saved file %q: %v", bundle.Files[index].Path, statErr)
+				}
+				if info.Mode().Perm() != reportFileMode {
+					t.Fatalf("saved file mode %d = %#o, want %#o", index, info.Mode().Perm(), reportFileMode)
+				}
+			}
+		})
+	}
+}
+
+// TestWriteReportOutputBundlePreservesCollisionSentinelsOnFailure verifies that
+// cleanup removes only the current suffix attempt for both output formats.
+// Authored by: OpenCode
+func TestWriteReportOutputBundlePreservesCollisionSentinelsOnFailure(t *testing.T) {
+	var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
+	var testCases = []struct {
+		name             string
+		outputFormat     reportmodel.ReportOutputFormat
+		documents        []reportmodel.ReportDocument
+		failureFileIndex int
+		expectedFiles    int
+	}{
+		{
+			name:             "Markdown",
+			outputFormat:     reportmodel.ReportOutputFormatMarkdown,
+			documents:        markdownDocumentPair(validReportDocument(generatedAt)),
+			failureFileIndex: 2,
+			expectedFiles:    2,
+		},
+		{
+			name:             "PDF",
+			outputFormat:     reportmodel.ReportOutputFormatPDF,
+			documents:        []reportmodel.ReportDocument{validPDFReportDocument([]byte("%PDF synthetic payload\n"), generatedAt)},
+			failureFileIndex: 1,
+			expectedFiles:    1,
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			var fixtureDir = t.TempDir()
+			var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+			defer restoreOutputSeams()
+
+			var sentinels = seedCollisionSentinels(t, fixtureDir, testCase.outputFormat, generatedAt)
+			var openedPaths []string
+			openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+				//nolint:gosec // Test seam intentionally opens the writer-provided path.
+				var file, err = os.OpenFile(path, flag, perm)
+				if err != nil {
+					return nil, err
+				}
+				openedPaths = append(openedPaths, path)
+				if len(openedPaths) == testCase.failureFileIndex {
+					return failingWriteFile{File: file, writeErr: errors.New("synthetic collision-attempt write failure")}, nil
+				}
+				return file, nil
+			}
+
+			var bundle, err = WriteReportOutputBundle(testCase.outputFormat, testCase.documents)
+			if err == nil {
+				t.Fatalf("expected collision-attempt failure")
+			}
+			assertNoSavedOutputBundle(t, bundle)
+			assertPathsRemoved(t, openedPaths, testCase.expectedFiles)
+			for _, sentinel := range sentinels {
+				assertPathContent(t, sentinel.path, sentinel.content)
+			}
+		})
+	}
+}
+
+// TestOpenPathRetainsAllSavedBundleFilesAfterWarning verifies opener-warning
+// behavior after complete Markdown and PDF saves without deleting any path.
+// Authored by: OpenCode
+func TestOpenPathRetainsAllSavedBundleFilesAfterWarning(t *testing.T) {
+	var generatedAt = time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC)
+	var testCases = []struct {
+		name         string
+		outputFormat reportmodel.ReportOutputFormat
+		documents    []reportmodel.ReportDocument
+	}{
+		{
+			name:         "Markdown",
+			outputFormat: reportmodel.ReportOutputFormatMarkdown,
+			documents:    markdownDocumentPair(validReportDocument(generatedAt)),
+		},
+		{
+			name:         "PDF",
+			outputFormat: reportmodel.ReportOutputFormatPDF,
+			documents:    []reportmodel.ReportDocument{validPDFReportDocument([]byte("%PDF synthetic payload\n"), generatedAt)},
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			var fixtureDir = t.TempDir()
+			var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+			defer restoreOutputSeams()
+
+			var bundle, err = WriteReportOutputBundle(testCase.outputFormat, testCase.documents)
+			if err != nil {
+				t.Fatalf("write %s output: %v", testCase.name, err)
+			}
+
+			var previousRunOpenCommand = runOpenCommand
+			t.Cleanup(func() { runOpenCommand = previousRunOpenCommand })
+			var openedPaths []string
+			runOpenCommand = func(command OpenCommand) error {
+				openedPaths = append(openedPaths, command.Args[0])
+				return errors.New("synthetic opener warning")
+			}
+
+			for _, outputFile := range bundle.Files {
+				if err := OpenPath(outputFile.Path); err == nil || !strings.Contains(err.Error(), "synthetic opener warning") {
+					t.Fatalf("expected opener warning for %q, got %v", outputFile.Path, err)
+				}
+			}
+			if len(openedPaths) != len(bundle.Files) {
+				t.Fatalf("expected one opener request per saved file, got %v", openedPaths)
+			}
+			for _, outputFile := range bundle.Files {
+				if _, statErr := os.Stat(outputFile.Path); statErr != nil {
+					t.Fatalf("expected saved file to remain after opener warning, got %v", statErr)
+				}
+			}
+		})
+	}
+}
+
 // TestBundleFilenameFallbacks verifies small filename helper fallbacks not hit
 // by end-to-end bundle writes.
 // Authored by: OpenCode
@@ -713,12 +1124,166 @@ func TestWriteReservedReportOutputFilesRejectsMismatchedCounts(t *testing.T) {
 	}
 }
 
+// TestWriteReportOutputBundleReportsReservationCleanupFailure verifies a path
+// reserved before a later reservation failure is surfaced when removal fails.
+// Authored by: OpenCode
+func TestWriteReportOutputBundleReportsReservationCleanupFailure(t *testing.T) {
+	var fixtureDir = t.TempDir()
+	var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+	defer restoreOutputSeams()
+
+	var reservationErr = errors.New("synthetic Annex reservation failure")
+	var removalErr = errors.New("synthetic reservation cleanup removal failure")
+	var reservedPath string
+	var openCount int
+	openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+		openCount++
+		if openCount == 2 {
+			return nil, reservationErr
+		}
+		reservedPath = path
+		//nolint:gosec // Test seam intentionally opens the writer-provided path.
+		return os.OpenFile(path, flag, perm)
+	}
+	removePath = func(path string) error {
+		if path == reservedPath {
+			return removalErr
+		}
+		return os.Remove(path)
+	}
+
+	var bundle, err = WriteReportOutputBundle(
+		reportmodel.ReportOutputFormatMarkdown,
+		markdownDocumentPair(validReportDocument(time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC))),
+	)
+	if err == nil || !errors.Is(err, reservationErr) || !errors.Is(err, removalErr) {
+		t.Fatalf("expected reservation and cleanup errors to remain reachable, got %v", err)
+	}
+	if category, ok := FailureCategoryOf(err); !ok || category != FailureCategoryReportFileWriteFailed {
+		t.Fatalf("expected write failure category, got category=%q ok=%t", category, ok)
+	}
+	assertNoSavedOutputBundle(t, bundle)
+	if paths := ResidualPathsOf(err); len(paths) != 1 || paths[0] != reservedPath {
+		t.Fatalf("expected reserved path as residual cleanup context, got %#v", paths)
+	}
+	if _, statErr := os.Stat(reservedPath); statErr != nil {
+		t.Fatalf("expected failed-removal path to remain, got %v", statErr)
+	}
+}
+
+// TestWriteReportOutputBundleReportsMixedCleanupAfterAnnexFailure verifies the
+// written main report is disclosed while a successfully removed Annex is not.
+// Authored by: OpenCode
+func TestWriteReportOutputBundleReportsMixedCleanupAfterAnnexFailure(t *testing.T) {
+	var fixtureDir = t.TempDir()
+	var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+	defer restoreOutputSeams()
+
+	var writeErr = errors.New("synthetic Annex write failure")
+	var removalErr = errors.New("synthetic main cleanup removal failure")
+	var openedPaths []string
+	openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+		//nolint:gosec // Test seam intentionally opens the writer-provided path.
+		var file, err = os.OpenFile(path, flag, perm)
+		if err != nil {
+			return nil, err
+		}
+		openedPaths = append(openedPaths, path)
+		if len(openedPaths) == 2 {
+			return failingWriteFile{File: file, writeErr: writeErr}, nil
+		}
+		return file, nil
+	}
+	removePath = func(path string) error {
+		if len(openedPaths) > 0 && path == openedPaths[0] {
+			return removalErr
+		}
+		return os.Remove(path)
+	}
+
+	var bundle, err = WriteReportOutputBundle(
+		reportmodel.ReportOutputFormatMarkdown,
+		markdownDocumentPair(validReportDocument(time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC))),
+	)
+	if err == nil || !errors.Is(err, writeErr) || !errors.Is(err, removalErr) {
+		t.Fatalf("expected Annex write and main removal failures, got %v", err)
+	}
+	assertNoSavedOutputBundle(t, bundle)
+	if paths := CleanupPathsOf(err); len(paths) != 2 {
+		t.Fatalf("expected both current-attempt paths in cleanup context, got %#v", paths)
+	}
+	if paths := ResidualPathsOf(err); len(paths) != 1 || paths[0] != openedPaths[0] {
+		t.Fatalf("expected only failed main removal as residual, got %#v", paths)
+	}
+	assertPathContent(t, openedPaths[0], "# Report\n")
+	assertPathDoesNotExist(t, openedPaths[1])
+}
+
+// TestWriteReportOutputBundleCollectsCleanupCloseFailure verifies cleanup close
+// errors remain reachable without falsely identifying a successfully removed path.
+// Authored by: OpenCode
+func TestWriteReportOutputBundleCollectsCleanupCloseFailure(t *testing.T) {
+	var fixtureDir = t.TempDir()
+	var restoreOutputSeams = installWriterTestSeams(t, fixtureDir)
+	defer restoreOutputSeams()
+
+	var writeErr = errors.New("synthetic write failure")
+	var closeErr = errors.New("synthetic cleanup close failure")
+	var openedPaths []string
+	openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+		//nolint:gosec // Test seam intentionally opens the writer-provided path.
+		var file, err = os.OpenFile(path, flag, perm)
+		if err != nil {
+			return nil, err
+		}
+		openedPaths = append(openedPaths, path)
+		if len(openedPaths) == 1 {
+			return failingWriteAndCloseFile{File: file, writeErr: writeErr, closeErr: closeErr}, nil
+		}
+		return file, nil
+	}
+
+	var bundle, err = WriteReportOutputBundle(
+		reportmodel.ReportOutputFormatMarkdown,
+		markdownDocumentPair(validReportDocument(time.Date(2026, time.May, 21, 12, 34, 56, 0, time.UTC))),
+	)
+	if err == nil || !errors.Is(err, writeErr) || !errors.Is(err, closeErr) {
+		t.Fatalf("expected initiating write and cleanup close errors, got %v", err)
+	}
+	assertNoSavedOutputBundle(t, bundle)
+	if paths := ResidualPathsOf(err); len(paths) != 0 {
+		t.Fatalf("expected no residual path after successful removal, got %#v", paths)
+	}
+	assertPathsRemoved(t, openedPaths, 2)
+}
+
 // failingWriteFile injects a deterministic write error after the file has been
 // reserved on disk.
 // Authored by: OpenCode
 type failingWriteFile struct {
 	*os.File
 	writeErr error
+}
+
+// failingWriteAndCloseFile injects independent initiating write and cleanup
+// close failures while leaving removal available to the test.
+// Authored by: OpenCode
+type failingWriteAndCloseFile struct {
+	*os.File
+	writeErr error
+	closeErr error
+}
+
+// Write returns the configured initiating write failure.
+// Authored by: OpenCode
+func (file failingWriteAndCloseFile) Write([]byte) (int, error) {
+	return 0, file.writeErr
+}
+
+// Close returns the configured cleanup close failure.
+// Authored by: OpenCode
+func (file failingWriteAndCloseFile) Close() error {
+	return file.closeErr
 }
 
 // Write returns the configured deterministic write error.
@@ -753,6 +1318,14 @@ type failingCloseFile struct {
 func (file failingCloseFile) Close() error {
 	_ = file.File.Close()
 	return file.closeErr
+}
+
+// collisionSentinel records one pre-existing synthetic output file whose path
+// and content must survive a later failed output attempt.
+// Authored by: OpenCode
+type collisionSentinel struct {
+	path    string
+	content string
 }
 
 // validReportDocument returns one minimal valid report document for writer tests.
@@ -854,6 +1427,29 @@ func installWriterTestSeams(t *testing.T, homeDir string) func() {
 	}
 }
 
+// seedCollisionSentinels creates the base and second-suffix output files that
+// force a failed test attempt to reserve the third suffix.
+// Authored by: OpenCode
+func seedCollisionSentinels(t *testing.T, homeDir string, outputFormat reportmodel.ReportOutputFormat, generatedAt time.Time) []collisionSentinel {
+	t.Helper()
+
+	var documentsDir = filepath.Join(homeDir, "Documents")
+	var baseName = buildReportFilenameBase(2024, reportmodel.CostBasisMethodFIFO, generatedAt)
+	var sentinels []collisionSentinel
+	for suffix := 1; suffix <= 2; suffix++ {
+		for _, filename := range bundleFilenames(outputFormat, baseName, suffix) {
+			var path = filepath.Join(documentsDir, filename)
+			var content = "synthetic pre-existing sentinel: " + filename + "\n"
+			if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+				t.Fatalf("seed collision sentinel %q: %v", path, err)
+			}
+			sentinels = append(sentinels, collisionSentinel{path: path, content: content})
+		}
+	}
+
+	return sentinels
+}
+
 // assertPathRemoved verifies partial-file cleanup after a failure path.
 // Authored by: OpenCode
 func assertPathRemoved(t *testing.T, path string) {
@@ -862,8 +1458,17 @@ func assertPathRemoved(t *testing.T, path string) {
 	if path == "" {
 		t.Fatalf("expected reserved path to be captured before failure")
 	}
+	assertPathDoesNotExist(t, path)
+}
+
+// assertPathDoesNotExist verifies that a path was not retained after a failure
+// or reservation rejection.
+// Authored by: OpenCode
+func assertPathDoesNotExist(t *testing.T, path string) {
+	t.Helper()
+
 	if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
-		t.Fatalf("expected partial file cleanup for %q, stat error: %v", path, statErr)
+		t.Fatalf("expected path %q not to exist, stat error: %v", path, statErr)
 	}
 }
 
@@ -878,6 +1483,33 @@ func assertPathsRemoved(t *testing.T, paths []string, expectedCount int) {
 	}
 	for _, path := range paths {
 		assertPathRemoved(t, path)
+	}
+}
+
+// assertNoSavedOutputBundle verifies that a failed transaction returned no
+// partially populated output metadata.
+// Authored by: OpenCode
+func assertNoSavedOutputBundle(t *testing.T, bundle reportmodel.ReportOutputBundle) {
+	t.Helper()
+
+	if bundle.OutputFormat != "" || !bundle.SavedAt.IsZero() || len(bundle.Files) != 0 || bundle.OpenRequested || bundle.OpenError != "" {
+		t.Fatalf("expected no saved output bundle after failure, got %#v", bundle)
+	}
+}
+
+// assertPathContent verifies that a pre-existing synthetic sentinel was not
+// changed by a later output attempt.
+// Authored by: OpenCode
+func assertPathContent(t *testing.T, path string, expected string) {
+	t.Helper()
+
+	// #nosec G304 -- the path is created by this test's synthetic output fixture.
+	var body, err = os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read sentinel %q: %v", path, err)
+	}
+	if string(body) != expected {
+		t.Fatalf("sentinel %q changed: got %q want %q", path, string(body), expected)
 	}
 }
 

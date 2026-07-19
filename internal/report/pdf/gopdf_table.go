@@ -1,6 +1,17 @@
 package pdf
 
-import "github.com/signintech/gopdf"
+import (
+	"strings"
+
+	"github.com/signintech/gopdf"
+)
+
+// tableCellBreakOption returns the word-break policy used by gopdf's table
+// layout for cell drawing.
+// Authored by: OpenCode
+func tableCellBreakOption() *gopdf.BreakOption {
+	return &gopdf.BreakOption{Mode: gopdf.BreakModeIndicatorSensitive, BreakIndicator: ' '}
+}
 
 // printableWidthColumns scales source column proportions to the full printable width, leaving page margins as equal outer table margins.
 // Authored by: OpenCode
@@ -69,7 +80,18 @@ func styledRowCells(row []string) []gopdf.RowCell {
 func sanitizeRow(row []string) []string {
 	var sanitized = make([]string, 0, len(row))
 	for _, cell := range row {
-		sanitized = append(sanitized, sanitizeText(cell))
+		sanitized = append(sanitized, sanitizeTableCell(cell))
 	}
 	return sanitized
+}
+
+// sanitizeTableCell preserves renderer-controlled line boundaries while
+// applying the existing single-line sanitization to each table-cell line.
+// Authored by: OpenCode
+func sanitizeTableCell(raw string) string {
+	var lines = strings.Split(raw, "\n")
+	for index := range lines {
+		lines[index] = sanitizeText(lines[index])
+	}
+	return strings.Join(lines, "\n")
 }

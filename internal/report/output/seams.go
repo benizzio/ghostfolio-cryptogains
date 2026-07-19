@@ -18,6 +18,11 @@ import (
 // Authored by: OpenCode
 const deterministicWriteFailureAfterCreateEnvName = "GHOSTFOLIO_CRYPTOGAINS_OUTPUT_FAIL_WRITE_AFTER_CREATE"
 
+// deterministicCleanupRemovalFailureEnvName enables one package-internal
+// deterministic removal failure after a failed report output attempt.
+// Authored by: OpenCode
+const deterministicCleanupRemovalFailureEnvName = "GHOSTFOLIO_CRYPTOGAINS_OUTPUT_FAIL_CLEANUP_REMOVE"
+
 // Test seams wrap platform and filesystem behavior so output tests can verify
 // failure handling without mutating the host system.
 // Authored by: OpenCode
@@ -48,6 +53,7 @@ var statPath = os.Stat
 // write failures safely.
 // Authored by: OpenCode
 var openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+	// #nosec G304 -- path is the validated, collision-safe report destination supplied to this filesystem seam.
 	var file, err = os.OpenFile(path, flag, perm)
 	if err != nil {
 		return nil, err
@@ -58,7 +64,13 @@ var openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncC
 
 // Test seams wrap file removal so output tests can verify cleanup behavior.
 // Authored by: OpenCode
-var removePath = os.Remove
+var removePath = func(path string) error {
+	var removeErr = deterministicCleanupRemovalFailureError()
+	if removeErr != nil {
+		return removeErr
+	}
+	return os.Remove(path)
+}
 
 // Test seams wrap timestamp generation so output tests can verify fallback time
 // behavior safely.
@@ -68,6 +80,7 @@ var currentTime = time.Now
 // runOpenCommand starts one opener subprocess for the provided command.
 // Authored by: OpenCode
 var runOpenCommand = func(command OpenCommand) error {
+	// #nosec G204 -- command is the platform-specific opener selected by the validated post-save opener seam.
 	var process = exec.Command(command.Name, command.Args...)
 	return process.Run()
 }
@@ -96,6 +109,18 @@ func deterministicWriteFailureAfterCreateError() error {
 	return errors.New(strings.TrimSpace(value))
 }
 
+// deterministicCleanupRemovalFailureError returns the configured package-
+// internal cleanup removal failure, if any.
+// Authored by: OpenCode
+func deterministicCleanupRemovalFailureError() error {
+	var value, ok = lookupEnv(deterministicCleanupRemovalFailureEnvName)
+	if !ok || strings.TrimSpace(value) == "" {
+		return nil
+	}
+
+	return errors.New(strings.TrimSpace(value))
+}
+
 // installWriteFailureAfterCreateForTesting overrides report-file reservation so
 // the returned write handle fails after the final path has already been created
 // on disk. Use this only in package-local tests.
@@ -107,6 +132,7 @@ func installWriteFailureAfterCreateForTesting(writeErr error) func() {
 
 	var previousOpenWritableFile = openWritableFile
 	openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+		// #nosec G304 -- path is the validated report destination passed through this deterministic test seam.
 		var file, err = os.OpenFile(path, flag, perm)
 		if err != nil {
 			return nil, err

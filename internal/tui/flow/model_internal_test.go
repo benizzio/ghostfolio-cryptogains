@@ -12,6 +12,7 @@ import (
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
+	lipgloss "charm.land/lipgloss/v2"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
@@ -216,10 +217,10 @@ func TestModelInitAndHelpers(t *testing.T) {
 	if model.syncReports.ReportResult.Success || model.syncReports.ReportResult.Message != "" || model.syncReports.ReportResult.FailureReason != runtime.ReportFailureNone || model.syncReports.ReportResult.Request != (reportmodel.ReportRequest{}) || model.syncReports.ReportResult.OutputFile != (reportmodel.ReportOutputFile{}) || model.syncReports.ReportResult.Attempt != (runtime.SyncAttempt{}) || model.syncReports.ReportResult.Diagnostic.Eligible || model.syncReports.ReportResult.Diagnostic.Path != "" || model.syncReports.ReportResult.Diagnostic.GenerationMessage != "" {
 		t.Fatalf("expected main menu entry to clear sync and reports report scratch state")
 	}
-	_ = model.enterSetup("invalid", bootstrap.SetupRequirementNone)
+	model.enterSetup("invalid")
 	_ = model.enterSyncReportsUnlock()
 	_ = model.enterSync()
-	_ = model.enterSyncWithContextToken()
+	model.enterSyncWithContextToken()
 	_ = model.selectedSetupOrigin()
 	_ = model.setupCanSave()
 	if reportMethodForIndex(-1) != "" {
@@ -995,6 +996,185 @@ func TestUpdateReportCoversSelectionBusyAndResultBranches(t *testing.T) {
 	model.enterMainMenu()
 	if model.syncReports.ReportResult.Success || model.syncReports.ReportResult.Message != "" || model.syncReports.ReportResult.FailureReason != runtime.ReportFailureNone || model.syncReports.ReportResult.Request != (reportmodel.ReportRequest{}) || model.syncReports.ReportResult.OutputFile != (reportmodel.ReportOutputFile{}) || model.syncReports.ReportResult.Attempt != (runtime.SyncAttempt{}) || model.syncReports.ReportResult.Diagnostic.Eligible || model.syncReports.ReportResult.Diagnostic.Path != "" || model.syncReports.ReportResult.Diagnostic.GenerationMessage != "" {
 		t.Fatalf("expected context exit to clear report history state, got %#v", model.syncReports)
+	}
+}
+
+// TestReportResultExitClearsSavedBundlePaths verifies result dismissal removes
+// both single-file and complete-bundle output state from the flow model.
+// Authored by: OpenCode
+func TestReportResultExitClearsSavedBundlePaths(t *testing.T) {
+	t.Parallel()
+
+	var savedAt = time.Date(2026, time.May, 21, 12, 0, 0, 0, time.UTC)
+	testCases := []struct {
+		name         string
+		outputFormat reportmodel.ReportOutputFormat
+		files        []reportmodel.ReportOutputFile
+		openError    string
+	}{
+		{
+			name:         "normal Markdown success",
+			outputFormat: reportmodel.ReportOutputFormatMarkdown,
+			files: []reportmodel.ReportOutputFile{
+				{DocumentsDirectory: "/tmp/Documents", Filename: "synthetic-report.md", Path: "/tmp/Documents/synthetic-report.md", Role: reportmodel.ReportDocumentRoleMain, MediaType: reportmodel.ReportMediaTypeMarkdown, SavedAt: savedAt},
+				{DocumentsDirectory: "/tmp/Documents", Filename: "synthetic-report-annex-1.md", Path: "/tmp/Documents/synthetic-report-annex-1.md", Role: reportmodel.ReportDocumentRoleAnnex, MediaType: reportmodel.ReportMediaTypeMarkdown, SavedAt: savedAt},
+			},
+		},
+		{
+			name:         "opener-warning PDF success",
+			outputFormat: reportmodel.ReportOutputFormatPDF,
+			openError:    "synthetic opener warning",
+			files: []reportmodel.ReportOutputFile{
+				{DocumentsDirectory: "/tmp/Documents", Filename: "synthetic-report.pdf", Path: "/tmp/Documents/synthetic-report.pdf", Role: reportmodel.ReportDocumentRoleCombined, MediaType: reportmodel.ReportMediaTypePDF, SavedAt: savedAt},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var model = newTestModel(t, nil)
+			model.active = reportResultScreenKey
+			model.syncReports.ReportResult = runtime.ReportOutcome{
+				Success:    true,
+				OutputFile: testCase.files[0],
+				OutputBundle: reportmodel.ReportOutputBundle{
+					OutputFormat:  testCase.outputFormat,
+					Files:         testCase.files,
+					SavedAt:       savedAt,
+					OpenRequested: true,
+					OpenError:     testCase.openError,
+				},
+			}
+
+			var updated, cmd = model.activateReportResultSelection()
+			if cmd != nil {
+				t.Fatalf("expected result dismissal to remain synchronous")
+			}
+			model = assertUpdatedModel(t, updated)
+			if model.active != syncReportsMenuScreenKey {
+				t.Fatalf("expected result dismissal to return to Sync and Reports, got %s", model.active)
+			}
+			var outcome = model.syncReports.ReportResult
+			if outcome.Success || outcome.Message != "" || outcome.OutputFile != (reportmodel.ReportOutputFile{}) || len(outcome.OutputBundle.Files) != 0 || outcome.OutputBundle.OutputFormat != "" || !outcome.OutputBundle.SavedAt.IsZero() || outcome.OutputBundle.OpenRequested || outcome.OutputBundle.OpenError != "" {
+				t.Fatalf("expected result dismissal to clear report and path state, got %#v", outcome)
+			}
+		})
+	}
+}
+
+// TestReportResultViewportMakesSmallTerminalDisclosureReachable verifies the
+// actual flow model keeps every long-path disclosure page reachable at 80x24.
+// Authored by: OpenCode
+func TestReportResultViewportMakesSmallTerminalDisclosureReachable(t *testing.T) {
+	t.Parallel()
+
+	var model = newTestModel(t, nil)
+	var updated, cmd = model.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	if cmd != nil {
+		t.Fatalf("expected resize to remain synchronous")
+	}
+	model = assertUpdatedModel(t, updated)
+
+	var mainPath = "/home/synthetic/Documents/portfolio-exports/2024/very-long-directory-segment/ghostfolio-capital-gains-main-distinctive.md"
+	var annexPath = "/home/synthetic/Documents/portfolio-exports/2024/another-very-long-directory-segment/ghostfolio-capital-gains-annex-distinctive.md"
+	model.enterReportResult(runtime.ReportOutcome{
+		Success: true,
+		Message: "Saved both Markdown report files and requested automatic opening.",
+		Request: reportmodel.ReportRequest{
+			Year:               2024,
+			CostBasisMethod:    reportmodel.CostBasisMethodFIFO,
+			ReportBaseCurrency: reportmodel.ReportBaseCurrencyUSD,
+			OutputFormat:       reportmodel.ReportOutputFormatMarkdown,
+		},
+		OutputBundle: reportmodel.ReportOutputBundle{
+			OutputFormat: reportmodel.ReportOutputFormatMarkdown,
+			Files: []reportmodel.ReportOutputFile{
+				{Path: mainPath, Role: reportmodel.ReportDocumentRoleMain},
+				{Path: annexPath, Role: reportmodel.ReportDocumentRoleAnnex},
+			},
+		},
+	})
+
+	if !model.report.ResultViewport.AtTop() {
+		t.Fatalf("expected a newly entered report result to start at the top")
+	}
+	var visiblePages strings.Builder
+	var visibleBodyPages strings.Builder
+	for page := 0; page < 200; page++ {
+		var content = model.View().Content
+		if lipgloss.Height(content) > 24 {
+			t.Fatalf("expected report result page height at most 24, got %d with viewport %dx%d and help %q", lipgloss.Height(content), model.report.ResultViewport.Width(), model.report.ResultViewport.Height(), model.reportResultHelpText())
+		}
+		visiblePages.WriteString(content)
+		visiblePages.WriteString("\n")
+		visibleBodyPages.WriteString(model.report.ResultViewport.View())
+		visibleBodyPages.WriteString("\n")
+		if model.report.ResultViewport.AtBottom() {
+			break
+		}
+		var previousOffset = model.report.ResultViewport.YOffset()
+		updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyPgDown}))
+		if cmd != nil {
+			t.Fatalf("expected report result paging to remain synchronous")
+		}
+		model = assertUpdatedModel(t, updated)
+		if model.report.ActionIndex != 0 {
+			t.Fatalf("expected page down to preserve action selection, got %d", model.report.ActionIndex)
+		}
+		if model.report.ResultViewport.YOffset() <= previousOffset {
+			t.Fatalf("expected page down to advance from offset %d", previousOffset)
+		}
+	}
+	if !model.report.ResultViewport.AtBottom() {
+		t.Fatalf("expected repeated page down input to reach the final result content")
+	}
+
+	var reachable = visiblePages.String()
+	for _, expected := range []string{
+		"pgup",
+		"pgdn",
+	} {
+		if !strings.Contains(reachable, expected) {
+			t.Fatalf("expected scrolling to make %q reachable, got %q", expected, reachable)
+		}
+	}
+	var reachableBody = strings.ReplaceAll(visibleBodyPages.String(), "\n", "")
+	for _, expected := range []string{
+		component.ReportCleartextExportDisclosureText,
+		"Saved Markdown Path: " + mainPath,
+		"Saved Annex 1 Markdown Path: " + annexPath,
+		component.ReportCleartextExportDeletionGuidanceText,
+	} {
+		if !strings.Contains(reachableBody, expected) {
+			t.Fatalf("expected scrolling to make wrapped body content %q reachable, got %q", expected, reachableBody)
+		}
+	}
+
+	var bottomOffset = model.report.ResultViewport.YOffset()
+	updated, cmd = model.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyPgUp}))
+	if cmd != nil {
+		t.Fatalf("expected report result page up to remain synchronous")
+	}
+	model = assertUpdatedModel(t, updated)
+	if model.report.ResultViewport.YOffset() >= bottomOffset || model.report.ActionIndex != 0 {
+		t.Fatalf("expected page up to scroll without changing action selection, got offset=%d action=%d", model.report.ResultViewport.YOffset(), model.report.ActionIndex)
+	}
+	var resizedFromOffset = model.report.ResultViewport.YOffset()
+	updated, cmd = model.Update(tea.WindowSizeMsg{Width: 100, Height: 32})
+	if cmd != nil {
+		t.Fatalf("expected report result resize to remain synchronous")
+	}
+	model = assertUpdatedModel(t, updated)
+	if model.report.ResultViewport.Width() != component.ContentWidthForScreen(100) || model.report.ResultViewport.Height() <= 0 {
+		t.Fatalf("expected resize to recompute viewport dimensions, got %dx%d", model.report.ResultViewport.Width(), model.report.ResultViewport.Height())
+	}
+	if resizedFromOffset > 0 && model.report.ResultViewport.AtTop() {
+		t.Fatalf("expected resize to preserve a reachable non-top scroll position")
+	}
+
+	model.enterReportResult(runtime.ReportOutcome{FailureReason: runtime.ReportFailureUnsupportedReportCalculation})
+	if !model.report.ResultViewport.AtTop() || model.report.ResultViewport.YOffset() != 0 {
+		t.Fatalf("expected entering a replacement result to reset scroll position, got %d", model.report.ResultViewport.YOffset())
 	}
 }
 
@@ -1855,6 +2035,12 @@ func TestGenerateDiagnosticReportAndServerReplacementIgnoreBranches(t *testing.T
 	}
 	if model.syncReports.ReportResult.Diagnostic.GenerationMessage != "Diagnostic report generation failed. Try again." {
 		t.Fatalf("expected report diagnostic error message, got %#v", model.syncReports.ReportResult.Diagnostic)
+	}
+
+	model.syncReports.ReportResult.ResidualOutputPaths = []string{"/tmp/Documents/synthetic-report.md"}
+	model.clearTransientReportState()
+	if len(model.syncReports.ReportResult.ResidualOutputPaths) != 0 {
+		t.Fatalf("expected report exit to clear residual output paths, got %#v", model.syncReports.ReportResult)
 	}
 
 	model = newTestModel(t, &config)

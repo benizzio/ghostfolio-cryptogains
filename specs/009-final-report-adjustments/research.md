@@ -46,26 +46,39 @@ renderers, but that risks format drift.
 
 ## Two-Decimal Financial Formatting
 
-Decision: Format each present currency-denominated amount or unit price from a
-defensive `apd.Decimal` copy by quantizing to exponent `-2` with
-`apd.RoundHalfUp`, then emit fixed-point text with two places. Start from a copy
-of `apd.BaseContext` so package exponent limits and default traps remain active.
-Set precision from checked source metadata as the source digit count plus any
-coefficient expansion needed to reach exponent `-2`, plus one possible carry
-digit. Reject precision arithmetic that cannot fit `uint32`. Accept no operation
-conditions except the expected `Rounded` and `Inexact` flags. Normalize a
-quantized zero to non-negative before rendering.
+Decision: Format each present currency-denominated amount or unit price by
+quantizing into a separate `apd.Decimal` destination at exponent `-2` with
+`apd.RoundHalfUp`, then emit fixed-point text with two places. Use a package-owned
+context with the pinned package exponent limits and default traps rather than the
+mutable `apd.BaseContext` variable. Set precision from checked source metadata as
+the source digit count plus any coefficient expansion needed to reach exponent
+`-2`, plus one possible carry digit. Reject precision above `2147383649`, the
+largest value for which pinned `apd v3.2.3` can calculate
+`MinExponent - int32(Precision) + 1` without wrapping below `math.MinInt32`.
+Delegate ordinary scale expansion and rounding directly to `Context.Quantize`; pre-expand
+only when a positive source exponent would require an exponent shift below
+`apd.MinExponent`, which the library rejects before quantization. Accept no
+operation conditions except the expected `Rounded` and `Inexact` flags. Normalize
+a quantized zero to non-negative before rendering.
 
 Rationale: `Context.Quantize` is the `apd` operation for a requested exponent and
 supports `RoundHalfUp`. The destination exponent preserves trailing zeros when
 rendered in fixed-point form. A separate destination protects the calculated
-input. Dynamic result precision avoids rejecting large whole values merely
-because adding two fractional places expands their coefficient. Checking the
-precision arithmetic, operation error, and condition mask prevents non-finite,
-overflowed, or unrepresentable data from becoming misleading report text.
-Inheriting `BaseContext` avoids the active zero-valued exponent bounds of a
-literal `apd.Context`. Normalizing zero satisfies the explicit `0.00`, not
-`-0.00`, contract.
+input because `apd` copies the operand into the result before changing it.
+Dynamic result precision avoids rejecting large whole values merely because
+adding two fractional places expands their coefficient. The library's public
+precision type is `uint32`, but its quantization implementation narrows precision
+and coefficient digit counts to `int32` and combines precision with
+`MinExponent`; the accepted domain must therefore stop at `2147383649`. Direct
+quantization supports ordinary values, while the narrow pre-expansion workaround
+preserves the accepted adjusted-exponent upper boundary
+where the required source-to-target exponent shift exceeds the library's
+`100000` shift limit. Checking precision arithmetic, operation errors, and the
+condition mask prevents non-finite, overflowed, or unrepresentable data from
+becoming misleading report text. A package-owned fully initialized context avoids
+the active zero-valued exponent bounds of a partial `apd.Context` and avoids
+depending on mutation of `apd.BaseContext`. Normalizing zero satisfies the
+explicit `0.00`, not `-0.00`, contract.
 
 Alternatives considered: String slicing or floating-point formatting, but both
 would bypass exact decimal semantics. Reuse the calculation context and its
@@ -252,7 +265,8 @@ Decision: Combine the closed acceptance manifest and field/vector/output matrix,
 pure shared-presentation tests, exact Markdown contracts, PDF layout recorder
 tests, extended concrete generated-PDF inspection, runtime parity and AUD-001
 model-equality tests, confidentiality sentinels, unchanged empirical calculation
-tests, and the isolated named performance scenario.
+tests, and an isolated named performance scenario limited to resource-sensitive
+evidence.
 
 Rationale: The current project PDF inspector proves landscape page geometry and
 searchable normalized text, but its normalization removes punctuation,
@@ -266,18 +280,22 @@ complete-row preflight, and safe finalization error propagation. Runtime and
 empirical tests protect the boundary before formatting. Searchable/selectable
 text and readable non-overlapping layout remain the accessibility boundary;
 tagged-PDF, PDF/UA, semantic reading-order, and screen-reader claims are excluded
-and cannot be inferred from text-run inspection. Performance remains outside
-deterministic coverage.
+and cannot be inferred from text-run inspection. Deterministic document-content
+and pagination assertions remain with package, contract, and integration tests.
+Performance remains outside deterministic coverage and does not duplicate those
+assertions.
 
 Failure and recovery evidence also forces unrenderable decimal, PDF layout,
 finalization, Markdown second-file, PDF save, and post-save opener failures.
 Sentinel colliding files prove that cleanup is limited to current-attempt paths.
 The performance fixture keeps its exact 10,000-activity, two-asset,
-three-currency composition and 6,666 three-entry conversion rows. Separate
-Markdown and PDF timers include generation, multiline PDF pagination and
-finalization, save, bundle validation, and opener invocation. Fixture setup and
-post-generation row, entry, page, header, and continuation inspection stay
-outside the measured intervals.
+three-currency composition, including the 6,666 non-USD conversion workload.
+Separate Markdown and PDF timers include generation, multiline PDF pagination
+and finalization, save, bundle validation, and opener invocation. Fixture setup
+and non-empty output checks stay outside the measured intervals. Generated
+warning, currency, rate, conversion-entry, cardinality, heading, and
+continuation-content assertions belong to deterministic package, contract, and
+integration owners rather than this resource-sensitive scenario.
 
 Alternatives considered: Depend only on normalized extracted text, but it cannot
 prove the new requirements. Add a second PDF parser, but the existing

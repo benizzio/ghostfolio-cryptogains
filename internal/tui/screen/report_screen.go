@@ -62,6 +62,7 @@ type ReportResultScreenParams struct {
 	MenuItems     []component.MenuItem
 	SelectedIndex int
 	HelpText      string
+	BodyView      string
 }
 
 // ReportSelectionScreenView renders the year, method, and base-currency
@@ -139,6 +140,36 @@ func ReportBusyScreenView(params ReportBusyScreenParams) string {
 //
 // Authored by: OpenCode
 func ReportResultScreenView(params ReportResultScreenParams) string {
+	var body = params.BodyView
+	if body == "" {
+		body = ReportResultBodyView(params)
+	}
+
+	return component.RenderScreen(
+		params.Theme,
+		params.Width,
+		params.Height,
+		"Report Result",
+		"Review the saved-path outcome and choose the next step.",
+		body,
+		component.ReportSavedPathsTransientStatusText,
+		params.HelpText,
+	)
+}
+
+// ReportResultBodyView renders the scrollable body content for one completed
+// report-generation attempt.
+//
+// Example:
+//
+//	body := screen.ReportResultBodyView(params)
+//	viewport.SetContent(body)
+//
+// The returned content includes the result metadata, saved-path or failure
+// summary, disclosure guidance, and action menu. It excludes shared screen
+// chrome so a flow-owned viewport can make every body line reachable.
+// Authored by: OpenCode
+func ReportResultBodyView(params ReportResultScreenParams) string {
 	var resultLine = params.Theme.SuccessStatus.Render("Success")
 	if !params.Outcome.Success {
 		resultLine = params.Theme.FailureStatus.Render(fmt.Sprintf("Failure Category: %s", params.Outcome.FailureReason))
@@ -147,7 +178,7 @@ func ReportResultScreenView(params ReportResultScreenParams) string {
 		resultLine = params.Theme.FailureStatus.Render("Success With Warning: automatic open failed after save")
 	}
 
-	var body = fmt.Sprintf(
+	return fmt.Sprintf(
 		"%s\n\nSelected Year: %d\nCost Basis Method: %s\nReport Base Currency: %s\nOutput Format: %s\n\n%s\n\n%s",
 		resultLine,
 		params.Outcome.Request.Year,
@@ -157,14 +188,27 @@ func ReportResultScreenView(params ReportResultScreenParams) string {
 		reportResultSummary(params.Outcome),
 		component.RenderMenu(params.Theme, params.MenuItems, params.SelectedIndex),
 	)
+}
 
-	return component.RenderScreen(
+// ReportResultBodyContentSize returns the viewport dimensions available inside
+// the report-result body panel for the current terminal and help text.
+//
+// Example:
+//
+//	width, height := screen.ReportResultBodyContentSize(params)
+//	viewport.SetWidth(width)
+//	viewport.SetHeight(height)
+//
+// Call this whenever report-result content or terminal dimensions change. The
+// calculation uses the same fixed chrome rendered by `ReportResultScreenView`.
+// Authored by: OpenCode
+func ReportResultBodyContentSize(params ReportResultScreenParams) (int, int) {
+	return component.ScreenBodyContentSize(
 		params.Theme,
 		params.Width,
 		params.Height,
 		"Report Result",
 		"Review the saved-path outcome and choose the next step.",
-		body,
 		component.ReportSavedPathsTransientStatusText,
 		params.HelpText,
 	)
@@ -268,13 +312,17 @@ func reportResultBaseCurrencyLabel(outcome runtime.ReportOutcome) string {
 // Authored by: OpenCode
 func reportResultSummary(outcome runtime.ReportOutcome) string {
 	if outcome.Success {
-		if len(outcome.OutputBundle.Files) > 0 {
-			return reportOutputBundleSummary(outcome)
+		var files = reportOutputFiles(outcome)
+		if len(files) > 0 {
+			return reportSuccessfulOutputSummary(outcome, files)
 		}
 		return outcome.Message
 	}
 
 	var lines = []string{outcome.Message}
+	if len(outcome.ResidualOutputPaths) > 0 {
+		lines = append(lines, reportResidualOutputSummary(outcome.ResidualOutputPaths))
+	}
 	if strings.TrimSpace(outcome.Diagnostic.GenerationMessage) != "" {
 		lines = append(lines, outcome.Diagnostic.GenerationMessage)
 	}
@@ -288,12 +336,40 @@ func reportResultSummary(outcome runtime.ReportOutcome) string {
 	return strings.Join(lines, "\n\n")
 }
 
-// reportOutputBundleSummary formats every saved path in a successful output
-// bundle.
+// reportResidualOutputSummary discloses every maybe-residual cleartext path and
+// gives explicit deletion guidance after failed cleanup.
 // Authored by: OpenCode
-func reportOutputBundleSummary(outcome runtime.ReportOutcome) string {
-	var lines []string
-	for _, file := range outcome.OutputBundle.Files {
+func reportResidualOutputSummary(paths []string) string {
+	var lines = []string{"Cleartext financial-data files from this failed report attempt may remain."}
+	for _, path := range paths {
+		lines = append(lines, fmt.Sprintf("Residual or maybe-residual path: %s", path))
+	}
+	lines = append(lines, "Delete every listed path to remove the cleartext financial data from this failed attempt.")
+	return strings.Join(lines, "\n")
+}
+
+// reportOutputFiles returns every saved file in the successful outcome without
+// retaining a second path collection in the TUI state.
+// Authored by: OpenCode
+func reportOutputFiles(outcome runtime.ReportOutcome) []reportmodel.ReportOutputFile {
+	if len(outcome.OutputBundle.Files) > 0 {
+		return outcome.OutputBundle.Files
+	}
+	if strings.TrimSpace(outcome.OutputFile.Path) != "" {
+		return []reportmodel.ReportOutputFile{outcome.OutputFile}
+	}
+	return nil
+}
+
+// reportSuccessfulOutputSummary formats every saved path in a successful
+// output, whether the files came from the preferred bundle or the legacy
+// single OutputFile fallback. The caller preserves bundle precedence, role-
+// specific path labels, cleartext disclosure, deletion guidance, and the
+// outcome-message fallback when no file was saved.
+// Authored by: OpenCode
+func reportSuccessfulOutputSummary(outcome runtime.ReportOutcome, files []reportmodel.ReportOutputFile) string {
+	var lines = []string{component.ReportCleartextExportDisclosureText}
+	for _, file := range files {
 		var label string
 		switch file.Role {
 		case reportmodel.ReportDocumentRoleAnnex:
@@ -305,6 +381,10 @@ func reportOutputBundleSummary(outcome runtime.ReportOutcome) string {
 		}
 		lines = append(lines, fmt.Sprintf("%s: %s", label, file.Path))
 	}
-	lines = append(lines, outcome.Message)
+	var message = strings.TrimSpace(outcome.Message)
+	if message != "" {
+		lines = append(lines, message)
+	}
+	lines = append(lines, component.ReportCleartextExportDeletionGuidanceText)
 	return strings.Join(lines, "\n\n")
 }

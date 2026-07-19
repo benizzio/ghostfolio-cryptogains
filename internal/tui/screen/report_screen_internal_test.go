@@ -168,6 +168,42 @@ func TestReportResultScreenViewRendersFailureBaseCurrency(t *testing.T) {
 	assertReportScreenContainsAll(t, content, []string{"Failure Category: unsupported report calculation", "Report Base Currency: USD"})
 }
 
+// TestReportResultScreenViewDisclosesResidualOutputPaths verifies failed cleanup
+// identifies cleartext risk and every path without presenting saved metadata.
+// Authored by: OpenCode
+func TestReportResultScreenViewDisclosesResidualOutputPaths(t *testing.T) {
+	t.Parallel()
+
+	var paths = []string{"/tmp/Documents/synthetic-main.md", "/tmp/Documents/synthetic-annex.md"}
+	var outcome = runtime.ReportOutcome{
+		Success:             false,
+		FailureReason:       runtime.ReportFailureReportFileWriteFailed,
+		Message:             "Cleanup could not confirm removal of every partial file.",
+		ResidualOutputPaths: paths,
+	}
+	var content = ReportResultScreenView(ReportResultScreenParams{
+		Theme:       component.DefaultTheme(),
+		Width:       100,
+		Height:      32,
+		MethodLabel: "FIFO",
+		MenuItems:   []component.MenuItem{{Label: component.BackToSyncReportsActionLabel, Enabled: true}},
+		Outcome:     outcome,
+	})
+
+	assertReportScreenContainsAll(t, content, []string{
+		"Cleartext financial-data files from this failed report attempt may remain.",
+		"Delete every listed path",
+	})
+	for _, path := range paths {
+		if strings.Count(content, path) != 1 {
+			t.Fatalf("expected residual path %q exactly once, got %q", path, content)
+		}
+	}
+	if strings.Contains(content, "Saved Markdown Path") || strings.Contains(content, "Any partial file created during this attempt was removed") {
+		t.Fatalf("expected no saved metadata or complete-cleanup claim, got %q", content)
+	}
+}
+
 // TestReportSelectionScreenViewRendersUnselectedOutputFormatGuidance verifies
 // stale output-format selections render actionable fallback copy.
 // Authored by: OpenCode
@@ -242,6 +278,84 @@ func TestReportResultScreenViewRendersPDFBundlePath(t *testing.T) {
 	})
 
 	assertReportScreenContainsAll(t, content, []string{"Output Format: PDF", "Saved PDF Path: /tmp/Documents/ghostfolio-capital-gains-2024-fifo.pdf"})
+}
+
+// TestReportResultScreenViewDisclosesCleartextFilesAndDeletionGuidance verifies
+// normal Markdown and opener-warning PDF results disclose every saved path.
+// Authored by: OpenCode
+func TestReportResultScreenViewDisclosesCleartextFilesAndDeletionGuidance(t *testing.T) {
+	t.Parallel()
+
+	var savedAt = time.Date(2026, time.May, 21, 11, 0, 1, 0, time.UTC)
+	testCases := []struct {
+		name          string
+		requestFormat reportmodel.ReportOutputFormat
+		failureReason runtime.ReportFailureReason
+		message       string
+		files         []reportmodel.ReportOutputFile
+	}{
+		{
+			name:          "normal Markdown success",
+			requestFormat: reportmodel.ReportOutputFormatMarkdown,
+			message:       "Saved both Markdown report files and requested automatic opening.",
+			files: []reportmodel.ReportOutputFile{
+				{DocumentsDirectory: "/tmp/Documents", Filename: "synthetic-report.md", Path: "/tmp/Documents/synthetic-report.md", Role: reportmodel.ReportDocumentRoleMain, MediaType: reportmodel.ReportMediaTypeMarkdown, SavedAt: savedAt},
+				{DocumentsDirectory: "/tmp/Documents", Filename: "synthetic-report-annex-1.md", Path: "/tmp/Documents/synthetic-report-annex-1.md", Role: reportmodel.ReportDocumentRoleAnnex, MediaType: reportmodel.ReportMediaTypeMarkdown, SavedAt: savedAt},
+			},
+		},
+		{
+			name:          "opener-warning PDF success",
+			requestFormat: reportmodel.ReportOutputFormatPDF,
+			failureReason: runtime.ReportFailureAutomaticOpenFailedAfterSave,
+			message:       "Saved the PDF report, but automatic opening failed. Open the file manually.",
+			files: []reportmodel.ReportOutputFile{
+				{DocumentsDirectory: "/tmp/Documents", Filename: "synthetic-report.pdf", Path: "/tmp/Documents/synthetic-report.pdf", Role: reportmodel.ReportDocumentRoleCombined, MediaType: reportmodel.ReportMediaTypePDF, SavedAt: savedAt},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var request, err = reportmodel.NewReportRequest(2024, reportmodel.CostBasisMethodFIFO, reportmodel.ReportBaseCurrencyUSD, testCase.requestFormat, time.Date(2026, time.May, 21, 11, 0, 0, 0, time.UTC))
+			if err != nil {
+				t.Fatalf("new report request: %v", err)
+			}
+			var bundle, bundleErr = reportmodel.NewReportOutputBundle(testCase.requestFormat, testCase.files, savedAt, true, "")
+			if bundleErr != nil {
+				t.Fatalf("new report output bundle: %v", bundleErr)
+			}
+
+			var content = ReportResultScreenView(ReportResultScreenParams{
+				Theme:       component.DefaultTheme(),
+				Width:       100,
+				Height:      32,
+				MethodLabel: reportmodel.CostBasisMethodFIFO.Label(),
+				MenuItems:   []component.MenuItem{{Label: component.BackToSyncReportsActionLabel, Enabled: true}},
+				Outcome: runtime.ReportOutcome{
+					Success:       true,
+					FailureReason: testCase.failureReason,
+					Message:       testCase.message,
+					Request:       request,
+					OutputFormat:  testCase.requestFormat,
+					OutputFile:    testCase.files[0],
+					OutputBundle:  bundle,
+				},
+			})
+
+			assertReportScreenContainsAll(t, content, []string{
+				component.ReportCleartextExportDisclosureText,
+				component.ReportCleartextExportDeletionGuidanceText,
+			})
+			for _, file := range testCase.files {
+				if strings.Count(content, file.Path) != 1 {
+					t.Fatalf("expected saved path %q, got %q", file.Path, content)
+				}
+			}
+			if strings.Count(content, component.ReportCleartextExportDisclosureText) != 1 || strings.Count(content, component.ReportCleartextExportDeletionGuidanceText) != 1 {
+				t.Fatalf("expected cleartext disclosure and deletion guidance once, got %q", content)
+			}
+		})
+	}
 }
 
 // assertReportScreenContainsAll verifies that rendered report content includes

@@ -63,7 +63,7 @@ func TestRenderMarkdownRendersEmptyStates(t *testing.T) {
 	}
 
 	assertContainsString(t, document.Content, "No assets had a non-zero net gain or loss in the selected year.")
-	assertContainsString(t, document.Content, "| Overall Yearly Net Total | 0 | USD |")
+	assertContainsString(t, document.Content, "| Overall Yearly Net Total | 0.00 | USD |")
 	assertContainsString(t, document.Content, "No assets reached full liquidation by year end.")
 	assertNotContainsString(t, document.Content, "## Asset Detail:")
 }
@@ -116,15 +116,33 @@ func TestRenderMarkdownCanonicalDecimalsCurrenciesAndSecretExclusion(t *testing.
 		t.Fatalf("render markdown report: %v", err)
 	}
 
-	assertContainsString(t, document.Content, "| BTC | 1250.5 | USD |")
-	assertContainsString(t, document.Content, "| ETH | -10 | USD |")
-	assertContainsString(t, document.Content, "| Overall Yearly Net Total | 1240.5 | USD |")
-	assertContainsString(t, document.Content, "| btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | 1 | 22009 | USD | USD |")
-	assertContainsString(t, document.Content, "| xrp-reduction-2024-001 | BLOCKCHAIN OP | 200 | 0 | 0 | 0 | 800 | 400 |  | USD |  | manual custody transfer token=[REDACTED] jwt=[REDACTED] payload=[REDACTED] |")
-	assertContainsString(t, document.Content, "| btc-sell-2024-001 | 1 | 22009 | 25000 | 2991 | USD |")
+	assertContainsString(t, document.Content, "| BTC | 1250.50 | USD |")
+	assertContainsString(t, document.Content, "| ETH | -10.00 | USD |")
+	assertContainsString(t, document.Content, "| Overall Yearly Net Total | 1240.50 | USD |")
+	assertContainsString(t, document.Content, "| btc-sell-2024-001 | SELL | 1 | 25000.00 | 25000.00 | 0.00 | 1 | 22009.00 | USD | USD |")
+	assertContainsString(t, document.Content, "| xrp-reduction-2024-001 | BLOCKCHAIN OP | 200 | 0.00 | 0.00 | 0.00 | 800 | 400.00 |  | USD |  | manual custody transfer token=[REDACTED] jwt=[REDACTED] payload=[REDACTED] |")
+	assertContainsString(t, document.Content, "| btc-sell-2024-001 | 1 | 22009.00 | 25000.00 | 2991.00 | USD |")
 	assertNotContainsString(t, document.Content, "secret-token")
 	assertNotContainsString(t, document.Content, "secret-jwt")
 	assertNotContainsString(t, document.Content, "opaque-payload")
+}
+
+// TestRenderMarkdownRejectsInvalidFinancialValueWithoutDocument verifies an
+// invalid financial input returns an error and no successful document payload.
+// Authored by: OpenCode
+func TestRenderMarkdownRejectsInvalidFinancialValueWithoutDocument(t *testing.T) {
+	var report = populatedMarkdownReportFixture()
+	var invalid apd.Decimal
+	invalid.Form = apd.Infinite
+	report.YearlyNetTotal = invalid
+
+	var document, err = reportmarkdown.Render(report)
+	if err == nil {
+		t.Fatal("expected invalid financial value to fail rendering")
+	}
+	if len(document.Content) != 0 {
+		t.Fatalf("expected invalid financial value to return no document, got %q", document.Content)
+	}
 }
 
 // populatedMarkdownReportFixture returns one deterministic calculated report for

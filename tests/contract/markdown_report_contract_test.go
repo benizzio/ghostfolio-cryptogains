@@ -53,20 +53,20 @@ func TestMarkdownReportDocumentContract(t *testing.T) {
 	assertContains(t, document.Content, "## Asset Detail: ETH")
 	assertContains(t, document.Content, "## Asset Detail: XRP")
 	assertContains(t, document.Content, "| Asset | Net Gain Or Loss | Report Calculation Currency |")
-	assertContains(t, document.Content, "| Overall Yearly Net Total | 2240.5 | EUR |")
+	assertContains(t, document.Content, "| Overall Yearly Net Total | 2240.50 | EUR |")
 	assertContains(t, document.Content, "| Asset | Historical Full Liquidation Count | Main Section Status |")
 	assertContains(t, document.Content, "### Opening Position")
 	assertContains(t, document.Content, "- **Quantity:** 2")
-	assertContains(t, document.Content, "- **Cost Basis:** 44018")
+	assertContains(t, document.Content, "- **Cost Basis:** 44018.00")
 	assertContains(t, document.Content, "- **Calculation Currency:** EUR")
 	assertContains(t, document.Content, "### In-Year Activity")
 	assertContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |")
 	assertContains(t, document.Content, "### Liquidation Calculations")
 	assertContains(t, document.Content, "### Closing Position")
-	assertContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | 1 | 22009 | USD | EUR | Converted | note token=[REDACTED] |")
-	assertContains(t, document.Content, "| 2024-04-01 10:00:00 | xrp-reduction-2024-001 | BLOCKCHAIN OP | 200 | 0 | 0 | 0 | 800 | 400 |  | EUR |  | custody transfer |")
+	assertContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | SELL | 1 | 25000.00 | 25000.00 | 0.00 | 1 | 22009.00 | USD | EUR | Converted | note token=[REDACTED] |")
+	assertContains(t, document.Content, "| 2024-04-01 10:00:00 | xrp-reduction-2024-001 | BLOCKCHAIN OP | 200 | 0.00 | 0.00 | 0.00 | 800 | 400.00 |  | EUR |  | custody transfer |")
 	assertContains(t, document.Content, "| Date | Source ID | Disposed Quantity | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |")
-	assertContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | 1 | 22009 | 25000 | 1240.5 | EUR |")
+	assertContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | 1 | 22009.00 | 25000.00 | 1240.50 | EUR |")
 	assertNotContains(t, document.Content, "| Date | Source ID | Disposed Quantity | Activity Currency |")
 	assertNotContains(t, document.Content, "NOT APPLICABLE")
 	assertNotContains(t, document.Content, "secret-token")
@@ -204,8 +204,8 @@ func TestMarkdownReportDistinguishesSameCurrencyAndConvertedRows(t *testing.T) {
 
 	assertContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |")
 	assertNotContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency |")
-	assertContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | 1 | 22009 | USD | EUR | Converted | note token=[REDACTED] |")
-	assertContains(t, document.Content, "| 2024-02-01 08:30:00 | eth-sell-2024-001 | SELL | 2 | 1000 | 2000 | 0 | 3 | 1000 | EUR | EUR | Same currency | same-currency priced sale |")
+	assertContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | SELL | 1 | 25000.00 | 25000.00 | 0.00 | 1 | 22009.00 | USD | EUR | Converted | note token=[REDACTED] |")
+	assertContains(t, document.Content, "| 2024-02-01 08:30:00 | eth-sell-2024-001 | SELL | 2 | 1000.00 | 2000.00 | 0.00 | 3 | 1000.00 | EUR | EUR | Same currency | same-currency priced sale |")
 	assertNotContains(t, document.Content, "same_currency")
 	assertNotContains(t, document.Content, "converted")
 	assertNotContains(t, document.Content, "| 2024-02-01 | eth-sell-2024-001 | ETH | EUR | EUR |")
@@ -224,7 +224,7 @@ func TestMarkdownReportAuditSourceIDsDoNotRenderAsSameCurrency(t *testing.T) {
 	}
 
 	assertNotContains(t, document.Content, "## Currency Conversion Audit")
-	assertContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | 1 | 22009 | USD | EUR | Converted |")
+	assertContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | SELL | 1 | 25000.00 | 25000.00 | 0.00 | 1 | 22009.00 | USD | EUR | Converted |")
 	assertNotContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | 1 | 22009 | USD | EUR | Same currency |")
 }
 
@@ -240,10 +240,10 @@ func TestMarkdownReportAssetDetailCurrencyColumnContracts(t *testing.T) {
 	}
 
 	assertContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Quantity After Row | Basis After Row | Original Activity Currency | Calculation Currency | Conversion Status | Note |")
-	assertContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | SELL | 1 | 25000 | 25000 | 0 | 1 | 22009 | USD | EUR | Converted | note token=[REDACTED] |")
+	assertContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | SELL | 1 | 25000.00 | 25000.00 | 0.00 | 1 | 22009.00 | USD | EUR | Converted | note token=[REDACTED] |")
 	assertNotContains(t, document.Content, "| Date | Source ID | Type | Quantity | Unit Price | Gross Value | Fee | Activity Currency |")
 	assertContains(t, document.Content, "| Date | Source ID | Disposed Quantity | Allocated Basis | Net Liquidation Proceeds | Gain Or Loss | Calculation Currency |")
-	assertContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | 1 | 22009 | 25000 | 1240.5 | EUR |")
+	assertContains(t, document.Content, "| 2023-12-31 23:15:00 | btc-sell-2024-001 | 1 | 22009.00 | 25000.00 | 1240.50 | EUR |")
 	assertNotContains(t, document.Content, "| Date | Source ID | Disposed Quantity | Activity Currency | Allocated Basis |")
 }
 

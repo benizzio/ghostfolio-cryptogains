@@ -14,6 +14,7 @@ import (
 
 	reportcalculate "github.com/benizzio/ghostfolio-cryptogains/internal/report/calculate"
 	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
+	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/flow"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil"
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeflow"
@@ -62,7 +63,7 @@ func TestReportGenerationMatchesControlledLedgersAcrossCostBasisMethods(t *testi
 				t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
 			}
 
-			var content = normalizeRenderedText(model.View().Content)
+			var content = runtimeflow.ReportResultText(t, model)
 			if !strings.Contains(content, "Selected Year: 2024") || !strings.Contains(content, "Cost Basis Method: "+method.Label()) {
 				t.Fatalf("expected selected year and method in result view, got %q", content)
 			}
@@ -147,7 +148,7 @@ func TestReportGenerationSupportsRoundedRepeatingDecimalHistoryAcrossMethods(t *
 			if model.ActiveScreen() != "report_result" {
 				t.Fatalf("expected report result screen, got %s", model.ActiveScreen())
 			}
-			var content = normalizeRenderedText(model.View().Content)
+			var content = runtimeflow.ReportResultText(t, model)
 			if !strings.Contains(content, "Saved Markdown Path:") || !strings.Contains(content, "Cost Basis Method: "+method.Label()) {
 				t.Fatalf("expected successful rounded report result for %q, got %q", method.Label(), content)
 			}
@@ -169,8 +170,8 @@ func TestReportGenerationSupportsRoundedRepeatingDecimalHistoryAcrossMethods(t *
 			}
 			var reportText = string(rawReport)
 			for _, expected := range []string{
-				"0.3333333333333333",
-				"0.6666666666666667",
+				"0.33",
+				"0.67",
 			} {
 				if !strings.Contains(reportText, expected) {
 					t.Fatalf("expected rounded repeating-decimal fragment %q in report %q", expected, reportText)
@@ -277,13 +278,13 @@ func assertExpectedReportLedger(t *testing.T, reportText string, expected testut
 		if entry.NetGainOrLoss == "0" {
 			continue
 		}
-		var row = "| " + entry.DisplayLabel + " | " + entry.NetGainOrLoss + " | " + expected.ReportCalculationCurrency + " |"
+		var row = "| " + entry.DisplayLabel + " | " + expectedReportMoney(t, entry.NetGainOrLoss) + " | " + expected.ReportCalculationCurrency + " |"
 		if !strings.Contains(reportText, row) {
 			t.Fatalf("expected summary row %q in report %q", row, reportText)
 		}
 	}
 
-	var yearlyNetRow = "| Overall Yearly Net Total | " + expected.YearlyNetTotal + " | " + expected.ReportCalculationCurrency + " |"
+	var yearlyNetRow = "| Overall Yearly Net Total | " + expectedReportMoney(t, expected.YearlyNetTotal) + " | " + expected.ReportCalculationCurrency + " |"
 	if !strings.Contains(reportText, yearlyNetRow) {
 		t.Fatalf("expected yearly net total row %q in report %q", yearlyNetRow, reportText)
 	}
@@ -311,9 +312,9 @@ func assertExpectedReportLedger(t *testing.T, reportText string, expected testut
 				liquidation.SourceID,
 				liquidation.DisposedQuantity,
 				liquidation.ActivityCurrency,
-				liquidation.AllocatedBasis,
-				liquidation.NetLiquidationProceeds,
-				liquidation.GainOrLoss,
+				expectedReportMoney(t, liquidation.AllocatedBasis),
+				expectedReportMoney(t, liquidation.NetLiquidationProceeds),
+				expectedReportMoney(t, liquidation.GainOrLoss),
 				liquidation.CalculationCurrency,
 			} {
 				if !strings.Contains(reportText, part) {
@@ -334,7 +335,7 @@ func assertExpectedActivityRow(t *testing.T, reportText string, expected testuti
 		expected.SourceID,
 		string(expected.ActivityType),
 		expected.Quantity,
-		expected.BasisAfterRow,
+		expectedReportMoney(t, expected.BasisAfterRow),
 		expected.CalculationCurrency,
 		expected.QuantityAfterRow,
 	} {
@@ -343,11 +344,14 @@ func assertExpectedActivityRow(t *testing.T, reportText string, expected testuti
 		}
 	}
 
-	if expected.GrossValue != "" && !strings.Contains(reportText, expected.GrossValue) {
-		t.Fatalf("expected priced row gross value %q in report %q", expected.GrossValue, reportText)
+	if expected.UnitPrice != "" && !strings.Contains(reportText, expectedReportMoney(t, expected.UnitPrice)) {
+		t.Fatalf("expected priced row unit price %q in report %q", expectedReportMoney(t, expected.UnitPrice), reportText)
 	}
-	if expected.FeeAmount != "" && !strings.Contains(reportText, expected.FeeAmount) {
-		t.Fatalf("expected priced row fee %q in report %q", expected.FeeAmount, reportText)
+	if expected.GrossValue != "" && !strings.Contains(reportText, expectedReportMoney(t, expected.GrossValue)) {
+		t.Fatalf("expected priced row gross value %q in report %q", expectedReportMoney(t, expected.GrossValue), reportText)
+	}
+	if expected.FeeAmount != "" && !strings.Contains(reportText, expectedReportMoney(t, expected.FeeAmount)) {
+		t.Fatalf("expected priced row fee %q in report %q", expectedReportMoney(t, expected.FeeAmount), reportText)
 	}
 	if expected.ActivityCurrency != "" && !strings.Contains(reportText, expected.ActivityCurrency) {
 		t.Fatalf("expected activity currency %q in report %q", expected.ActivityCurrency, reportText)
@@ -355,6 +359,24 @@ func assertExpectedActivityRow(t *testing.T, reportText string, expected testuti
 	if expected.HoldingReductionExplanation != "" && !strings.Contains(reportText, expected.HoldingReductionExplanation) {
 		t.Fatalf("expected holding reduction explanation %q in report %q", expected.HoldingReductionExplanation, reportText)
 	}
+}
+
+// expectedReportMoney renders one legacy expected monetary value at the US1
+// report presentation scale without changing the calculation fixture.
+// Authored by: OpenCode
+func expectedReportMoney(t *testing.T, raw string) string {
+	t.Helper()
+	var value, _, err = decimalsupport.ParseString(raw)
+	if err != nil {
+		t.Fatalf("parse expected monetary value %q: %v", raw, err)
+	}
+	var rounded apd.Decimal
+	var context = apd.BaseContext.WithPrecision(64)
+	context.Rounding = apd.RoundHalfUp
+	if _, err = context.Quantize(&rounded, &value, -2); err != nil {
+		t.Fatalf("round expected monetary value %q: %v", raw, err)
+	}
+	return rounded.Text('f')
 }
 
 // decimalInt formats one integration assertion integer without extra helpers.

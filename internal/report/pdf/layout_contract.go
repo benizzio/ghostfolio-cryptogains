@@ -23,6 +23,9 @@ type pdfContentLayout interface {
 	AddSubsectionHeading(text string) error
 	AddKeyValue(label string, value string) error
 	AddParagraph(text string) error
+	// AddBoldParagraph emits one fully bold, wrapped paragraph as a single layout operation.
+	// Authored by: OpenCode
+	AddBoldParagraph(text string) error
 	AddTable(table pdfTable) error
 }
 
@@ -40,7 +43,11 @@ type pdfLayoutDocument interface {
 	pdfDocumentStarter
 	fontLoader
 	pdfAnnexLayout
-	Bytes() []byte
+	// Bytes finalizes the document and returns its complete PDF payload. A
+	// finalization failure must return a nil payload and an error so callers do
+	// not treat partial bytes as a successful report.
+	// Authored by: OpenCode
+	Bytes() ([]byte, error)
 }
 
 // pdfColumn describes one PDF table column.
@@ -65,8 +72,8 @@ type pdfTable struct {
 // newPDFDocumentForRenderer keeps concrete PDF adapter startup failures
 // testable without involving external files or platform fonts.
 // Authored by: OpenCode
-var newPDFDocumentForRenderer = func() pdfLayoutDocument {
-	return newGopdfDocument()
+var newPDFDocumentForRenderer = func(finalizer ByteFinalizer) pdfLayoutDocument {
+	return newGopdfDocument(finalizer)
 }
 
 // startPDFDocument starts one A4 PDF document through the renderer seam.

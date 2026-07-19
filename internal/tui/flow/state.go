@@ -7,6 +7,7 @@ import (
 	"context"
 
 	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/viewport"
 
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
@@ -78,6 +79,7 @@ type reportState struct {
 	SelectedYear         int
 	SelectedBaseCurrency reportmodel.ReportBaseCurrency
 	SelectedOutputFormat reportmodel.ReportOutputFormat
+	ResultViewport       viewport.Model
 }
 
 // serverReplacementState holds transient UI state for server-mismatch confirmation.
@@ -150,7 +152,10 @@ func newSyncReportsContextState(serverOrigin string, protectedData runtime.Prote
 // newReportState creates the initial report workflow state.
 // Authored by: OpenCode
 func newReportState(years []int) reportState {
-	var state = reportState{FocusArea: 0, MethodIndex: 0, BaseCurrencyIndex: 0, OutputFormatIndex: 0, SelectedBaseCurrency: reportBaseCurrencyForIndex(0), SelectedOutputFormat: reportOutputFormatForIndex(0)}
+	var resultViewport = viewport.New()
+	resultViewport.SoftWrap = true
+	resultViewport.FillHeight = true
+	var state = reportState{FocusArea: 0, MethodIndex: 0, BaseCurrencyIndex: 0, OutputFormatIndex: 0, SelectedBaseCurrency: reportBaseCurrencyForIndex(0), SelectedOutputFormat: reportOutputFormatForIndex(0), ResultViewport: resultViewport}
 	if len(years) > 0 {
 		state.SelectedYear = years[0]
 	}

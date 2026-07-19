@@ -16,23 +16,28 @@ import (
 // per-asset audit report.
 // Authored by: OpenCode
 type AuditActivityEntry struct {
-	SourceID               string
-	OccurredAt             time.Time
-	ActivityType           ActivityType
-	Quantity               apd.Decimal
-	UnitPrice              *apd.Decimal
-	GrossValue             *apd.Decimal
-	FeeAmount              *apd.Decimal
-	ActivityCurrency       string
-	CalculationCurrency    string
-	QuantityAfterActivity  apd.Decimal
-	BasisAfterActivity     apd.Decimal
-	FullLiquidationEvent   bool
-	AllocatedBasis         *apd.Decimal
-	NetLiquidationProceeds *apd.Decimal
-	GainOrLoss             *apd.Decimal
-	ConversionStatus       ConversionStatus
-	Note                   string
+	SourceID              string
+	OccurredAt            time.Time
+	ActivityType          ActivityType
+	Quantity              apd.Decimal
+	UnitPrice             *apd.Decimal
+	GrossValue            *apd.Decimal
+	FeeAmount             *apd.Decimal
+	ActivityCurrency      string
+	CalculationCurrency   string
+	QuantityAfterActivity apd.Decimal
+	BasisAfterActivity    apd.Decimal
+	FullLiquidationEvent  bool
+	// IsZeroPricedHoldingReduction preserves the inherited exact classification
+	// for transient Annex 1 presentation without changing the retained activity
+	// currency or being persisted as report state.
+	// Authored by: OpenCode
+	IsZeroPricedHoldingReduction bool
+	AllocatedBasis               *apd.Decimal
+	NetLiquidationProceeds       *apd.Decimal
+	GainOrLoss                   *apd.Decimal
+	ConversionStatus             ConversionStatus
+	Note                         string
 }
 
 // Validate verifies that an Annex 1 activity has the required identity, exact
@@ -129,9 +134,12 @@ func cloneAuditActivityEntries(entries []AuditActivityEntry) []AuditActivityEntr
 	var cloned = make([]AuditActivityEntry, 0, len(entries))
 	for _, entry := range entries {
 		var entryCopy = entry
+		entryCopy.Quantity = decimalsupport.Clone(entry.Quantity)
 		entryCopy.UnitPrice = decimalsupport.ClonePointer(entry.UnitPrice)
 		entryCopy.GrossValue = decimalsupport.ClonePointer(entry.GrossValue)
 		entryCopy.FeeAmount = decimalsupport.ClonePointer(entry.FeeAmount)
+		entryCopy.QuantityAfterActivity = decimalsupport.Clone(entry.QuantityAfterActivity)
+		entryCopy.BasisAfterActivity = decimalsupport.Clone(entry.BasisAfterActivity)
 		entryCopy.AllocatedBasis = decimalsupport.ClonePointer(entry.AllocatedBasis)
 		entryCopy.NetLiquidationProceeds = decimalsupport.ClonePointer(entry.NetLiquidationProceeds)
 		entryCopy.GainOrLoss = decimalsupport.ClonePointer(entry.GainOrLoss)

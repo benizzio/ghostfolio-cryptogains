@@ -285,6 +285,14 @@ func (m *Model) handleReportFinished(message reportFinishedMsg) (tea.Model, tea.
 // handleReportResultKey routes completed report-result navigation.
 // Authored by: OpenCode
 func (m *Model) handleReportResultKey(message tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if key.Matches(message, pageUpBinding()) {
+		m.report.ResultViewport.PageUp()
+		return m, nil
+	}
+	if key.Matches(message, pageDownBinding()) {
+		m.report.ResultViewport.PageDown()
+		return m, nil
+	}
 	if m.report.Busy {
 		return m, nil
 	}
@@ -304,6 +312,7 @@ func (m *Model) handleReportResultKey(message tea.KeyPressMsg) (tea.Model, tea.C
 		return m.activateReportResultSelection()
 	}
 
+	m.refreshReportResultViewport(false)
 	return m, nil
 }
 

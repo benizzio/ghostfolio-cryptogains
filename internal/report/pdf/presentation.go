@@ -62,6 +62,18 @@ func conversionStatusColumn(row reportmodel.AssetActivityRow) (string, error) {
 	return sanitizeText(label), nil
 }
 
+// sanitizeConvertedCell assembles and sanitizes each complete logical converted
+// entry before inserting the PDF-only semicolon and line-break boundary.
+// Authored by: OpenCode
+func sanitizeConvertedCell(entries []presentation.ConvertedAmountEntry) string {
+	var sanitized = make([]string, 0, len(entries))
+	for _, entry := range entries {
+		var rendered = entry.Label + ": " + entry.OriginalAmount + " -> " + entry.ConvertedAmount
+		sanitized = append(sanitized, sanitizeText(rendered))
+	}
+	return strings.Join(sanitized, ";\n")
+}
+
 // sanitizeText redacts obvious secret-shaped fragments and normalizes one line.
 // Authored by: OpenCode
 func sanitizeText(raw string) string {

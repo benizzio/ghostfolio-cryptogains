@@ -101,6 +101,48 @@ func TestReportOutputWritesMarkdownPairContract(t *testing.T) {
 	testutil.AssertFileContent(t, bundle.Files[1].Path, "# Annex 1 - Audit\n")
 }
 
+// TestReportOutputOwnerOnlyModeContract verifies successful Markdown and PDF
+// output files are created with the requested owner-only permissions.
+// Authored by: OpenCode
+func TestReportOutputOwnerOnlyModeContract(t *testing.T) {
+	var testCases = []struct {
+		name         string
+		outputFormat reportmodel.ReportOutputFormat
+	}{
+		{name: "Markdown", outputFormat: reportmodel.ReportOutputFormatMarkdown},
+		{name: "PDF", outputFormat: reportmodel.ReportOutputFormatPDF},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			var fixture = testutil.NewReportIOFixture(t)
+			var request = testutil.DeterministicReportRequestFixture(testCase.outputFormat)
+			var documents []reportmodel.ReportDocument
+			if testCase.outputFormat == reportmodel.ReportOutputFormatMarkdown {
+				documents = deterministicMarkdownOutputDocuments(t, request)
+			} else {
+				documents = []reportmodel.ReportDocument{deterministicPDFOutputDocument(t, request)}
+			}
+
+			var bundle, err = reportoutput.WriteReportOutputBundle(testCase.outputFormat, documents)
+			if err != nil {
+				t.Fatalf("write %s output: %v", testCase.name, err)
+			}
+			for _, outputFile := range bundle.Files {
+				testutil.AssertPathWithin(t, outputFile.Path, fixture.DocumentsDir)
+				var info, statErr = os.Stat(outputFile.Path)
+				if statErr != nil {
+					t.Fatalf("stat saved %q: %v", outputFile.Path, statErr)
+				}
+				if info.Mode().Perm() != 0o600 {
+					t.Fatalf("saved %q mode = %s, want 0600", outputFile.Path, info.Mode().Perm())
+				}
+			}
+		})
+	}
+}
+
 // TestReportOutputUsesPairedMarkdownSuffixContract verifies Markdown collision
 // handling reserves the same suffix for the main and Annex 1 files.
 // Authored by: OpenCode
@@ -181,6 +223,87 @@ func TestReportOutputUsesPDFSuffixContract(t *testing.T) {
 		reportmodel.ReportMediaTypePDF,
 	})
 	assertReportOutputFile(t, bundle.Files[0], fixture.DocumentsDir, `^ghostfolio-capital-gains-2024-fifo-2026-05-21_12-34-56-2\.pdf$`)
+}
+
+// TestReportOutputFailedAttemptRetainsCollisionSentinelsContract verifies that
+// deterministic write failure removes only current-attempt paths and returns no
+// partial saved paths for either supported format.
+// Authored by: OpenCode
+func TestReportOutputFailedAttemptRetainsCollisionSentinelsContract(t *testing.T) {
+	var testCases = []struct {
+		name         string
+		outputFormat reportmodel.ReportOutputFormat
+	}{
+		{name: "Markdown", outputFormat: reportmodel.ReportOutputFormatMarkdown},
+		{name: "PDF", outputFormat: reportmodel.ReportOutputFormatPDF},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			var fixture = testutil.NewReportIOFixture(t)
+			var filenames = testutil.DeterministicReportOutputFilenameFixture()
+			var sentinelNames []string
+			var currentAttemptNames []string
+			if testCase.outputFormat == reportmodel.ReportOutputFormatMarkdown {
+				sentinelNames = []string{
+					filenames.MarkdownMainFilename,
+					filenames.MarkdownAnnexFilename,
+					reportOutputFilenameWithSuffix(filenames.MarkdownMainFilename, "-2"),
+					reportOutputFilenameWithSuffix(filenames.MarkdownAnnexFilename, "-2"),
+				}
+				currentAttemptNames = []string{
+					reportOutputFilenameWithSuffix(filenames.MarkdownMainFilename, "-3"),
+					reportOutputFilenameWithSuffix(filenames.MarkdownAnnexFilename, "-3"),
+				}
+			} else {
+				sentinelNames = []string{
+					filenames.PDFCombinedFilename,
+					reportOutputFilenameWithSuffix(filenames.PDFCombinedFilename, "-2"),
+				}
+				currentAttemptNames = []string{
+					reportOutputFilenameWithSuffix(filenames.PDFCombinedFilename, "-3"),
+				}
+			}
+
+			for _, filename := range sentinelNames {
+				testutil.WriteFixtureFile(t, fixture.ReportPath(filename), "synthetic collision sentinel: "+filename+"\n")
+			}
+			t.Setenv("GHOSTFOLIO_CRYPTOGAINS_OUTPUT_FAIL_WRITE_AFTER_CREATE", "synthetic post-create write failure")
+
+			var request = testutil.DeterministicReportRequestFixture(testCase.outputFormat)
+			var documents []reportmodel.ReportDocument
+			if testCase.outputFormat == reportmodel.ReportOutputFormatMarkdown {
+				documents = deterministicMarkdownOutputDocuments(t, request)
+			} else {
+				documents = []reportmodel.ReportDocument{deterministicPDFOutputDocument(t, request)}
+			}
+
+			var bundle, err = reportoutput.WriteReportOutputBundle(testCase.outputFormat, documents)
+			if err == nil {
+				t.Fatalf("expected deterministic %s write failure", testCase.name)
+			}
+			if len(bundle.Files) != 0 || bundle.OutputFormat != "" || !bundle.SavedAt.IsZero() {
+				t.Fatalf("expected no partial saved paths, got %#v", bundle)
+			}
+			for _, filename := range sentinelNames {
+				testutil.AssertFileContent(t, fixture.ReportPath(filename), "synthetic collision sentinel: "+filename+"\n")
+			}
+			for _, filename := range currentAttemptNames {
+				if _, statErr := os.Stat(fixture.ReportPath(filename)); !os.IsNotExist(statErr) {
+					t.Fatalf("expected current-attempt path %q to be removed, stat error: %v", filename, statErr)
+				}
+			}
+		})
+	}
+}
+
+// reportOutputFilenameWithSuffix inserts a deterministic collision suffix before
+// one output filename's extension.
+// Authored by: OpenCode
+func reportOutputFilenameWithSuffix(filename string, suffix string) string {
+	var extension = filepath.Ext(filename)
+	return strings.TrimSuffix(filename, extension) + suffix + extension
 }
 
 // deterministicMarkdownOutputDocuments builds the main and Annex 1 Markdown

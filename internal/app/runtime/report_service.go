@@ -14,6 +14,7 @@ import (
 	reportoutput "github.com/benizzio/ghostfolio-cryptogains/internal/report/output"
 	reportpdf "github.com/benizzio/ghostfolio-cryptogains/internal/report/pdf"
 	datesupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/date"
+	"github.com/benizzio/ghostfolio-cryptogains/internal/support/redact"
 	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	"golang.org/x/image/font/gofont/gobold"
 	"golang.org/x/image/font/gofont/goregular"
@@ -76,19 +77,33 @@ func newReportService(
 	baseConfigDir string,
 	allowDevHTTP bool,
 	currencyRates reportcalculate.CurrencyRateService,
+	pipelineOptions ReportPipelineOptions,
 ) ReportService {
 	var calculator = reportcalculate.NewCalculator(currencyRates)
+	var calculate reportCalculator = calculator.Calculate
+	if pipelineOptions.CalculatedReportTransform != nil {
+		calculate = func(ctx context.Context, request reportmodel.ReportRequest, cache syncmodel.ProtectedActivityCache) (reportmodel.CapitalGainsReport, error) {
+			var report, err = calculator.Calculate(ctx, request, cache)
+			if err != nil {
+				return reportmodel.CapitalGainsReport{}, err
+			}
+			return pipelineOptions.CalculatedReportTransform(report), nil
+		}
+	}
 
-	return &reportService{
+	var service = &reportService{
 		snapshots:         snapshots,
 		allowDevHTTP:      allowDevHTTP,
 		diagnosticReports: newDiagnosticReportService(baseConfigDir),
 		currencyRates:     currencyRates,
-		calculate:         calculator.Calculate,
-		renderBundle:      renderReportOutputBundle,
-		writeBundle:       reportoutput.WriteReportOutputBundle,
-		open:              reportoutput.OpenPath,
+		calculate:         calculate,
+		renderBundle: func(outputFormat reportmodel.ReportOutputFormat, report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+			return renderReportOutputBundleWithOptions(outputFormat, report, pipelineOptions)
+		},
 	}
+	service.writeBundle = reportoutput.WriteReportOutputBundle
+	service.open = reportoutput.OpenPath
+	return service
 }
 
 // Generate validates report availability, calculates the report, renders
@@ -128,7 +143,7 @@ func (s *reportService) Generate(ctx context.Context, request ReportGenerationRe
 				"Could not render the %d %s report: %s. No report file was saved.",
 				request.Request.Year,
 				request.Request.CostBasisMethod.Label(),
-				strings.TrimSpace(err.Error()),
+				strings.TrimSpace(redact.ErrorText(err)),
 			),
 			reportDiagnosticContextFromError(wrappedErr),
 		)
@@ -137,15 +152,18 @@ func (s *reportService) Generate(ctx context.Context, request ReportGenerationRe
 	outputBundle, err = s.writeReportDocuments(request.Request.OutputFormat, documents)
 	if err != nil {
 		var reason = reportWriteFailureReason(err)
-		var wrappedErr = reportWriteDiagnosticError(reason, err)
-		return s.reportFailureOutcome(
+		var cleanupPaths = reportoutput.CleanupPathsOf(err)
+		var wrappedErr = reportWriteDiagnosticError(reason, err, cleanupPaths)
+		var outcome = s.reportFailureOutcome(
 			ctx,
 			request,
 			outcomeAttempt,
 			reason,
-			reportWriteFailureMessage(reason, err),
+			reportWriteFailureMessage(reason, err, cleanupPaths, reportoutput.ResidualPathsOf(err), reportoutput.CleanupFailed(err)),
 			reportDiagnosticContextFromError(wrappedErr),
 		)
+		outcome.ResidualOutputPaths = reportoutput.ResidualPathsOf(err)
+		return outcome
 	}
 
 	var openedOutputBundle, openedOutcome = requestAutomaticOpenBundle(request.Request, outputBundle, s.open)
@@ -189,28 +207,63 @@ func (s *reportService) writeReportDocuments(outputFormat reportmodel.ReportOutp
 // format and returns the rendered documents to save.
 // Authored by: OpenCode
 func renderReportOutputBundle(outputFormat reportmodel.ReportOutputFormat, report reportmodel.CapitalGainsReport) ([]reportmodel.ReportDocument, error) {
+	return renderReportOutputBundleWithOptions(outputFormat, report, ReportPipelineOptions{})
+}
+
+// renderReportOutputBundleWithOptions selects the local renderer with one
+// immutable report-pipeline option set.
+// Authored by: OpenCode
+func renderReportOutputBundleWithOptions(
+	outputFormat reportmodel.ReportOutputFormat,
+	report reportmodel.CapitalGainsReport,
+	pipelineOptions ReportPipelineOptions,
+) ([]reportmodel.ReportDocument, error) {
 	switch outputFormat {
 	case reportmodel.ReportOutputFormatMarkdown:
-		return reportmarkdown.RenderDocuments(report)
+		return renderMarkdownReportOutputBundle(report, pipelineOptions)
 	case reportmodel.ReportOutputFormatPDF:
-		var renderer, err = reportpdf.NewRenderer(reportPDFRenderOptions())
-		if err != nil {
-			return nil, err
-		}
-		var payload []byte
-		payload, err = renderer.Render(report)
-		if err != nil {
-			return nil, err
-		}
-		var document reportmodel.ReportDocument
-		document, err = newReportDocumentForRuntime(reportmodel.ReportDocumentTypePDF, reportmodel.ReportDocumentRoleCombined, payload, report.Year, report.CostBasisMethod, report.GeneratedAt)
-		if err != nil {
-			return nil, err
-		}
-		return []reportmodel.ReportDocument{document}, nil
+		return renderPDFReportOutputBundle(report, pipelineOptions)
 	default:
 		return nil, fmt.Errorf("unsupported report output format %q", outputFormat)
 	}
+}
+
+// renderMarkdownReportOutputBundle renders the Markdown documents and invokes
+// the optional observer immediately before rendering.
+// Authored by: OpenCode
+func renderMarkdownReportOutputBundle(report reportmodel.CapitalGainsReport, pipelineOptions ReportPipelineOptions) ([]reportmodel.ReportDocument, error) {
+	var renderer = reportmarkdown.NewRenderer(reportmarkdown.RenderOptions{FinancialFormatting: pipelineOptions.MarkdownFinancialFormatting})
+	if pipelineOptions.MarkdownRenderObserver != nil {
+		pipelineOptions.MarkdownRenderObserver()
+	}
+	return renderer.RenderDocuments(report)
+}
+
+// renderPDFReportOutputBundle renders one combined PDF document and invokes
+// the optional observer after renderer construction succeeds.
+// Authored by: OpenCode
+func renderPDFReportOutputBundle(report reportmodel.CapitalGainsReport, pipelineOptions ReportPipelineOptions) ([]reportmodel.ReportDocument, error) {
+	var renderOptions = reportPDFRenderOptions()
+	renderOptions.FinancialFormatting = pipelineOptions.PDFFinancialFormatting
+	renderOptions.ByteFinalizer = pipelineOptions.PDFByteFinalizer
+	var renderer, err = reportpdf.NewRenderer(renderOptions)
+	if err != nil {
+		return nil, err
+	}
+	if pipelineOptions.PDFRenderObserver != nil {
+		pipelineOptions.PDFRenderObserver()
+	}
+	var payload []byte
+	payload, err = renderer.Render(report)
+	if err != nil {
+		return nil, err
+	}
+	var document reportmodel.ReportDocument
+	document, err = newReportDocumentForRuntime(reportmodel.ReportDocumentTypePDF, reportmodel.ReportDocumentRoleCombined, payload, report.Year, report.CostBasisMethod, report.GeneratedAt)
+	if err != nil {
+		return nil, err
+	}
+	return []reportmodel.ReportDocument{document}, nil
 }
 
 // readAvailableCache validates that the shared unlocked snapshot can satisfy
@@ -250,7 +303,7 @@ func (s *reportService) readAvailableCache(request reportmodel.ReportRequest) (
 			ReportFailureUnsupportedReportCalculation,
 			fmt.Sprintf(
 				"Could not generate the report request: %s. Choose one of the available report years: %s.",
-				strings.TrimSpace(err.Error()),
+				strings.TrimSpace(redact.ErrorText(err)),
 				joinAvailableYears(cache.AvailableReportYears),
 			),
 		), false
@@ -302,7 +355,7 @@ func (s *reportService) reportFailureOutcome(
 // reportCalculationFailureMessage formats one actionable calculation failure.
 // Authored by: OpenCode
 func (s *reportService) reportCalculationFailureMessage(request reportmodel.ReportRequest, err error) string {
-	var detail = strings.TrimSpace(err.Error())
+	var detail = strings.TrimSpace(redact.ErrorText(err))
 	var conversionContext = s.reportConversionFailureContext(err)
 	if conversionContext != "" {
 		detail += "\n\n" + conversionContext

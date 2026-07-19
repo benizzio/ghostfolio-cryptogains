@@ -138,9 +138,10 @@ Post-analysis remediation gate status against constitution v3.0.0: PASS
 - [x] Precision: Existing finite `apd.Decimal` values and explicit currency
   identities remain authoritative. Present monetary amounts and unit prices are
   cloned and quantized only into final strings at exponent `-2` with
-  `apd.RoundHalfUp`. Formatting uses a copy of `apd.BaseContext`, checked result
-  precision sized for trailing zeros and carry, and accepts only expected
-  `Rounded` and `Inexact` conditions. Quantities use the objective FR-009
+  `apd.RoundHalfUp`. Formatting uses a package-owned context matching the pinned
+  `apd` exponent limits and default traps, checked `apd`-compatible result
+  precision sized for trailing zeros and carry, and accepts only expected `Rounded` and
+  `Inexact` conditions. Quantities use the objective FR-009
   canonical representation. Rates preserve every significant digit of the
   normalized evidence while discarding provider lexical scale. Each existing
   pre-format activity currency value remains unchanged before rendering. No
@@ -328,10 +329,12 @@ not a general decimal rule.
   proves complete searchable/selectable text and non-overlapping layout without
   claiming ACC-002-excluded conformance.
 - Existing empirical fixtures remain unchanged. The named performance fixture
-  independently times both formats, verifies exactly 6,666 three-entry
-  conversion rows, and proves the PDF conversion audit spans continuation pages
-  with every row, entry, repeated header, and continuation context retained.
-  Inspection occurs outside the measured intervals.
+  retains its exact 10,000-activity composition and independently times both
+  formats, requiring successful non-empty local outputs and opener invocation
+  under the strict two-minute limit. Deterministic package, contract, and
+  integration tests verify the 6,666 three-entry conversion rows and PDF
+  continuation content; the performance suite does not duplicate those
+  document-contract assertions.
 
 ## Constitution Prerequisite
 

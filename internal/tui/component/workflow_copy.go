@@ -101,6 +101,19 @@ const (
 	// Authored by: OpenCode
 	ReportSavedPathsTransientStatusText = "Saved paths are transient and are cleared when this result is dismissed."
 
+	// ReportCleartextExportDisclosureText is the canonical result-screen
+	// disclosure that every successful report file is a cleartext financial-data
+	// export. The TUI owns rendering this fixed copy; runtime save/open outcomes
+	// must not duplicate it.
+	// Authored by: OpenCode
+	ReportCleartextExportDisclosureText = "The saved report files are cleartext financial data exports."
+
+	// ReportCleartextExportDeletionGuidanceText is the canonical result-screen
+	// instruction to delete every listed successful report file. It is rendered
+	// once by the TUI after saved paths and is not operational runtime status.
+	// Authored by: OpenCode
+	ReportCleartextExportDeletionGuidanceText = "To remove the exported financial data, delete every listed file."
+
 	// ReportDiagnosticAvailableFromScreenMessage explains that report diagnostics can be generated from the report-result screen.
 	// Authored by: OpenCode
 	ReportDiagnosticAvailableFromScreenMessage = "Generate Diagnostic Report is available for this failure from this screen."

@@ -10,6 +10,13 @@ import (
 // renderAnnex renders Annex 1 after the required PDF page break.
 // Authored by: OpenCode
 func renderAnnex(document pdfContentLayout, annex reportmodel.AuditAnnex) error {
+	return renderAnnexWithFinancialFormatting(document, annex, presentation.DefaultFinancialFormattingOptions())
+}
+
+// renderAnnexWithFinancialFormatting renders Annex 1 with one renderer-scoped
+// immutable financial policy.
+// Authored by: OpenCode
+func renderAnnexWithFinancialFormatting(document pdfContentLayout, annex reportmodel.AuditAnnex, options presentation.FinancialFormattingOptions) error {
 	if document == nil {
 		return fmt.Errorf("pdf layout document is required")
 	}
@@ -22,30 +29,37 @@ func renderAnnex(document pdfContentLayout, annex reportmodel.AuditAnnex) error 
 	if err := document.AddTitle(annex.Title); err != nil {
 		return err
 	}
-	if err := renderAnnexPerAssetAudit(document, annex); err != nil {
+	if err := renderAnnexPerAssetAuditWithFinancialFormatting(document, annex, options); err != nil {
 		return err
 	}
-	return renderAnnexConversionAudit(document, annex)
+	return renderAnnexConversionAuditWithFinancialFormatting(document, annex, options)
 }
 
 // renderAnnexPerAssetAudit renders the Detailed Per-Asset Audit Report section.
 // Authored by: OpenCode
 func renderAnnexPerAssetAudit(document pdfContentLayout, annex reportmodel.AuditAnnex) error {
+	return renderAnnexPerAssetAuditWithFinancialFormatting(document, annex, presentation.DefaultFinancialFormattingOptions())
+}
+
+// renderAnnexPerAssetAuditWithFinancialFormatting renders audit activity rows
+// with one renderer-scoped immutable financial policy.
+// Authored by: OpenCode
+func renderAnnexPerAssetAuditWithFinancialFormatting(document pdfContentLayout, annex reportmodel.AuditAnnex, options presentation.FinancialFormattingOptions) error {
 	if err := document.AddSectionHeading("Detailed Per-Asset Audit Report"); err != nil {
 		return err
 	}
 	if len(annex.PerAssetAuditSections) == 0 {
 		return document.AddParagraph("No per-asset audit activity is available for this report.")
 	}
-	for _, section := range annex.PerAssetAuditSections {
+	for sectionIndex, section := range annex.PerAssetAuditSections {
 		if err := document.AddSubsectionHeading("Asset: " + renderDisplayLabel(section.DisplayLabel, section.AssetIdentityKey)); err != nil {
 			return err
 		}
 		var rows [][]string
-		for _, entry := range section.Entries {
-			var row, err = renderAnnexActivityRow(entry)
+		for entryIndex, entry := range section.Entries {
+			var row, err = renderAnnexActivityRowWithFinancialFormatting(entry, options)
 			if err != nil {
-				return fmt.Errorf("render annex audit entry %q: %w", entry.SourceID, err)
+				return fmt.Errorf("render annex section %d activity row %d: %w", sectionIndex+1, entryIndex+1, err)
 			}
 			rows = append(rows, row)
 		}
@@ -83,7 +97,14 @@ func renderAnnexPerAssetAudit(document pdfContentLayout, annex reportmodel.Audit
 // renderAnnexActivityRow formats one detailed audit activity row for a PDF table.
 // Authored by: OpenCode
 func renderAnnexActivityRow(entry reportmodel.AuditActivityEntry) ([]string, error) {
-	var rendered, err = presentation.BuildAnnexActivityRow(entry)
+	return renderAnnexActivityRowWithFinancialFormatting(entry, presentation.DefaultFinancialFormattingOptions())
+}
+
+// renderAnnexActivityRowWithFinancialFormatting renders one Annex activity row
+// with a renderer-scoped immutable financial policy.
+// Authored by: OpenCode
+func renderAnnexActivityRowWithFinancialFormatting(entry reportmodel.AuditActivityEntry, options presentation.FinancialFormattingOptions) ([]string, error) {
+	var rendered, err = presentation.BuildAnnexActivityRowWithFinancialFormatting(entry, options)
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +116,13 @@ func renderAnnexActivityRow(entry reportmodel.AuditActivityEntry) ([]string, err
 // renderAnnexConversionAudit renders Annex 1 currency conversion evidence.
 // Authored by: OpenCode
 func renderAnnexConversionAudit(document pdfContentLayout, annex reportmodel.AuditAnnex) error {
+	return renderAnnexConversionAuditWithFinancialFormatting(document, annex, presentation.DefaultFinancialFormattingOptions())
+}
+
+// renderAnnexConversionAuditWithFinancialFormatting renders conversion rows
+// with one renderer-scoped immutable financial policy.
+// Authored by: OpenCode
+func renderAnnexConversionAuditWithFinancialFormatting(document pdfContentLayout, annex reportmodel.AuditAnnex, options presentation.FinancialFormattingOptions) error {
 	if err := document.AddSectionHeading("Currency Conversion Audit"); err != nil {
 		return err
 	}
@@ -104,7 +132,7 @@ func renderAnnexConversionAudit(document pdfContentLayout, annex reportmodel.Aud
 
 	var rows [][]string
 	for index, entry := range annex.ConversionAuditEntries {
-		var row, err = renderConversionAuditRow(index, entry)
+		var row, err = renderConversionAuditRowWithFinancialFormatting(index, entry, options)
 		if err != nil {
 			return err
 		}
@@ -131,10 +159,29 @@ func renderAnnexConversionAudit(document pdfContentLayout, annex reportmodel.Aud
 
 // renderConversionAuditRow formats one conversion audit row.
 // Authored by: OpenCode
+//
+//nolint:unparam // Direct renderer tests exercise non-zero entry indexes.
 func renderConversionAuditRow(index int, entry reportmodel.ConversionAuditEntry) ([]string, error) {
-	var row, err = presentation.BuildConversionAuditRow(index, entry)
+	return renderConversionAuditRowWithFinancialFormatting(index, entry, presentation.DefaultFinancialFormattingOptions())
+}
+
+// renderConversionAuditRowWithFinancialFormatting renders one conversion row
+// with a renderer-scoped immutable financial policy.
+// Authored by: OpenCode
+func renderConversionAuditRowWithFinancialFormatting(index int, entry reportmodel.ConversionAuditEntry, options presentation.FinancialFormattingOptions) ([]string, error) {
+	var row, err = presentation.BuildConversionAuditRowWithFinancialFormatting(index, entry, options)
 	if err != nil {
 		return nil, err
 	}
-	return sanitizeRow([]string{row.Date, row.SourceID, row.Asset, row.RateDate, row.SourceCurrency, row.ReportBaseCurrency, row.ConvertedAmounts, row.QuoteDirection, row.RateValue}), nil
+	return []string{
+		sanitizeText(row.Date),
+		sanitizeText(row.SourceID),
+		sanitizeText(row.Asset),
+		sanitizeText(row.RateDate),
+		sanitizeText(row.SourceCurrency),
+		sanitizeText(row.ReportBaseCurrency),
+		sanitizeConvertedCell(row.ConvertedAmountEntries),
+		sanitizeText(row.QuoteDirection),
+		sanitizeText(row.RateValue),
+	}, nil
 }

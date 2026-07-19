@@ -88,7 +88,9 @@ Rules:
   plus coefficient digit count minus one, is from `-100000` through `100000` and
   whose correctly rounded scale-2 result, including a carry, also has adjusted
   exponent no greater than `100000`. Scale-2 quantization precision, including
-  coefficient expansion and one carry digit, must not exceed `4294967295`.
+  coefficient expansion and one carry digit, must not exceed `2147383649`, the
+  maximum precision supported by pinned `apd v3.2.3` without wrapping its signed
+  `MinExponent - precision + 1` arithmetic.
   Successful formatting rules apply only inside that domain. Values outside it,
   including an upper-bound carry to adjusted exponent `100001`, fail under the
   Failure Contract before visible output.
@@ -416,11 +418,14 @@ Automated tests must cover both formats and prove:
 - warning and converted-entry content remains complete searchable/selectable
   text with preserved order and non-overlapping layout, without claiming the
   assistive capabilities excluded by ACC-002
-- the named 10,000-activity fixture produces exactly 6,666 three-entry
-  conversion rows in both formats; the PDF audit spans multiple pages with every
-  row and entry present, searchable, inside printable bounds, and accompanied by
-  repeated header and continuation context where applicable
-- separate Markdown and PDF duration records use the specified CI environment
-  and timing boundary, including PDF multiline measurement, pagination,
-  finalization, save, and opener invocation while excluding fixture setup and
-  post-generation inspection
+- deterministic package, contract, and integration tests prove that the named
+  10,000-activity fixture produces exactly 6,666 three-entry conversion rows in
+  both formats; the PDF audit spans multiple pages with every row and entry
+  present, searchable, inside printable bounds, and accompanied by repeated
+  header and continuation context where applicable
+- the isolated performance suite proves the exact local workload composition,
+  separate Markdown and PDF duration records under the specified CI environment
+  and timing boundary, successful non-empty outputs, opener invocation, and
+  performance-coverage isolation. It does not inspect document content or
+  duplicate deterministic warning, rate, conversion-entry, cardinality,
+  heading, or pagination assertions.

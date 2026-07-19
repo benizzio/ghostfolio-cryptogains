@@ -63,16 +63,35 @@ func writeConversionAuditSection(builder *strings.Builder, report reportmodel.Ca
 // writeConversionAuditRow renders one grouped activity-level conversion audit row.
 // Authored by: OpenCode
 func writeConversionAuditRow(builder *strings.Builder, entryIndex int, entry reportmodel.ConversionAuditEntry) error {
-	var row, err = presentation.BuildConversionAuditRow(entryIndex, entry)
+	return writeConversionAuditRowWithFinancialFormatting(builder, entryIndex, entry, presentation.DefaultFinancialFormattingOptions())
+}
+
+// writeConversionAuditRowWithFinancialFormatting renders one conversion row
+// with a renderer-scoped immutable financial policy.
+// Authored by: OpenCode
+func writeConversionAuditRowWithFinancialFormatting(builder *strings.Builder, entryIndex int, entry reportmodel.ConversionAuditEntry, options presentation.FinancialFormattingOptions) error {
+	var row, err = presentation.BuildConversionAuditRowWithFinancialFormatting(entryIndex, entry, options)
 	if err != nil {
 		return err
 	}
 
 	fmt.Fprintf(builder,
 		"| %s | %s | %s | %s | %s | %s | %s | %s | %s |\n",
-		sanitizeInlineText(row.Date), sanitizeInlineText(row.SourceID), sanitizeInlineText(row.Asset), sanitizeInlineText(row.RateDate), sanitizeInlineText(row.SourceCurrency), sanitizeInlineText(row.ReportBaseCurrency), sanitizeInlineText(row.ConvertedAmounts), sanitizeInlineText(row.QuoteDirection), sanitizeInlineText(row.RateValue),
+		sanitizeInlineText(row.Date), sanitizeInlineText(row.SourceID), sanitizeInlineText(row.Asset), sanitizeInlineText(row.RateDate), sanitizeInlineText(row.SourceCurrency), sanitizeInlineText(row.ReportBaseCurrency), renderConvertedAmountEntries(row.ConvertedAmountEntries), sanitizeInlineText(row.QuoteDirection), sanitizeInlineText(row.RateValue),
 	)
 	return nil
+}
+
+// renderConvertedAmountEntries escapes each logical entry component before
+// assembling the Markdown-only syntax and boundary used in the table cell.
+// Authored by: OpenCode
+func renderConvertedAmountEntries(entries []presentation.ConvertedAmountEntry) string {
+	var rendered = make([]string, 0, len(entries))
+	for _, entry := range entries {
+		rendered = append(rendered, fmt.Sprintf("%s: %s -> %s", sanitizeConvertedAmountComponent(entry.Label), sanitizeConvertedAmountComponent(entry.OriginalAmount), sanitizeConvertedAmountComponent(entry.ConvertedAmount)))
+	}
+
+	return strings.Join(rendered, ";<br>")
 }
 
 // rateAuthorityLabel returns report-facing authority labels for canonical rate

@@ -74,5 +74,5 @@ func validateReportBaseCurrency(currency ReportBaseCurrency) error {
 		}
 	}
 
-	return fmt.Errorf("unsupported report base currency %q", currency)
+	return fmt.Errorf("unsupported report base currency")
 }

@@ -18,13 +18,12 @@ func (m *Model) clearSyncReportsRuntimeState() {
 	m.report = newReportState(m.syncReports.ProtectedData.AvailableReportYears)
 }
 
-// enterSetup routes the application to the setup workflow.
+// enterSetup routes the application to the setup workflow without a startup requirement.
 // Authored by: OpenCode
-func (m *Model) enterSetup(message string, startupReason bootstrap.SetupRequirementReason) tea.Cmd {
+func (m *Model) enterSetup(message string) {
 	m.active = setupScreenKey
-	m.setup = newSetupState(m.currentConfig, startupReason)
+	m.setup = newSetupState(m.currentConfig, bootstrap.SetupRequirementNone)
 	m.setup.ValidationMessage = message
-	return nil
 }
 
 // enterMainMenu routes the application back to the main menu.
@@ -51,7 +50,7 @@ func (m *Model) enterSyncReportsUnlock() tea.Cmd {
 
 // enterSyncReportsMenu routes the application to the unlocked Sync and Reports context menu.
 // Authored by: OpenCode
-func (m *Model) enterSyncReportsMenu(unlocked runtime.SyncReportsContextResult, token string) tea.Cmd {
+func (m *Model) enterSyncReportsMenu(unlocked runtime.SyncReportsContextResult, token string) {
 	m.active = syncReportsMenuScreenKey
 	m.sync = newSyncState()
 	m.sync.InputFocused = false
@@ -64,7 +63,6 @@ func (m *Model) enterSyncReportsMenu(unlocked runtime.SyncReportsContextResult, 
 	m.syncReports.ReportUnavailable = unlocked.ReportUnavailableReason
 	m.syncReports.UnlockFailure = runtime.SyncFailureNone
 	m.report = newReportState(unlocked.ProtectedData.AvailableReportYears)
-	return nil
 }
 
 // enterReportSelection routes the application to the report-selection screen.
@@ -84,6 +82,7 @@ func (m *Model) enterReportResult(outcome runtime.ReportOutcome) {
 	m.report.AttemptID = ""
 	m.report.ActionIndex = 0
 	m.syncReports.ReportResult = outcome
+	m.refreshReportResultViewport(true)
 }
 
 // enterSync routes the application to the sync entry screen.
@@ -98,14 +97,13 @@ func (m *Model) enterSync() tea.Cmd {
 // token-free context mode, reusing the active `Sync and Reports` token without
 // exposing it in the renderer or input state.
 // Authored by: OpenCode
-func (m *Model) enterSyncWithContextToken() tea.Cmd {
+func (m *Model) enterSyncWithContextToken() {
 	m.active = syncScreenKey
 	m.sync = newSyncState()
 	m.sync.UseContextToken = true
 	m.sync.InputFocused = false
 	m.sync.TokenInput.Blur()
 	m.sync.MenuIndex = menuIndexForAction(m.syncMenuActions(), syncMenuActionStartSync)
-	return nil
 }
 
 // enterServerReplacement routes the application to the server-mismatch confirmation screen.

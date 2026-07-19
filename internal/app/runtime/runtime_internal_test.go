@@ -12,8 +12,10 @@ import (
 	configmodel "github.com/benizzio/ghostfolio-cryptogains/internal/config/model"
 	configstore "github.com/benizzio/ghostfolio-cryptogains/internal/config/store"
 	ghostfolioclient "github.com/benizzio/ghostfolio-cryptogains/internal/ghostfolio/client"
+	reportmodel "github.com/benizzio/ghostfolio-cryptogains/internal/report/model"
 	snapshotstore "github.com/benizzio/ghostfolio-cryptogains/internal/snapshot/store"
 	decimalsupport "github.com/benizzio/ghostfolio-cryptogains/internal/support/decimal"
+	syncmodel "github.com/benizzio/ghostfolio-cryptogains/internal/sync/model"
 	syncnormalize "github.com/benizzio/ghostfolio-cryptogains/internal/sync/normalize"
 	syncvalidate "github.com/benizzio/ghostfolio-cryptogains/internal/sync/validate"
 )
@@ -322,6 +324,31 @@ func TestClearSessionSecrets(t *testing.T) {
 	clearSessionSecrets(&session)
 	if session.SecurityToken != "" || session.AuthToken != "" || session.UserBaseCurrency != "" {
 		t.Fatalf("expected secrets to be cleared: %#v", session)
+	}
+}
+
+// TestNewReportServiceUsesConcreteOutputDefaults verifies the production
+// writer and opener remain installed when renderer options are supplied.
+// Authored by: OpenCode
+func TestNewReportServiceUsesConcreteOutputDefaults(t *testing.T) {
+	var service, ok = newReportService(nil, "", false, nil, ReportPipelineOptions{}).(*reportService)
+	if !ok {
+		t.Fatal("expected concrete report service")
+	}
+	if service.writeBundle == nil || service.open == nil {
+		t.Fatal("expected concrete report output writer and opener defaults")
+	}
+
+	service, ok = newReportService(nil, "", false, nil, ReportPipelineOptions{
+		CalculatedReportTransform: func(report reportmodel.CapitalGainsReport) reportmodel.CapitalGainsReport {
+			return report
+		},
+	}).(*reportService)
+	if !ok {
+		t.Fatal("expected concrete transformed report service")
+	}
+	if _, err := service.calculate(context.Background(), reportmodel.ReportRequest{}, syncmodel.ProtectedActivityCache{}); err == nil {
+		t.Fatal("expected transformed calculator to preserve calculation errors")
 	}
 }
 

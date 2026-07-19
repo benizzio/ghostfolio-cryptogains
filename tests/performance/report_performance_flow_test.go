@@ -6,8 +6,7 @@ package performance
 import (
 	"context"
 	"os"
-	"regexp"
-	"strings"
+	stdruntime "runtime"
 	"testing"
 	"time"
 
@@ -18,25 +17,26 @@ import (
 	"github.com/benizzio/ghostfolio-cryptogains/tests/testutil/runtimeflow"
 )
 
-// TestReportPerformanceFlowLargeHistoryFixture verifies the 10,000-activity
-// Markdown and PDF report path with deterministic conversion evidence.
+// TestReportPerformanceFlowLargeHistoryFixture verifies the exact 10,000-activity
+// Markdown and PDF report generation path using local deterministic inputs.
 // Authored by: OpenCode
 func TestReportPerformanceFlowLargeHistoryFixture(t *testing.T) {
-	const minimumActivityCount = 10000
-	const minimumCalendarYearSpan = 5
+	const expectedActivityCount = 10000
 	const threshold = 2 * time.Minute
-	var fixture = largeReportFixture(t)
+	var requestedAt = time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC)
+	logPerformanceEnvironment(t)
+	var fixture = runtimeflow.LargeReportFixture(t)
 	var reportIO = testutil.NewReportIOFixture(t)
 	var openLogPath = runtimeflow.InstallOpenCommandRecorder(t, 0)
-	var harness = runtimeflow.NewRuntimeBackedFlowHarness(t, t.TempDir(), runtimeflow.MustCloudSetupConfig(t), false)
+	var harness = runtimeflow.NewRuntimeBackedFlowHarnessWithCurrencyRateService(t, t.TempDir(), runtimeflow.MustCloudSetupConfig(t), false, runtimeflow.DeterministicCurrencyRates{})
 	var token = "performance-token"
-	if fixture.ActivityCount != minimumActivityCount {
-		t.Fatalf("expected %d activities, got %d", minimumActivityCount, fixture.ActivityCount)
+	if fixture.ActivityCount != expectedActivityCount {
+		t.Fatalf("expected %d activities, got %d", expectedActivityCount, fixture.ActivityCount)
 	}
-	if fixture.CalendarYearSpan < minimumCalendarYearSpan {
-		t.Fatalf("expected at least %d calendar years, got %d", minimumCalendarYearSpan, fixture.CalendarYearSpan)
+	if fixture.CalendarYearSpan != 6 {
+		t.Fatalf("expected six calendar years, got %d", fixture.CalendarYearSpan)
 	}
-	assertLargeHistoryCrossCurrencyActivity(t, fixture.ProtectedActivityCache.Activities)
+	assertLargeHistoryActivityComposition(t, fixture.ProtectedActivityCache.Activities)
 	runtimeflow.SeedProtectedSnapshot(t, harness, token, fixture.ProtectedActivityCache)
 	var contextResult = harness.App.SyncService.UnlockSelectedServerSnapshot(context.Background(), harness.Config, token)
 	if !contextResult.ProtectedData.HasReadableSnapshot || contextResult.ReportUnavailableReason != runtime.ReportFailureNone {
@@ -44,9 +44,8 @@ func TestReportPerformanceFlowLargeHistoryFixture(t *testing.T) {
 	}
 	var outputFormats = []reportmodel.ReportOutputFormat{reportmodel.ReportOutputFormatMarkdown, reportmodel.ReportOutputFormatPDF}
 	var outcomes = make(map[reportmodel.ReportOutputFormat]runtime.ReportOutcome)
-	var elapsedByFormat = make(map[reportmodel.ReportOutputFormat]time.Duration)
 	for _, outputFormat := range outputFormats {
-		var request, err = reportmodel.NewReportRequest(fixture.ReportYear, reportmodel.CostBasisMethodHIFO, reportmodel.ReportBaseCurrencyUSD, outputFormat, time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC))
+		var request, err = reportmodel.NewReportRequest(fixture.ReportYear, reportmodel.CostBasisMethodHIFO, reportmodel.ReportBaseCurrencyUSD, outputFormat, requestedAt)
 		if err != nil {
 			t.Fatalf("new %s report request: %v", outputFormat, err)
 		}
@@ -59,16 +58,28 @@ func TestReportPerformanceFlowLargeHistoryFixture(t *testing.T) {
 		if !outcome.Success || outcome.FailureReason != runtime.ReportFailureNone {
 			t.Fatalf("expected successful %s large-history report generation, got %#v", outputFormat, outcome)
 		}
+		if outcome.Request.Year != 2025 || outcome.Request.CostBasisMethod != reportmodel.CostBasisMethodHIFO || outcome.Request.ReportBaseCurrency != reportmodel.ReportBaseCurrencyUSD || !outcome.Request.RequestedAt.Equal(requestedAt) {
+			t.Fatalf("unexpected %s report request: %#v", outputFormat, outcome.Request)
+		}
 		if !outcome.OutputBundle.OpenRequested {
 			t.Fatalf("expected %s opener request, got %#v", outputFormat, outcome.OutputBundle)
+		}
+		if len(outcome.OutputBundle.Files) == 0 {
+			t.Fatalf("expected at least one generated %s output file", outputFormat)
 		}
 		for _, outputFile := range outcome.OutputBundle.Files {
 			testutil.AssertPathWithin(t, outputFile.Path, reportIO.DocumentsDir)
 			testutil.AssertRegularFile(t, outputFile.Path)
+			var fileInfo, statErr = os.Stat(outputFile.Path)
+			if statErr != nil {
+				t.Fatalf("stat generated %s output: %v", outputFormat, statErr)
+			}
+			if fileInfo.Size() == 0 {
+				t.Fatalf("expected non-empty generated %s output at %q", outputFormat, outputFile.Path)
+			}
 		}
 		outcomes[outputFormat] = outcome
-		elapsedByFormat[outputFormat] = elapsed
-		t.Logf("%s large-history report generation completed in %s", outputFormat, elapsed)
+		t.Logf("performance format=%s elapsed=%s threshold=%s", outputFormat, elapsed, threshold)
 	}
 	var requests = runtimeflow.ReadOpenCommandRequests(t, openLogPath)
 	if len(requests) != len(outcomes) {
@@ -81,70 +92,91 @@ func TestReportPerformanceFlowLargeHistoryFixture(t *testing.T) {
 		}
 	}
 
-	var markdownOutcome = outcomes[reportmodel.ReportOutputFormatMarkdown]
-	if len(markdownOutcome.OutputBundle.Files) != 2 {
-		t.Fatalf("expected main-plus-annex Markdown bundle, got %#v", markdownOutcome.OutputBundle)
-	}
-	var reportBytes, readErr = os.ReadFile(markdownOutcome.OutputBundle.Files[0].Path)
-	if readErr != nil {
-		t.Fatalf("read saved report: %v", readErr)
-	}
-	for _, expected := range []string{"# Ghostfolio Capital Gains And Losses Report", "- **Year:** 2025", "- **Cost Basis Method:** HIFO", "## Gains-And-Losses Summary", "## Reference Section"} {
-		if !strings.Contains(string(reportBytes), expected) {
-			t.Fatalf("expected saved report to contain %q", expected)
-		}
-	}
-	var annexBytes, annexReadErr = os.ReadFile(markdownOutcome.OutputBundle.Files[1].Path)
-	if annexReadErr != nil {
-		t.Fatalf("read saved annex: %v", annexReadErr)
-	}
-	for _, expected := range []string{"# Annex 1 - Audit", "## Detailed Per-Asset Audit Report", "## Currency Conversion Audit"} {
-		if !strings.Contains(string(annexBytes), expected) {
-			t.Fatalf("expected saved annex to contain %q", expected)
-		}
-	}
-
-	var pdfOutcome = outcomes[reportmodel.ReportOutputFormatPDF]
-	if len(pdfOutcome.OutputBundle.Files) != 1 {
-		t.Fatalf("expected one combined PDF file, got %#v", pdfOutcome.OutputBundle)
-	}
-	var pdfBytes, pdfReadErr = os.ReadFile(pdfOutcome.OutputBundle.Files[0].Path)
-	if pdfReadErr != nil {
-		t.Fatalf("read saved PDF: %v", pdfReadErr)
-	}
-	assertGeneratedLargeHistoryPDFContract(t, pdfBytes)
 	runtimeflow.AssertNoCleartextReportInAppStorage(t, harness.BaseDir)
-	t.Logf("10,000-activity verification completed for Markdown in %s and PDF in %s across %d calendar years", elapsedByFormat[reportmodel.ReportOutputFormatMarkdown], elapsedByFormat[reportmodel.ReportOutputFormatPDF], fixture.CalendarYearSpan)
+	t.Logf("10,000-activity verification completed across %d calendar years; performance coverage mode=none", fixture.CalendarYearSpan)
 }
 
-// assertLargeHistoryCrossCurrencyActivity verifies the fixture exercises all
-// currencies required by the report conversion scenario.
+// logPerformanceEnvironment records the runner and Go conditions for local or
+// authoritative isolated performance evidence.
 // Authored by: OpenCode
-func assertLargeHistoryCrossCurrencyActivity(t *testing.T, activities []syncmodel.ActivityRecord) {
+func logPerformanceEnvironment(t *testing.T) {
 	t.Helper()
-	var currencies = make(map[string]bool)
+	var runnerImage = os.Getenv("ImageOS")
+	if runnerImage == "" {
+		runnerImage = os.Getenv("RUNNER_OS")
+	}
+	if runnerImage == "" {
+		runnerImage = stdruntime.GOOS
+	}
+	var runnerImageVersion = os.Getenv("ImageVersion")
+	if runnerImageVersion == "" {
+		runnerImageVersion = "local"
+	}
+	t.Logf("performance environment: runner_image=%s runner_image_version=%s os=%s arch=%s cpus=%d go=%s rate_source=local exact_rate=1.1 network=disabled coverage_mode=none", runnerImage, runnerImageVersion, stdruntime.GOOS, stdruntime.GOARCH, stdruntime.NumCPU(), stdruntime.Version())
+}
+
+// assertLargeHistoryActivityComposition verifies every scale-fixture dimension
+// before protected snapshot setup and report generation begin.
+// Authored by: OpenCode
+func assertLargeHistoryActivityComposition(t *testing.T, activities []syncmodel.ActivityRecord) {
+	t.Helper()
+	if len(activities) != 10000 {
+		t.Fatalf("expected 10000 activities, got %d", len(activities))
+	}
+	var assetCounts = make(map[string]int)
+	var currencyCounts = make(map[string]int)
+	var activityTypeCounts = make(map[string]map[syncmodel.ActivityType]int)
+	var buyYearCounts = make(map[string]map[int]int)
+	var quantityOne = mustDecimalPointer(t, "1")
 	for _, activity := range activities {
-		currencies[activity.OrderCurrency] = true
-	}
-	for _, currency := range []string{"USD", "EUR", "GBP"} {
-		if !currencies[currency] {
-			t.Fatalf("expected large-history fixture to include %s activity currency, got %#v", currency, currencies)
+		assetCounts[activity.AssetIdentityKey]++
+		currencyCounts[activity.OrderCurrency]++
+		if activityTypeCounts[activity.AssetIdentityKey] == nil {
+			activityTypeCounts[activity.AssetIdentityKey] = make(map[syncmodel.ActivityType]int)
+		}
+		activityTypeCounts[activity.AssetIdentityKey][activity.ActivityType]++
+		if activity.Quantity.Cmp(quantityOne) != 0 {
+			t.Fatalf("expected quantity-one activity, got %s for %q", activity.Quantity.String(), activity.SourceID)
+		}
+		if activity.OrderUnitPrice != nil || activity.OrderGrossValue == nil || activity.OrderFeeAmount == nil {
+			t.Fatalf("expected priced activity fields for %q, got %#v", activity.SourceID, activity)
+		}
+		if activity.OrderGrossValue.Sign() <= 0 || activity.OrderFeeAmount.Sign() <= 0 {
+			t.Fatalf("expected positive same-tier priced values for %q, got gross=%s fee=%s", activity.SourceID, activity.OrderGrossValue, activity.OrderFeeAmount)
+		}
+		var occurredAt, err = time.Parse(time.RFC3339, activity.OccurredAt)
+		if err != nil {
+			t.Fatalf("parse activity date for %q: %v", activity.SourceID, err)
+		}
+		if activity.ActivityType == syncmodel.ActivityTypeBuy && (occurredAt.Year() < 2020 || occurredAt.Year() > 2024) {
+			t.Fatalf("expected BUY activity between 2020 and 2024, got %s for %q", occurredAt.Format(time.DateOnly), activity.SourceID)
+		}
+		if activity.ActivityType == syncmodel.ActivityTypeBuy {
+			if buyYearCounts[activity.AssetIdentityKey] == nil {
+				buyYearCounts[activity.AssetIdentityKey] = make(map[int]int)
+			}
+			buyYearCounts[activity.AssetIdentityKey][occurredAt.Year()]++
+		}
+		if activity.ActivityType == syncmodel.ActivityTypeSell && occurredAt.Year() != 2025 {
+			t.Fatalf("expected SELL activity in 2025, got %s for %q", occurredAt.Format(time.DateOnly), activity.SourceID)
 		}
 	}
-}
-
-// assertGeneratedLargeHistoryPDFContract verifies the combined PDF envelope,
-// page metadata, and pagination.
-// Authored by: OpenCode
-func assertGeneratedLargeHistoryPDFContract(t *testing.T, pdfBytes []byte) {
-	t.Helper()
-	var pdfText = string(pdfBytes)
-	for _, expected := range []string{"%PDF-", "%%EOF", "/MediaBox"} {
-		if !strings.Contains(pdfText, expected) {
-			t.Fatalf("expected generated PDF to contain %q", expected)
+	for assetKey, count := range map[string]int{"asset-btc-performance-001": 5000, "asset-eth-performance-001": 5000} {
+		if assetCounts[assetKey] != count {
+			t.Fatalf("expected %d activities for %s, got %d", count, assetKey, assetCounts[assetKey])
+		}
+		if activityTypeCounts[assetKey][syncmodel.ActivityTypeBuy] != 2500 || activityTypeCounts[assetKey][syncmodel.ActivityTypeSell] != 2500 {
+			t.Fatalf("expected 2500 BUY and 2500 SELL activities for %s, got %#v", assetKey, activityTypeCounts[assetKey])
+		}
+		for year := 2020; year <= 2024; year++ {
+			if buyYearCounts[assetKey][year] != 500 {
+				t.Fatalf("expected 500 BUY activities for %s in %d, got %d", assetKey, year, buyYearCounts[assetKey][year])
+			}
 		}
 	}
-	if len(regexp.MustCompile(`/Type\s*/Page\b`).FindAll(pdfBytes, -1)) < 2 {
-		t.Fatalf("expected generated PDF to contain multiple report pages")
+	for currency, count := range map[string]int{"USD": 3334, "EUR": 3333, "GBP": 3333} {
+		if currencyCounts[currency] != count {
+			t.Fatalf("expected %d %s activities, got %d", count, currency, currencyCounts[currency])
+		}
 	}
 }

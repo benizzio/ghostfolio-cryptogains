@@ -7,7 +7,6 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/component"
 )
@@ -20,6 +19,10 @@ var (
 	cachedCancelBinding    = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel"))
 	cachedEditSetupBinding = key.NewBinding(key.WithKeys("ctrl+e"), key.WithHelp("ctrl+e", "edit setup"))
 	cachedQuitBinding      = key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit"))
+	cachedPageUpBinding    = key.NewBinding(key.WithKeys("pgup"), key.WithHelp("pgup", "scroll up"))
+	cachedPageDownBinding  = key.NewBinding(key.WithKeys("pgdown"), key.WithHelp("pgdn", "scroll down"))
+	cachedReportActionHelp = key.NewBinding(key.WithKeys("up", "down"), key.WithHelp("up/down", "choose action"))
+	cachedReportScrollHelp = key.NewBinding(key.WithKeys("pgup", "pgdown"), key.WithHelp("pgup/pgdn", "scroll"))
 )
 
 // upBinding returns the shared upward menu navigation binding.
@@ -64,6 +67,30 @@ func quitBinding() key.Binding {
 	return cachedQuitBinding
 }
 
+// pageUpBinding returns the report-result upward paging binding.
+// Authored by: OpenCode
+func pageUpBinding() key.Binding {
+	return cachedPageUpBinding
+}
+
+// pageDownBinding returns the report-result downward paging binding.
+// Authored by: OpenCode
+func pageDownBinding() key.Binding {
+	return cachedPageDownBinding
+}
+
+// reportActionHelpBinding returns compact report-result action-navigation help.
+// Authored by: OpenCode
+func reportActionHelpBinding() key.Binding {
+	return cachedReportActionHelp
+}
+
+// reportScrollHelpBinding returns compact report-result paging help.
+// Authored by: OpenCode
+func reportScrollHelpBinding() key.Binding {
+	return cachedReportScrollHelp
+}
+
 // updateMainMenu handles main-menu navigation.
 // Authored by: OpenCode
 func (m *Model) updateMainMenu(message tea.Msg) (tea.Model, tea.Cmd) {
@@ -74,7 +101,8 @@ func (m *Model) updateMainMenu(message tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch {
 	case key.Matches(keyMessage, editSetupBinding()):
-		return m, m.enterSetup("", bootstrap.SetupRequirementNone)
+		m.enterSetup("")
+		return m, nil
 	case key.Matches(keyMessage, enterBinding()):
 		return m, m.enterSyncReportsUnlock()
 	default:
@@ -129,7 +157,8 @@ func (m *Model) activateSyncResultSelection() (tea.Model, tea.Cmd) {
 		return m.generateDiagnosticReport()
 	case resultMenuActionSyncAgain:
 		if m.syncReports.Active {
-			return m, m.enterSyncWithContextToken()
+			m.enterSyncWithContextToken()
+			return m, nil
 		}
 		return m, m.enterSync()
 	case resultMenuActionBackToMainMenu:
@@ -189,7 +218,8 @@ func (m *Model) activateSyncReportsMenuSelection() (tea.Model, tea.Cmd) {
 
 	switch action {
 	case syncReportsMenuActionSyncData:
-		return m, m.enterSyncWithContextToken()
+		m.enterSyncWithContextToken()
+		return m, nil
 	case syncReportsMenuActionGenerateReport:
 		return m.activateSyncReportsGenerateReport()
 	case syncReportsMenuActionGenerateDiagnostic:
@@ -256,39 +286,40 @@ func (m *Model) moveSyncReportsMenuSelection(step int, items []component.MenuIte
 // Authored by: OpenCode
 func (m *Model) generateDiagnosticReport() (tea.Model, tea.Cmd) {
 	var request = m.result.Outcome.Diagnostic.Request
-	var useSyncReportsContext = m.active == syncReportsMenuScreenKey
-	if useSyncReportsContext {
+	switch m.active {
+	case syncReportsMenuScreenKey:
 		request = m.syncReports.SyncResult.Outcome.Diagnostic.Request
-	} else if m.active == reportResultScreenKey {
+	case reportResultScreenKey:
 		request = m.syncReports.ReportResult.Diagnostic.Request
 	}
 	if request.ServerOrigin == "" && m.currentConfig != nil {
 		request.ServerOrigin = m.currentConfig.ServerOrigin
 	}
 	if request.Attempt.AttemptID == "" {
-		if useSyncReportsContext {
+		switch m.active {
+		case syncReportsMenuScreenKey:
 			request.Attempt = m.syncReports.SyncResult.Outcome.Attempt
-		} else if m.active == reportResultScreenKey {
+		case reportResultScreenKey:
 			request.Attempt = m.syncReports.ReportResult.Attempt
-		} else {
+		default:
 			request.Attempt = m.result.Outcome.Attempt
 		}
 	}
-	if useSyncReportsContext {
+	switch m.active {
+	case syncReportsMenuScreenKey:
 		m.syncReports.SyncResult.Outcome.Diagnostic.Request = request
 		m.syncReports.SyncResult.Busy = true
 		m.syncReports.SyncResult.StatusMessage = "Generating diagnostic report..."
 		m.sync.MenuIndex = m.syncReportsDefaultMenuIndex()
-	} else {
-		if m.active == reportResultScreenKey {
-			m.syncReports.ReportResult.Diagnostic.Request = request
-			m.report.Busy = true
-			m.syncReports.ReportResult.Diagnostic.GenerationMessage = "Generating diagnostic report..."
-		} else {
-			m.result.Outcome.Diagnostic.Request = request
-			m.result.Busy = true
-			m.result.StatusMessage = "Generating diagnostic report..."
-		}
+	case reportResultScreenKey:
+		m.syncReports.ReportResult.Diagnostic.Request = request
+		m.report.Busy = true
+		m.syncReports.ReportResult.Diagnostic.GenerationMessage = "Generating diagnostic report..."
+		m.refreshReportResultViewport(false)
+	default:
+		m.result.Outcome.Diagnostic.Request = request
+		m.result.Busy = true
+		m.result.StatusMessage = "Generating diagnostic report..."
 	}
 	return m, m.generateDiagnosticReportCmd(request)
 }
@@ -316,11 +347,13 @@ func (m *Model) handleDiagnosticReportFinished(message diagnosticReportFinishedM
 		m.report.Busy = false
 		if message.Err != nil {
 			m.syncReports.ReportResult.Diagnostic.GenerationMessage = "Diagnostic report generation failed. Try again."
+			m.refreshReportResultViewport(false)
 			return m, nil
 		}
 
 		m.syncReports.ReportResult.Diagnostic.Path = message.Path
 		m.syncReports.ReportResult.Diagnostic.GenerationMessage = "Diagnostic report generated successfully."
+		m.refreshReportResultViewport(false)
 		return m, nil
 	}
 

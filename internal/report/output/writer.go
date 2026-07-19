@@ -46,7 +46,8 @@ type writeSyncCloser interface {
 //
 // Markdown output writes a main report and Annex 1 with matched collision
 // suffixes. PDF output writes one combined `.pdf` file. If any write, sync, or
-// close fails, every file created by the attempt is removed before returning.
+// close fails, cleanup is attempted for every file created by the attempt and
+// any path whose removal fails is attached to the returned error.
 // Authored by: OpenCode
 func WriteReportOutputBundle(outputFormat reportmodel.ReportOutputFormat, documents []reportmodel.ReportDocument) (reportmodel.ReportOutputBundle, error) {
 	var savedAt = normalizeReportDocumentSavedAt(documents)
@@ -71,27 +72,18 @@ func WriteReportOutputBundle(outputFormat reportmodel.ReportOutputFormat, docume
 		return reportmodel.ReportOutputBundle{}, err
 	}
 
-	var cleanupPaths = true
-	defer func() {
-		if !cleanupPaths {
-			return
-		}
-		cleanupReservedReportFiles(reservations)
-	}()
-
 	var files []reportmodel.ReportOutputFile
 	files, err = writeReservedReportOutputFiles(documentsDir, savedAt, reservations, documents)
 	if err != nil {
-		return reportmodel.ReportOutputBundle{}, err
+		return reportmodel.ReportOutputBundle{}, outputFailureAfterCleanup(err, reservations)
 	}
 
 	var bundle reportmodel.ReportOutputBundle
 	bundle, err = newReportOutputBundleForWrite(outputFormat, files, savedAt, false, "")
 	if err != nil {
-		return reportmodel.ReportOutputBundle{}, err
+		return reportmodel.ReportOutputBundle{}, outputFailureAfterCleanup(err, reservations)
 	}
 
-	cleanupPaths = false
 	return bundle, nil
 }
 
@@ -127,10 +119,9 @@ func writeReservedReportOutputFiles(
 	}
 
 	var files = make([]reportmodel.ReportOutputFile, 0, len(reservations))
-	for len(reservations) > 0 {
-		var reservation = reservations[0]
+	for index := range reservations {
+		var reservation = &reservations[index]
 		var document = documents[0]
-		reservations = reservations[1:]
 		documents = documents[1:]
 
 		var outputFile, err = writeReservedReportOutputFile(documentsDir, savedAt, reservation, document)
@@ -149,7 +140,7 @@ func writeReservedReportOutputFiles(
 func writeReservedReportOutputFile(
 	documentsDir string,
 	savedAt time.Time,
-	reservation reservedReportFile,
+	reservation *reservedReportFile,
 	document reportmodel.ReportDocument,
 ) (reportmodel.ReportOutputFile, error) {
 	if err := writeReservedReportFile(reservation, document); err != nil {
@@ -173,6 +164,7 @@ type reservedReportFile struct {
 	filename string
 	path     string
 	file     writeSyncCloser
+	closed   bool
 }
 
 // validateDocumentsDirectory verifies the resolved Documents directory before
@@ -207,7 +199,10 @@ func reserveReportFiles(documentsDir string, outputFormat reportmodel.ReportOutp
 		if err == nil {
 			return reservations, nil
 		}
-		cleanupReservedReportFiles(reservations)
+		var cleanup = cleanupReservedReportFiles(reservations)
+		if cleanup.err != nil {
+			return nil, failureWithCleanup(err, cleanup)
+		}
 		if errors.Is(err, os.ErrExist) {
 			continue
 		}
@@ -276,7 +271,7 @@ func buildAnnexReportFilenameBase(baseName string) string {
 
 // writeReservedReportFile writes, syncs, and closes one reserved output file.
 // Authored by: OpenCode
-func writeReservedReportFile(reservation reservedReportFile, document reportmodel.ReportDocument) error {
+func writeReservedReportFile(reservation *reservedReportFile, document reportmodel.ReportDocument) error {
 	if _, err := reservation.file.Write(document.Content); err != nil {
 		return wrapFailure(
 			FailureCategoryReportFileWriteFailed,
@@ -295,20 +290,87 @@ func writeReservedReportFile(reservation reservedReportFile, document reportmode
 			fmt.Errorf("close report file %q: %w", reservation.path, err),
 		)
 	}
+	reservation.closed = true
 
 	return nil
 }
 
-// cleanupReservedReportFiles closes and removes every reserved path.
+// reportFileCleanup stores collected cleanup errors and paths whose removal did
+// not succeed for one current output attempt.
 // Authored by: OpenCode
-func cleanupReservedReportFiles(reservations []reservedReportFile) {
+type reportFileCleanup struct {
+	err           error
+	paths         []string
+	residualPaths []string
+}
+
+// cleanupReservedReportFiles closes and removes every reserved path while
+// collecting all close and removal failures.
+// Authored by: OpenCode
+func cleanupReservedReportFiles(reservations []reservedReportFile) reportFileCleanup {
+	var cleanup reportFileCleanup
+	var cleanupErrors []error
 	for _, reservation := range reservations {
-		if reservation.file != nil {
-			_ = reservation.file.Close()
-		}
 		if reservation.path != "" {
-			_ = removePath(reservation.path)
+			cleanup.paths = append(cleanup.paths, reservation.path)
 		}
+		var reservationErrors, residual = cleanupReservedReportFile(reservation)
+		cleanupErrors = append(cleanupErrors, reservationErrors...)
+		if residual {
+			cleanup.residualPaths = append(cleanup.residualPaths, reservation.path)
+		}
+	}
+	cleanup.err = errors.Join(cleanupErrors...)
+	return cleanup
+}
+
+// cleanupReservedReportFile closes and removes one current-attempt reservation
+// and reports whether removal failed without confirming that the path is absent.
+// Authored by: OpenCode
+func cleanupReservedReportFile(reservation reservedReportFile) ([]error, bool) {
+	var cleanupErrors []error
+	if reservation.file != nil && !reservation.closed {
+		if err := reservation.file.Close(); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("close reserved report file %q during cleanup: %w", reservation.path, err))
+		}
+	}
+	if reservation.path == "" {
+		return cleanupErrors, false
+	}
+
+	var removeErr = removePath(reservation.path)
+	if removeErr == nil {
+		return cleanupErrors, false
+	}
+	cleanupErrors = append(cleanupErrors, fmt.Errorf("remove reserved report file %q during cleanup: %w", reservation.path, removeErr))
+	return cleanupErrors, !errors.Is(removeErr, os.ErrNotExist)
+}
+
+// outputFailureAfterCleanup preserves the initiating failure and attaches
+// structured current-attempt cleanup context.
+// Authored by: OpenCode
+func outputFailureAfterCleanup(err error, reservations []reservedReportFile) error {
+	return failureWithCleanup(err, cleanupReservedReportFiles(reservations))
+}
+
+// failureWithCleanup keeps the initiating category and errors.Is chain while
+// appending collected cleanup failures and transient path context.
+// Authored by: OpenCode
+func failureWithCleanup(err error, cleanup reportFileCleanup) error {
+	var category, ok = FailureCategoryOf(err)
+	if !ok {
+		category = FailureCategoryReportFileWriteFailed
+	}
+	var combined = err
+	if cleanup.err != nil {
+		combined = errors.Join(err, cleanup.err)
+	}
+	return &Failure{
+		category:      category,
+		err:           combined,
+		cleanupPaths:  append([]string(nil), cleanup.paths...),
+		residualPaths: append([]string(nil), cleanup.residualPaths...),
+		cleanupFailed: cleanup.err != nil,
 	}
 }
 
