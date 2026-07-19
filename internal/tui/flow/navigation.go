@@ -7,7 +7,6 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/component"
 )
@@ -102,7 +101,8 @@ func (m *Model) updateMainMenu(message tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch {
 	case key.Matches(keyMessage, editSetupBinding()):
-		return m, m.enterSetup("", bootstrap.SetupRequirementNone)
+		m.enterSetup("")
+		return m, nil
 	case key.Matches(keyMessage, enterBinding()):
 		return m, m.enterSyncReportsUnlock()
 	default:
@@ -157,7 +157,8 @@ func (m *Model) activateSyncResultSelection() (tea.Model, tea.Cmd) {
 		return m.generateDiagnosticReport()
 	case resultMenuActionSyncAgain:
 		if m.syncReports.Active {
-			return m, m.enterSyncWithContextToken()
+			m.enterSyncWithContextToken()
+			return m, nil
 		}
 		return m, m.enterSync()
 	case resultMenuActionBackToMainMenu:
@@ -217,7 +218,8 @@ func (m *Model) activateSyncReportsMenuSelection() (tea.Model, tea.Cmd) {
 
 	switch action {
 	case syncReportsMenuActionSyncData:
-		return m, m.enterSyncWithContextToken()
+		m.enterSyncWithContextToken()
+		return m, nil
 	case syncReportsMenuActionGenerateReport:
 		return m.activateSyncReportsGenerateReport()
 	case syncReportsMenuActionGenerateDiagnostic:
@@ -284,40 +286,40 @@ func (m *Model) moveSyncReportsMenuSelection(step int, items []component.MenuIte
 // Authored by: OpenCode
 func (m *Model) generateDiagnosticReport() (tea.Model, tea.Cmd) {
 	var request = m.result.Outcome.Diagnostic.Request
-	var useSyncReportsContext = m.active == syncReportsMenuScreenKey
-	if useSyncReportsContext {
+	switch m.active {
+	case syncReportsMenuScreenKey:
 		request = m.syncReports.SyncResult.Outcome.Diagnostic.Request
-	} else if m.active == reportResultScreenKey {
+	case reportResultScreenKey:
 		request = m.syncReports.ReportResult.Diagnostic.Request
 	}
 	if request.ServerOrigin == "" && m.currentConfig != nil {
 		request.ServerOrigin = m.currentConfig.ServerOrigin
 	}
 	if request.Attempt.AttemptID == "" {
-		if useSyncReportsContext {
+		switch m.active {
+		case syncReportsMenuScreenKey:
 			request.Attempt = m.syncReports.SyncResult.Outcome.Attempt
-		} else if m.active == reportResultScreenKey {
+		case reportResultScreenKey:
 			request.Attempt = m.syncReports.ReportResult.Attempt
-		} else {
+		default:
 			request.Attempt = m.result.Outcome.Attempt
 		}
 	}
-	if useSyncReportsContext {
+	switch m.active {
+	case syncReportsMenuScreenKey:
 		m.syncReports.SyncResult.Outcome.Diagnostic.Request = request
 		m.syncReports.SyncResult.Busy = true
 		m.syncReports.SyncResult.StatusMessage = "Generating diagnostic report..."
 		m.sync.MenuIndex = m.syncReportsDefaultMenuIndex()
-	} else {
-		if m.active == reportResultScreenKey {
-			m.syncReports.ReportResult.Diagnostic.Request = request
-			m.report.Busy = true
-			m.syncReports.ReportResult.Diagnostic.GenerationMessage = "Generating diagnostic report..."
-			m.refreshReportResultViewport(false)
-		} else {
-			m.result.Outcome.Diagnostic.Request = request
-			m.result.Busy = true
-			m.result.StatusMessage = "Generating diagnostic report..."
-		}
+	case reportResultScreenKey:
+		m.syncReports.ReportResult.Diagnostic.Request = request
+		m.report.Busy = true
+		m.syncReports.ReportResult.Diagnostic.GenerationMessage = "Generating diagnostic report..."
+		m.refreshReportResultViewport(false)
+	default:
+		m.result.Outcome.Diagnostic.Request = request
+		m.result.Busy = true
+		m.result.StatusMessage = "Generating diagnostic report..."
 	}
 	return m, m.generateDiagnosticReportCmd(request)
 }

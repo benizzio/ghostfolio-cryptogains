@@ -26,6 +26,29 @@ import (
 	"github.com/cockroachdb/apd/v3"
 )
 
+// TestReportOutputCleanupOnlyFailureDetails verifies save failures whose
+// cleanup error did not leave a residual path and the diagnostic error text.
+// Authored by: OpenCode
+func TestReportOutputCleanupOnlyFailureDetails(t *testing.T) {
+	t.Parallel()
+
+	var message = reportWriteFailureMessage(
+		ReportFailureReportFileWriteFailed,
+		errors.New("write failed"),
+		nil,
+		nil,
+		true,
+	)
+	if !strings.Contains(message, "additional close or removal error") {
+		t.Fatalf("expected cleanup-only failure guidance, got %q", message)
+	}
+
+	var diagnosticErr = reportWriteDiagnosticError(ReportFailureReportFileWriteFailed, errors.New("write failed"), nil)
+	if diagnosticErr.Error() != "could not save the report file" {
+		t.Fatalf("unexpected diagnostic error text: %q", diagnosticErr.Error())
+	}
+}
+
 // TestReportServiceGenerateCoversAvailabilityAndPersistenceOutcomes verifies
 // runtime report-service classification, success, and opener-warning behavior.
 // Authored by: OpenCode

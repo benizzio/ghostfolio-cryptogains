@@ -217,10 +217,10 @@ func TestModelInitAndHelpers(t *testing.T) {
 	if model.syncReports.ReportResult.Success || model.syncReports.ReportResult.Message != "" || model.syncReports.ReportResult.FailureReason != runtime.ReportFailureNone || model.syncReports.ReportResult.Request != (reportmodel.ReportRequest{}) || model.syncReports.ReportResult.OutputFile != (reportmodel.ReportOutputFile{}) || model.syncReports.ReportResult.Attempt != (runtime.SyncAttempt{}) || model.syncReports.ReportResult.Diagnostic.Eligible || model.syncReports.ReportResult.Diagnostic.Path != "" || model.syncReports.ReportResult.Diagnostic.GenerationMessage != "" {
 		t.Fatalf("expected main menu entry to clear sync and reports report scratch state")
 	}
-	_ = model.enterSetup("invalid", bootstrap.SetupRequirementNone)
+	model.enterSetup("invalid")
 	_ = model.enterSyncReportsUnlock()
 	_ = model.enterSync()
-	_ = model.enterSyncWithContextToken()
+	model.enterSyncWithContextToken()
 	_ = model.selectedSetupOrigin()
 	_ = model.setupCanSave()
 	if reportMethodForIndex(-1) != "" {

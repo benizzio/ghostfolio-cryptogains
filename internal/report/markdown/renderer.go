@@ -77,18 +77,7 @@ func markdownReportIdentifiers(report reportmodel.CapitalGainsReport) []string {
 	for _, entry := range report.ReferenceEntries {
 		identifiers = append(identifiers, entry.AssetIdentityKey, entry.DisplayLabel)
 	}
-	for _, section := range report.DetailSections {
-		identifiers = append(identifiers, section.AssetIdentityKey, section.DisplayLabel)
-		for _, row := range section.ActivityRows {
-			identifiers = append(identifiers, row.SourceID)
-		}
-		for _, liquidation := range section.LiquidationSummaries {
-			identifiers = append(identifiers, liquidation.SourceID)
-			for _, match := range liquidation.Matches {
-				identifiers = append(identifiers, match.AcquisitionSourceID)
-			}
-		}
-	}
+	identifiers = appendMarkdownDetailIdentifiers(identifiers, report.DetailSections)
 	for _, section := range report.AuditAnnex.PerAssetAuditSections {
 		identifiers = append(identifiers, section.AssetIdentityKey, section.DisplayLabel)
 		for _, entry := range section.Entries {
@@ -99,6 +88,25 @@ func markdownReportIdentifiers(report reportmodel.CapitalGainsReport) []string {
 		identifiers = append(identifiers, entry.SourceID, entry.AssetLabel)
 		for _, amount := range entry.Amounts {
 			identifiers = append(identifiers, amount.SourceID)
+		}
+	}
+	return identifiers
+}
+
+// appendMarkdownDetailIdentifiers collects identifiers from detailed activity
+// and liquidation rows for renderer error redaction.
+// Authored by: OpenCode
+func appendMarkdownDetailIdentifiers(identifiers []string, sections []reportmodel.AssetDetailSection) []string {
+	for _, section := range sections {
+		identifiers = append(identifiers, section.AssetIdentityKey, section.DisplayLabel)
+		for _, row := range section.ActivityRows {
+			identifiers = append(identifiers, row.SourceID)
+		}
+		for _, liquidation := range section.LiquidationSummaries {
+			identifiers = append(identifiers, liquidation.SourceID)
+			for _, match := range liquidation.Matches {
+				identifiers = append(identifiers, match.AcquisitionSourceID)
+			}
 		}
 	}
 	return identifiers

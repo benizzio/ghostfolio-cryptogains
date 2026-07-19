@@ -188,49 +188,42 @@ func TestRendererInternalErrorBranches(t *testing.T) {
 		}
 	})
 
-	t.Run("activity row invalid optional decimal", func(t *testing.T) {
-		var builder strings.Builder
-		var invalid apd.Decimal
-		invalid.Form = apd.Infinite
-
-		var err = writeActivityBlock(&builder, reportmodel.AssetDetailSection{
-			ActivityRows: []reportmodel.AssetActivityRow{{
-				SourceID:            "row-1",
+	var invalidOptionalDecimalCases = []struct {
+		name          string
+		sourceID      string
+		expectedStage string
+		useGrossValue bool
+	}{
+		{name: "activity row invalid optional decimal", sourceID: "row-1", expectedStage: "render activity gross value", useGrossValue: true},
+		{name: "activity row invalid optional unit price", sourceID: "row-unit-price", expectedStage: "render activity unit price"},
+	}
+	for _, testCase := range invalidOptionalDecimalCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			var builder strings.Builder
+			var invalid apd.Decimal
+			invalid.Form = apd.Infinite
+			var row = reportmodel.AssetActivityRow{
+				SourceID:            testCase.sourceID,
 				OccurredAt:          time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
 				ActivityType:        reportmodel.ActivityTypeBuy,
 				Quantity:            *apd.New(1, 0),
-				GrossValue:          &invalid,
 				BasisAfterRow:       *apd.New(1, 0),
 				CalculationCurrency: "USD",
 				QuantityAfterRow:    *apd.New(1, 0),
-			}},
-		})
-		if err == nil || !strings.Contains(err.Error(), `render activity row 1: render activity gross value`) || strings.Contains(err.Error(), "row-1") {
-			t.Fatalf("expected wrapped activity-row error, got %v", err)
-		}
-	})
+			}
+			if testCase.useGrossValue {
+				row.GrossValue = &invalid
+			} else {
+				row.UnitPrice = &invalid
+			}
 
-	t.Run("activity row invalid optional unit price", func(t *testing.T) {
-		var builder strings.Builder
-		var invalid apd.Decimal
-		invalid.Form = apd.Infinite
-
-		var err = writeActivityBlock(&builder, reportmodel.AssetDetailSection{
-			ActivityRows: []reportmodel.AssetActivityRow{{
-				SourceID:            "row-unit-price",
-				OccurredAt:          time.Date(2026, time.May, 21, 10, 0, 0, 0, time.UTC),
-				ActivityType:        reportmodel.ActivityTypeBuy,
-				Quantity:            *apd.New(1, 0),
-				UnitPrice:           &invalid,
-				BasisAfterRow:       *apd.New(1, 0),
-				CalculationCurrency: "USD",
-				QuantityAfterRow:    *apd.New(1, 0),
-			}},
+			var err = writeActivityBlock(&builder, reportmodel.AssetDetailSection{ActivityRows: []reportmodel.AssetActivityRow{row}})
+			var expectedError = "render activity row 1: " + testCase.expectedStage
+			if err == nil || !strings.Contains(err.Error(), expectedError) || strings.Contains(err.Error(), testCase.sourceID) {
+				t.Fatalf("expected wrapped activity-row error, got %v", err)
+			}
 		})
-		if err == nil || !strings.Contains(err.Error(), `render activity row 1: render activity unit price`) || strings.Contains(err.Error(), "row-unit-price") {
-			t.Fatalf("expected wrapped activity-row unit-price error, got %v", err)
-		}
-	})
+	}
 
 	t.Run("liquidation invalid decimal", func(t *testing.T) {
 		var builder strings.Builder

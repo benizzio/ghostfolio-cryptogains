@@ -53,6 +53,7 @@ var statPath = os.Stat
 // write failures safely.
 // Authored by: OpenCode
 var openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+	// #nosec G304 -- path is the validated, collision-safe report destination supplied to this filesystem seam.
 	var file, err = os.OpenFile(path, flag, perm)
 	if err != nil {
 		return nil, err
@@ -79,6 +80,7 @@ var currentTime = time.Now
 // runOpenCommand starts one opener subprocess for the provided command.
 // Authored by: OpenCode
 var runOpenCommand = func(command OpenCommand) error {
+	// #nosec G204 -- command is the platform-specific opener selected by the validated post-save opener seam.
 	var process = exec.Command(command.Name, command.Args...)
 	return process.Run()
 }
@@ -130,6 +132,7 @@ func installWriteFailureAfterCreateForTesting(writeErr error) func() {
 
 	var previousOpenWritableFile = openWritableFile
 	openWritableFile = func(path string, flag int, perm os.FileMode) (writeSyncCloser, error) {
+		// #nosec G304 -- path is the validated report destination passed through this deterministic test seam.
 		var file, err = os.OpenFile(path, flag, perm)
 		if err != nil {
 			return nil, err

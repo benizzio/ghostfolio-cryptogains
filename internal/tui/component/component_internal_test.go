@@ -65,6 +65,23 @@ func TestContentWidthForScreenClampsPaddingBoundary(t *testing.T) {
 	}
 }
 
+// TestScreenBodyContentSizeClampsDimensions verifies fallback terminal
+// dimensions and the minimum usable body height.
+// Authored by: OpenCode
+func TestScreenBodyContentSizeClampsDimensions(t *testing.T) {
+	t.Parallel()
+
+	var width, height = ScreenBodyContentSize(DefaultTheme(), 0, 0, "Title", "Subtitle", "Status", "Footer")
+	if width != ContentWidthForScreen(100) || height < 1 {
+		t.Fatalf("unexpected fallback body size: width=%d height=%d", width, height)
+	}
+
+	_, height = ScreenBodyContentSize(DefaultTheme(), 1, 1, "Title", "Subtitle", "Status", "Footer")
+	if height != 1 {
+		t.Fatalf("expected body height to clamp to one, got %d", height)
+	}
+}
+
 // TestReportCleartextExportCopyCoversDisclosureAndDeletion verifies the shared
 // result-screen copy required for explicit report exports.
 // Authored by: OpenCode

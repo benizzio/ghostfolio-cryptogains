@@ -1,6 +1,8 @@
 package pdf
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/signintech/gopdf"
@@ -70,4 +72,49 @@ func TestGopdfDocumentTablePreflightEdgeBranches(t *testing.T) {
 			Rows:    [][]string{{"row"}},
 		})
 	}, "table row height")
+}
+
+// TestGopdfDocumentTableRowGuards verifies current-page capacity, positive
+// fixed-row capacity, and data-row drawing failure propagation.
+// Authored by: OpenCode
+func TestGopdfDocumentTableRowGuards(t *testing.T) {
+	var document = startedTestDocument(t)
+	if capacity := document.tableRowCapacityAt(pageMargin, 24); capacity <= 0 {
+		t.Fatalf("positive row capacity = %d, want greater than zero", capacity)
+	}
+
+	document.y = pageBottom
+	var err = document.addTableRows(
+		pdfTable{Rows: [][]string{{"row"}}},
+		[]pdfColumn{{Header: "Entry", Width: 100, Align: "left"}},
+		[]float64{24},
+		24,
+	)
+	if err == nil || !strings.Contains(err.Error(), "current page") {
+		t.Fatalf("current-page capacity error = %v", err)
+	}
+
+	var previousDrawer = drawTableForGopdfDocument
+	defer func() { drawTableForGopdfDocument = previousDrawer }()
+	var drawCalls int
+	drawTableForGopdfDocument = func(gopdf.TableLayout) error {
+		drawCalls++
+		if drawCalls == 2 {
+			return errors.New("data row draw failed")
+		}
+		return nil
+	}
+	document = startedTestDocument(t)
+	err = document.drawTableChunk(
+		pdfTable{},
+		[]pdfColumn{{Header: "Entry", Width: 100, Align: "left"}},
+		[][]string{{"row"}},
+		[]float64{24},
+		24,
+		0,
+		false,
+	)
+	if err == nil || !strings.Contains(err.Error(), "data row draw failed") {
+		t.Fatalf("data-row drawing error = %v", err)
+	}
 }

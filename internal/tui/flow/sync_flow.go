@@ -11,7 +11,6 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/benizzio/ghostfolio-cryptogains/internal/app/bootstrap"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/app/runtime"
 	"github.com/benizzio/ghostfolio-cryptogains/internal/tui/component"
 )
@@ -260,7 +259,8 @@ func (m *Model) syncPrimaryMenuAction() menuActionID {
 // Authored by: OpenCode
 func (m *Model) startSync() (tea.Model, tea.Cmd) {
 	if m.currentConfig == nil {
-		return m, m.enterSetup("Complete setup before Sync Data can run.", bootstrap.SetupRequirementNone)
+		m.enterSetup("Complete setup before Sync Data can run.")
+		return m, nil
 	}
 
 	var token string
@@ -293,7 +293,8 @@ func (m *Model) startSync() (tea.Model, tea.Cmd) {
 // Authored by: OpenCode
 func (m *Model) unlockSyncReportsContext() (tea.Model, tea.Cmd) {
 	if m.currentConfig == nil {
-		return m, m.enterSetup("Complete setup before Sync and Reports can run.", bootstrap.SetupRequirementNone)
+		m.enterSetup("Complete setup before Sync and Reports can run.")
+		return m, nil
 	}
 
 	var token = strings.TrimSpace(m.sync.TokenInput.Value())
@@ -314,7 +315,8 @@ func (m *Model) unlockSyncReportsContext() (tea.Model, tea.Cmd) {
 		m.sync.MenuIndex = 1
 		return m, nil
 	}
-	return m, m.enterSyncReportsMenu(unlocked, token)
+	m.enterSyncReportsMenu(unlocked, token)
+	return m, nil
 }
 
 // startSyncAttempt starts one async sync request.

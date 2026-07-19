@@ -121,6 +121,14 @@ func TestDeterministicCleanupRemovalFailureError(t *testing.T) {
 	if err := deterministicCleanupRemovalFailureError(); err == nil || err.Error() != "cleanup removal failed" {
 		t.Fatalf("expected trimmed cleanup removal failure, got %v", err)
 	}
+	if err := removePath("unused"); err == nil || err.Error() != "cleanup removal failed" {
+		t.Fatalf("expected removal seam to return configured cleanup failure, got %v", err)
+	}
+
+	var cleanupErrors, residual = cleanupReservedReportFile(reservedReportFile{})
+	if len(cleanupErrors) != 0 || residual {
+		t.Fatalf("expected empty reservation cleanup to be a no-op, got errors=%v residual=%t", cleanupErrors, residual)
+	}
 }
 
 // TestWrapDeterministicWriteFailure verifies both the passthrough and injected
@@ -134,6 +142,7 @@ func TestWrapDeterministicWriteFailure(t *testing.T) {
 
 	var fixtureDir = t.TempDir()
 	var plainPath = filepath.Join(fixtureDir, "plain.md")
+	// #nosec G304 -- plainPath is constructed entirely within this test-owned temporary directory.
 	var plainFile, err = os.OpenFile(plainPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		t.Fatalf("open plain fixture file: %v", err)
@@ -151,6 +160,7 @@ func TestWrapDeterministicWriteFailure(t *testing.T) {
 	}
 
 	var failingPath = filepath.Join(fixtureDir, "failing.md")
+	// #nosec G304 -- failingPath is constructed entirely within this test-owned temporary directory.
 	var failingFile, failingErr = os.OpenFile(failingPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if failingErr != nil {
 		t.Fatalf("open failing fixture file: %v", failingErr)
