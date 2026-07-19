@@ -1,8 +1,9 @@
+# Co-authored by: OpenCode and benizzio
 GO ?= go
-GOCOVERAGEPLUS ?= $(GO) run github.com/Fabianexe/gocoverageplus@v1.2.0
-GOLANGCI_LINT ?= golangci-lint
-GOVULNCHECK ?= $(GO) run golang.org/x/vuln/cmd/govulncheck@v1.5.0
-GITLEAKS ?= $(GO) run github.com/zricethezav/gitleaks/v8@v8.30.1
+GOCOVERAGEPLUS ?= $(GO) tool gocoverageplus
+GOLANGCI_LINT ?= $(GO) tool golangci-lint
+GOVULNCHECK ?= $(GO) tool govulncheck
+GITLEAKS ?= $(GO) tool gitleaks
 QUALITY_BASE_REF ?= origin/main
 ARGS ?=
 PRODUCTION_PACKAGES = $(shell $(GO) run ./tools/coverpkg -go $(GO) ./cmd/... ./internal/...)

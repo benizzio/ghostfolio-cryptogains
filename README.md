@@ -80,6 +80,16 @@ Empirical data and golden oracle fixtures live under `testdata/empirical/`; ordi
 `.github/workflows/test.yml` invokes the reusable test-suite workflow. Its check names are `test / run`, `coverage / run`, and `test-performance / run`; the separate changed-source check is `quality`. These checks run independently on fresh Ubuntu runners, and none runs external integration.
 `make quality` runs the changed-source quality gate for `*.go`, `go.mod`, and `go.sum` changes using `golangci-lint`, `govulncheck`, and `gitleaks`. It must pass for every feature, including the explicit skip path when no source inputs changed.
 
+## Dependency Maintenance
+
+Dependabot checks the root Go module and GitHub Actions weekly. The Go module includes the application dependencies and the quality and coverage commands declared by `tool` directives in `go.mod`. Dependency and action update pull requests must pass the existing `test / run`, `coverage / run`, `test-performance / run`, and `quality` checks.
+
+Dependabot vulnerability alerts and automatic security-update pull requests require the repository dependency graph, Dependabot alerts, and Dependabot security updates to be enabled in GitHub repository settings.
+
+Go language updates remain manual because Dependabot does not update the `go` directive in `go.mod`. To update Go, run `go get go@latest`, run `go mod tidy` and `go mod verify`, review all resulting dependency and tool changes, then run `make test`, `make coverage`, `make test-performance`, and `make quality QUALITY_BASE_REF=origin/main`.
+
+The pinned rotki archive and generated empirical fixtures remain a separate empirical-oracle maintenance boundary. Spec Kit and repository-local Spec Kit extension versions remain managed by their own installation and update process.
+
 ## Local Storage And User Exports
 
 Bootstrap setup stays in a single machine-local JSON file named `setup.json`.
