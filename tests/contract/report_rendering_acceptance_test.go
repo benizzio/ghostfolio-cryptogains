@@ -124,6 +124,51 @@ func TestRenderingAcceptanceAccountingRejectsUnverifiedOccurrences(t *testing.T)
 	}
 }
 
+// TestRenderingAcceptancePDFWarningRejectsInvalidSequences proves duplicate,
+// partially regular, and misplaced complete warnings cannot earn W credit.
+// Authored by: OpenCode
+func TestRenderingAcceptancePDFWarningRejectsInvalidSequences(t *testing.T) {
+	var acceptanceCase = testutil.DeterministicReportPresentationAcceptanceFixture().Cases[0]
+	var occurrence = reportPresentationOccurrenceForFormat(acceptanceCase, testutil.ReportPresentationFormatPDF, testutil.ReportPresentationPopulationWarning)
+	var warningFragments = []testutil.PDFTextRun{
+		{Text: "The data in this report does not follow any legally required rules", FontResource: "F2"},
+		{Text: "for any country's tax returns and is for reference only.", FontResource: "F2"},
+	}
+	var valid = []testutil.PDFTextRun{
+		{Text: "Ghostfolio Capital Gains And Losses Report", FontResource: "F2"},
+		{Text: "Report Calculation Currency:", FontResource: "F1"},
+		{Text: "EUR", FontResource: "F1"},
+	}
+	valid = append(valid, warningFragments...)
+	valid = append(valid, testutil.PDFTextRun{Text: "Gains-And-Losses Summary", FontResource: "F2"})
+
+	var duplicate = append([]testutil.PDFTextRun(nil), valid[:len(valid)-1]...)
+	duplicate = append(duplicate, warningFragments...)
+	duplicate = append(duplicate, valid[len(valid)-1])
+	var nonBold = append([]testutil.PDFTextRun(nil), valid...)
+	nonBold[4].FontResource = "F1"
+	var misplaced = append([]testutil.PDFTextRun(nil), valid...)
+	misplaced[1], misplaced[3] = misplaced[3], misplaced[1]
+	misplaced[2], misplaced[4] = misplaced[4], misplaced[2]
+
+	for name, runs := range map[string][]testutil.PDFTextRun{
+		"duplicate": duplicate,
+		"non-bold":  nonBold,
+		"misplaced": misplaced,
+	} {
+		t.Run(name, func(t *testing.T) {
+			var observed = make(map[string]string)
+			var err = recordRenderingAcceptancePDFWarningObservation(observed, acceptanceCase, occurrence, "EUR", testutil.GeneratedPDF{TextRuns: runs})
+			if err == nil {
+				t.Fatal("invalid PDF warning sequence was accepted")
+			}
+			if len(observed) != 0 {
+				t.Fatal("invalid PDF warning sequence earned W credit")
+			}
+		})
+	}
+}
+
 // newRenderingAcceptanceAccounting creates independent expected and observed
 // semantic-key sets so missing, extra, and empty populations are distinguishable.
 // Authored by: OpenCode
@@ -395,26 +440,35 @@ func validateRenderingAcceptanceMarkdownControls(acceptanceCase testutil.ReportP
 	}
 	var main = string(documents[0].Content)
 	var annex = string(documents[1].Content)
-	if strings.Count(main, testutil.ReportPresentationLegalWarningText) != 1 || strings.Contains(annex, testutil.ReportPresentationLegalWarningText) {
+	var boldWarning = "**" + testutil.ReportPresentationLegalWarningText + "**"
+	var metadataIndex = strings.Index(main, "- **Report Calculation Currency:** "+report.ReportCalculationCurrency)
+	var warningIndex = strings.Index(main, "\n"+boldWarning+"\n")
+	var summaryIndex = strings.Index(main, "## Gains-And-Losses Summary")
+	if strings.Count(main, testutil.ReportPresentationLegalWarningText) != 1 || strings.Count(main, boldWarning) != 1 || strings.Contains(annex, testutil.ReportPresentationLegalWarningText) || metadataIndex < 0 || warningIndex <= metadataIndex || summaryIndex <= warningIndex {
 		return observed, fmt.Errorf("warning occurrence or Annex exclusion is invalid")
 	}
 	if err := recordRenderingAcceptanceObservation(observed, acceptanceCase, reportPresentationOccurrenceForFormat(acceptanceCase, testutil.ReportPresentationFormatMarkdown, testutil.ReportPresentationPopulationWarning), testutil.ReportPresentationLegalWarningText, testutil.ReportPresentationLegalWarningText); err != nil {
 		return observed, err
 	}
 	for _, occurrence := range acceptanceCase.OccurrenceKeys {
-		if (occurrence.Format != testutil.ReportPresentationFormatMarkdown && (occurrence.Population != testutil.ReportPresentationPopulationParity || !isRenderingAcceptanceRateMetadataField(occurrence.FieldName))) || occurrence.Population == testutil.ReportPresentationPopulationWarning || occurrence.Population == testutil.ReportPresentationPopulationModelIntegrity || (occurrence.Population == testutil.ReportPresentationPopulationParity && !isRenderingAcceptanceRateMetadataField(occurrence.FieldName)) {
+		var parityControl = occurrence.Population == testutil.ReportPresentationPopulationParity && (isRenderingAcceptanceRateMetadataField(occurrence.FieldName) || isRenderingAcceptanceAbsentNullableField(acceptanceCase, occurrence.FieldName))
+		if (occurrence.Format != testutil.ReportPresentationFormatMarkdown && !parityControl) || occurrence.Population == testutil.ReportPresentationPopulationWarning || occurrence.Population == testutil.ReportPresentationPopulationModelIntegrity || (occurrence.Population == testutil.ReportPresentationPopulationParity && !parityControl) {
 			continue
 		}
 		var expected, err = renderingAcceptanceExpectedValue(acceptanceCase, report, occurrence)
 		if err != nil {
 			return observed, err
 		}
-		var actual, found = renderingAcceptanceMarkdownValue(acceptanceCase, report, occurrence, main, annex)
+		var lookup = occurrence
+		if occurrence.Population == testutil.ReportPresentationPopulationParity && isRenderingAcceptanceAbsentNullableField(acceptanceCase, occurrence.FieldName) {
+			lookup.Population = testutil.ReportPresentationPopulationVisibleFinancial
+		}
+		var actual, found = renderingAcceptanceMarkdownValue(acceptanceCase, report, lookup, main, annex)
 		if !found {
 			return observed, fmt.Errorf("Markdown occurrence %q is missing", renderingAcceptanceOccurrenceKey(occurrence))
 		}
 		var concrete = occurrence
-		if occurrence.Population == testutil.ReportPresentationPopulationParity && isRenderingAcceptanceRateMetadataField(occurrence.FieldName) {
+		if occurrence.Population == testutil.ReportPresentationPopulationParity {
 			concrete.Format = testutil.ReportPresentationFormatMarkdown
 			concrete.DocumentRole = reportPresentationDocumentRoleForParity(occurrence.DocumentRole, testutil.ReportPresentationFormatMarkdown)
 		}
@@ -431,27 +485,29 @@ func validateRenderingAcceptanceMarkdownControls(acceptanceCase testutil.ReportP
 // Authored by: OpenCode
 func validateRenderingAcceptancePDFControls(acceptanceCase testutil.ReportPresentationAcceptanceCase, report reportmodel.CapitalGainsReport, inspection testutil.GeneratedPDF) (map[string]string, error) {
 	var observed = make(map[string]string)
-	if !inspection.ContainsSearchableText(testutil.ReportPresentationLegalWarningText) {
-		return observed, fmt.Errorf("PDF warning is not searchable")
-	}
 	var warning = reportPresentationOccurrenceForFormat(acceptanceCase, testutil.ReportPresentationFormatPDF, testutil.ReportPresentationPopulationWarning)
-	if err := recordRenderingAcceptanceObservation(observed, acceptanceCase, warning, testutil.ReportPresentationLegalWarningText, testutil.ReportPresentationLegalWarningText); err != nil {
+	if err := recordRenderingAcceptancePDFWarningObservation(observed, acceptanceCase, warning, report.ReportCalculationCurrency, inspection); err != nil {
 		return observed, err
 	}
 	for _, occurrence := range acceptanceCase.OccurrenceKeys {
-		if (occurrence.Format != testutil.ReportPresentationFormatPDF && (occurrence.Population != testutil.ReportPresentationPopulationParity || !isRenderingAcceptanceRateMetadataField(occurrence.FieldName))) || occurrence.Population == testutil.ReportPresentationPopulationWarning || occurrence.Population == testutil.ReportPresentationPopulationModelIntegrity || (occurrence.Population == testutil.ReportPresentationPopulationParity && !isRenderingAcceptanceRateMetadataField(occurrence.FieldName)) {
+		var parityControl = occurrence.Population == testutil.ReportPresentationPopulationParity && (isRenderingAcceptanceRateMetadataField(occurrence.FieldName) || isRenderingAcceptanceAbsentNullableField(acceptanceCase, occurrence.FieldName))
+		if (occurrence.Format != testutil.ReportPresentationFormatPDF && !parityControl) || occurrence.Population == testutil.ReportPresentationPopulationWarning || occurrence.Population == testutil.ReportPresentationPopulationModelIntegrity || (occurrence.Population == testutil.ReportPresentationPopulationParity && !parityControl) {
 			continue
 		}
 		var expected, err = renderingAcceptanceExpectedValue(acceptanceCase, report, occurrence)
 		if err != nil {
 			return observed, err
 		}
-		var actual, found = renderingAcceptancePDFValue(acceptanceCase, report, occurrence, inspection)
+		var lookup = occurrence
+		if occurrence.Population == testutil.ReportPresentationPopulationParity && isRenderingAcceptanceAbsentNullableField(acceptanceCase, occurrence.FieldName) {
+			lookup.Population = testutil.ReportPresentationPopulationVisibleFinancial
+		}
+		var actual, found = renderingAcceptancePDFValue(acceptanceCase, report, lookup, inspection)
 		if !found {
 			return observed, fmt.Errorf("PDF occurrence %q is missing", renderingAcceptanceOccurrenceKey(occurrence))
 		}
 		var concrete = occurrence
-		if occurrence.Population == testutil.ReportPresentationPopulationParity && isRenderingAcceptanceRateMetadataField(occurrence.FieldName) {
+		if occurrence.Population == testutil.ReportPresentationPopulationParity {
 			concrete.Format = testutil.ReportPresentationFormatPDF
 			concrete.DocumentRole = reportPresentationDocumentRoleForParity(occurrence.DocumentRole, testutil.ReportPresentationFormatPDF)
 		}
@@ -461,6 +517,77 @@ func validateRenderingAcceptancePDFControls(acceptanceCase testutil.ReportPresen
 	}
 	addRenderingAcceptanceFormatParityObservations(observed, acceptanceCase, testutil.ReportPresentationFormatPDF)
 	return observed, nil
+}
+
+// renderingAcceptancePDFRunSequence identifies one complete logical phrase in
+// ordered PDF text runs, including all width-wrapped fragments.
+// Authored by: OpenCode
+type renderingAcceptancePDFRunSequence struct {
+	start int
+	end   int
+	runs  []testutil.PDFTextRun
+}
+
+// recordRenderingAcceptancePDFWarningObservation credits W only after the sole
+// complete sequence is fully bold and lies between complete metadata and summary
+// sequences.
+// Authored by: OpenCode
+func recordRenderingAcceptancePDFWarningObservation(observed map[string]string, acceptanceCase testutil.ReportPresentationAcceptanceCase, occurrence testutil.ReportPresentationOccurrenceKey, currency string, inspection testutil.GeneratedPDF) error {
+	var warningSequences = renderingAcceptancePDFRunSequences(inspection.TextRuns, testutil.ReportPresentationLegalWarningText)
+	if len(warningSequences) != 1 {
+		return fmt.Errorf("PDF complete warning sequence count = %d, want 1", len(warningSequences))
+	}
+	var boldResource string
+	for _, run := range inspection.TextRuns {
+		if renderingAcceptancePDFText(run.Text) == "Ghostfolio Capital Gains And Losses Report" {
+			boldResource = run.FontResource
+			break
+		}
+	}
+	if boldResource == "" {
+		return fmt.Errorf("PDF embedded bold font resource is not identifiable")
+	}
+	var warningSequence = warningSequences[0]
+	for _, fragment := range warningSequence.runs {
+		if fragment.FontResource != boldResource {
+			return fmt.Errorf("PDF warning fragment %q uses font %q, want %q", fragment.Text, fragment.FontResource, boldResource)
+		}
+	}
+	var metadataSequences = renderingAcceptancePDFRunSequences(inspection.TextRuns, "Report Calculation Currency: "+currency)
+	var summarySequences = renderingAcceptancePDFRunSequences(inspection.TextRuns, "Gains-And-Losses Summary")
+	if len(metadataSequences) != 1 || len(summarySequences) == 0 || metadataSequences[0].end >= warningSequence.start || summarySequences[0].start <= warningSequence.end {
+		return fmt.Errorf("PDF warning is not after metadata and before summary")
+	}
+	return recordRenderingAcceptanceObservation(observed, acceptanceCase, occurrence, testutil.ReportPresentationLegalWarningText, testutil.ReportPresentationLegalWarningText)
+}
+
+// renderingAcceptancePDFRunSequences returns every complete contiguous logical
+// phrase from the ordered run stream rather than stopping at the first match.
+// Authored by: OpenCode
+func renderingAcceptancePDFRunSequences(runs []testutil.PDFTextRun, target string) []renderingAcceptancePDFRunSequence {
+	var normalizedTarget = renderingAcceptancePDFText(target)
+	var sequences []renderingAcceptancePDFRunSequence
+	for start := range runs {
+		var joined string
+		for end := start; end < len(runs); end++ {
+			joined = renderingAcceptancePDFText(joined + " " + runs[end].Text)
+			if joined == normalizedTarget {
+				sequences = append(sequences, renderingAcceptancePDFRunSequence{start: start, end: end, runs: append([]testutil.PDFTextRun(nil), runs[start:end+1]...)})
+				break
+			}
+			if !strings.HasPrefix(normalizedTarget, joined) {
+				break
+			}
+		}
+	}
+	return sequences
+}
+
+// renderingAcceptancePDFText normalizes only layout whitespace while retaining
+// warning punctuation and complete words.
+// Authored by: OpenCode
+func renderingAcceptancePDFText(value string) string {
+	return strings.Join(strings.Fields(value), " ")
 }
 
 // reportPresentationOccurrenceForFormat finds the single warning or model key
@@ -526,6 +653,9 @@ func renderingAcceptanceExpectedValue(acceptanceCase testutil.ReportPresentation
 		}
 		if acceptanceCase.Omitted && occurrence.FieldName == "per_asset_net_gain_or_loss" {
 			return "<omitted>", nil
+		}
+		if isRenderingAcceptanceAbsentNullableField(acceptanceCase, occurrence.FieldName) {
+			return "", nil
 		}
 	}
 	switch occurrence.Population {
@@ -616,10 +746,19 @@ func canonicalAcceptanceDecimal(value apd.Decimal) string {
 // optional model fields while retaining required decimal fields in their rows.
 // Authored by: OpenCode
 func presentationFinancialFieldIsNullableForAcceptance(acceptanceCase testutil.ReportPresentationAcceptanceCase, fieldName string) bool {
-	if acceptanceCase.FinancialFieldClass == "liquidation-allocated-basis" || acceptanceCase.FinancialFieldClass == "liquidation-net-proceeds-gain-or-loss" {
-		return false
+	for _, field := range acceptanceCase.FinancialFields {
+		if field.Name == fieldName {
+			return field.Nullable
+		}
 	}
-	return fieldName == "unit_price" || fieldName == "gross_value" || fieldName == "fee_amount" || fieldName == "allocated_basis" || fieldName == "net_proceeds" || fieldName == "gain_or_loss"
+	return false
+}
+
+// isRenderingAcceptanceAbsentNullableField identifies blank fields retained for
+// applicability and parity evidence but excluded from V.
+// Authored by: OpenCode
+func isRenderingAcceptanceAbsentNullableField(acceptanceCase testutil.ReportPresentationAcceptanceCase, fieldName string) bool {
+	return acceptanceCase.Absent && presentationFinancialFieldIsNullableForAcceptance(acceptanceCase, fieldName)
 }
 
 // renderingAcceptanceFinancialValue returns one exact model amount for a
@@ -1833,8 +1972,8 @@ func renderingAcceptanceCloneReport(report reportmodel.CapitalGainsReport) (repo
 // Authored by: OpenCode
 func assertRenderingAcceptanceManifest(t *testing.T, manifest testutil.ReportPresentationAcceptanceManifest) {
 	t.Helper()
-	if len(manifest.Cases) != 148 || manifest.Counters.CaseCount != 148 {
-		t.Fatalf("closed acceptance case population A = %d/%d, want 148/148", len(manifest.Cases), manifest.Counters.CaseCount)
+	if len(manifest.Cases) != 146 || manifest.Counters.CaseCount != 146 {
+		t.Fatalf("closed acceptance case population A = %d/%d, want 146/146", len(manifest.Cases), manifest.Counters.CaseCount)
 	}
 	var IDs = make(map[string]struct{}, len(manifest.Cases))
 	for _, acceptanceCase := range manifest.Cases {
@@ -1870,17 +2009,17 @@ func assertRenderingAcceptanceManifest(t *testing.T, manifest testutil.ReportPre
 		}
 	}
 	var expectedCounters = testutil.ReportPresentationAcceptanceCounters{
-		CaseCount: 148,
+		CaseCount: 146,
 		Populations: map[testutil.ReportPresentationPopulation]int{
-			testutil.ReportPresentationPopulationWarning:            296,
-			testutil.ReportPresentationPopulationVisibleFinancial:   688,
-			testutil.ReportPresentationPopulationModelIntegrity:     296,
+			testutil.ReportPresentationPopulationWarning:            292,
+			testutil.ReportPresentationPopulationVisibleFinancial:   664,
+			testutil.ReportPresentationPopulationModelIntegrity:     292,
 			testutil.ReportPresentationPopulationQuantity:           80,
 			testutil.ReportPresentationPopulationBoolean:            16,
 			testutil.ReportPresentationPopulationClassifiedCurrency: 2,
 			testutil.ReportPresentationPopulationUnclassified:       4,
 			testutil.ReportPresentationPopulationConversionRow:      16,
-			testutil.ReportPresentationPopulationParity:             601,
+			testutil.ReportPresentationPopulationParity:             596,
 			testutil.ReportPresentationPopulationConvertedEntry:     24,
 		},
 	}
@@ -1893,7 +2032,7 @@ func assertRenderingAcceptanceManifest(t *testing.T, manifest testutil.ReportPre
 // schemas independently of the manifest's generated slice.
 // Authored by: OpenCode
 func renderingAcceptanceClosedCaseIDs() map[string]struct{} {
-	var IDs = make(map[string]struct{}, 148)
+	var IDs = make(map[string]struct{}, 146)
 	IDs["warning/wrapped"] = struct{}{}
 	var nonNegative = []string{"zero", "tiny-positive", "whole", "one-place", "two-place", "below-positive-tie", "positive-tie", "above-positive-tie", "positive-carry", "large-positive"}
 	var signedOnly = []string{"negative-whole", "negative-below-tie", "negative-tie", "negative-above-tie", "negative-carry", "signed-zero", "negative-tiny", "negative-zero-adjacent-tie", "large-negative"}
@@ -1906,8 +2045,8 @@ func renderingAcceptanceClosedCaseIDs() map[string]struct{} {
 		{id: "summary-net-gain-or-loss", signed: true, omitted: true},
 		{id: "position-cost-basis"},
 		{id: "in-year-activity", nullable: true},
-		{id: "liquidation-allocated-basis", nullable: true},
-		{id: "liquidation-net-proceeds-gain-or-loss", signed: true, nullable: true},
+		{id: "liquidation-allocated-basis"},
+		{id: "liquidation-net-proceeds-gain-or-loss", signed: true},
 		{id: "audit-activity", nullable: true},
 		{id: "audit-allocated-basis", nullable: true},
 		{id: "audit-net-proceeds-gain-or-loss", signed: true, nullable: true},

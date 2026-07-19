@@ -54,7 +54,7 @@ func newPresentationWarningCase() ReportPresentationAcceptanceCase {
 // every matrix row, nullable absent control, and inherited summary omission.
 // Authored by: OpenCode
 func newPresentationFinancialCases() []ReportPresentationAcceptanceCase {
-	var cases = make([]ReportPresentationAcceptanceCase, 0, 124)
+	var cases = make([]ReportPresentationAcceptanceCase, 0, 122)
 	for _, row := range presentationFinancialRows() {
 		var vectors = presentationNonNegativeVectors()
 		if row.Signed {
@@ -74,7 +74,7 @@ func newPresentationFinancialCases() []ReportPresentationAcceptanceCase {
 			appendPresentationFinancialOccurrences(&acceptanceCase, row)
 			cases = append(cases, acceptanceCase)
 		}
-		if row.Nullable {
+		if presentationFinancialRowHasNullableField(row) {
 			var absentCase = newPresentationCase(ReportPresentationAcceptanceCase{
 				ID:              "financial/" + row.ID + "/absent",
 				Kind:            ReportPresentationCaseKindFinancial,
@@ -104,6 +104,18 @@ func newPresentationFinancialCases() []ReportPresentationAcceptanceCase {
 		}
 	}
 	return cases
+}
+
+// presentationFinancialRowHasNullableField reports whether the matrix row can
+// carry a meaningful absent-value control.
+// Authored by: OpenCode
+func presentationFinancialRowHasNullableField(row presentationFinancialRow) bool {
+	for _, field := range row.Fields {
+		if field.Nullable {
+			return true
+		}
+	}
+	return false
 }
 
 // newPresentationQuantityCases creates the five FR-009 quantity controls.

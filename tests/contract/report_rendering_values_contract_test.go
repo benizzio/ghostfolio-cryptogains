@@ -28,15 +28,15 @@ func TestReportRenderingClosedManifestContract(t *testing.T) {
 	var manifest = testutil.DeterministicReportPresentationAcceptanceFixture()
 	var expectedCaseKinds = map[testutil.ReportPresentationCaseKind]int{
 		testutil.ReportPresentationCaseKindWarning:   1,
-		testutil.ReportPresentationCaseKindFinancial: 124,
+		testutil.ReportPresentationCaseKindFinancial: 122,
 		testutil.ReportPresentationCaseKindQuantity:  5,
 		testutil.ReportPresentationCaseKindRate:      5,
 		testutil.ReportPresentationCaseKindBoolean:   2,
 		testutil.ReportPresentationCaseKindCurrency:  3,
 		testutil.ReportPresentationCaseKindConverted: 8,
 	}
-	if len(manifest.Cases) != 148 {
-		t.Fatalf("closed acceptance case count = %d, want 148", len(manifest.Cases))
+	if len(manifest.Cases) != 146 {
+		t.Fatalf("closed acceptance case count = %d, want 146", len(manifest.Cases))
 	}
 
 	var caseIDs = make(map[string]bool, len(manifest.Cases))
@@ -60,17 +60,17 @@ func TestReportRenderingClosedManifestContract(t *testing.T) {
 	}
 
 	var expectedCounters = testutil.ReportPresentationAcceptanceCounters{
-		CaseCount: 148,
+		CaseCount: 146,
 		Populations: map[testutil.ReportPresentationPopulation]int{
-			testutil.ReportPresentationPopulationWarning:            296,
-			testutil.ReportPresentationPopulationVisibleFinancial:   688,
-			testutil.ReportPresentationPopulationModelIntegrity:     296,
+			testutil.ReportPresentationPopulationWarning:            292,
+			testutil.ReportPresentationPopulationVisibleFinancial:   664,
+			testutil.ReportPresentationPopulationModelIntegrity:     292,
 			testutil.ReportPresentationPopulationQuantity:           80,
 			testutil.ReportPresentationPopulationBoolean:            16,
 			testutil.ReportPresentationPopulationClassifiedCurrency: 2,
 			testutil.ReportPresentationPopulationUnclassified:       4,
 			testutil.ReportPresentationPopulationConversionRow:      16,
-			testutil.ReportPresentationPopulationParity:             601,
+			testutil.ReportPresentationPopulationParity:             596,
 			testutil.ReportPresentationPopulationConvertedEntry:     24,
 		},
 	}

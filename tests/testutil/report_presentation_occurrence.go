@@ -3,8 +3,8 @@ package testutil
 import "strconv"
 
 // appendPresentationFinancialOccurrences adds visible-field and parity keys for
-// one matrix case, retaining blank nullable rows and excluding only omitted
-// exact-zero summary occurrences from V.
+// one matrix case, retaining blank nullable rows for parity while adding only
+// present, visible financial values to V.
 // Authored by: OpenCode
 func appendPresentationFinancialOccurrences(acceptanceCase *ReportPresentationAcceptanceCase, row presentationFinancialRow) {
 	var documentRole = ReportPresentationDocumentRoleMain
@@ -13,7 +13,7 @@ func appendPresentationFinancialOccurrences(acceptanceCase *ReportPresentationAc
 	}
 	for _, field := range row.Fields {
 		var assetIdentity, sourceIdentity = presentationFinancialIdentity(row, field)
-		if !presentationFieldIsOmitted(*acceptanceCase, field.Name) {
+		if !presentationFieldIsOmitted(*acceptanceCase, field.Name) && (!acceptanceCase.Absent || !field.Nullable) {
 			acceptanceCase.OccurrenceKeys = append(acceptanceCase.OccurrenceKeys,
 				presentationOccurrence(ReportPresentationPopulationVisibleFinancial, acceptanceCase.ID, ReportPresentationFormatMarkdown, documentRole, row.Section, assetIdentity, sourceIdentity, field.Name, field.AmountKind, field.AmountOrdinal),
 				presentationOccurrence(ReportPresentationPopulationVisibleFinancial, acceptanceCase.ID, ReportPresentationFormatPDF, ReportPresentationDocumentRoleCombined, row.Section, assetIdentity, sourceIdentity, field.Name, field.AmountKind, field.AmountOrdinal),

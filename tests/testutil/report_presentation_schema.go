@@ -122,13 +122,15 @@ const (
 // ReportPresentationFinancialField describes one semantic financial field in a
 // matrix row, including its amount kind and ordinal within a repeated group.
 // Name identifies the visible field, AmountKind identifies the financial
-// presentation policy, and AmountOrdinal preserves the expected occurrence
-// order for repeated values.
+// presentation policy, AmountOrdinal preserves the expected occurrence order
+// for repeated values, and Nullable marks fields whose visible value can be
+// blank while the containing row remains applicable.
 // Authored by: OpenCode
 type ReportPresentationFinancialField struct {
 	Name          string
 	AmountKind    string
 	AmountOrdinal int
+	Nullable      bool
 }
 
 // ReportPresentationFormatAttempt describes one format attempt for an

@@ -7,7 +7,6 @@ type presentationFinancialRow struct {
 	Section         string
 	DocumentRole    ReportPresentationDocumentRole
 	Signed          bool
-	Nullable        bool
 	SummaryOmission bool
 	Fields          []ReportPresentationFinancialField
 }
@@ -42,11 +41,10 @@ func presentationFinancialRows() []presentationFinancialRow {
 			ID:           "in-year-activity",
 			Section:      "in_year_activity",
 			DocumentRole: ReportPresentationDocumentRoleMain,
-			Nullable:     true,
 			Fields: []ReportPresentationFinancialField{
-				{Name: "unit_price", AmountKind: "unit_price", AmountOrdinal: 0},
-				{Name: "gross_value", AmountKind: "gross_value", AmountOrdinal: 1},
-				{Name: "fee_amount", AmountKind: "fee_amount", AmountOrdinal: 2},
+				{Name: "unit_price", AmountKind: "unit_price", AmountOrdinal: 0, Nullable: true},
+				{Name: "gross_value", AmountKind: "gross_value", AmountOrdinal: 1, Nullable: true},
+				{Name: "fee_amount", AmountKind: "fee_amount", AmountOrdinal: 2, Nullable: true},
 				{Name: "basis_after_row", AmountKind: "cost_basis", AmountOrdinal: 3},
 			},
 		},
@@ -54,7 +52,6 @@ func presentationFinancialRows() []presentationFinancialRow {
 			ID:           "liquidation-allocated-basis",
 			Section:      "liquidation_calculations",
 			DocumentRole: ReportPresentationDocumentRoleMain,
-			Nullable:     true,
 			Fields:       []ReportPresentationFinancialField{{Name: "allocated_basis", AmountKind: "cost_basis", AmountOrdinal: 0}},
 		},
 		{
@@ -62,7 +59,6 @@ func presentationFinancialRows() []presentationFinancialRow {
 			Section:      "liquidation_calculations",
 			DocumentRole: ReportPresentationDocumentRoleMain,
 			Signed:       true,
-			Nullable:     true,
 			Fields: []ReportPresentationFinancialField{
 				{Name: "net_proceeds", AmountKind: "proceeds", AmountOrdinal: 0},
 				{Name: "gain_or_loss", AmountKind: "gain_or_loss", AmountOrdinal: 1},
@@ -72,11 +68,10 @@ func presentationFinancialRows() []presentationFinancialRow {
 			ID:           "audit-activity",
 			Section:      "detailed_per_asset_audit",
 			DocumentRole: ReportPresentationDocumentRoleAnnex,
-			Nullable:     true,
 			Fields: []ReportPresentationFinancialField{
-				{Name: "unit_price", AmountKind: "unit_price", AmountOrdinal: 0},
-				{Name: "gross_value", AmountKind: "gross_value", AmountOrdinal: 1},
-				{Name: "fee_amount", AmountKind: "fee_amount", AmountOrdinal: 2},
+				{Name: "unit_price", AmountKind: "unit_price", AmountOrdinal: 0, Nullable: true},
+				{Name: "gross_value", AmountKind: "gross_value", AmountOrdinal: 1, Nullable: true},
+				{Name: "fee_amount", AmountKind: "fee_amount", AmountOrdinal: 2, Nullable: true},
 				{Name: "basis_after_activity", AmountKind: "cost_basis", AmountOrdinal: 3},
 			},
 		},
@@ -84,18 +79,16 @@ func presentationFinancialRows() []presentationFinancialRow {
 			ID:           "audit-allocated-basis",
 			Section:      "detailed_per_asset_audit",
 			DocumentRole: ReportPresentationDocumentRoleAnnex,
-			Nullable:     true,
-			Fields:       []ReportPresentationFinancialField{{Name: "allocated_basis", AmountKind: "cost_basis", AmountOrdinal: 0}},
+			Fields:       []ReportPresentationFinancialField{{Name: "allocated_basis", AmountKind: "cost_basis", AmountOrdinal: 0, Nullable: true}},
 		},
 		{
 			ID:           "audit-net-proceeds-gain-or-loss",
 			Section:      "detailed_per_asset_audit",
 			DocumentRole: ReportPresentationDocumentRoleAnnex,
 			Signed:       true,
-			Nullable:     true,
 			Fields: []ReportPresentationFinancialField{
-				{Name: "net_proceeds", AmountKind: "proceeds", AmountOrdinal: 0},
-				{Name: "gain_or_loss", AmountKind: "gain_or_loss", AmountOrdinal: 1},
+				{Name: "net_proceeds", AmountKind: "proceeds", AmountOrdinal: 0, Nullable: true},
+				{Name: "gain_or_loss", AmountKind: "gain_or_loss", AmountOrdinal: 1, Nullable: true},
 			},
 		},
 		{
