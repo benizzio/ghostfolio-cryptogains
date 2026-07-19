@@ -134,9 +134,12 @@ func cloneAuditActivityEntries(entries []AuditActivityEntry) []AuditActivityEntr
 	var cloned = make([]AuditActivityEntry, 0, len(entries))
 	for _, entry := range entries {
 		var entryCopy = entry
+		entryCopy.Quantity = decimalsupport.Clone(entry.Quantity)
 		entryCopy.UnitPrice = decimalsupport.ClonePointer(entry.UnitPrice)
 		entryCopy.GrossValue = decimalsupport.ClonePointer(entry.GrossValue)
 		entryCopy.FeeAmount = decimalsupport.ClonePointer(entry.FeeAmount)
+		entryCopy.QuantityAfterActivity = decimalsupport.Clone(entry.QuantityAfterActivity)
+		entryCopy.BasisAfterActivity = decimalsupport.Clone(entry.BasisAfterActivity)
 		entryCopy.AllocatedBasis = decimalsupport.ClonePointer(entry.AllocatedBasis)
 		entryCopy.NetLiquidationProceeds = decimalsupport.ClonePointer(entry.NetLiquidationProceeds)
 		entryCopy.GainOrLoss = decimalsupport.ClonePointer(entry.GainOrLoss)

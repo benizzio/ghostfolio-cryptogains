@@ -1834,9 +1834,9 @@ func TestNewPerAssetAuditSectionClonesInheritedClassificationAndAuditValues(t *t
 	t.Parallel()
 
 	var activityDate = time.Date(2024, time.January, 5, 0, 0, 0, 0, time.UTC)
-	var quantity = mustReportDecimal(t, "1")
-	var quantityAfter = mustReportDecimal(t, "1")
-	var basisAfter = mustReportDecimal(t, "11")
+	var quantity = mustReportDecimal(t, "340282366920938463463374607431768211457")
+	var quantityAfter = mustReportDecimal(t, "340282366920938463463374607431768211458")
+	var basisAfter = mustReportDecimal(t, "340282366920938463463374607431768211459")
 	var entries = []AuditActivityEntry{{
 		SourceID:                     "audit-buy-1",
 		OccurredAt:                   activityDate,
@@ -1866,14 +1866,21 @@ func TestNewPerAssetAuditSectionClonesInheritedClassificationAndAuditValues(t *t
 	entries[0].SourceID = "mutated-source"
 	entries[0].OccurredAt = activityDate.Add(time.Hour)
 	entries[0].ActivityType = ActivityTypeSell
-	entries[0].Quantity = mustReportDecimal(t, "2")
+	var increment apd.BigInt
+	increment.SetInt64(1)
+	entries[0].Quantity.Coeff.Add(&entries[0].Quantity.Coeff, &increment)
 	*entries[0].UnitPrice = mustReportDecimal(t, "20")
 	*entries[0].GrossValue = mustReportDecimal(t, "20")
 	*entries[0].FeeAmount = mustReportDecimal(t, "2")
 	entries[0].ActivityCurrency = "GBP"
 	entries[0].CalculationCurrency = "EUR"
-	entries[0].QuantityAfterActivity = mustReportDecimal(t, "0")
-	entries[0].BasisAfterActivity = mustReportDecimal(t, "0")
+	entries[0].QuantityAfterActivity.Coeff.Add(&entries[0].QuantityAfterActivity.Coeff, &increment)
+	entries[0].BasisAfterActivity.Coeff.Add(&entries[0].BasisAfterActivity.Coeff, &increment)
+	if quantity.Text('f') != "340282366920938463463374607431768211458" ||
+		quantityAfter.Text('f') != "340282366920938463463374607431768211459" ||
+		basisAfter.Text('f') != "340282366920938463463374607431768211460" {
+		t.Fatalf("expected coefficient mutation to change shallow decimal copies")
+	}
 	entries[0].FullLiquidationEvent = false
 	entries[0].IsZeroPricedHoldingReduction = false
 	*entries[0].AllocatedBasis = mustReportDecimal(t, "20")
@@ -1886,7 +1893,7 @@ func TestNewPerAssetAuditSectionClonesInheritedClassificationAndAuditValues(t *t
 	if cloned.SourceID != "audit-buy-1" || !cloned.OccurredAt.Equal(activityDate) || cloned.ActivityType != ActivityTypeBuy {
 		t.Fatalf("expected cloned audit identity values to remain unchanged, got %#v", cloned)
 	}
-	if cloned.Quantity.Cmp(&quantity) != 0 {
+	if cloned.Quantity.Text('f') != "340282366920938463463374607431768211457" {
 		t.Fatalf("expected cloned quantity to remain unchanged, got %s", cloned.Quantity.Text('f'))
 	}
 	assertOptionalDecimalString(t, cloned.UnitPrice, "10")
@@ -1895,7 +1902,8 @@ func TestNewPerAssetAuditSectionClonesInheritedClassificationAndAuditValues(t *t
 	if cloned.ActivityCurrency != "EUR" || cloned.CalculationCurrency != "USD" {
 		t.Fatalf("expected cloned currencies to retain pre-format values, got %#v", cloned)
 	}
-	if cloned.QuantityAfterActivity.Cmp(&quantityAfter) != 0 || cloned.BasisAfterActivity.Cmp(&basisAfter) != 0 {
+	if cloned.QuantityAfterActivity.Text('f') != "340282366920938463463374607431768211458" ||
+		cloned.BasisAfterActivity.Text('f') != "340282366920938463463374607431768211459" {
 		t.Fatalf("expected cloned replay values to remain unchanged, got %#v", cloned)
 	}
 	if !cloned.FullLiquidationEvent || !cloned.IsZeroPricedHoldingReduction {
