@@ -144,7 +144,7 @@ Open source TUI to extract data from Ghostfolio and generate capital gains (and 
   - `tools/coverpkg/` computes the `cmd/` and `internal/` production package denominator used by canonical coverage.
   - `tools/coveragegate/` enforces canonical 100% statement, global line, global branch, per-file line, and per-file branch coverage only.
   - `tools/empiricaloracle/` contains regeneration-only oracle tooling. Ordinary tool tests do not regenerate or download; explicit regeneration may use local Python and the pinned rotki cache.
-  - `tools/tools.go` pins development-only tool dependencies.
+  - `go.mod` tool directives pin development-only quality and coverage commands so Dependabot can maintain them with the module graph.
   - `testdata/empirical/` contains the synthetic empirical dataset and generated golden oracle fixtures.
   - `third_party/rotki/` records pinned rotki provenance for empirical oracle boundaries. It is not vendored application runtime code.
   - `specs/` contains feature plans, contracts, checklists, and research. `specs/tiny/` contains lightweight active or recent TinySpec artifacts. Read the active spec before making non-trivial changes.

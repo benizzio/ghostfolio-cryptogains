@@ -1,0 +1,13 @@
+# Dependabot maintains the dependency ecosystems represented by tracked manifests.
+# Authored by: OpenCode
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
