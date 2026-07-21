@@ -9,7 +9,7 @@ require (
 	github.com/cockroachdb/apd/v3 v3.2.3
 	github.com/signintech/gopdf v0.36.1
 	golang.org/x/crypto v0.54.0
-	golang.org/x/image v0.43.0
+	golang.org/x/image v0.44.0
 )
 
 require (
