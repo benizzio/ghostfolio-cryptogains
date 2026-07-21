@@ -1,208 +1,376 @@
 # ghostfolio-cryptogains
 
-Terminal UI for syncing supported Ghostfolio activity history into token-locked local snapshots and generating yearly Markdown capital gains and losses reports from the unlocked synced dataset. The application keeps bootstrap setup in `setup.json`, stores synced activity history only in protected snapshots, writes successful report output only to the current user's Documents folder, and keeps no in-application report history.
+`ghostfolio-cryptogains` is a terminal application that syncs supported activity
+history from Ghostfolio and generates yearly capital gains and losses reports.
+Synced activity is stored in token-locked local snapshots. Reports are generated
+as Markdown or PDF files in the current user's Documents directory.
 
-## Running
+> The generated reports are reference material. They do not implement the legally
+> required tax rules of any country and are not tax-return output.
+
+## Main Features
+
+- Full-screen terminal workflow for Ghostfolio Cloud and custom Ghostfolio origins.
+- Complete paginated sync of supported `BUY` and `SELL` activity history.
+- Deterministic normalization, duplicate removal, and validation before data is
+  accepted for reporting.
+- Token-derived encrypted snapshots for later use without storing the Ghostfolio
+  security token or JWT.
+- Exact-decimal report calculation with FIFO, LIFO, HIFO, Average Cost Basis, and
+  a scope-local hybrid cost-basis method.
+- USD and EUR reports with official ECB or Federal Reserve exchange-rate evidence
+  when currency conversion is required.
+- Timestamped Markdown main-plus-annex bundles or combined searchable PDF reports.
+- Local diagnostic reports for eligible sync and report failures.
+- No in-application report history, reopen catalog, remote report storage, or
+  automatic re-ingestion of exported reports.
+
+## Requirements
+
+- Go 1.26.5.
+- An interactive terminal.
+- A Ghostfolio Cloud account or a reachable compatible self-hosted Ghostfolio
+  server.
+- A Ghostfolio security token.
+- A pre-existing, writable Documents directory for report exports.
+- Network access for initial dependency installation, Ghostfolio sync, and any
+  required ECB or Federal Reserve currency conversion.
+
+Linux, macOS, and Windows are target platforms. Maintained CI verification runs on
+Ubuntu. On Linux, `xdg-open` is optional and is used only to open a saved report in
+the default application.
+
+## Installation
+
+The project does not currently publish tagged releases, prebuilt binaries, or
+package-manager distributions. Install the current source with Go:
+
+```bash
+go install github.com/benizzio/ghostfolio-cryptogains/cmd/ghostfolio-cryptogains@latest
+```
+
+Go installs the executable in `GOBIN`, or in Go's default binary directory when
+`GOBIN` is unset. Add that directory to `PATH` to invoke
+`ghostfolio-cryptogains` by name.
+
+To build from a checkout instead:
+
+```bash
+git clone https://github.com/benizzio/ghostfolio-cryptogains.git
+cd ghostfolio-cryptogains
+go build -o ghostfolio-cryptogains ./cmd/ghostfolio-cryptogains
+./ghostfolio-cryptogains
+```
+
+On Windows, use `ghostfolio-cryptogains.exe` as the output and executable name.
+
+## Startup
+
+Start an installed executable:
+
+```bash
+ghostfolio-cryptogains
+```
+
+Run directly from a source checkout:
 
 ```bash
 make run
 ```
 
-Use `make run-dev` only when intentionally testing a custom `http://` origin.
-
-Supported runtime flags:
-
-- `--config-dir <path>` overrides the base config directory used for `setup.json`, protected snapshots, and diagnostic reports.
-- `--dev-mode` allows custom `http://` origins for local development only and auto-generates eligible synced-data diagnostic reports.
-- `--request-timeout <duration>` sets the full sync timeout. The default is `30s`.
-
-## Verification
+Pass runtime flags through the Make target with `ARGS`:
 
 ```bash
-# Isolated package behavior
-make test-unit
-# Externally visible workflows and storage
-make test-contract
-# Cross-package offline workflows
-make test-integration
-# Synthetic financial oracle datasets
-make test-empirical
-# Repository-local tool behavior
-make test-tools
-# Aggregate deterministic offline verification
-make test
-
-# Isolated package diagnostic profile
-make coverage-unit
-# Workflow and storage diagnostic profile
-make coverage-contract
-# Cross-package offline diagnostic profile
-make coverage-integration
-# Financial oracle dataset diagnostic profile
-make coverage-empirical
-# Repository-local tool diagnostic profile
-make coverage-tools
-# Canonical production coverage enforcement
-make coverage
-
-# Tagged 10,000-activity resource scenarios
-make test-performance
-
-# Opt-in live-network integration checks
-make test-external-integration
-# Live-network integration diagnostic profile
-make coverage-external-integration
-
-# Changed Go and module source scanning
-make quality QUALITY_BASE_REF=origin/main
+make run ARGS='--config-dir /path/to/config-base --request-timeout 45s'
 ```
 
-`make test` is the exact deterministic aggregate of `test-unit`, `test-contract`, `test-integration`, `test-empirical`, and `test-tools`. It excludes external integration and performance.
+Use `make run-dev` only when intentionally testing a custom `http://` origin:
 
-| Target | Scope and boundary |
+```bash
+make run-dev ARGS='--config-dir /path/to/config-base'
+```
+
+HTTP does not provide transport encryption, and development mode does not limit
+custom HTTP origins to the local machine. Do not use development mode with
+production credentials or across an untrusted network; the security token, JWT,
+account context, and activity data could be exposed in transit.
+
+### Runtime Flags
+
+| Flag | Default | Purpose |
+| --- | --- | --- |
+| `--config-dir <path>` | Operating-system user config directory | Overrides the base config directory. The application still appends `ghostfolio-cryptogains/`. |
+| `--dev-mode` | `false` | Allows custom `http://` origins for the current process and automatically writes eligible diagnostics. |
+| `--request-timeout <duration>` | `30s` | Sets the Ghostfolio client and sync-attempt timeout. The value must be a positive Go duration. |
+| `--window-width <int>` | `100` | Sets the initial test-friendly terminal window width. |
+| `--window-height <int>` | `32` | Sets the initial test-friendly terminal window height. |
+
+## Using The Application
+
+### 1. Configure Ghostfolio
+
+On first launch, choose Ghostfolio Cloud or enter a custom server origin.
+
+- Ghostfolio Cloud uses `https://ghostfol.io`.
+- A custom origin must contain only an absolute scheme, host, and optional port.
+- Custom origins require HTTPS unless the application is running with
+  `--dev-mode`.
+- Setup saves the selected server, but it does not authenticate or store a
+  Ghostfolio security token.
+- An HTTP origin remembered in development mode is invalid on a later launch
+  without `--dev-mode`; the application returns to setup before making a
+  Ghostfolio request.
+
+Use `Ctrl+E` from the main menu to edit remembered setup.
+
+### 2. Unlock Sync And Reports
+
+Select `Sync and Reports` and enter the Ghostfolio security token. The token is
+masked in the terminal and retained only in the active application context. It is
+used to unlock a matching local snapshot or authenticate a new context against
+Ghostfolio.
+
+An existing protected snapshot can be unlocked without contacting Ghostfolio.
+Leaving the Sync and Reports context clears its transient token and report state.
+The same token is required to recover that snapshot in a later process.
+
+### 3. Sync Activity
+
+Select `Sync Data` to:
+
+1. Authenticate against Ghostfolio.
+2. Retrieve the user's base-currency context.
+3. Retrieve the complete paginated activity history.
+4. Normalize, order, deduplicate, and validate supported activity.
+5. Atomically write a protected local snapshot.
+
+Only `BUY` and `SELL` activity is supported. Validation rejects unsupported or
+ambiguous history, including non-positive quantities, invalid monetary values,
+zero-priced buys, unexplained zero-priced sells, and activity that would produce
+negative holdings.
+
+A successful refresh with the same token replaces its selected-server snapshot
+only after the new protected write succeeds. Another valid token creates an
+isolated snapshot.
+
+### 4. Generate A Report
+
+Select `Generate Capital Gains Report`, then choose:
+
+- a year available in the unlocked snapshot;
+- FIFO, LIFO, HIFO, Average Cost Basis, or the scope-local hybrid method;
+- USD or EUR as the report currency; and
+- Markdown or PDF as the output format.
+
+The calculation replays supported history through the selected year. Cross-currency
+activity may require live ECB access for EUR reports or Federal Reserve access for
+USD reports. Each provider supports a fixed set of source currencies and searches
+up to 30 days back for an available observation. Unsupported currencies or
+unavailable observations stop report generation before export. Exchange-rate
+evidence is cached only for the current process.
+
+Markdown output contains one main report and one separate Annex 1 file. PDF output
+contains the main report and Annex 1 in one landscape A4 file. The report includes
+summary, per-asset, rate-source, reference, and detailed activity audit data.
+
+### 5. Manage The Export
+
+Reports are saved to the resolved Documents directory:
+
+| Platform | Report directory |
 | --- | --- |
-| `make test-unit` | `./cmd/...`, `./internal/...`, and `./tests/unit`; deterministic and offline. |
-| `make test-contract` | `tests/contract`; deterministic offline external contracts. |
-| `make test-integration` | `tests/integration`; deterministic cross-package flows with no live provider network. |
-| `make test-empirical` | `tests/empirical/...` against committed synthetic datasets and golden fixtures; ordinary execution is read-only. |
-| `make test-tools` | Ordinary `tools/empiricaloracle` tests; no oracle regeneration or download. |
-| `make test-performance` | Only `./tests/performance`, with `-tags=performance -count=1 -v -parallel=1 -timeout=10m`; deterministic local-fixture scenarios with no live provider network. It provides timing, responsiveness, bounded-lookup, and resource evidence. |
-| `make test-external-integration` | Opt-in live ECB/Fed checks in `tests/externalintegration`; excluded from pull-request CI. |
+| Linux | Configured XDG Documents directory, otherwise `~/Documents/` |
+| macOS | `~/Documents/` |
+| Windows | `%USERPROFILE%\Documents\` |
 
-`tests/performance` is excluded from `make test`, `make coverage`, and ordinary `go test ./...`. It has no coverage target, profile, CI coverage job, or coverage context, and performance evidence must never be merged into canonical coverage.
+The Documents directory must already exist. The output location is not currently
+configurable, and `--config-dir` does not change it.
 
-Coverage leaf artifacts are `unit.out`, `contract.out`, `integration.out`, `empirical.out`, `tools.out`, and `external-integration.out` under `dist/coverage/`. They are diagnostic only and do not run `coveragegate`; external-integration coverage is live opt-in.
-`make coverage` clears and writes `dist/coverage/coverage.out` and `dist/coverage/coverage.xml`. It uses deterministic unit, contract, integration, and empirical drivers with a production denominator limited to `cmd/` and `internal/`; `coveragegate` enforces the canonical 100% statement, global line, global branch, per-file line, and per-file branch requirements. Tool coverage runs separately and does not expand that denominator. External integration and performance are excluded.
+Report names include the year, cost-basis method, and timestamp. Existing files
+are not overwritten; a numeric suffix is added on collision. The application asks
+the operating system to open the main Markdown file or combined PDF after saving.
+An open failure is reported as a warning and does not remove the saved files.
 
-`tests/testutil/` is shared integration/performance infrastructure: `runtimeapp` creates test runtime applications, while `runtimeflow` provides the runtime-backed harness, deterministic conversion, protected snapshot, TUI flow driver, and report output/artifact helpers. Scenario fixtures remain local.
-Empirical data and golden oracle fixtures live under `testdata/empirical/`; ordinary tests neither download data nor invoke rotki or oracle regeneration. `tools/empiricaloracle` is regeneration-only tooling. An explicit regeneration may use local Python and the pinned rotki cache.
+All exported Markdown and PDF files contain cleartext financial data. The result
+screen lists every saved path. Delete every listed file when the export is no
+longer needed.
 
-`.github/workflows/test.yml` invokes the reusable test-suite workflow. Its check names are `test / run`, `coverage / run`, and `test-performance / run`; the separate changed-source check is `quality`. These checks run independently on fresh Ubuntu runners, and none runs external integration.
-`make quality` runs the changed-source quality gate for `*.go`, `go.mod`, and `go.sum` changes using `golangci-lint`, `govulncheck`, and `gitleaks`. It must pass for every feature, including the explicit skip path when no source inputs changed.
+### Generate A Diagnostic
 
-## Dependency Maintenance
+For an eligible failure in a normal run, select `Generate Diagnostic Report` from
+the failure result or Sync and Reports context. Development mode writes eligible
+diagnostics automatically. The action is available only for failure categories
+that provide diagnostic context.
 
-Dependabot checks the root Go module and GitHub Actions weekly. The Go module includes the application dependencies and the quality and coverage commands declared by `tool` directives in `go.mod`. Dependency and action update pull requests must pass the existing `test / run`, `coverage / run`, `test-performance / run`, and `quality` checks.
+### Keyboard Controls
 
-Dependabot vulnerability alerts and automatic security-update pull requests require the repository dependency graph, Dependabot alerts, and Dependabot security updates to be enabled in GitHub repository settings.
+| Key | Action |
+| --- | --- |
+| `Up` / `Down` | Move through menu choices. |
+| `Enter` | Select the current choice. |
+| `Tab` | Change input focus where multiple fields are present. |
+| `Esc` | Cancel setup editing. |
+| `Ctrl+E` | Edit setup from the main menu. |
+| `Page Up` / `Page Down` | Scroll a report result. |
+| `Ctrl+C` | Quit. |
 
-Go language updates remain manual because Dependabot does not update the `go` directive in `go.mod`. To update Go, run `go get go@latest`, run `go mod tidy` and `go mod verify`, review all resulting dependency and tool changes, then run `make test`, `make coverage`, `make test-performance`, and `make quality QUALITY_BASE_REF=origin/main`.
+## Local Data And Security
 
-The pinned rotki archive and generated empirical fixtures remain a separate empirical-oracle maintenance boundary. Spec Kit and repository-local Spec Kit extension versions remain managed by their own installation and update process.
+The default application root is:
 
-## Local Storage And User Exports
+| Platform | Application root |
+| --- | --- |
+| Linux | `$XDG_CONFIG_HOME/ghostfolio-cryptogains/` or `~/.config/ghostfolio-cryptogains/` |
+| macOS | `~/Library/Application Support/ghostfolio-cryptogains/` |
+| Windows | `%AppData%\ghostfolio-cryptogains\` |
 
-Bootstrap setup stays in a single machine-local JSON file named `setup.json`.
+When `--config-dir <path>` is supplied, the application root becomes
+`<path>/ghostfolio-cryptogains/`.
 
-Persisted fields:
+| Path below the application root | Contents |
+| --- | --- |
+| `setup.json` | Bootstrap schema, selected server mode and origin, development-HTTP state, and update time. |
+| `snapshots/*.snapshot` | Normalized activity history protected with a token-derived Argon2id key and AES-GCM. |
+| `diagnostics/*.diagnostic.json` | Unencrypted diagnostics generated for eligible failures. |
 
-- `schema_version`
-- `setup_complete`
-- `server_mode`
-- `server_origin`
-- `allow_dev_http`
-- `updated_at`
+On platforms that expose Unix permission bits, application directories request
+mode `0700`, while setup, snapshot, diagnostic, and report files request mode
+`0600`. Windows relies on the current user's filesystem access controls instead.
 
-Expected file locations:
+The Ghostfolio security token, Ghostfolio JWT, and raw unprotected Ghostfolio
+payload are not persisted. Protected snapshots cannot be recovered without the
+corresponding token.
 
-- Linux: `$XDG_CONFIG_HOME/ghostfolio-cryptogains/setup.json` or `~/.config/ghostfolio-cryptogains/setup.json`
-- macOS: `~/Library/Application Support/ghostfolio-cryptogains/setup.json`
-- Windows: `%AppData%\ghostfolio-cryptogains\setup.json`
+Diagnostics are not encrypted. Production-mode diagnostics omit quantity and
+monetary-value fields but can retain identifiers, timestamps, asset metadata,
+currencies, comments, server origin, and failure context. Development-mode
+diagnostics can retain financial values. Review a diagnostic before sharing it.
 
-Protected snapshot directory:
+### Removing Local Data
 
-- Linux: `$XDG_CONFIG_HOME/ghostfolio-cryptogains/snapshots/` or `~/.config/ghostfolio-cryptogains/snapshots/`
-- macOS: `~/Library/Application Support/ghostfolio-cryptogains/snapshots/`
-- Windows: `%AppData%\ghostfolio-cryptogains\snapshots\`
+Exit the application before removing local data.
 
-Diagnostic report directory:
+- Delete `setup.json` to return the next launch to first-run setup.
+- Delete `snapshots/` to remove protected synced activity history.
+- Delete `diagnostics/` to remove local diagnostic reports.
+- Delete every generated `ghostfolio-capital-gains-*.md` and
+  `ghostfolio-capital-gains-*.pdf` file from Documents to remove cleartext report
+  exports.
 
-- Linux: `$XDG_CONFIG_HOME/ghostfolio-cryptogains/diagnostics/` or `~/.config/ghostfolio-cryptogains/diagnostics/`
-- macOS: `~/Library/Application Support/ghostfolio-cryptogains/diagnostics/`
-- Windows: `%AppData%\ghostfolio-cryptogains\diagnostics\`
+Deleting setup does not delete snapshots, diagnostics, or report exports.
 
-Report output directory:
+## Current Limitations
 
-- Linux: configured XDG Documents directory when available, otherwise `~/Documents/`
-- macOS: `~/Documents/`
-- Windows: `%USERPROFILE%\Documents\`
+- Activity types other than `BUY` and `SELL` are not supported.
+- Report currencies are limited to USD and EUR.
+- Reports are not country-specific tax-return output.
+- Cross-currency report calculation may require live ECB or Federal Reserve
+  access even when an existing protected snapshot is available offline.
+- Cross-currency conversion is limited to source currencies and observations
+  supported by the selected official provider.
+- The Documents directory must exist and cannot be overridden.
+- There is no report preview, persistent report history, or reopen catalog.
+- There are no published release binaries or declared minimum compatible
+  Ghostfolio product versions.
 
-Protection notes:
+## Development
 
-- Unix-like platforms create the config directory with `0700` permissions and the setup file with `0600` permissions where the platform exposes those permission bits.
-- Windows uses the current user's application-data directory and does not rely on Unix permission bits.
-- Protected snapshots use token-derived encryption and store normalized activity history, not the Ghostfolio token or JWT.
-- Report generation reads only the unlocked protected snapshot. It does not persist report content, report paths, or report history back into `setup.json`, snapshots, or diagnostics.
-- A successful user-requested report export is either one cleartext Markdown main file plus one matching Markdown Annex file or one combined cleartext PDF in the user's Documents folder.
-- Report exports contain financial data. The application requests mode `0600` where permission bits are supported and reports every saved path. Feature 009 requires the result screen to add explicit cleartext status and instructions to delete every listed file.
-- Report rendering and saving are local-only. The application keeps report content in memory until the selected-format bundle succeeds and retains no report history, durable output-path state, reopen catalog, extra cleartext copy, or automatic re-ingestion.
-- Eligible synced-data failures can write structured local diagnostic reports. Outside explicit development mode those reports redact financial-value fields.
-- The application does not persist the Ghostfolio security token, Ghostfolio JWT, or raw unprotected Ghostfolio payloads in this slice.
+### Developer Requirements
 
-## Removing Local Data
+- Go 1.26.5.
+- Git and Make.
+- A POSIX-compatible command environment for maintained Make recipes. On Windows,
+  use WSL, Git Bash, or an equivalent environment.
+- Network access when Go modules, toolchain components, vulnerability data, or
+  opt-in live integrations are not cached.
+- A fetched `origin/main` ref for the standard changed-source quality gate.
 
-Delete the bootstrap setup file to force the next launch back to first-run setup.
+Development tools such as `golangci-lint`, `govulncheck`, `gitleaks`, and
+`gocoverageplus` are pinned through `tool` directives in `go.mod`; separate global
+installations are not required.
 
-- Linux: `rm "$XDG_CONFIG_HOME/ghostfolio-cryptogains/setup.json"` or `rm ~/.config/ghostfolio-cryptogains/setup.json`
-- macOS: `rm "$HOME/Library/Application Support/ghostfolio-cryptogains/setup.json"`
-- Windows PowerShell: `Remove-Item "$env:AppData\ghostfolio-cryptogains\setup.json"`
+### Project Structure
 
-- Delete the `snapshots/` directory under the same application root to remove protected synced activity history.
-- Delete the `diagnostics/` directory under the same application root to remove local synced-data diagnostic reports.
-- Delete generated `ghostfolio-capital-gains-*.md` and `ghostfolio-capital-gains-*.pdf` files from the user's Documents folder to remove cleartext report exports. Delete every path reported for the selected format.
-- If `setup.json` is removed after startup, the current run keeps its in-memory server selection until the application exits.
+| Path | Responsibility |
+| --- | --- |
+| `cmd/ghostfolio-cryptogains/` | CLI parsing, runtime assembly, startup routing, and Bubble Tea process entrypoint. |
+| `internal/app/bootstrap/` | Process options and startup decisions. |
+| `internal/app/runtime/` | Cross-package orchestration for setup, sync, snapshots, diagnostics, and report generation. |
+| `internal/config/` | Bootstrap model, origin normalization, and atomic `setup.json` persistence. |
+| `internal/ghostfolio/` | Ghostfolio HTTP client, DTO validation, and mapping into normalized activity. |
+| `internal/integration/currency/` | ECB and Federal Reserve clients, rate evidence, conversion policy, and in-process caching. |
+| `internal/sync/` | Normalized activity model, ordering, duplicate handling, year derivation, and history validation. |
+| `internal/snapshot/` | Protected snapshot model, cryptographic envelope, discovery, compatibility, and atomic storage. |
+| `internal/report/model/` | Report requests, calculated models, output metadata, validation, and report-domain errors. |
+| `internal/report/basis/` | FIFO, LIFO, HIFO, average-cost, and scope-local hybrid allocation state. |
+| `internal/report/calculate/` | Yearly gains-and-losses calculation from protected activity history. |
+| `internal/report/presentation/` | Shared report display rules and format-neutral presentation rows. |
+| `internal/report/markdown/` | Markdown main-report and Annex 1 rendering. |
+| `internal/report/pdf/` | Local searchable PDF rendering, layout, pagination, and embedded fonts. |
+| `internal/report/output/` | Documents resolution, collision-safe writes, cleanup, and default-app opening. |
+| `internal/tui/` | Root workflow state, screens, reusable components, keyboard interaction, and result copy. |
+| `internal/support/` | Shared date, decimal, exact-math, redaction, and text helpers. |
+| `tests/` | Unit, contract, integration, empirical, performance, live external-integration, and shared test support. |
+| `tools/` | Coverage denominator and gate tools plus explicit empirical-oracle regeneration tooling. |
+| `specs/` | Feature requirements, plans, research, contracts, quickstarts, and task records. |
 
-## Development Mode
+Keep Ghostfolio transport details inside `internal/ghostfolio/`, normalized sync
+rules inside `internal/sync/`, report financial rules inside `internal/report/`,
+cross-package orchestration inside `internal/app/runtime/`, and rendering or input
+state inside `internal/tui/`.
 
-Start the app with `make run-dev` to allow custom `http://` origins during setup.
+### Verification Commands
 
-- Without `--dev-mode`, custom origins must use `https://`.
-- The default Ghostfolio Cloud origin remains `https://ghostfol.io`.
-- Remembered setup is revalidated on every launch. A remembered `http://` origin becomes invalid when the app is started again without `--dev-mode`, and the user is sent back to setup before any Ghostfolio request runs.
-- Eligible synced-data failures write diagnostic reports automatically only in explicit development mode. Production-like runs require an explicit user choice.
+| Command | Scope |
+| --- | --- |
+| `make test-unit` | Deterministic package-local tests under `cmd/`, `internal/`, and `tests/unit`. |
+| `make test-contract` | Deterministic externally visible contracts under `tests/contract`. |
+| `make test-integration` | Deterministic cross-package runtime flows under `tests/integration`; no live providers. |
+| `make test-empirical` | Exact calculations against committed synthetic datasets and golden fixtures. |
+| `make test-tools` | Repository-local empirical-oracle tool tests without regeneration. |
+| `make test` | Exact deterministic aggregate of the five targets above. |
+| `make coverage` | Canonical production coverage profile and 100% statement, line, and branch enforcement. |
+| `make test-performance` | Isolated build-tagged resource scenarios; no live provider network or coverage artifact. |
+| `make test-external-integration` | Opt-in live ECB and Federal Reserve checks; excluded from pull-request CI. |
+| `make quality QUALITY_BASE_REF=origin/main` | Changed Go and module source lint, vulnerability, and secret scans. |
 
-## Current Slice Scope
+`make coverage` writes `dist/coverage/coverage.out` and
+`dist/coverage/coverage.xml`. Diagnostic leaf targets are `coverage-unit`,
+`coverage-contract`, `coverage-integration`, `coverage-empirical`,
+`coverage-tools`, and `coverage-external-integration`. Performance evidence never
+contributes to canonical coverage.
 
-Current behavior:
+The changed-source quality gate considers `*.go`, `go.mod`, and `go.sum`. It must
+also succeed through its explicit skip path for documentation-only changes.
 
-- the application opens in a full-screen Bubble Tea interface
-- first-run setup lets the user choose Ghostfolio Cloud or a canonical custom origin
-- the main menu exposes `Sync and Reports`
-- entering `Sync and Reports` prompts once for the Ghostfolio security token and unlocks the active sync-and-report context
-- the unlocked context always shows `Sync Data` and `Generate Capital Gains Report`
-- sync calls `POST /api/v1/auth/anonymous` and then pages `GET /api/v1/activities?skip=<n>&take=<n>&sortColumn=date&sortDirection=asc` until the full reported history is retrieved
-- successful sync normalizes and validates supported `BUY` and `SELL` activity history and stores it as a protected local snapshot for future use
-- unlocked synced data shows last successful sync metadata and available report years without forcing a new sync
-- report generation uses the unlocked protected snapshot as input, not a fresh Ghostfolio API call
-- report generation supports FIFO, LIFO, HIFO, Average Cost Basis, and Scope-Local Exact Unit Matching, otherwise Scope-Local Average Cost with Oldest-Acquired Deemed-Disposal Order
-- successful report generation writes either one timestamped Markdown main file plus its matching Annex or one combined PDF to Documents, requests one OS default-app open, and shows every saved path; feature 009 adds explicit cleartext and file-removal guidance
-- automatic-open failure leaves the saved report file in place and reports the warning without treating the save as failed
-- leaving the result screen or the unlocked context clears transient in-memory report state so the application keeps no report history or reopen list
-- same-token refresh replaces the existing selected-server snapshot only after the new protected write succeeds atomically
-- a different valid token creates a separate isolated protected snapshot for the same server
-- an active readable snapshot can trigger server-replacement confirmation before a new sync starts
-- eligible synced-data failures can write local diagnostic reports and disclose the written path
+Empirical datasets and generated oracle fixtures under `testdata/empirical/` are
+read-only during ordinary development. `make regenerate-empirical-fixtures` is an
+explicit maintenance operation that may use Python, Git, network access, and the
+pinned rotki cache; do not run it unless the active specification authorizes
+fixture maintenance.
 
-Supported failure categories:
+### CI Checks
 
-- `rejected token`
-- `timeout`
-- `connectivity problem`
-- `unsuccessful server response`
-- `incompatible server contract`
-- `unsupported activity history`
-- `unsupported stored-data version`
-- `incompatible new sync data`
-- `server replacement cancelled`
-- `no synced data available`
-- `no reportable years available`
-- `unsupported report calculation`
-- `documents folder unavailable`
-- `report file write failed`
-- `automatic open failed after save`
+Pull requests use these independent checks on fresh Ubuntu runners:
 
-Not in scope yet:
+- `test / run`
+- `coverage / run`
+- `test-performance / run`
+- `quality`
 
-- report preview before save
-- report history or reopen catalog
-- cached-data browsing beyond the unlocked readiness summary
+Live external integration is not part of pull-request CI.
+
+### Further Reading
+
+- [Repository operating rules and package ownership](AGENTS.md)
+- [Engineering constitution](.specify/memory/constitution.md)
+- [Current implementation plan](specs/009-final-report-adjustments/plan.md)
+- [Current verification quickstart](specs/009-final-report-adjustments/quickstart.md)
+- [Feature specifications and design history](specs/)
+- [Empirical dataset boundary](testdata/empirical/README.md)
+- [Pinned rotki oracle provenance](third_party/rotki/README.md)
+- [Maintained commands](Makefile)
+
+## License
+
+This project is licensed under the [GNU General Public License v3.0](LICENSE).
