@@ -3,9 +3,9 @@ module github.com/benizzio/ghostfolio-cryptogains
 go 1.26.5
 
 require (
-	charm.land/bubbles/v2 v2.1.0
+	charm.land/bubbles/v2 v2.1.1
 	charm.land/bubbletea/v2 v2.0.8
-	charm.land/lipgloss/v2 v2.0.3
+	charm.land/lipgloss/v2 v2.0.4
 	github.com/cockroachdb/apd/v3 v3.2.3
 	github.com/signintech/gopdf v0.36.1
 	golang.org/x/crypto v0.54.0
@@ -164,7 +164,7 @@ require (
 	github.com/matoous/godox v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-runewidth v0.0.23 // indirect
+	github.com/mattn/go-runewidth v0.0.24 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mgechev/revive v1.15.0 // indirect
 	github.com/mholt/archives v0.1.2 // indirect
