@@ -180,7 +180,7 @@ require (
 	github.com/nishanths/exhaustive v0.12.0 // indirect
 	github.com/nishanths/predeclared v0.2.2 // indirect
 	github.com/nunnatsa/ginkgolinter v0.23.0 // indirect
-	github.com/nwaples/rardecode/v2 v2.1.0 // indirect
+	github.com/nwaples/rardecode/v2 v2.2.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.3.1 // indirect
 	github.com/phpdave11/gofpdi v1.0.16 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect

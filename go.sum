@@ -539,8 +539,8 @@ github.com/nishanths/predeclared v0.2.2 h1:V2EPdZPliZymNAn79T8RkNApBjMmVKh5XRpLm
 github.com/nishanths/predeclared v0.2.2/go.mod h1:RROzoN6TnGQupbC+lqggsOlcgysk3LMK/HI84Mp280c=
 github.com/nunnatsa/ginkgolinter v0.23.0 h1:x3o4DGYOWbBMP/VdNQKgSj+25aJKx2Pe6lHr8gBcgf8=
 github.com/nunnatsa/ginkgolinter v0.23.0/go.mod h1:9qN1+0akwXEccwV1CAcCDfcoBlWXHB+ML9884pL4SZ4=
-github.com/nwaples/rardecode/v2 v2.1.0 h1:JQl9ZoBPDy+nIZGb1mx8+anfHp/LV3NE2MjMiv0ct/U=
-github.com/nwaples/rardecode/v2 v2.1.0/go.mod h1:7uz379lSxPe6j9nvzxUZ+n7mnJNgjsRNb6IbvGVHRmw=
+github.com/nwaples/rardecode/v2 v2.2.0 h1:4ufPGHiNe1rYJxYfehALLjup4Ls3ck42CWwjKiOqu0A=
+github.com/nwaples/rardecode/v2 v2.2.0/go.mod h1:7uz379lSxPe6j9nvzxUZ+n7mnJNgjsRNb6IbvGVHRmw=
 github.com/onsi/ginkgo/v2 v2.28.2 h1:DTrMfpqxiNUyQ3Y0zhn1n3cOO2euFgQPYIpkWwxVFps=
 github.com/onsi/ginkgo/v2 v2.28.2/go.mod h1:CLtbVInNckU3/+gC8LzkGUb9oF+e8W8TdUsxPwvdOgE=
 github.com/onsi/gomega v1.39.1 h1:1IJLAad4zjPn2PsnhH70V4DKRFlrCzGBNrNaru+Vf28=
